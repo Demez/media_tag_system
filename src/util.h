@@ -158,8 +158,9 @@ void util_array_remove_element( T* data, COUNT_TYPE& count, COUNT_TYPE index )
 }
 
 
+
 template< typename T >
-bool array_append( T*& data, u32 count )
+bool util_array_append( T*& data, size_t count )
 {
 #if 1
 	T* new_data = ch_recalloc< T >( data, count, 1 );
@@ -183,7 +184,7 @@ bool array_append( T*& data, u32 count )
 
 
 template< typename T >
-bool array_append_err( T*& data, u32 count, const char* msg )
+bool util_array_append_err( T*& data, u32 count, const char* msg )
 {
 #if 1
 	T* new_data = ch_recalloc< T >( data, count, 1 );
@@ -208,6 +209,30 @@ bool array_append_err( T*& data, u32 count, const char* msg )
 	return false;
 }
 
+
+// Allocates X amount more space in the array
+template< typename T >
+bool util_array_extend( T*& data, size_t count, size_t extend_amount )
+{
+#if 1
+	T* new_data = ch_recalloc< T >( data, count, extend_amount );
+
+	if ( !new_data )
+		return true;
+
+	data = new_data;
+#else
+	T* new_data = ch_realloc< T >( data, count + extend_amount );
+
+	if ( !new_data )
+		return true;
+
+	data = new_data;
+	memset( &data[ count ], 0, sizeof( T ) );
+#endif
+
+	return false;
+}
 
 // --------------------------------------------------------------------------------------------------------
 // system functions
@@ -299,6 +324,8 @@ void        util_append_str( str_buf_t& buffer, const char* str, size_t len, siz
 // kinda lame lol
 void        util_format_time( char* buffer, double time );  // expects at least TIME_BUFFER characters in buffer
 void        util_format_time( char* buffer, size_t buffer_size, double time );
+
+u64         util_get_time_ms();
 
 
 // --------------------------------------------------------------------------------------------------------

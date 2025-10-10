@@ -28,6 +28,7 @@ public:
 
 	~CodecJPEG()
 	{
+		tjDestroy( tjpg );
 	}
 
 	// TODO: have this just be a list of valid extensions on codec register
@@ -41,7 +42,171 @@ public:
 		return true;
 	}
 
-	bool image_load( const fs::path& path, image_info_t* image_info ) override
+	bool image_load_scaled( const fs::path& path, image_t* image, int area_width, int area_height ) override
+	{
+		tjhandle local_tjpg = tjInitDecompress();
+
+		if ( local_tjpg == nullptr )
+		{
+			fprintf( stderr, "[FormatJpeg] Failed to allocate memory for jpeg decompressor.\n" );
+			return false;
+		}
+
+		// FILE* pFile = fopen( path.c_str(), "rb" );
+		// if ( !pFile )
+		// 	return nullptr;
+
+		//auto          startTime   = std::chrono::high_resolution_clock::now();
+
+		size_t        fileDataLen = 0;
+		char*         fileData    = fs_read_file( path.string().c_str(), &fileDataLen );
+
+		//auto          endTime     = std::chrono::high_resolution_clock::now();
+		//float read_time                 = std::chrono::duration< float, std::chrono::seconds::period >( endTime - startTime ).count();
+		//printf( "%f READ TIME\n", read_time );
+
+		int subSamp, colorSpace;
+
+		int           ret = tjDecompressHeader3(
+          local_tjpg,
+          (const unsigned char*)fileData,
+          fileDataLen,
+          &image->width,
+          &image->height,
+          &subSamp,
+          &colorSpace );
+
+        if ( ret != 0 )
+		{
+			fprintf( stderr, "[FormatJpeg] Failed to decompress header on image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
+			free( fileData );
+			tjDestroy( local_tjpg );
+			return false;
+		}
+
+		int pixelFmt     = TJPF_BGR;
+
+		int                               scaling_factor_count;
+		tjscalingfactor* scaling_factor = tjGetScalingFactors( &scaling_factor_count );
+
+		// srData.resize( imageInfo->aWidth * imageInfo->aHeight * tjPixelSize[ pixelFmt ] );
+
+		// lol
+
+		//	float max_size = std::max( width, height );
+		//	new_width      = jpeg->width / max_size;
+
+		// Fit image in window size
+		// SDL_FRect dst_rect{};
+		// float     factor[ 2 ] = { 1.f, 1.f };
+		// 
+		// if ( image->width > width )
+		// 	factor[ 0 ] = (float)width / (float)image->width;
+		// 
+		// if ( image->height > height )
+		// 	factor[ 1 ] = (float)height / (float)image->height;
+		// 
+		// float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
+		// 
+		// int   pitch      = ( image->width * zoom_level ) * tjPixelSize[ pixelFmt ];
+		// 
+		// float scaled_width  = image->width * zoom_level;
+		// float scaled_height = image->width * zoom_level;
+
+		// best fit
+		int  best_width = image->width, best_height = image->height;
+
+		bool                              scale_down = ( image->width > area_width || image->height > area_height );
+		bool found      = false;
+
+		if ( scale_down )
+		{
+			for ( int i = 0; i < scaling_factor_count; i++ )
+			{
+				int scaled_width  = TJSCALED( image->width, scaling_factor[ i ] );
+				int scaled_height = TJSCALED( image->height, scaling_factor[ i ] );
+
+				if ( scaled_width > image->width || scaled_height > image->height )
+					continue;
+
+				// if ( scaled_width <= best_width && scaled_height <= best_height )
+				if ( scaled_width >= area_width && scaled_height >= area_height )
+				{
+					if ( !found || ( scaled_width < best_width && scaled_height < best_height ) )
+					{
+						best_width  = scaled_width;
+						best_height = scaled_height;
+						found       = true;
+					}
+				}
+
+				// if ( scaled_width <= width && scaled_height <= height )
+			//	if ( scaled_width >= width && scaled_height >= height )
+			//	{
+			//		// if ( scaled_width <= image->width && scaled_height <= image->height )
+			//		{
+			//			if ( scaled_width > best_width && scaled_height > best_height )
+			//			{
+			//				best_width  = scaled_width;
+			//				best_height = scaled_height;
+			//			}
+			//		}
+			//	}
+			}
+
+			printf( "SCALED %d x %d -> %d x %d\n", image->width, image->height, best_width, best_height );
+		}
+		else
+		{
+			best_width  = image->width;
+			best_height = image->height;
+		}
+
+		if ( best_width == 0 )
+			best_width = image->width;
+
+		if ( best_height == 0 )
+			best_height = image->height;
+
+		image->data = ch_realloc< unsigned char >( image->data, best_width * best_height * tjPixelSize[ pixelFmt ] );
+
+		int pitch        = best_width * tjPixelSize[ pixelFmt ];
+
+		ret         = tjDecompress2(
+          local_tjpg,
+          (const unsigned char*)fileData,
+          fileDataLen,
+          (unsigned char*)image->data,
+          0,
+          pitch,
+          best_height,
+          pixelFmt,
+          // TJFLAG_FASTUPSAMPLE | TJFLAG_FASTDCT
+          TJFLAG_ACCURATEDCT );
+
+		free( fileData );
+		tjDestroy( local_tjpg );
+
+        if ( ret != 0 )
+		{
+			// fprintf( stderr, "[FormatJpeg] Failed to decompress image: %ws\n%s\n", path.c_str(), tjGetErrorStr2( tjpg ) );
+			fprintf( stderr, "[FormatJpeg] Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
+			free( image->data );
+			return false;
+		}
+
+		image->width = best_width;
+		image->height = best_height;
+
+		image->format   = FMT_BGRA8;
+		// imageInfo->aFormat = FMT_RGBA8;
+		image->bit_depth = 4;  // uhhhh
+		image->pitch     = pitch;
+
+		return image;
+	}
+
+	bool image_load( const fs::path& path, image_t* image ) override
 	{
 		// FILE* pFile = fopen( path.c_str(), "rb" );
 		// if ( !pFile )
@@ -62,8 +227,8 @@ public:
 			tjpg,
 			(const unsigned char*)fileData,
 			fileDataLen,
-          &image_info->width,
-          &image_info->height,
+          &image->width,
+          &image->height,
 			&subSamp,
 			&colorSpace
 		);
@@ -71,6 +236,7 @@ public:
         if ( ret != 0 )
 		{
 			fprintf( stderr, "[FormatJpeg] Failed to decompress header on image: %s\n%s\n", tjGetErrorStr2( tjpg ), path.string().c_str() );
+			free( fileData );
 			return false;
 		}
 
@@ -93,33 +259,33 @@ public:
 		// SDL_FRect dst_rect{};
 		// float     factor[ 2 ] = { 1.f, 1.f };
 		// 
-		// if ( image_info->width > width )
-		// 	factor[ 0 ] = (float)width / (float)image_info->width;
+		// if ( image->width > width )
+		// 	factor[ 0 ] = (float)width / (float)image->width;
 		// 
-		// if ( image_info->height > height )
-		// 	factor[ 1 ] = (float)height / (float)image_info->height;
+		// if ( image->height > height )
+		// 	factor[ 1 ] = (float)height / (float)image->height;
 		// 
 		// float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 		// 
-		// int   pitch      = ( image_info->width * zoom_level ) * tjPixelSize[ pixelFmt ];
+		// int   pitch      = ( image->width * zoom_level ) * tjPixelSize[ pixelFmt ];
 		// 
-		// float scaled_width  = image_info->width * zoom_level;
-		// float scaled_height = image_info->width * zoom_level;
+		// float scaled_width  = image->width * zoom_level;
+		// float scaled_height = image->width * zoom_level;
 
 		// best fit
-		int  best_width = image_info->width, best_height = image_info->height;
+		int  best_width = image->width, best_height = image->height;
 
-		bool scale_down = ( image_info->width > width || image_info->height > height );
+		bool scale_down = ( image->width > width || image->height > height );
 		bool found      = false;
 
 		if ( scale_down )
 		{
 			for ( int i = 0; i < scaling_factor_count; i++ )
 			{
-				int scaled_width  = TJSCALED( image_info->width, scaling_factor[ i ] );
-				int scaled_height = TJSCALED( image_info->height, scaling_factor[ i ] );
+				int scaled_width  = TJSCALED( image->width, scaling_factor[ i ] );
+				int scaled_height = TJSCALED( image->height, scaling_factor[ i ] );
 
-				if ( scaled_width > image_info->width || scaled_height > image_info->height )
+				if ( scaled_width > image->width || scaled_height > image->height )
 					continue;
 
 				// if ( scaled_width <= best_width && scaled_height <= best_height )
@@ -136,7 +302,7 @@ public:
 				// if ( scaled_width <= width && scaled_height <= height )
 			//	if ( scaled_width >= width && scaled_height >= height )
 			//	{
-			//		// if ( scaled_width <= image_info->width && scaled_height <= image_info->height )
+			//		// if ( scaled_width <= image->width && scaled_height <= image->height )
 			//		{
 			//			if ( scaled_width > best_width && scaled_height > best_height )
 			//			{
@@ -147,36 +313,37 @@ public:
 			//	}
 			}
 
-			printf( "SCALED %d x %d -> %d x %d\n", image_info->width, image_info->height, best_width, best_height );
+			printf( "SCALED %d x %d -> %d x %d\n", image->width, image->height, best_width, best_height );
 		}
 		else
 		{
-			best_width  = image_info->width;
-			best_height = image_info->height;
+			best_width  = image->width;
+			best_height = image->height;
 		}
 
 		if ( best_width == 0 )
-			best_width = image_info->width;
+			best_width = image->width;
 
 		if ( best_height == 0 )
-			best_height = image_info->height;
+			best_height = image->height;
 
-		image_info->data = ch_realloc< unsigned char >( image_info->data, best_width * best_height * tjPixelSize[ pixelFmt ] );
+		image->data = ch_realloc< unsigned char >( image->data, best_width * best_height * tjPixelSize[ pixelFmt ] );
 
 		int pitch        = best_width * tjPixelSize[ pixelFmt ];
 
-		ret = tjDecompress2(
-		    tjpg,
-		    (const unsigned char*)fileData,
-			fileDataLen,
-          (unsigned char*)image_info->data,
+		ret         = tjDecompress2(
+          tjpg,
+          (const unsigned char*)fileData,
+          fileDataLen,
+          (unsigned char*)image->data,
           0,
           pitch,
           best_height,
-			pixelFmt,
+          pixelFmt,
           // TJFLAG_FASTUPSAMPLE | TJFLAG_FASTDCT
-          TJFLAG_ACCURATEDCT
-		);
+          TJFLAG_ACCURATEDCT );
+		
+		free( fileData );
 
         if ( ret != 0 )
 		{
@@ -185,23 +352,23 @@ public:
 			return false;
 		}
 
-		image_info->width = best_width;
-		image_info->height = best_height;
+		image->width = best_width;
+		image->height = best_height;
 
-		image_info->format   = FMT_BGRA8;
+		image->format   = FMT_BGRA8;
 		// imageInfo->aFormat = FMT_RGBA8;
-		image_info->bit_depth = 4;  // uhhhh
-		image_info->pitch     = pitch;
+		image->bit_depth = 4;  // uhhhh
+		image->pitch     = pitch;
 
-		return image_info;
+		return image;
 	}
 
-	image_info_t* image_load( const fs::path& path ) override
+	image_t* image_load( const fs::path& path ) override
 	{
 		size_t        fileDataLen = 0;
 		char*         fileData    = fs_read_file( path.string().c_str(), &fileDataLen );
 
-		image_info_t* image_info  = new image_info_t;
+		image_t* image  = new image_t;
 
 		int subSamp, colorSpace;
 
@@ -209,8 +376,8 @@ public:
 			tjpg,
 			(const unsigned char*)fileData,
 			fileDataLen,
-          &image_info->width,
-          &image_info->height,
+          &image->width,
+          &image->height,
 			&subSamp,
 			&colorSpace
 		);
@@ -218,6 +385,7 @@ public:
         if ( ret != 0 )
 		{
 			fprintf( stderr, "[FormatJpeg] Failed to decompress header on image: %s\n%s\n", tjGetErrorStr2( tjpg ), path.c_str() );
+			free( fileData );
 			return nullptr;
 		}
 
@@ -225,19 +393,21 @@ public:
 
 		// srData.resize( imageInfo->aWidth * imageInfo->aHeight * tjPixelSize[ pixelFmt ] );
 
-		image_info->data = ch_calloc< unsigned char >( image_info->width * image_info->height * tjPixelSize[ pixelFmt ] );
+		image->data = ch_calloc< unsigned char >( image->width * image->height * tjPixelSize[ pixelFmt ] );
 
 		ret = tjDecompress2(
 		    tjpg,
 		    (const unsigned char*)fileData,
 			fileDataLen,
-          (unsigned char*)image_info->data,
+          (unsigned char*)image->data,
 			0,
-		  image_info->width * 4,
+		  image->width * 4,
 			0,
 			pixelFmt,
 			TJFLAG_FASTDCT
 		);
+
+		free( fileData );
 
         if ( ret != 0 )
 		{
@@ -246,11 +416,11 @@ public:
 			return nullptr;
 		}
 
-		image_info->format   = FMT_BGRA8;
+		image->format   = FMT_BGRA8;
 		// imageInfo->aFormat = FMT_RGBA8;
-		image_info->bit_depth = 4;  // uhhhh
+		image->bit_depth = 4;  // uhhhh
 
-		return image_info;
+		return image;
 	}
 };
 

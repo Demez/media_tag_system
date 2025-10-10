@@ -14,6 +14,9 @@
 #include <shlobj_core.h> 
 #include <time.h>
 
+#include <profileapi.h>
+#include <stdint.h>
+
 
 // ----------------------------------------------------
 
@@ -656,8 +659,12 @@ void sys_browse_to_file( const char* path )
 }
 
 
+static LARGE_INTEGER g_win_perf_freq;
+
 int sys_init()
 {
+	QueryPerformanceFrequency( &g_win_perf_freq );
+
 	g_con_out = GetStdHandle( STD_OUTPUT_HANDLE );
 
 	if ( g_con_out == INVALID_HANDLE_VALUE )
@@ -673,4 +680,26 @@ int sys_init()
 void sys_shutdown()
 {
 }
+
+
+u64 util_get_time_ms()
+{
+	LARGE_INTEGER counter;
+	QueryPerformanceCounter( &counter );
+	return (uint64_t)( counter.QuadPart * 1000 / g_win_perf_freq.QuadPart );
+}
+
+
+// LINUX VERSION
+#if 0
+#include <time.h>
+#include <stdint.h>
+
+u64 util_get_time_ms()
+{
+	struct timespec ts;
+	clock_gettime( CLOCK_MONOTONIC, &ts );
+	return (uint64_t)( ts.tv_sec * 1000ULL + ts.tv_nsec / 1000000ULL );
+}
+#endif
 
