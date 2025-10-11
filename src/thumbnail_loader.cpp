@@ -9,8 +9,8 @@ constexpr int         JOB_QUEUE_SIZE    = 32;
 constexpr int         THUMBNAIL_THREADS = 1;
 constexpr int         MAX_THUMBNAILS    = 256;
 
-constexpr const char* FAILED_IMAGE_PATH = "super_missing_texture.jpg";
-image_t*              FAILED_IMAGE      = nullptr;
+// constexpr const char* FAILED_IMAGE_PATH = "super_missing_texture.jpg";
+// image_t*              FAILED_IMAGE      = nullptr;
 
 std::atomic< bool >   g_thumbnails_running;
 std::thread*          g_thumbnail_worker[ THUMBNAIL_THREADS ];
@@ -233,11 +233,11 @@ bool thumbnail_loader_init()
 	g_thumbnail_queue.read_pos  = 0;
 
 	// load fail image
-	FAILED_IMAGE                = ch_calloc< image_t >( 1 );
-	if ( !g_test_codec->image_load_scaled( FAILED_IMAGE_PATH, FAILED_IMAGE, 512, 512 ) )
-	{
-		return false;
-	}
+//	FAILED_IMAGE                = ch_calloc< image_t >( 1 );
+//	if ( !g_test_codec->image_load_scaled( FAILED_IMAGE_PATH, FAILED_IMAGE, 512, 512 ) )
+//	{
+//		return false;
+//	}
 
 	g_thumbnails_running.store( true );
 
