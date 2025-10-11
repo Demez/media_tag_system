@@ -3,7 +3,7 @@ cmake_minimum_required( VERSION 3.18 FATAL_ERROR )
 # use folders for visual studio
 set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo")
+set( CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo" )
 
 set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 set( CMAKE_SHARED_LIBRARY_PREFIX "" )
@@ -19,8 +19,6 @@ set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJ_OUT} )
 
 foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
     string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
-
-    # set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CH_BUILD}/bin )
     set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${PROJ_OUT} )
     set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${PROJ_OUT} )
     set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${PROJ_OUT} )
@@ -140,10 +138,13 @@ set(
     SRC_FILES
     src/main.cpp
     src/main.h
+    src/thumbnail_loader.cpp
+    src/gallery_view.cpp
     src/util.cpp
     src/util.h
     src/args.cpp
     src/args.h
+    src/handles.h
 
     src/codecs/codec_jpeg.cpp
 
@@ -182,5 +183,11 @@ foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 		"thirdparty/mozjpeg/build/${OUTPUT_CONFIG}"
 	)
 endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
+
+source_group(
+	TREE ${CMAKE_CURRENT_LIST_DIR}/src
+	PREFIX "Source Files"
+	FILES ${SRC_FILES}
+)
 
 

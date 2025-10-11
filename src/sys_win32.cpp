@@ -62,7 +62,7 @@ const wchar_t* sys_get_error_w()
 	  NULL );
 
 	static wchar_t message[ 1100 ];
-	memset( message, 1100, 0 );
+	memset( message, 0, sizeof( wchar_t ) * 1100 );
 
 	if ( ret == 0 )
 	{
