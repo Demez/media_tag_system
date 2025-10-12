@@ -15,8 +15,15 @@ extern size_t                     g_folder_index;
 
 std::vector< gallery_item_t >     g_gallery_items;
 
+const int                         GALLERY_GRID_X_COUNT = 6;
 
-void gallery_draw_header()
+
+void gallery_view_input()
+{
+}
+
+
+void gallery_view_draw_header()
 {
 	int window_width, window_height;
 	SDL_GetWindowSize( g_main_window, &window_width, &window_height );
@@ -34,7 +41,7 @@ void gallery_draw_header()
 }
 
 
-void gallery_draw_content()
+void gallery_view_draw_content()
 {
 	int window_width, window_height;
 	SDL_GetWindowSize( g_main_window, &window_width, &window_height );
@@ -56,11 +63,10 @@ void gallery_draw_content()
 
 	// ScrollToBringRectIntoView
 
-	int    grid_count_x        = 6;
 	int    grid_item_padding   = style.ItemSpacing.x;
 
-	// float       item_size_x       = ( region_avail.x / grid_count_x ) - ( grid_count_x * grid_item_padding ) - ( grid_item_padding * 2 );
-	float  item_size_x         = ( region_avail.x / grid_count_x ) - ( ( grid_count_x - 1 ) * grid_item_padding );
+	// float       item_size_x       = ( region_avail.x / GALLERY_GRID_X_COUNT ) - ( GALLERY_GRID_X_COUNT * grid_item_padding ) - ( grid_item_padding * 2 );
+	float  item_size_x         = ( region_avail.x / GALLERY_GRID_X_COUNT ) - ( ( GALLERY_GRID_X_COUNT - 1 ) * grid_item_padding );
 	float  item_size_y         = item_size_x + text_height + style.ItemInnerSpacing.y;
 
 	int    grid_pos_x          = 0;
@@ -85,7 +91,7 @@ void gallery_draw_content()
 
 		ImGui::SetNextWindowSize( { item_size_x, item_size_y } );
 
-		if ( grid_pos_x == grid_count_x )
+		if ( grid_pos_x == GALLERY_GRID_X_COUNT )
 		{
 			grid_pos_x = 0;
 			ImGui::SetCursorPosX( ImGui::GetCursorPosX() + style.ItemSpacing.x );
@@ -125,14 +131,15 @@ void gallery_draw_content()
 
 		ImGui::PushID( *entry.string().c_str() );
 
-		if ( ImGui::BeginChild( entry.string().c_str(), {}, ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar ) )
+		if ( ImGui::BeginChild( entry.string().c_str(), {}, ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar ) )
 		{
+#if 1
 			image_visible_count++;
 
-			float  image_size  = item_size_x - ( style.ItemInnerSpacing.y * 4 );
+			float  image_bounds  = item_size_x - ( style.ItemInnerSpacing.y * 4 );
 			ImVec2 current_pos = ImGui::GetCursorPos();
 			// ImGui::SetNextWindowPos( { current_pos.x + style.ItemInnerSpacing.x, current_pos.y + style.ItemInnerSpacing.y } );
-			ImGui::SetNextWindowSize( { image_size, image_size } );
+			ImGui::SetNextWindowSize( { image_bounds, image_bounds } );
 
 			// if ( visible )
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, { 0.25f, 0.25f, 0.25f, 1.f } );
@@ -141,18 +148,13 @@ void gallery_draw_content()
 
 			if ( thumbnail )
 			{
-				if ( thumbnail->path != entry )
-				{
-					printf( "how did we get here?\n" );
-				}
-
 				if ( thumbnail->status == e_thumbnail_status_finished )
 				{
 					// Fit image in window size, scaling up if needed
 					float factor[ 2 ] = { 1.f, 1.f };
 
-					factor[ 0 ]       = (float)image_size / (float)thumbnail->data->width;
-					factor[ 1 ]       = (float)image_size / (float)thumbnail->data->height;
+					factor[ 0 ]       = (float)image_bounds / (float)thumbnail->data->width;
+					factor[ 1 ]       = (float)image_bounds / (float)thumbnail->data->height;
 
 					float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
@@ -162,8 +164,8 @@ void gallery_draw_content()
 
 					// center the image
 					ImVec2 image_offset = ImGui::GetCursorPos();
-					image_offset.x += ( image_size - scaled_image_size.x ) / 2;
-					image_offset.y += ( image_size - scaled_image_size.y ) / 2;
+					image_offset.x += ( image_bounds - scaled_image_size.x ) / 2;
+					image_offset.y += ( image_bounds - scaled_image_size.y ) / 2;
 
 					ImGui::SetCursorPos( image_offset );
 
@@ -171,30 +173,21 @@ void gallery_draw_content()
 				}
 				else
 				{
-					ImGui::Dummy( { image_size, image_size } );
+					ImGui::Dummy( { image_bounds, image_bounds } );
 				}
 			}
-			else if ( !thumbnail || thumbnail->status == e_thumbnail_status_failed )
+			else
 			{
 				if ( !thumbnail )
 					thumbnail_requests.emplace_back( entry, i );
 				// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
-				ImGui::Dummy( { image_size, image_size } );
-
-				// if ( ImGui::BeginChild( "##image", {} ) )
-				// {
-				// }
-				// else
-				// {
-				// 	// printf( "HIDDEN\n" );
-				// }
-				//
-				// ImGui::EndChild();
+				ImGui::Dummy( { image_bounds, image_bounds } );
 			}
 
 			// if ( visible )
 			ImGui::PopStyleColor();
+#endif
 		}
 
 		ImGui::TextUnformatted( entry.string().c_str() );
@@ -220,7 +213,7 @@ void gallery_draw_content()
 }
 
 
-void gallery_draw()
+void gallery_view_draw()
 {
 	int window_width, window_height;
 	SDL_GetWindowSize( g_main_window, &window_width, &window_height );
@@ -235,12 +228,12 @@ void gallery_draw()
 	}
 
 	// Header
-	gallery_draw_header();
+	gallery_view_draw_header();
 
 	// Sidebar
 
 	// Gallery View
-	gallery_draw_content();
+	gallery_view_draw_content();
 
 	thumbnail_cache_debug_draw();
 

@@ -20,16 +20,20 @@ SDL_Renderer*              g_main_renderer      = nullptr;
 bool                       g_running            = true;
 bool                       g_gallery_view       = false;
 
+
+// TODO: handle videos soon
+struct main_image_data_t
+{
+	SDL_Texture* texture;
+	SDL_Surface* surface;
+};
+
 // Main Image
-image_t*                   g_jpeg               = new image_t;
-SDL_Texture*               g_focused_image      = nullptr;
-SDL_Surface*               g_focused_image_surf = nullptr;
+image_t                    g_image;
+main_image_data_t          g_image_data;
 
-// Image to free next frame
-image_t*                   g_free_jpeg          = nullptr;
-SDL_Texture*               g_free_image         = nullptr;
-SDL_Surface*               g_free_image_surf    = nullptr;
-
+// Previous Image to Free
+main_image_data_t          g_image_data_free;
 
 std::vector< fs::path >    g_folder_media_list;
 std::vector< h_thumbnail > g_folder_thumbnail_list;
@@ -45,7 +49,7 @@ void register_codec( ICodec* codec )
 void imgui_draw()
 {
 	if ( g_gallery_view )
-		gallery_draw();
+		gallery_view_draw();
 }
 
 
@@ -75,43 +79,36 @@ void folder_load_media_list()
 }
 
 
-void folder_load_image()
+void media_view_load()
 {
 	float load_time = 0.f;
 
 	{
 		auto startTime = std::chrono::high_resolution_clock::now();
 
-		// g_jpeg = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
-		g_test_codec->image_load( g_folder_media_list[ g_folder_index ], g_jpeg );
+		// g_image_view.image = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
+		g_test_codec->image_load( g_folder_media_list[ g_folder_index ], &g_image );
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 
 		load_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 	}
 
-	if ( g_jpeg )
-	{
-		// auto startTime       = std::chrono::high_resolution_clock::now();
+	// auto startTime       = std::chrono::high_resolution_clock::now();
 
-		g_focused_image_surf = SDL_CreateSurfaceFrom( g_jpeg->width, g_jpeg->height, SDL_PIXELFORMAT_BGR24, g_jpeg->data, g_jpeg->pitch );
-		// g_focused_image_surf = SDL_CreateSurfaceFrom( g_jpeg->width, g_jpeg->height, SDL_PIXELFORMAT_RGB24, g_jpeg->data, g_jpeg->width * g_jpeg->pitch );
-		// g_focused_image_surf = SDL_CreateSurfaceFrom( g_jpeg->width, g_jpeg->height, SDL_PIXELFORMAT_XBGR8888, g_jpeg->data, g_jpeg->width * g_jpeg->pitch );
-		g_focused_image      = SDL_CreateTextureFromSurface( g_main_renderer, g_focused_image_surf );
+	g_image_data.surface = SDL_CreateSurfaceFrom( g_image.width, g_image.height, g_image.format, g_image.data, g_image.pitch );
+	g_image_data.texture = SDL_CreateTextureFromSurface( g_main_renderer, g_image_data.surface );
 
-		// auto  currentTime    = std::chrono::high_resolution_clock::now();
-		// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-		//printf( "%f Load - %f Up - %s\n", load_time, up_time, g_folder_media_list[ g_folder_index ].string().c_str() );
-		printf( "%f Load - %s\n", load_time, g_folder_media_list[ g_folder_index ].string().c_str() );
-	}
+	// auto  currentTime    = std::chrono::high_resolution_clock::now();
+	// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
+	//printf( "%f Load - %f Up - %s\n", load_time, up_time, g_folder_media_list[ g_folder_index ].string().c_str() );
+	printf( "%f Load - %s\n", load_time, g_folder_media_list[ g_folder_index ].string().c_str() );
 }
 
 
-void folder_load_next_image( bool prev = false )
+void media_view_advance( bool prev = false )
 {
-	g_free_image      = g_focused_image;
-	g_free_image_surf = g_focused_image_surf;
-	g_free_jpeg       = g_jpeg;
+	g_image_data_free = g_image_data;
 
 	if ( prev )
 	{
@@ -128,14 +125,28 @@ void folder_load_next_image( bool prev = false )
 			g_folder_index = 0;
 	}
 
-	folder_load_image();
+	media_view_load();
+}
+
+
+void image_view_input()
+{
+	if ( g_gallery_view )
+		return;
+
+	if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
+	{
+		media_view_advance();
+	}
+	else if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
+	{
+		media_view_advance( true );
+	}
 }
 
 
 int main( int argc, char* argv[] )
 {
-	memset( g_jpeg, 0, sizeof( image_t ) );
-
 	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
 	{
 		printf( "Failed to init SDL\n" );
@@ -188,7 +199,7 @@ int main( int argc, char* argv[] )
 	}
 
 	folder_load_media_list();
-	folder_load_image();
+	media_view_load();
 
 	while ( g_running )
 	{
@@ -232,20 +243,12 @@ int main( int argc, char* argv[] )
 
 		bool show_frame_time = false;
 
-		if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
-		{
-			folder_load_next_image();
-			show_frame_time = true;
-		}
-		else if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
-		{
-			folder_load_next_image( true );
-			show_frame_time = true;
-		}
-		else if ( ImGui::IsKeyPressed( ImGuiKey_Enter ) )
+		if ( ImGui::IsKeyPressed( ImGuiKey_Enter ) )
 		{
 			g_gallery_view = !g_gallery_view;
 		}
+
+		image_view_input();
 
 		ImGui::ShowDemoWindow();
 		imgui_draw();
@@ -256,7 +259,7 @@ int main( int argc, char* argv[] )
 		SDL_SetRenderDrawColorFloat( g_main_renderer, clear_color.x, clear_color.y, clear_color.z, clear_color.w );
 		SDL_RenderClear( g_main_renderer );
 
-		if ( !g_gallery_view && g_jpeg )
+		if ( !g_gallery_view && g_image_data.texture )
 		{
 			// new image size
 		//	int new_width, new_height;
@@ -270,49 +273,39 @@ int main( int argc, char* argv[] )
 			SDL_FRect dst_rect{};
 			float factor[ 2 ] = { 1.f, 1.f };
 
-			if ( g_jpeg->width > width )
-				factor[ 0 ] = (float)width / (float)g_jpeg->width;
+			if ( g_image.width > width )
+				factor[ 0 ] = (float)width / (float)g_image.width;
 
-			if ( g_jpeg->height > height )
-				factor[ 1 ] = (float)height / (float)g_jpeg->height;
+			if ( g_image.height > height )
+				factor[ 1 ] = (float)height / (float)g_image.height;
 
 			float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
-			dst_rect.w       = g_jpeg->width * zoom_level;
-			dst_rect.h       = g_jpeg->height * zoom_level;
+			dst_rect.w       = g_image.width * zoom_level;
+			dst_rect.h       = g_image.height * zoom_level;
 			dst_rect.x       = width / 2 - ( dst_rect.w / 2 );
 			dst_rect.y       = height / 2 - ( dst_rect.h / 2 );
 
-			SDL_RenderTexture( g_main_renderer, g_focused_image, NULL, &dst_rect );
+			SDL_RenderTexture( g_main_renderer, g_image_data.texture, NULL, &dst_rect );
 		}
 
 		ImGui_ImplSDLRenderer3_RenderDrawData( ImGui::GetDrawData(), g_main_renderer );
 
 		SDL_RenderPresent( g_main_renderer );
 
-		if ( g_free_image )
+		if ( g_image_data_free.texture )
 		{
-			SDL_DestroyTexture( g_free_image );
-			SDL_DestroySurface( g_free_image_surf );
+			SDL_DestroyTexture( g_image_data_free.texture );
+			SDL_DestroySurface( g_image_data_free.surface );
 
-			g_free_image      = nullptr;
-			g_free_image_surf = nullptr;
-		}
-
-		if ( g_free_jpeg )
-		{
-			// free( g_free_jpeg->data );
-			// delete g_free_jpeg;
-			// 
-			// g_free_jpeg = nullptr;
+			g_image_data_free.texture = nullptr;
+			g_image_data_free.surface = nullptr;
 		}
 
 		//auto  currentTime = std::chrono::high_resolution_clock::now();
 		//float time     = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 		//if ( show_frame_time )
 		// printf( "%f FRAMETIME\n", time );
-
-		thumbnail_loader_update_after_render();
 	}
 
 	args_free();

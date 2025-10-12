@@ -10,6 +10,7 @@ namespace fs = std::filesystem;
 
 #include <cstdio>
 #include <vector>
+#include <atomic>
 
 #include "imgui.h"
 #include "SDL3/SDL.h"
@@ -22,34 +23,35 @@ extern SDL_Window* g_main_window;
 // codec handler
 
 
-enum PixelFormat
-{
-	FMT_NONE,
-
-	FMT_RGB8,
-	FMT_RGBA8,
-
-	FMT_BGR8,
-	FMT_BGRA8,
-
-	COUNT,
-};
-
-
 struct image_t
 {
-	int            width;
-	int            height;
-	int            bit_depth;
-	int            pitch;
-	PixelFormat    format = FMT_NONE;
-	unsigned char* data;
+	int             width;
+	int             height;
+	int             bit_depth;
+	int             pitch;
+	SDL_PixelFormat format;
+	unsigned char*  data;
 };
 
 
-class ICodec
+struct image_load_settings_t
 {
-  public:
+	// When not 0, The codec will load the smallest version of an image that's larger than this resolution
+	ImVec2   target_size;
+
+	// Old image data, this will be reused if valid data
+	image_t* image;
+
+	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
+	bool     load_quick;
+
+	// Is this being loaded from a thread?
+	bool     threaded_load;
+};
+
+
+struct ICodec
+{
 	virtual bool     check_extension( const char* ext )                                                              = 0;
 	virtual bool     check_header( const fs::path& path )                                                            = 0;
 
@@ -64,11 +66,18 @@ class ICodec
 void register_codec( ICodec* codec );
 
 
+// TODO: add image load functions here
+// - add animated image support
+// - add color profile support (PAIN)
+// - split it into reading the file first, passing it into each codec to check the header, if valid, load the rest of the image
+
+
 // ---------------------------------------------------------
 // Gallery View
 
 
-void gallery_draw();
+void gallery_view_input();
+void gallery_view_draw();
 
 
 // ---------------------------------------------------------
@@ -95,10 +104,6 @@ enum e_thumbnail_status
 
 	// Failed to load thumbnail
 	e_thumbnail_status_failed,
-
-	// This thumbnail is no longer valid, it has been freed to make room for other thumbnails
-	// (is this useful at all? just use invalid instead)
-	// e_thumbnail_status_freed,
 };
 
 
@@ -107,24 +112,23 @@ HANDLE_GEN_32( h_thumbnail );
 
 struct thumbnail_t
 {
-	e_thumbnail_status status;
-	u32                distance;  // higher distances get freed first for other thumbnails
-	char*              path;  // mainly for debugging
-	image_t*           data;
-	SDL_Surface*       sdl_surface;
-	SDL_Texture*       sdl_texture;
-	ImTextureRef       im_texture;
+	std::atomic< e_thumbnail_status > status;
+	u32                               distance;  // higher distances get freed first for other thumbnails
+	char*                             path;      // mainly for debugging
+	image_t*                          data;
+	SDL_Surface*                      sdl_surface;
+	SDL_Texture*                      sdl_texture;
+	ImTextureRef                      im_texture;
 };
 
 
 bool          thumbnail_loader_init();
 void          thumbnail_loader_shutdown();
 void          thumbnail_loader_update();
-void          thumbnail_loader_update_after_render();
 
 h_thumbnail   thumbnail_queue_image( const fs::path& path );
 thumbnail_t*  thumbnail_get_data( h_thumbnail handle );
-void          thumbnail_free( const fs::path& path, h_thumbnail handle );
+// void          thumbnail_free( const fs::path& path, h_thumbnail handle );
 
 // distance based cache
 void          thumbnail_update_distance( h_thumbnail handle, u32 distance );

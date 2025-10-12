@@ -3,10 +3,9 @@
 #include <thread>
 #include <mutex>
 #include <queue>
-#include <atomic>
 
 constexpr int         JOB_QUEUE_SIZE    = 32;
-constexpr int         THUMBNAIL_THREADS = 1;
+constexpr int         THUMBNAIL_THREADS = 8;
 constexpr int         MAX_THUMBNAILS    = 256;
 
 // constexpr const char* FAILED_IMAGE_PATH = "super_missing_texture.jpg";
@@ -19,10 +18,19 @@ extern SDL_Renderer*  g_main_renderer;
 extern ICodec* g_test_codec;
 
 
+enum e_job_state
+{
+	e_job_state_free,
+	e_job_state_working,
+	e_job_state_finished,
+};
+
+
 struct thumbnail_job_t
 {
 	char*       path;
 	h_thumbnail thumbnail;
+	e_job_state state;
 };
 
 
@@ -87,6 +95,13 @@ h_thumbnail thumbnail_loader_queue_push( const char* path )
 		return {};
 	}
 
+	// the queue is not full, so create a new job for it
+	thumbnail_job_t& job = g_thumbnail_queue.buffer[ current_pos ];
+
+	// next job isn't free?
+	// if ( job.state != e_job_state_free )
+	// 	return {};
+
 	// u32 cache_pos               = g_thumbnail_cache.write_pos;
 	// g_thumbnail_cache.write_pos = ( cache_pos + 1 ) % MAX_THUMBNAILS;
 
@@ -106,9 +121,17 @@ h_thumbnail thumbnail_loader_queue_push( const char* path )
 			break;
 		}
 
-		if ( g_thumbnail_cache.buffer[ cache_pos ].status == e_thumbnail_status_loading )
+		// if ( g_thumbnail_cache.buffer[ cache_pos ].status != e_thumbnail_status_free &&
+		//      g_thumbnail_cache.buffer[ cache_pos ].status != e_thumbnail_status_finished &&
+		//      g_thumbnail_cache.buffer[ cache_pos ].status != e_thumbnail_status_failed )
+		// 	break;
+		
+		if ( g_thumbnail_cache.buffer[ cache_pos ].status == e_thumbnail_status_queued )
 			continue;
 
+		if ( g_thumbnail_cache.buffer[ cache_pos ].status == e_thumbnail_status_loading )
+			continue;
+		
 		if ( g_thumbnail_cache.buffer[ cache_pos ].status == e_thumbnail_status_uploading )
 			continue;
 
@@ -146,14 +169,13 @@ h_thumbnail thumbnail_loader_queue_push( const char* path )
 	handle.index         = cache_pos;
 	handle.generation    = ++g_thumbnail_cache.generation[ cache_pos ];
 
-	// the queue is not full, so create a new job for it
-	thumbnail_job_t& job = g_thumbnail_queue.buffer[ current_pos ];
-
 	if ( job.path )
 		free( job.path );
 
 	job.path                                       = strdup( path );
 	job.thumbnail                                  = handle;
+	job.state                                      = e_job_state_working;
+
 	g_thumbnail_cache.buffer[ cache_pos ].status   = e_thumbnail_status_queued;
 	g_thumbnail_cache.buffer[ cache_pos ].path     = strdup( path );
 	g_thumbnail_cache.used_this_frame[ cache_pos ] = true;
@@ -167,8 +189,7 @@ h_thumbnail thumbnail_loader_queue_push( const char* path )
 
 thumbnail_job_t* thumbnail_loader_queue_pop()
 {
-	// wait for reads/writes before loading it
-	u32 current_pos = g_thumbnail_queue.read_pos.load( std::memory_order_acquire );
+	u32 current_pos = g_thumbnail_queue.read_pos.load( std::memory_order_relaxed );
 
 	// make sure we aren't at the write position, nothing new added yet then
 	if ( current_pos == g_thumbnail_queue.write_pos.load( std::memory_order_acquire ) )
@@ -189,7 +210,6 @@ void thumbnail_loader_worker()
 	{
 		thumbnail_job_t* job = thumbnail_loader_queue_pop();
 
-		// no work for us to do right now
 		if ( !job )
 		{
 			SDL_Delay( 250 );
@@ -201,28 +221,23 @@ void thumbnail_loader_worker()
 		if ( !thumbnail )
 			continue;
 
-		thumbnail->status = e_thumbnail_status_loading;
+		//printf( "STARTING LOAD OF IMAGE: %s\n", job->path );
+
+		thumbnail->status.store( e_thumbnail_status_loading, std::memory_order_release );
 		thumbnail->data   = ch_calloc< image_t >( 1 );
 
-		if ( thumbnail->data == nullptr )
-		{
-			printf( "????\n" );
-		}
-
-		if ( !g_test_codec->image_load_scaled( job->path, thumbnail->data, 512, 512 ) )
+		if ( !g_test_codec->image_load_scaled( job->path, thumbnail->data, 400, 400 ) )
 		{
 			printf( "FAILED TO LOAD IMAGE: %s\n", job->path );
 			thumbnail->status = e_thumbnail_status_failed;
 			continue;
 		}
 
-		if ( thumbnail->data == nullptr )
-		{
-			printf( "????\n" );
-		}
-
-		thumbnail->status = e_thumbnail_status_uploading;
 		printf( "LOADED IMAGE: %s\n", job->path );
+
+		job->state = e_job_state_free;
+
+		thumbnail->status.store( e_thumbnail_status_uploading, std::memory_order_release );
 	}
 }
 
@@ -282,38 +297,41 @@ void thumbnail_loader_update()
 			continue;
 
 		// thumbnail_t& thumbnail = g_thumbnail_cache.buffer[ g_thumbnail_cache.read_pos ];
-		thumbnail_t& thumbnail = g_thumbnail_cache.buffer[ i ];
+		thumbnail_t&       thumbnail = g_thumbnail_cache.buffer[ i ];
 
 		// if ( thumbnail.status != e_thumbnail_status_uploading )
 		// 	break;
-		// 
+		//
 		// if ( ++g_thumbnail_cache.read_pos == MAX_THUMBNAILS )
 		// 	g_thumbnail_cache.read_pos = 0;
 
-		if ( thumbnail.status != e_thumbnail_status_uploading )
+		e_thumbnail_status status    = thumbnail.status.load( std::memory_order_acquire );
+
+		if ( status != e_thumbnail_status_uploading )
 			continue;
 
-		thumbnail.sdl_surface = SDL_CreateSurfaceFrom( thumbnail.data->width, thumbnail.data->height, SDL_PIXELFORMAT_BGR24, thumbnail.data->data, thumbnail.data->pitch );
+		//printf( "UPLOADING IMAGE: %s\n", thumbnail.path );
+
+		if ( !thumbnail.data->data )
+		{
+			printf( "data is nullptr\n" );
+		}
+
+		thumbnail.sdl_surface = SDL_CreateSurfaceFrom( thumbnail.data->width, thumbnail.data->height, thumbnail.data->format, thumbnail.data->data, thumbnail.data->pitch );
 		thumbnail.sdl_texture = SDL_CreateTextureFromSurface( g_main_renderer, thumbnail.sdl_surface );
 		thumbnail.im_texture  = thumbnail.sdl_texture;
 
 		free( thumbnail.data->data );
+		thumbnail.data->data = nullptr;
 
 		if ( thumbnail.sdl_texture )
+		{
 			thumbnail.status = e_thumbnail_status_finished;
+			//printf( "IMAGE FINISHED: %s\n", thumbnail.path );
+		}
 		else
 			thumbnail.status = e_thumbnail_status_failed;
 	}
-}
-
-
-void thumbnail_loader_update_after_render()
-{
-//	for ( u32 i = 0; i < MAX_THUMBNAILS; i++ )
-//	{
-//		// reset all of these
-//		g_thumbnail_cache.used_this_frame[ i ] = false;
-//	}
 }
 
 
