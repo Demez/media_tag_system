@@ -128,6 +128,14 @@ struct CodecJPEG: public ICodec
 
 		image->data = ch_calloc< unsigned char >( best_width * best_height * tjPixelSize[ pixelFmt ] );
 
+		if ( !image->data )
+		{
+			fprintf( stderr, "CODEC_JPEG: Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
+			free( fileData );
+			tjDestroy( local_tjpg );
+			return false;
+		}
+
 		int pitch        = best_width * tjPixelSize[ pixelFmt ];
 
 		ret         = tjDecompress2(
@@ -143,12 +151,21 @@ struct CodecJPEG: public ICodec
           TJFLAG_ACCURATEDCT );
 
 		free( fileData );
-		tjDestroy( local_tjpg );
 
         if ( ret != 0 )
 		{
 			// fprintf( stderr, "[FormatJpeg] Failed to decompress image: %ws\n%s\n", path.c_str(), tjGetErrorStr2( tjpg ) );
-			fprintf( stderr, "[FormatJpeg] Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
+			fprintf( stderr, "CODEC_JPEG: Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
+			tjDestroy( local_tjpg );
+			free( image->data );
+			return false;
+		}
+
+		tjDestroy( local_tjpg );
+
+		if ( !image->data )
+		{
+			printf( "Jpeg Decompress returned a nullptr?\n" );
 			free( image->data );
 			return false;
 		}
@@ -160,7 +177,7 @@ struct CodecJPEG: public ICodec
 		image->bit_depth = 4;  // uhhhh
 		image->pitch     = pitch;
 
-		return image;
+		return true;
 	}
 
 	bool image_load( const fs::path& path, image_t* image ) override

@@ -12,6 +12,8 @@ ICodec*                    g_test_codec         = nullptr;
 fs::path                   TEST_IMAGE           = "D:\\demez_archive\\media\\downloads\\art\\[bsky] camothetiger.bsky.social—2025.04.14—3lmqydllpak2a—bafkreidjzm36t5zwx7drrmioalhswola36t3hngwmtqbolfriogffzclbe.jpg";
 // fs::path TEST_IMAGE      = "D:\\demez_archive\\media\\downloads\\art\\WsWLHtGJ_400x400.jpg";
 fs::path                   TEST_FOLDER          = "D:\\demez_archive\\media\\downloads\\art";
+// fs::path                   TEST_FOLDER          = "D:\\demez_archive\\media\\downloads\\_unsorted";
+// fs::path                   TEST_FOLDER          = "D:\\demez_archive\\media\\downloads\\photos_furry";
 
 
 SDL_Window*                g_main_window        = nullptr;
@@ -19,6 +21,9 @@ SDL_Renderer*              g_main_renderer      = nullptr;
 
 bool                       g_running            = true;
 bool                       g_gallery_view       = false;
+
+bool                       g_mouse_scrolled_up   = false;
+bool                       g_mouse_scrolled_down = false;
 
 
 // TODO: handle videos soon
@@ -31,6 +36,7 @@ struct main_image_data_t
 // Main Image
 image_t                    g_image;
 main_image_data_t          g_image_data;
+size_t                     g_image_index = 0;
 
 // Previous Image to Free
 main_image_data_t          g_image_data_free;
@@ -103,6 +109,8 @@ void media_view_load()
 	// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 	//printf( "%f Load - %f Up - %s\n", load_time, up_time, g_folder_media_list[ g_folder_index ].string().c_str() );
 	printf( "%f Load - %s\n", load_time, g_folder_media_list[ g_folder_index ].string().c_str() );
+
+	g_image_index = g_folder_index;
 }
 
 
@@ -142,6 +150,22 @@ void image_view_input()
 	{
 		media_view_advance( true );
 	}
+}
+
+
+void gallery_view_toggle()
+{
+	if ( g_gallery_view )
+	{
+		if ( g_image_index != g_folder_index )
+			media_view_load();
+	}
+	else
+	{
+		gallery_view_scroll_to_selected();
+	}
+
+	g_gallery_view = !g_gallery_view;
 }
 
 
@@ -204,9 +228,13 @@ int main( int argc, char* argv[] )
 	while ( g_running )
 	{
 		// don't go full speed lol
-		SDL_Delay( 10 );
+		// SDL_Delay( 5 );
+		SDL_Delay( 2 );
 		
 		thumbnail_loader_update();
+
+		g_mouse_scrolled_up   = false;
+		g_mouse_scrolled_down = false;
 
 		//auto      startTime = std::chrono::high_resolution_clock::now();
 
@@ -218,6 +246,13 @@ int main( int argc, char* argv[] )
 
 			switch ( event.type )
 			{
+				case SDL_EVENT_MOUSE_WHEEL:
+					if ( event.wheel.integer_y > 0 )
+						g_mouse_scrolled_up = true;
+					else
+						g_mouse_scrolled_down = true;
+					break;
+
 				case SDL_EVENT_WINDOW_RESIZED:
 					int width, height;
 					SDL_GetWindowSize( g_main_window, &width, &height );
@@ -243,12 +278,12 @@ int main( int argc, char* argv[] )
 
 		bool show_frame_time = false;
 
-		if ( ImGui::IsKeyPressed( ImGuiKey_Enter ) )
-		{
-			g_gallery_view = !g_gallery_view;
-		}
-
 		image_view_input();
+
+		if ( ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
+		{
+			gallery_view_toggle();
+		}
 
 		ImGui::ShowDemoWindow();
 		imgui_draw();

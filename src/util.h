@@ -1,5 +1,7 @@
 #pragma once
 
+#include "imgui.h"
+
 #include <cstdio>
 #include <cstring>
 #include <stdlib.h>
@@ -303,6 +305,8 @@ void        sys_browse_to_file( const char* path );
 
 // --------------------------------------------------------------------------------------------------------
 // utility functions
+
+bool        point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size );
 
 #if _WIN32
 char*       strcasestr( const char* s, const char* find );

@@ -73,11 +73,20 @@ void register_codec( ICodec* codec );
 
 
 // ---------------------------------------------------------
-// Gallery View
 
 
+// imgui scroll hack lol
+extern bool g_mouse_scrolled_up;
+extern bool g_mouse_scrolled_down;
+
+
+void media_view_load();
+
+void gallery_view_scroll_to_selected();
 void gallery_view_input();
 void gallery_view_draw();
+
+void gallery_view_toggle();
 
 
 // ---------------------------------------------------------

@@ -1,3 +1,4 @@
+#include "main.h"
 #include "util.h"
 
 #include <sys/stat.h>
@@ -24,6 +25,12 @@
 // windows-specific mkdir() is used
   #define mkdir( f ) mkdir( f, 666 )
 #endif
+
+
+bool point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size )
+{
+	return point[ 0 ] >= min_size[ 0 ] && point[ 0 ] <= max_size[ 0 ] && point[ 1 ] <= max_size[ 1 ] && point[ 1 ] >= min_size[ 1 ];
+}
 
 
 #ifdef _WIN32
