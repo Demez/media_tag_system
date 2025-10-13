@@ -140,6 +140,7 @@ set(
     src/main.h
     src/thumbnail_loader.cpp
     src/gallery_view.cpp
+    src/media_view.cpp
     src/util.cpp
     src/util.h
     src/args.cpp

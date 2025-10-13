@@ -25,14 +25,6 @@ bool                       g_gallery_view       = false;
 bool                       g_mouse_scrolled_up   = false;
 bool                       g_mouse_scrolled_down = false;
 
-
-// TODO: handle videos soon
-struct main_image_data_t
-{
-	SDL_Texture* texture;
-	SDL_Surface* surface;
-};
-
 // Main Image
 image_t                    g_image;
 main_image_data_t          g_image_data;
@@ -49,13 +41,6 @@ size_t                     g_folder_index = 0;
 void register_codec( ICodec* codec )
 {
 	g_test_codec = codec;
-}
-
-
-void imgui_draw()
-{
-	if ( g_gallery_view )
-		gallery_view_draw();
 }
 
 
@@ -85,70 +70,15 @@ void folder_load_media_list()
 }
 
 
-void media_view_load()
+void imgui_draw()
 {
-	float load_time = 0.f;
-
+	if ( g_gallery_view )
 	{
-		auto startTime = std::chrono::high_resolution_clock::now();
-
-		// g_image_view.image = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
-		g_test_codec->image_load( g_folder_media_list[ g_folder_index ], &g_image );
-
-		auto currentTime = std::chrono::high_resolution_clock::now();
-
-		load_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-	}
-
-	// auto startTime       = std::chrono::high_resolution_clock::now();
-
-	g_image_data.surface = SDL_CreateSurfaceFrom( g_image.width, g_image.height, g_image.format, g_image.data, g_image.pitch );
-	g_image_data.texture = SDL_CreateTextureFromSurface( g_main_renderer, g_image_data.surface );
-
-	// auto  currentTime    = std::chrono::high_resolution_clock::now();
-	// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-	//printf( "%f Load - %f Up - %s\n", load_time, up_time, g_folder_media_list[ g_folder_index ].string().c_str() );
-	printf( "%f Load - %s\n", load_time, g_folder_media_list[ g_folder_index ].string().c_str() );
-
-	g_image_index = g_folder_index;
-}
-
-
-void media_view_advance( bool prev = false )
-{
-	g_image_data_free = g_image_data;
-
-	if ( prev )
-	{
-		if ( g_folder_index == 0 )
-			g_folder_index = g_folder_media_list.size();
-		
-		g_folder_index--;
+		gallery_view_draw();
 	}
 	else
 	{
-		g_folder_index++;
-
-		if ( g_folder_index == g_folder_media_list.size() )
-			g_folder_index = 0;
-	}
-
-	media_view_load();
-}
-
-
-void image_view_input()
-{
-	if ( g_gallery_view )
-		return;
-
-	if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
-	{
-		media_view_advance();
-	}
-	else if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
-	{
-		media_view_advance( true );
+		media_view_input();
 	}
 }
 
@@ -278,8 +208,6 @@ int main( int argc, char* argv[] )
 
 		bool show_frame_time = false;
 
-		image_view_input();
-
 		if ( ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
 		{
 			gallery_view_toggle();
@@ -296,32 +224,7 @@ int main( int argc, char* argv[] )
 
 		if ( !g_gallery_view && g_image_data.texture )
 		{
-			// new image size
-		//	int new_width, new_height;
-			int width, height;
-			SDL_GetWindowSize( g_main_window, &width, &height );
-		//
-		//	float max_size = std::max( width, height );
-		//	new_width      = jpeg->width / max_size;
-			
-			// Fit image in window size
-			SDL_FRect dst_rect{};
-			float factor[ 2 ] = { 1.f, 1.f };
-
-			if ( g_image.width > width )
-				factor[ 0 ] = (float)width / (float)g_image.width;
-
-			if ( g_image.height > height )
-				factor[ 1 ] = (float)height / (float)g_image.height;
-
-			float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
-
-			dst_rect.w       = g_image.width * zoom_level;
-			dst_rect.h       = g_image.height * zoom_level;
-			dst_rect.x       = width / 2 - ( dst_rect.w / 2 );
-			dst_rect.y       = height / 2 - ( dst_rect.h / 2 );
-
-			SDL_RenderTexture( g_main_renderer, g_image_data.texture, NULL, &dst_rect );
+			media_view_draw();
 		}
 
 		ImGui_ImplSDLRenderer3_RenderDrawData( ImGui::GetDrawData(), g_main_renderer );

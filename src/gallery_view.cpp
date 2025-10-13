@@ -19,7 +19,7 @@ std::vector< gallery_item_t >     g_gallery_items;
 
 const int                         GALLERY_GRID_X_COUNT = 12;
 
-const int                         MOUSE_SCROLL_AMOUNT = 150;
+const int                         MOUSE_SCROLL_AMOUNT  = 150;
 
 
 void gallery_view_input()
@@ -240,15 +240,9 @@ void gallery_view_draw_content()
 				float scroll_offset = 0;
 
 				if ( scroll_up )
-				{
-					float distance = ( cursor_pos.y - style.ItemSpacing.y ) - visible_top;
-					scroll_offset  = distance;
-				}
+					scroll_offset = ( cursor_pos.y - style.ItemSpacing.y ) - visible_top;
 				else
-				{
-					float distance = ( cursor_pos.y + item_size_y + style.ItemSpacing.y ) - visible_bottom;
-					scroll_offset  = distance;
-				}
+					scroll_offset = ( cursor_pos.y + item_size_y + style.ItemSpacing.y ) - visible_bottom;
 
 				ImGui::SetScrollY( ImGui::GetScrollY() + scroll_offset );
 			}
@@ -258,125 +252,92 @@ void gallery_view_draw_content()
 		if ( !ImGui::IsRectVisible( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + item_size_y } ) )
 		{
 			// use a dummy instead of a full child window, cheaper
-			// though could try to do something cheaper still
 			ImGui::Dummy( { item_size_x, item_size_y } );
-			// advance cursor
-			// ImGui::SetCursorPosY( ImGui::GetCursorPosY() + item_size_y + style.ItemSpacing.x );
-
 			grid_pos_x++;
 			continue;
 		}
 
-		if ( ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + item_size_y } ) )
-		{
-			item_hovered = true;
-		}
+		item_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + item_size_y } );
 
 		if ( g_folder_index == i )
-		{
-			//if ( g_scroll_to_selected )
-			//{
-			//	if ( distance > 0 )
-			//		ImGui::SetScrollHereY();
-			//}
-
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBg ] );
-		}
 		else if ( item_hovered )
-		{
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBgHovered ] );
-		}
 
-		//ImGui::PushID( *entry.string().c_str() );
-
-		// if ( !draw_child )
+		if ( ImGui::BeginChild( i + 1, {}, ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar ) )
 		{
-			if ( ImGui::BeginChild( i + 1, {}, ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar ) )
-			{
 #if 1
-				image_visible_count++;
+			image_visible_count++;
 
-				float  image_bounds = item_size_x - ( style.ItemInnerSpacing.y * 4 );
-				ImVec2 current_pos  = ImGui::GetCursorPos();
-				// ImGui::SetNextWindowPos( { current_pos.x + style.ItemInnerSpacing.x, current_pos.y + style.ItemInnerSpacing.y } );
-				ImGui::SetNextWindowSize( { image_bounds, image_bounds } );
+			float  image_bounds = item_size_x - ( style.ItemInnerSpacing.y * 4 );
+			ImVec2 current_pos  = ImGui::GetCursorPos();
+			ImGui::SetNextWindowSize( { image_bounds, image_bounds } );
 
-				// if ( visible )
-				ImGui::PushStyleColor( ImGuiCol_ChildBg, { 0.25f, 0.25f, 0.25f, 1.f } );
+			ImGui::PushStyleColor( ImGuiCol_ChildBg, { 0.25f, 0.25f, 0.25f, 1.f } );
 
-				thumbnail_t* thumbnail = thumbnail_get_data( g_folder_thumbnail_list[ i ] );
+			thumbnail_t* thumbnail = thumbnail_get_data( g_folder_thumbnail_list[ i ] );
 
-				if ( thumbnail )
+			if ( thumbnail )
+			{
+				if ( thumbnail->status == e_thumbnail_status_finished )
 				{
-					if ( thumbnail->status == e_thumbnail_status_finished )
-					{
-						// Fit image in window size, scaling up if needed
-						float factor[ 2 ] = { 1.f, 1.f };
+					// Fit image in window size, scaling up if needed
+					float factor[ 2 ] = { 1.f, 1.f };
 
-						factor[ 0 ]       = (float)image_bounds / (float)thumbnail->data->width;
-						factor[ 1 ]       = (float)image_bounds / (float)thumbnail->data->height;
+					factor[ 0 ]       = (float)image_bounds / (float)thumbnail->data->width;
+					factor[ 1 ]       = (float)image_bounds / (float)thumbnail->data->height;
 
-						float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
+					float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
-						ImVec2 scaled_image_size;
-						scaled_image_size.x = thumbnail->data->width * zoom_level;
-						scaled_image_size.y = thumbnail->data->height * zoom_level;
+					ImVec2 scaled_image_size;
+					scaled_image_size.x = thumbnail->data->width * zoom_level;
+					scaled_image_size.y = thumbnail->data->height * zoom_level;
 
-						// center the image
-						ImVec2 image_offset = ImGui::GetCursorPos();
-						image_offset.x += ( image_bounds - scaled_image_size.x ) / 2;
-						image_offset.y += ( image_bounds - scaled_image_size.y ) / 2;
+					// center the image
+					ImVec2 image_offset = ImGui::GetCursorPos();
+					image_offset.x += ( image_bounds - scaled_image_size.x ) / 2;
+					image_offset.y += ( image_bounds - scaled_image_size.y ) / 2;
 
-						ImGui::SetCursorPos( image_offset );
+					ImGui::SetCursorPos( image_offset );
 
-						ImGui::Image( thumbnail->im_texture, scaled_image_size );
-					}
-					else
-					{
-						ImGui::Dummy( { image_bounds, image_bounds } );
-					}
+					ImGui::Image( thumbnail->im_texture, scaled_image_size );
 				}
 				else
 				{
-					if ( !thumbnail )
-						thumbnail_requests.emplace_back( entry, i );
-					// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
-
 					ImGui::Dummy( { image_bounds, image_bounds } );
 				}
+			}
+			else
+			{
+				if ( !thumbnail )
+					thumbnail_requests.emplace_back( entry, i );
+				// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
-				// if ( visible )
-				ImGui::PopStyleColor();
-#endif
+				ImGui::Dummy( { image_bounds, image_bounds } );
 			}
 
-			ImGui::TextUnformatted( entry.string().c_str() );
-
-			ImGui::EndChild();
+			// if ( visible )
+			ImGui::PopStyleColor();
+#endif
 		}
 
-		//ImGui::PopID();
+		ImGui::TextUnformatted( entry.string().c_str() );
+
+		ImGui::EndChild();
 
 		if ( g_folder_index == i || item_hovered )
-		{
 			ImGui::PopStyleColor();
-		}
 
 		if ( item_hovered && ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
 		{
 			g_folder_index = i;
 
 			if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
-			{
 				gallery_view_toggle();
-			}
 		}
 
 		grid_pos_x++;
 	}
-
-	// ???
-	//ImGui::SetCursorPosX( 0 );
 
 	ImGui::EndChild();
 

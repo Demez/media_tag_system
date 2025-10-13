@@ -5,7 +5,7 @@
 #include <queue>
 
 constexpr int         JOB_QUEUE_SIZE    = 32;
-constexpr int         THUMBNAIL_THREADS = 16;
+constexpr int         THUMBNAIL_THREADS = 8;
 constexpr int         MAX_THUMBNAILS    = 512;
 
 // constexpr const char* FAILED_IMAGE_PATH = "super_missing_texture.jpg";

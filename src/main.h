@@ -16,7 +16,11 @@ namespace fs = std::filesystem;
 #include "SDL3/SDL.h"
 
 
-extern SDL_Window* g_main_window;
+extern SDL_Window*   g_main_window;
+extern SDL_Renderer* g_main_renderer;
+
+
+HANDLE_GEN_32( h_thumbnail );
 
 
 // ---------------------------------------------------------
@@ -75,18 +79,42 @@ void register_codec( ICodec* codec );
 // ---------------------------------------------------------
 
 
+// TODO: handle videos soon
+struct main_image_data_t
+{
+	SDL_Texture* texture;
+	SDL_Surface* surface;
+};
+
 // imgui scroll hack lol
-extern bool g_mouse_scrolled_up;
-extern bool g_mouse_scrolled_down;
+extern bool                       g_mouse_scrolled_up;
+extern bool                       g_mouse_scrolled_down;
+
+extern std::vector< fs::path >    g_folder_media_list;
+extern std::vector< h_thumbnail > g_folder_thumbnail_list;
+extern size_t                     g_folder_index;
 
 
-void media_view_load();
+// Main Image
+extern image_t                    g_image;
+extern main_image_data_t          g_image_data;
+extern size_t                     g_image_index;
 
-void gallery_view_scroll_to_selected();
-void gallery_view_input();
-void gallery_view_draw();
+// Previous Image to Free
+extern main_image_data_t          g_image_data_free;
 
-void gallery_view_toggle();
+
+void                              media_view_load();
+void                              media_view_input();
+void                              media_view_draw();
+
+void                              gallery_view_scroll_to_selected();
+void                              gallery_view_input();
+void                              gallery_view_draw();
+
+void                              gallery_view_toggle();
+
+void                              folder_load_media_list();
 
 
 // ---------------------------------------------------------
@@ -114,9 +142,6 @@ enum e_thumbnail_status
 	// Failed to load thumbnail
 	e_thumbnail_status_failed,
 };
-
-
-HANDLE_GEN_32( h_thumbnail );
 
 
 struct thumbnail_t
