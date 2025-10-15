@@ -275,7 +275,7 @@ int main( int argc, char* argv[] )
 			gallery_view_toggle();
 		}
 
-		// ImGui::ShowDemoWindow();
+		ImGui::ShowDemoWindow();
 		imgui_draw();
 
 		ImGui::Render();

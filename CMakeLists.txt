@@ -8,6 +8,8 @@ set( CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo" )
 set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 set( CMAKE_SHARED_LIBRARY_PREFIX "" )
 
+option( FREETYPE "Use Freetype in ImGui" ON )
+
 project( media_tag_system )
 
 set( PROJ_OBJ "obj" )
@@ -163,6 +165,21 @@ set(
     src/imgui/imgui_widgets.cpp
 )
 
+set( FREETYPE_DIR "thirdparty/freetype" )
+
+if ( FREETYPE )
+	set(
+		FREETYPE_IMGUI_SRC
+		src/imgui/imgui_freetype.cpp
+		src/imgui/imgui_freetype.h
+	)
+
+	include_directories( "${FREETYPE_DIR}/include" )
+	add_compile_definitions( IMGUI_ENABLE_FREETYPE=1 )
+else()
+	set( FREETYPE_IMGUI_SRC )
+endif()
+
 include_directories(
 	"src/"
 	"src/imgui"
@@ -171,11 +188,24 @@ include_directories(
 	"thirdparty/mozjpeg"
 )
 
-add_executable( media_tag_system ${SRC_FILES} )
+add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} )
 
 # native file dialog
 target_link_libraries( media_tag_system PRIVATE nfd SDL3 turbojpeg-static )
 target_link_directories( media_tag_system PRIVATE "thirdparty/nativefiledialog/build/src" "thirdparty/SDL3/lib/x64" "thirdparty/mozjpeg/build" )
+
+if ( FREETYPE )
+	target_link_libraries( media_tag_system PRIVATE "freetype" )
+	# target_link_directories( media_tag_system "${FREETYPE_DIR}/include" )
+
+	foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
+	target_link_directories(
+		media_tag_system PRIVATE
+		target_link_directories( media_tag_system PRIVATE "${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static" )
+	)
+	endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
+
+endif()
 
 foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	target_link_directories(
@@ -188,7 +218,7 @@ endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}/src
 	PREFIX "Source Files"
-	FILES ${SRC_FILES}
+	FILES ${SRC_FILES} ${FREETYPE_IMGUI_SRC}
 )
 
 
