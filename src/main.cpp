@@ -24,6 +24,11 @@ bool                       g_gallery_view       = false;
 
 bool                       g_mouse_scrolled_up   = false;
 bool                       g_mouse_scrolled_down = false;
+bool                       g_window_resized      = false;
+
+ivec2                      g_mouse_delta{};
+ivec2                      g_mouse_pos{};
+ivec2                      g_mouse_pos_prev{};
 
 // Main Image
 image_t                    g_image;
@@ -34,6 +39,7 @@ size_t                     g_image_index = 0;
 main_image_data_t          g_image_data_free;
 
 std::vector< fs::path >    g_folder_media_list;
+std::vector< std::string > g_folder_media_filenames;
 std::vector< h_thumbnail > g_folder_thumbnail_list;
 size_t                     g_folder_index = 0;
 
@@ -44,12 +50,31 @@ void register_codec( ICodec* codec )
 }
 
 
+void update_window_title()
+{
+	char buf[ 512 ];
+
+	if ( g_gallery_view )
+	{
+		snprintf( buf, 512, "Media Tag System - %s", TEST_FOLDER.string().c_str() );
+	}
+	else
+	{
+		snprintf( buf, 512, "Media Tag System - %s", g_folder_media_list[ g_folder_index ].string().c_str() );
+	}
+
+	SDL_SetWindowTitle( g_main_window, buf );
+}
+
+
 void folder_load_media_list()
 {
 	g_folder_media_list.clear();
+	g_folder_media_filenames.clear();
 	g_folder_thumbnail_list.clear();
 
 	g_folder_media_list.reserve( 5000 );
+	g_folder_media_filenames.reserve( 5000 );
 	g_folder_thumbnail_list.reserve( 5000 );
 
 	for ( const auto& entry : fs::directory_iterator( TEST_FOLDER ) )
@@ -62,6 +87,7 @@ void folder_load_media_list()
 		if ( path.extension() == ".jpg" || path.extension() == ".jpeg" )
 		{
 			g_folder_media_list.push_back( path );
+			g_folder_media_filenames.push_back( path.filename().string() );
 			// g_folder_thumbnail_list.push_back( UINT32_MAX );
 		}
 	}
@@ -78,7 +104,7 @@ void imgui_draw()
 	}
 	else
 	{
-		media_view_input();
+		media_view_draw_imgui();
 	}
 }
 
@@ -96,6 +122,8 @@ void gallery_view_toggle()
 	}
 
 	g_gallery_view = !g_gallery_view;
+
+	update_window_title();
 }
 
 
@@ -116,6 +144,9 @@ int main( int argc, char* argv[] )
 		return 1;
 	}
 
+	if ( !SDL_SetRenderVSync( g_main_renderer, 1 ) )
+		printf( "Failed to enable VSync\n" );
+
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 
@@ -129,6 +160,15 @@ int main( int argc, char* argv[] )
 	{
 		printf( "Failed to init imgui for sdl3 renderer\n" );
 		return 1;
+	}
+
+	sys_font_data_t font_data = sys_get_font();
+
+	if ( font_data.font_path )
+	{
+		ImGui::GetIO().Fonts->AddFontFromFileTTF( font_data.font_path, font_data.height, nullptr );
+
+		ImGui_ImplSDLRenderer3_CreateDeviceObjects();
 	}
 
 	ImGuiIO& io      = ImGui::GetIO();
@@ -159,14 +199,18 @@ int main( int argc, char* argv[] )
 	{
 		// don't go full speed lol
 		// SDL_Delay( 5 );
-		SDL_Delay( 2 );
+		//SDL_Delay( 2 );
 		
 		thumbnail_loader_update();
 
 		g_mouse_scrolled_up   = false;
 		g_mouse_scrolled_down = false;
+		g_window_resized      = false;
 
 		//auto      startTime = std::chrono::high_resolution_clock::now();
+
+		g_mouse_delta[ 0 ]    = 0.f;
+		g_mouse_delta[ 1 ]    = 0.f;
 
 		// Handle Events
 		SDL_Event event;
@@ -181,6 +225,15 @@ int main( int argc, char* argv[] )
 						g_mouse_scrolled_up = true;
 					else
 						g_mouse_scrolled_down = true;
+
+					media_view_scroll_zoom( event.wheel.integer_y );
+					break;
+
+				case SDL_EVENT_MOUSE_MOTION:
+					g_mouse_pos[ 0 ] = event.motion.x;
+					g_mouse_pos[ 1 ] = event.motion.y;
+					g_mouse_delta[ 0 ] += event.motion.xrel;
+					g_mouse_delta[ 1 ] += event.motion.yrel;
 					break;
 
 				case SDL_EVENT_WINDOW_RESIZED:
@@ -188,6 +241,9 @@ int main( int argc, char* argv[] )
 					SDL_GetWindowSize( g_main_window, &width, &height );
 					io.DisplaySize.x = width;
 					io.DisplaySize.y = height;
+
+					g_window_resized = true;
+					media_view_window_resize();
 					break;
 
 				case SDL_EVENT_QUIT:
@@ -196,6 +252,12 @@ int main( int argc, char* argv[] )
 					break;
 			}
 		}
+
+		//g_mouse_delta[ 0 ]    = g_mouse_pos[ 0 ] - g_mouse_pos_prev[ 0 ];
+		//g_mouse_delta[ 1 ]    = g_mouse_pos[ 1 ] - g_mouse_pos_prev[ 1 ];
+		
+		g_mouse_pos_prev[ 0 ] = g_mouse_pos[ 0 ];
+		g_mouse_pos_prev[ 1 ] = g_mouse_pos[ 1 ];
 
 		if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_MINIMIZED )
 		{
@@ -213,7 +275,7 @@ int main( int argc, char* argv[] )
 			gallery_view_toggle();
 		}
 
-		ImGui::ShowDemoWindow();
+		// ImGui::ShowDemoWindow();
 		imgui_draw();
 
 		ImGui::Render();
@@ -224,7 +286,7 @@ int main( int argc, char* argv[] )
 
 		if ( !g_gallery_view && g_image_data.texture )
 		{
-			media_view_draw();
+			media_view_draw_image();
 		}
 
 		ImGui_ImplSDLRenderer3_RenderDrawData( ImGui::GetDrawData(), g_main_renderer );

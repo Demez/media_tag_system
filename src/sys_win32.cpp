@@ -659,6 +659,36 @@ void sys_browse_to_file( const char* path )
 }
 
 
+// TODO: query the registry to get the font path
+// also add freetype to this
+sys_font_data_t sys_get_font()
+{
+	NONCLIENTMETRICS metrics{ sizeof( NONCLIENTMETRICS ) };
+
+	BOOL ret = SystemParametersInfo( SPI_GETNONCLIENTMETRICS, sizeof( NONCLIENTMETRICS ), &metrics, 0 );
+
+	if ( ret == FALSE )
+	{
+		sys_print_last_error();
+		printf( "Failed to get info for font paths\n" );
+		return {};
+	}
+
+	sys_font_data_t font_data{};
+
+	wchar_t         buf[ 512 ];
+	// _snwprintf( buf, 512, L"C:\\Windows\\Fonts\\%s.ttf", metrics.lfCaptionFont.lfFaceName );
+	_snwprintf( buf, 512, L"C:\\Windows\\Fonts\\%s.ttf", L"segoeui" );
+
+	font_data.font_path = sys_to_utf8( buf );
+	// font_data.height    = abs( metrics.lfCaptionFont.lfHeight );
+	font_data.height    = 16;
+	font_data.weight    = abs( metrics.lfCaptionFont.lfWeight );
+
+	return font_data;
+}
+
+
 static LARGE_INTEGER g_win_perf_freq;
 
 int sys_init()

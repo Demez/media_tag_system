@@ -79,6 +79,14 @@ void register_codec( ICodec* codec );
 // ---------------------------------------------------------
 
 
+enum e_zoom_mode
+{
+	e_zoom_mode_fit,
+	e_zoom_mode_fit_width,
+	e_zoom_mode_fixed,
+};
+
+
 // TODO: handle videos soon
 struct main_image_data_t
 {
@@ -86,9 +94,15 @@ struct main_image_data_t
 	SDL_Surface* surface;
 };
 
+
 // imgui scroll hack lol
 extern bool                       g_mouse_scrolled_up;
 extern bool                       g_mouse_scrolled_down;
+extern bool                       g_window_resized;
+
+extern ivec2                      g_mouse_delta;
+extern ivec2                      g_mouse_pos;
+extern ivec2                      g_mouse_pos_prev;
 
 extern std::vector< fs::path >    g_folder_media_list;
 extern std::vector< h_thumbnail > g_folder_thumbnail_list;
@@ -96,6 +110,7 @@ extern size_t                     g_folder_index;
 
 
 // Main Image
+extern e_zoom_mode                g_image_zoom_mode;
 extern image_t                    g_image;
 extern main_image_data_t          g_image_data;
 extern size_t                     g_image_index;
@@ -106,7 +121,11 @@ extern main_image_data_t          g_image_data_free;
 
 void                              media_view_load();
 void                              media_view_input();
-void                              media_view_draw();
+void                              media_view_draw_imgui();
+void                              media_view_draw_image();
+void                              media_view_scroll_zoom( float amount );
+void                              media_view_advance( bool prev = false );
+void                              media_view_window_resize();
 
 void                              gallery_view_scroll_to_selected();
 void                              gallery_view_input();
@@ -114,6 +133,7 @@ void                              gallery_view_draw();
 
 void                              gallery_view_toggle();
 
+void                              update_window_title();
 void                              folder_load_media_list();
 
 

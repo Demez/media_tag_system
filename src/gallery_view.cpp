@@ -10,6 +10,7 @@ struct gallery_item_t
 extern fs::path TEST_FOLDER;
 
 extern std::vector< fs::path >    g_folder_media_list;
+extern std::vector< std::string > g_folder_media_filenames;
 extern std::vector< h_thumbnail > g_folder_thumbnail_list;
 extern size_t                     g_folder_index;
 
@@ -150,20 +151,24 @@ void gallery_view_draw_content()
 
 	// scroll speed hack
 	{
-		static float prev_scroll = ImGui::GetScrollY();
 		float scroll = ImGui::GetScrollY();
-
+		float scroll_amount = item_size_y + style.ItemSpacing.y;
+		
 		if ( g_mouse_scrolled_up )
-		{
-			// float diff = scroll - prev_scroll;
-			ImGui::SetScrollY( scroll - MOUSE_SCROLL_AMOUNT );
-		}
+			scroll -= scroll_amount;
+
 		else if ( g_mouse_scrolled_down )
+			scroll += scroll_amount;
+
+		if ( g_window_resized )
 		{
-			ImGui::SetScrollY( scroll + MOUSE_SCROLL_AMOUNT );
+			float scroll_diff = fmod( scroll, scroll_amount );
+
+			if ( scroll_diff > 0 )
+				scroll -= scroll_diff;
 		}
 
-		prev_scroll = scroll;
+		ImGui::SetScrollY( scroll );
 	}
 
 	for ( size_t i = 0; i < g_folder_media_list.size(); i++ )
@@ -321,7 +326,7 @@ void gallery_view_draw_content()
 #endif
 		}
 
-		ImGui::TextUnformatted( entry.string().c_str() );
+		ImGui::TextUnformatted( g_folder_media_filenames[ i ].c_str() );
 
 		ImGui::EndChild();
 

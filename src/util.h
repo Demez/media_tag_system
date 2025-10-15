@@ -299,6 +299,16 @@ int         sys_execute( const char* command );
 // NOTE: path cannot be over MAX_PATH (260 characters), thanks windows shell
 void        sys_browse_to_file( const char* path );
 
+struct sys_font_data_t
+{
+	char* font_path;
+	float weight;
+	float height;
+};
+
+// get the default font to use for imgui
+sys_font_data_t sys_get_font();
+
 // print color with \aFFF escape codes for color values
 //void        sys_print_color( const char* string );
 
