@@ -130,6 +130,9 @@ if ( MSVC )
 		"/INCREMENTAL"
 	)
 	
+	message( "Copying SDL3" )
+	configure_file( "thirdparty/SDL3/lib/x64/SDL3.dll" "${PROJ_OUT}/SDL3.dll" COPYONLY )
+	
 else()  # linux
 endif()
 
