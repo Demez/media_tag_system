@@ -9,8 +9,6 @@ struct gallery_item_t
 
 extern fs::path TEST_FOLDER;
 
-extern std::vector< fs::path >    g_folder_media_list;
-extern std::vector< std::string > g_folder_media_filenames;
 extern std::vector< h_thumbnail > g_folder_thumbnail_list;
 extern size_t                     g_folder_index;
 
@@ -173,9 +171,9 @@ void gallery_view_draw_content()
 
 	for ( size_t i = 0; i < g_folder_media_list.size(); i++ )
 	{
-		const fs::path& entry  = g_folder_media_list[ i ];
+		const media_entry_t& media  = g_folder_media_list[ i ];
 
-		float           scroll = ImGui::GetScrollY();
+		float                scroll = ImGui::GetScrollY();
 
 		ImGui::SetNextWindowSize( { item_size_x, item_size_y } );
 
@@ -315,7 +313,7 @@ void gallery_view_draw_content()
 			else
 			{
 				if ( !thumbnail )
-					thumbnail_requests.emplace_back( entry, i );
+					thumbnail_requests.emplace_back( media.path, i );
 				// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 				ImGui::Dummy( { image_bounds, image_bounds } );
@@ -326,7 +324,7 @@ void gallery_view_draw_content()
 #endif
 		}
 
-		ImGui::TextUnformatted( g_folder_media_filenames[ i ].c_str() );
+		ImGui::TextUnformatted( media.filename.c_str() );
 
 		ImGui::EndChild();
 

@@ -10,7 +10,6 @@ bool                     g_image_flip_v = false;
 bool                     g_image_flip_h = false;
 float                    g_image_rot    = 0.f;
 
-
 // Image Panning
 bool                     g_image_pan    = false;
 
@@ -24,6 +23,12 @@ extern ICodec*           g_test_codec;
 
 constexpr double         ZOOM_AMOUNT = 0.1;
 constexpr double         ZOOM_MIN    = 0.01;
+
+
+static e_media_type get_media_type()
+{
+	return g_folder_media_list[ g_folder_index ].type;
+}
 
 
 void media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true )
@@ -216,7 +221,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
 	{
-		sys_browse_to_file( g_folder_media_list[ g_folder_index ].string().c_str() );
+		sys_browse_to_file( g_folder_media_list[ g_folder_index ].path.string().c_str() );
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -353,7 +358,7 @@ void media_view_input()
 
 void media_view_window_resize()
 {
-	if ( g_image_zoom_mode == e_zoom_mode_fit || e_zoom_mode_fit_width )
+	if ( g_image_zoom_mode == e_zoom_mode_fit || g_image_zoom_mode == e_zoom_mode_fit_width )
 	{
 		media_view_fit_in_view( false );
 	}
@@ -362,28 +367,41 @@ void media_view_window_resize()
 
 void media_view_load()
 {
-	float load_time = 0.f;
+	float          load_time = 0.f;
+	media_entry_t& entry = g_folder_media_list[ g_folder_index ];
 
 	{
 		auto startTime = std::chrono::high_resolution_clock::now();
 
-		// g_image_view.image = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
-		g_test_codec->image_load( g_folder_media_list[ g_folder_index ], &g_image );
+		if ( entry.type == e_media_type_image )
+		{
+			// g_image_view.image = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
+			g_test_codec->image_load( entry.path, &g_image );
+		}
+		else
+		{
+			mpv_cmd_loadfile( entry.path.string().c_str() );
+		}
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 
 		load_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
+
+		// auto startTime       = std::chrono::high_resolution_clock::now();
+
+		if ( entry.type == e_media_type_image )
+		{
+			gl_update_texture( g_image_data.texture, &g_image );
+		}
+
+	//	g_image_data.surface = SDL_CreateSurfaceFrom( g_image.width, g_image.height, g_image.format, g_image.data, g_image.pitch );
+	//	g_image_data.texture = SDL_CreateTextureFromSurface( g_main_renderer, g_image_data.surface );
+
+		// auto  currentTime    = std::chrono::high_resolution_clock::now();
+		// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
+		//printf( "%f Load - %f Up - %s\n", load_time, up_time, g_folder_media_list[ g_folder_index ].string().c_str() );
+		printf( "%f Load - %s\n", load_time, g_folder_media_list[ g_folder_index ].path.string().c_str() );
 	}
-
-	// auto startTime       = std::chrono::high_resolution_clock::now();
-
-	g_image_data.surface = SDL_CreateSurfaceFrom( g_image.width, g_image.height, g_image.format, g_image.data, g_image.pitch );
-	g_image_data.texture = SDL_CreateTextureFromSurface( g_main_renderer, g_image_data.surface );
-
-	// auto  currentTime    = std::chrono::high_resolution_clock::now();
-	// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-	//printf( "%f Load - %f Up - %s\n", load_time, up_time, g_folder_media_list[ g_folder_index ].string().c_str() );
-	printf( "%f Load - %s\n", load_time, g_folder_media_list[ g_folder_index ].string().c_str() );
 
 	g_image_index = g_folder_index;
 
@@ -395,8 +413,15 @@ void media_view_load()
 
 void media_view_advance( bool prev )
 {
-	g_image_data_free = g_image_data;
+	if ( g_folder_media_list.size() == 1 )
+		return;
 
+	if ( get_media_type() == e_media_type_video )
+		mpv_cmd_loadfile( "" );
+	//else
+	//	g_image_data_free = g_image_data;
+
+advance:
 	if ( prev )
 	{
 		if ( g_folder_index == 0 )
@@ -412,6 +437,9 @@ void media_view_advance( bool prev )
 			g_folder_index = 0;
 	}
 
+	if ( g_folder_media_list[ g_folder_index ].type == e_media_type_directory )
+		goto advance;
+
 	media_view_load();
 }
 
@@ -419,10 +447,28 @@ void media_view_advance( bool prev )
 void media_view_draw_imgui()
 {
 	media_view_input();
+
+	if ( get_media_type() == e_media_type_video )
+	{
+		// Draw playback controls
+	}
+	else if ( get_media_type() == e_media_type_image_animated )
+	{
+		// Draw frame controls
+	}
 }
 
 
-void media_view_draw_image()
+float vertices[] = {
+	// positions          // colors           // texture coords
+	0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,    // top right
+	0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,   // bottom right
+	-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom left
+	-0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f    // top left
+};
+
+
+static void media_view_draw_image()
 {
 	SDL_FRect dst_rect{};
 	dst_rect.w = g_image_size.x;
@@ -442,13 +488,56 @@ void media_view_draw_image()
 		dst_rect.y += g_image_size.y;
 	}
 
+	int width, height;
+	SDL_GetWindowSize( g_main_window, &width, &height );
+
+	glEnable( GL_TEXTURE_2D );
+	glBindTexture( GL_TEXTURE_2D, g_image_data.texture );
+
+ 	glMatrixMode( GL_PROJECTION );
+ 	glLoadIdentity();
+ 	//glOrtho( g_image_pos.x, g_image_pos.x + g_image_size.x, g_image_pos.y, g_image_pos.y + g_image_size.y, -1, 1 );
+ 	glOrtho( 0, width, height, 0, -1, 1 );
+ 	glMatrixMode( GL_MODELVIEW );
+ 	glLoadIdentity();
+ 
+ 	glBegin( GL_QUADS );
+//	glTexCoord2f( 0, 1 );
+//	glVertex2f( g_image_pos.x, g_image_pos.y );
+//	glTexCoord2f( 1, 1 );
+//	glVertex2f( g_image_pos.x + 50, g_image_pos.y );
+//	glTexCoord2f( 1, 0 );
+//	glVertex2f( g_image_pos.x + 50, g_image_pos.y + 50 );
+//	glTexCoord2f( 0, 0 );
+//	glVertex2f( g_image_pos.x, g_image_pos.y + 50 );
+
+ 	glTexCoord2f( 0, 0 );
+	glVertex2f( g_image_pos.x, g_image_pos.y );
+ 	glTexCoord2f( 1, 0 );
+	glVertex2f( g_image_pos.x + g_image_size.x, g_image_pos.y );
+ 	glTexCoord2f( 1, 1 );
+	glVertex2f( g_image_pos.x + g_image_size.x, g_image_pos.y + g_image_size.y );
+ 	glTexCoord2f( 0, 1 );
+	glVertex2f( g_image_pos.x, g_image_pos.y + g_image_size.y );
+ 	glEnd();
+
+	glDisable( GL_TEXTURE_2D );
+
 	// SDL_RenderTexture( g_main_renderer, g_image_data.texture, NULL, &dst_rect );
 
-	ImVec2 mouse_pos_image_coords( (float)g_mouse_pos[ 0 ] - g_image_pos.x, (float)g_mouse_pos[ 1 ] - g_image_pos.y );
-	ImVec2 image_pos_end( g_image_pos.x + g_image_size.x, g_image_pos.y + g_image_size.y );
+//	SDL_RenderTextureRotated( g_main_renderer, g_image_data.texture, NULL, &dst_rect, g_image_rot, nullptr, SDL_FLIP_NONE );
+}
 
-	SDL_FPoint image_center( g_image_pos.x + ( g_image_size.x / 2 ), g_image_pos.y + ( g_image_size.y / 2 ) );
 
-	SDL_RenderTextureRotated( g_main_renderer, g_image_data.texture, NULL, &dst_rect, g_image_rot, nullptr, SDL_FLIP_NONE );
+void media_view_draw()
+{
+	if ( get_media_type() == e_media_type_video )
+	{
+		mpv_draw_frame();
+	}
+	else
+	{
+		media_view_draw_image();
+	}
 }
 

@@ -1,23 +1,25 @@
 #pragma once
 
+#include "mpv_interface.h"
 #include "args.h"
 #include "util.h"
 #include "handles.h"
 
-#include <filesystem>
-
-namespace fs = std::filesystem;
+#include "imgui.h"
+#include "glad/glad.h"
+#include "SDL3/SDL.h"
 
 #include <cstdio>
 #include <vector>
 #include <atomic>
 
-#include "imgui.h"
-#include "SDL3/SDL.h"
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 
 extern SDL_Window*   g_main_window;
-extern SDL_Renderer* g_main_renderer;
+// extern SDL_Renderer* g_main_renderer;
 
 
 HANDLE_GEN_32( h_thumbnail );
@@ -33,7 +35,7 @@ struct image_t
 	int             height;
 	int             bit_depth;
 	int             pitch;
-	SDL_PixelFormat format;
+	GLint           format;
 	unsigned char*  data;
 };
 
@@ -79,6 +81,18 @@ void register_codec( ICodec* codec );
 // ---------------------------------------------------------
 
 
+enum e_media_type
+{
+	e_media_type_none,
+	e_media_type_directory,
+	e_media_type_image,
+	e_media_type_image_animated,
+	e_media_type_video,
+
+	e_media_type_count,
+};
+
+
 enum e_zoom_mode
 {
 	e_zoom_mode_fit,
@@ -87,54 +101,64 @@ enum e_zoom_mode
 };
 
 
-// TODO: handle videos soon
+struct media_entry_t
+{
+	fs::path     path;
+	std::string  filename;
+	e_media_type type;
+};
+
+
 struct main_image_data_t
 {
-	SDL_Texture* texture;
-	SDL_Surface* surface;
+	// TODO: add multiple frames here
+	GLuint texture;
 };
 
 
 // imgui scroll hack lol
-extern bool                       g_mouse_scrolled_up;
-extern bool                       g_mouse_scrolled_down;
-extern bool                       g_window_resized;
+extern bool                         g_mouse_scrolled_up;
+extern bool                         g_mouse_scrolled_down;
+extern bool                         g_window_resized;
 
-extern ivec2                      g_mouse_delta;
-extern ivec2                      g_mouse_pos;
-extern ivec2                      g_mouse_pos_prev;
+extern ivec2                        g_mouse_delta;
+extern ivec2                        g_mouse_pos;
 
-extern std::vector< fs::path >    g_folder_media_list;
-extern std::vector< h_thumbnail > g_folder_thumbnail_list;
-extern size_t                     g_folder_index;
+extern std::vector< media_entry_t > g_folder_media_list;
+extern std::vector< h_thumbnail >   g_folder_thumbnail_list;
+extern size_t                       g_folder_index;
 
 
 // Main Image
-extern e_zoom_mode                g_image_zoom_mode;
-extern image_t                    g_image;
-extern main_image_data_t          g_image_data;
-extern size_t                     g_image_index;
+extern e_zoom_mode                  g_image_zoom_mode;
+extern image_t                      g_image;
+extern main_image_data_t            g_image_data;
+extern size_t                       g_image_index;
 
 // Previous Image to Free
-extern main_image_data_t          g_image_data_free;
+extern main_image_data_t            g_image_data_free;
 
 
-void                              media_view_load();
-void                              media_view_input();
-void                              media_view_draw_imgui();
-void                              media_view_draw_image();
-void                              media_view_scroll_zoom( float amount );
-void                              media_view_advance( bool prev = false );
-void                              media_view_window_resize();
+void                                media_view_load();
+void                                media_view_input();
+void                                media_view_draw_imgui();
+void                                media_view_draw();
+void                                media_view_scroll_zoom( float amount );
+void                                media_view_advance( bool prev = false );
+void                                media_view_window_resize();
 
-void                              gallery_view_scroll_to_selected();
-void                              gallery_view_input();
-void                              gallery_view_draw();
+void                                gallery_view_scroll_to_selected();
+void                                gallery_view_input();
+void                                gallery_view_draw();
 
-void                              gallery_view_toggle();
+void                                gallery_view_toggle();
 
-void                              update_window_title();
-void                              folder_load_media_list();
+void                                update_window_title();
+void                                folder_load_media_list();
+
+GLuint                              gl_upload_texture( image_t* image );
+void                                gl_update_texture( GLuint texture, image_t* image );
+void                                gl_free_texture( GLuint texture );
 
 
 // ---------------------------------------------------------
@@ -170,8 +194,7 @@ struct thumbnail_t
 	u32                               distance;  // higher distances get freed first for other thumbnails
 	char*                             path;      // mainly for debugging
 	image_t*                          data;
-	SDL_Surface*                      sdl_surface;
-	SDL_Texture*                      sdl_texture;
+	GLuint                            texture;
 	ImTextureRef                      im_texture;
 };
 

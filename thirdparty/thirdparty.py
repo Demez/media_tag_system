@@ -100,9 +100,10 @@ def _print_severity(level: Severity, spacing: str, *text):
 
 
 def win32_set_fore_color(color: int):
-    if not ctypes.windll.kernel32.SetConsoleTextAttribute(_win32_handle, color):
-        print(f"[ERROR] WIN32 Changing Colors Failed, Error Code: {str(ctypes.GetLastError())},"
-              f" color: {color}, handle: {str(_win32_handle)}")
+    ctypes.windll.kernel32.SetConsoleTextAttribute(_win32_handle, color)
+    # if not ctypes.windll.kernel32.SetConsoleTextAttribute(_win32_handle, color):
+    #     print(f"[ERROR] WIN32 Changing Colors Failed, Error Code: {str(ctypes.GetLastError())},"
+    #           f" color: {color}, handle: {str(_win32_handle)}")
 
 
 def stdout_color(color: Color, *text):
@@ -347,6 +348,9 @@ Basic Structure for a file here:
     
     # OPTIONAL: Name of the folder the file is extracted to, and will be renamed to what "name" is, usually not needed
     "extracted_folder": "",
+    
+    # OPTIONAL: If we can't extract this, tell the user to extract it manually, thanks p7zr and mpv...
+    "user_extract": False,
 },
 '''
 
@@ -371,6 +375,12 @@ FILE_LIST = {
             "file": "nativefiledialog-extended-1.2.1.zip",
             "name": "nativefiledialog",
             "func": compile_nativefiledialog,
+        },
+        {
+            "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20251017/mpv-dev-x86_64-v3-20251017-git-233e896.7z",
+            "file": "mpv-dev-x86_64-v3-20251017-git-233e896.7z",
+            "name": "mpv",
+            "user_extract": True,
         },
     ],
 
@@ -415,34 +425,59 @@ def download_file(url: str) -> bytes:
     return file_data
 
 
-def extract_file(file_data: bytes, file: str, file_ext: str, folder: str) -> bool:
-    # i hate this, why is there no library that can load it from bytes directly
-    tmp_file = "tmp." + file
-    tmp_file_io: BinaryIO
-    with open(tmp_file, mode="wb") as tmp_file_io:
-        tmp_file_io.write(file_data)
+def write_file(file: str, file_data: bytes) -> bool:
+    try:
+        file_io: BinaryIO
+        with open(file, mode="wb") as file_io:
+            file_io.write(file_data)
+    except Exception as E:
+        print(f"Failed to write \"{file}\", {E}")
+        return False
 
+    return True
+
+
+def extract_file_user(file: str, folder: str) -> bool:
+    # play bell/error sound
+    print("\007")
+
+    print(f"Please extract the file \"{file}\" yourself, current libraries don't support extracting it")
+    input("Press Enter when finished")
+
+    if not os.path.exists(folder):
+        print("Extracted folder does not exist? Skipping")
+        return False
+
+    return True
+
+
+def extract_file(tmp_file: str, file_ext: str, tmp_folder: str, folder: str, user_extract: bool) -> bool:
     if not os.path.isdir(folder):
         os.makedirs(folder)
 
-    if file_ext == "7z":
-        py7zr.unpack_7zarchive(tmp_file, folder)
-    elif file_ext == "xz":
-        with tarfile.open(tmp_file, "r:xz") as tar:
-            tar.extractall(path=folder)
-    elif file_ext == "zip":
-        zf = ZipFile(tmp_file)
-        zf.extractall(folder)
-        zf.close()
-    elif file_ext == "exe":
-        pass
+    return_value = False
+    if user_extract:
+        return_value = extract_file_user(tmp_file, tmp_folder)
     else:
-        error(f"No support for file extension - extract it manually: {file_ext}")
-        return False
+        if file_ext == "7z":
+            py7zr.unpack_7zarchive(tmp_file, folder)
+            return_value = True
+        elif file_ext == "xz":
+            with tarfile.open(tmp_file, "r:xz") as tar:
+                tar.extractall(path=folder)
+            return_value = True
+        elif file_ext == "zip":
+            zf = ZipFile(tmp_file)
+            zf.extractall(folder)
+            zf.close()
+            return_value = True
+        elif file_ext == "exe":
+            pass
+        else:
+            return_value = extract_file_user(tmp_file, tmp_folder)
 
     os.remove(tmp_file)
-
-    return True
+    return return_value
 
 
 def handle_item(item: dict):
@@ -451,6 +486,7 @@ def handle_item(item: dict):
     name = item["name"] if "name" in item else ""
     func = item["func"] if "func" in item else None
     extracted_folder = item["extracted_folder"] if "extracted_folder" in item else None
+    user_extract = item["user_extract"] if "user_extract" in item else False
 
     # Check if we want this item
     if ARGS.target is not None:
@@ -476,12 +512,16 @@ def handle_item(item: dict):
             if file_data == b"":
                 return
 
-            # is this just a full filename
-            if not is_zip:
-                with open(file, mode="wb") as file_io:
-                    file_io.write(file_data)
+            if user_extract or not is_zip:
+                tmp_file = file
             else:
-                if not extract_file(file_data, file, file_ext, "."):
+                tmp_file = "tmp." + file
+
+            if not write_file(tmp_file, file_data):
+                return False
+
+            if is_zip:
+                if not extract_file(tmp_file, file_ext, folder,".", user_extract):
                     return
 
                 # rename it
@@ -494,8 +534,6 @@ def handle_item(item: dict):
     if func:
         print_color(Color.CYAN, f"Running Post Build Func: \"{name}\"")
         func()
-
-    reset_dir()
 
 
 def main():
@@ -512,6 +550,7 @@ def main():
     # Do all platforms last
     for item in FILE_LIST[OS.Any]:
         handle_item(item)
+        reset_dir()
 
     # check for any errors and print them
     errors_str = "Error" if len(ERROR_LIST) == 1 else "Errors"

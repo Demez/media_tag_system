@@ -4,7 +4,7 @@
 #include <mutex>
 #include <queue>
 
-constexpr int         JOB_QUEUE_SIZE    = 32;
+constexpr int         JOB_QUEUE_SIZE    = 64;
 constexpr int         THUMBNAIL_THREADS = 8;
 constexpr int         MAX_THUMBNAILS    = 512;
 
@@ -69,8 +69,7 @@ void thumbnail_loader_free_data( u32 index )
 
 	thumbnail.im_texture = nullptr;
 
-	SDL_DestroyTexture( thumbnail.sdl_texture );
-	SDL_DestroySurface( thumbnail.sdl_surface );
+	gl_free_texture( thumbnail.texture );
 
 	free( thumbnail.data );
 	free( thumbnail.path );
@@ -157,7 +156,7 @@ h_thumbnail thumbnail_loader_queue_push( const char* path )
 		return {};
 	}
 
-	if ( g_thumbnail_cache.buffer[ cache_pos ].sdl_texture )
+	if ( g_thumbnail_cache.buffer[ cache_pos ].texture )
 	{
 		thumbnail_loader_free_data( cache_pos );
 	}
@@ -331,9 +330,8 @@ void thumbnail_loader_update()
 			printf( "data is nullptr\n" );
 		}
 
-		thumbnail.sdl_surface = SDL_CreateSurfaceFrom( thumbnail.data->width, thumbnail.data->height, thumbnail.data->format, thumbnail.data->data, thumbnail.data->pitch );
-		thumbnail.sdl_texture = SDL_CreateTextureFromSurface( g_main_renderer, thumbnail.sdl_surface );
-		thumbnail.im_texture  = thumbnail.sdl_texture;
+		thumbnail.texture    = gl_upload_texture( thumbnail.data );
+		thumbnail.im_texture = thumbnail.texture;
 
 		{
 			free( thumbnail.data->data );
@@ -341,7 +339,7 @@ void thumbnail_loader_update()
 			printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
 		}
 
-		if ( thumbnail.sdl_texture )
+		if ( thumbnail.texture )
 		{
 			thumbnail.status = e_thumbnail_status_finished;
 			//printf( "IMAGE FINISHED: %s\n", thumbnail.path );

@@ -129,11 +129,17 @@ if ( MSVC )
 	add_link_options(
 		"/INCREMENTAL"
 	)
+
+	link_libraries( opengl32 )
 	
 	message( "Copying SDL3" )
 	configure_file( "thirdparty/SDL3/lib/x64/SDL3.dll" "${PROJ_OUT}/SDL3.dll" COPYONLY )
 	
+	message( "Copying MPV" )
+	configure_file( "thirdparty/mpv/libmpv-2.dll" "${PROJ_OUT}/libmpv-2.dll" COPYONLY )
+	
 else()  # linux
+	link_libraries( GL )
 endif()
 
 
@@ -146,6 +152,9 @@ set(
     src/thumbnail_loader.cpp
     src/gallery_view.cpp
     src/media_view.cpp
+    src/mpv_interface.cpp
+    src/mpv_interface.h
+	
     src/util.cpp
     src/util.h
     src/args.cpp
@@ -166,6 +175,10 @@ set(
     src/imgui/imgui_impl_win32.cpp
     src/imgui/imgui_tables.cpp
     src/imgui/imgui_widgets.cpp
+
+	src/glad/glad.c
+	src/glad/glad.h
+	src/glad/khrplatform.h
 )
 
 set( FREETYPE_DIR "thirdparty/freetype" )
@@ -186,9 +199,11 @@ endif()
 include_directories(
 	"src/"
 	"src/imgui"
+	"src/glad"
 	"thirdparty/nativefiledialog/src/include"
 	"thirdparty/SDL3/include"
 	"thirdparty/mozjpeg"
+	"thirdparty/mpv/include"
 )
 
 add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} )

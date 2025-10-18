@@ -2,46 +2,48 @@
 
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
-#include "imgui_impl_sdlrenderer3.h"
+#include "imgui_impl_opengl3.h"
 
 #define DATABASE_FILE "tag_database.txt"
 
 // TEMPORARY
-ICodec*                    g_test_codec         = nullptr;
+ICodec*                      g_test_codec  = nullptr;
 
-fs::path                   TEST_IMAGE           = "D:\\demez_archive\\media\\downloads\\art\\[bsky] camothetiger.bsky.social—2025.04.14—3lmqydllpak2a—bafkreidjzm36t5zwx7drrmioalhswola36t3hngwmtqbolfriogffzclbe.jpg";
+fs::path                     TEST_VIDEO    = "D:\\demez_archive\\media\\downloads\\animation\\[twitter] Firefwex—2025.09.08—1964945929297183176—1OJiHkcntDGT4NR5.mp4";
+fs::path                     TEST_IMAGE    = "D:\\demez_archive\\media\\downloads\\art\\[bsky] camothetiger.bsky.social—2025.04.14—3lmqydllpak2a—bafkreidjzm36t5zwx7drrmioalhswola36t3hngwmtqbolfriogffzclbe.jpg";
 // fs::path TEST_IMAGE      = "D:\\demez_archive\\media\\downloads\\art\\WsWLHtGJ_400x400.jpg";
-fs::path                   TEST_FOLDER          = "D:\\demez_archive\\media\\downloads\\art";
+//fs::path                     TEST_FOLDER   = "D:\\demez_archive\\media\\downloads\\art";
+fs::path                     TEST_FOLDER   = "D:\\demez_archive\\media\\downloads";
 // fs::path                   TEST_FOLDER          = "D:\\demez_archive\\media\\downloads\\_unsorted";
 // fs::path                   TEST_FOLDER          = "D:\\demez_archive\\media\\downloads\\photos_furry";
 
 
-SDL_Window*                g_main_window        = nullptr;
-SDL_Renderer*              g_main_renderer      = nullptr;
+SDL_Window*                  g_main_window = nullptr;
+// SDL_Renderer*              g_main_renderer       = nullptr;
+SDL_GLContext                g_gl_context;
 
-bool                       g_running            = true;
-bool                       g_gallery_view       = false;
+bool                         g_running             = true;
+bool                         g_gallery_view        = false;
+bool                         g_mpv_ready           = false;
 
-bool                       g_mouse_scrolled_up   = false;
-bool                       g_mouse_scrolled_down = false;
-bool                       g_window_resized      = false;
+bool                         g_mouse_scrolled_up   = false;
+bool                         g_mouse_scrolled_down = false;
+bool                         g_window_resized      = false;
 
-ivec2                      g_mouse_delta{};
-ivec2                      g_mouse_pos{};
-ivec2                      g_mouse_pos_prev{};
+ivec2                        g_mouse_delta{};
+ivec2                        g_mouse_pos{};
 
 // Main Image
-image_t                    g_image;
-main_image_data_t          g_image_data;
-size_t                     g_image_index = 0;
+image_t                      g_image;
+main_image_data_t            g_image_data;
+size_t                       g_image_index = 0;
 
 // Previous Image to Free
-main_image_data_t          g_image_data_free;
+main_image_data_t            g_image_data_free;
 
-std::vector< fs::path >    g_folder_media_list;
-std::vector< std::string > g_folder_media_filenames;
-std::vector< h_thumbnail > g_folder_thumbnail_list;
-size_t                     g_folder_index = 0;
+std::vector< media_entry_t > g_folder_media_list;
+std::vector< h_thumbnail >   g_folder_thumbnail_list;
+size_t                       g_folder_index = 0;
 
 
 void register_codec( ICodec* codec )
@@ -60,7 +62,7 @@ void update_window_title()
 	}
 	else
 	{
-		snprintf( buf, 512, "Media Tag System - %s", g_folder_media_list[ g_folder_index ].string().c_str() );
+		snprintf( buf, 512, "Media Tag System - %s", g_folder_media_list[ g_folder_index ].path.string().c_str() );
 	}
 
 	SDL_SetWindowTitle( g_main_window, buf );
@@ -70,26 +72,52 @@ void update_window_title()
 void folder_load_media_list()
 {
 	g_folder_media_list.clear();
-	g_folder_media_filenames.clear();
 	g_folder_thumbnail_list.clear();
 
 	g_folder_media_list.reserve( 5000 );
-	g_folder_media_filenames.reserve( 5000 );
 	g_folder_thumbnail_list.reserve( 5000 );
 
 	for ( const auto& entry : fs::directory_iterator( TEST_FOLDER ) )
 	{
-		if ( !entry.is_regular_file() )
-			continue;
-
 		const fs::path& path = entry.path();
 
-		if ( path.extension() == ".jpg" || path.extension() == ".jpeg" )
+		if ( entry.is_directory() )
 		{
-			g_folder_media_list.push_back( path );
-			g_folder_media_filenames.push_back( path.filename().string() );
-			// g_folder_thumbnail_list.push_back( UINT32_MAX );
+			g_folder_media_list.emplace_back( path, path.filename().string(), e_media_type_directory );
+			continue;
 		}
+
+		const fs::path& ext       = path.extension();
+		e_media_type    type      = e_media_type_none;
+		bool            valid_ext = false;
+
+		// Image Formats
+		valid_ext |= ext == ".jpg";
+		valid_ext |= ext == ".jpeg";
+
+		if ( valid_ext )
+		{
+			type = e_media_type_image;
+		}
+		else
+		{
+			// Video Formats
+			valid_ext |= ext == ".mp4";
+			valid_ext |= ext == ".mkv";
+			valid_ext |= ext == ".webm";
+			valid_ext |= ext == ".mov";
+
+			if ( valid_ext )
+			{
+				type = e_media_type_video;
+			}
+		}
+
+		if ( !valid_ext )
+			continue;
+
+		g_folder_media_list.emplace_back( path, path.filename().string(), type );
+		// g_folder_thumbnail_list.push_back( UINT32_MAX );
 	}
 
 	g_folder_thumbnail_list.resize( g_folder_media_list.size() );
@@ -118,6 +146,8 @@ void gallery_view_toggle()
 	}
 	else
 	{
+		// clear mpv
+		mpv_cmd_loadfile( "" );
 		gallery_view_scroll_to_selected();
 	}
 
@@ -127,70 +157,130 @@ void gallery_view_toggle()
 }
 
 
+void gl_update_texture( GLuint texture, image_t* image )
+{
+	glBindTexture( GL_TEXTURE_2D, texture );
+	
+	// disable wrapping
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+
+	// Setup filtering parameters for display
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+
+	// Upload pixels into texture
+	glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
+	glTexImage2D( GL_TEXTURE_2D, 0, image->format, image->width, image->height, 0, image->format, GL_UNSIGNED_BYTE, image->data );
+
+	glBindTexture( GL_TEXTURE_2D, 0 );
+}
+
+
+GLuint gl_upload_texture( image_t* image )
+{
+	GLuint image_texture;
+	glGenTextures( 1, &image_texture );
+
+	gl_update_texture( image_texture, image );
+
+	return image_texture;
+}
+
+
+void gl_free_texture( GLuint texture )
+{
+	glDeleteTextures( 1, &texture );
+}
+
+
 int main( int argc, char* argv[] )
 {
+	args_init( argc, argv );
+	sys_init();
+
 	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
 	{
 		printf( "Failed to init SDL\n" );
 		return 1;
 	}
 
-	args_init( argc, argv );
-	sys_init();
+	g_main_window = SDL_CreateWindow( "Media Tag System", 1600, 900, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL );
 
-	if ( !SDL_CreateWindowAndRenderer( "Image Tag System", 1600, 900, SDL_WINDOW_RESIZABLE, &g_main_window, &g_main_renderer ) )
+	if ( !g_main_window )
 	{
-		printf( "Failed to create SDL window and renderer\n" );
+		printf( "Failed to create SDL window\n" );
 		return 1;
 	}
 
-	if ( !SDL_SetRenderVSync( g_main_renderer, 1 ) )
-		printf( "Failed to enable VSync\n" );
+	g_gl_context = SDL_GL_CreateContext( g_main_window );
+	
+	if ( !g_gl_context )
+	{
+		printf( "Failed to create GL Context\n" );
+		return 1;
+	}
+	
+	SDL_GL_MakeCurrent( g_main_window, g_gl_context );
+
+	if ( !gladLoadGL() )
+	{
+		printf( "Failed to load GL\n" );
+		return 1;
+	}
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 
-	if ( !ImGui_ImplSDL3_InitForSDLRenderer( g_main_window, g_main_renderer ) )
+	if ( !ImGui_ImplSDL3_InitForOpenGL( g_main_window, g_gl_context ) )
 	{
 		printf( "Failed to init imgui for sdl3\n" );
 		return 1;
 	}
-	
-	if ( !ImGui_ImplSDLRenderer3_Init( g_main_renderer ) )
+
+	if ( !ImGui_ImplOpenGL3_Init() )
 	{
-		printf( "Failed to init imgui for sdl3 renderer\n" );
+		printf( "Failed to init imgui opengl\n" );
 		return 1;
 	}
-
+	
 	sys_font_data_t font_data = sys_get_font();
-
+	
 	if ( font_data.font_path )
 	{
 		ImGui::GetIO().Fonts->AddFontFromFileTTF( font_data.font_path, font_data.height, nullptr );
-
-		ImGui_ImplSDLRenderer3_CreateDeviceObjects();
+	
+		ImGui_ImplOpenGL3_CreateDeviceObjects();
 	}
 
-	ImGuiIO& io      = ImGui::GetIO();
+	ImGuiIO& io = ImGui::GetIO();
 
-	io.DisplaySize.x = 1600;
-	io.DisplaySize.y = 900;
+	int      width, height;
+	SDL_GetWindowSize( g_main_window, &width, &height );
+	io.DisplaySize.x   = width;
+	io.DisplaySize.y   = height;
 
 	ImVec4 clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
 
-	// image_t* jpeg        = g_test_codec->image_load( TEST_IMAGE );
-	// 
-	// if ( jpeg )
-	// {
-	// 	g_focused_image_surf = SDL_CreateSurfaceFrom( jpeg->width, jpeg->height, SDL_PIXELFORMAT_XBGR8888, jpeg->data, jpeg->width * 4 );
-	// 	g_focused_image      = SDL_CreateTextureFromSurface( g_main_renderer, g_focused_image_surf );
-	// }
+	if ( !load_mpv_dll() )
+	{
+		printf( "Failed to load MPV\n" );
+	}
+	else
+	{
+		if ( !start_mpv() )
+			printf( "Failed to start MPV\n" );
+		else
+			g_mpv_ready = true;
+	}
 
 	if ( !thumbnail_loader_init() )
 	{
 		printf( "Failed to init thumbnail loader\n" );
 		return 1;
 	}
+	
+	glGenTextures( 1, &g_image_data.texture );
 
 	folder_load_media_list();
 	media_view_load();
@@ -199,7 +289,7 @@ int main( int argc, char* argv[] )
 	{
 		// don't go full speed lol
 		// SDL_Delay( 5 );
-		//SDL_Delay( 2 );
+		SDL_Delay( 1 );
 		
 		thumbnail_loader_update();
 
@@ -244,6 +334,7 @@ int main( int argc, char* argv[] )
 
 					g_window_resized = true;
 					media_view_window_resize();
+					mpv_window_resize();
 					break;
 
 				case SDL_EVENT_QUIT:
@@ -253,12 +344,6 @@ int main( int argc, char* argv[] )
 			}
 		}
 
-		//g_mouse_delta[ 0 ]    = g_mouse_pos[ 0 ] - g_mouse_pos_prev[ 0 ];
-		//g_mouse_delta[ 1 ]    = g_mouse_pos[ 1 ] - g_mouse_pos_prev[ 1 ];
-		
-		g_mouse_pos_prev[ 0 ] = g_mouse_pos[ 0 ];
-		g_mouse_pos_prev[ 1 ] = g_mouse_pos[ 1 ];
-
 		if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_MINIMIZED )
 		{
 			SDL_Delay( 10 );
@@ -267,46 +352,43 @@ int main( int argc, char* argv[] )
 
 		ImGui::NewFrame();
 		ImGui_ImplSDL3_NewFrame();
+		ImGui_ImplOpenGL3_NewFrame();
 
 		bool show_frame_time = false;
-
+		
 		if ( ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
 		{
 			gallery_view_toggle();
 		}
+
+		int width, height;
+		SDL_GetWindowSize( g_main_window, &width, &height );
+
+		glViewport( 0, 0, width, height );
+		glClearColor( clear_color.x, clear_color.y, clear_color.z, clear_color.w );
+		glClear( GL_COLOR_BUFFER_BIT );
 
 		ImGui::ShowDemoWindow();
 		imgui_draw();
 
 		ImGui::Render();
 
-		SDL_SetRenderScale( g_main_renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y );
-		SDL_SetRenderDrawColorFloat( g_main_renderer, clear_color.x, clear_color.y, clear_color.z, clear_color.w );
-		SDL_RenderClear( g_main_renderer );
-
-		if ( !g_gallery_view && g_image_data.texture )
+		if ( !g_gallery_view )
 		{
-			media_view_draw_image();
+			media_view_draw();
 		}
 
-		ImGui_ImplSDLRenderer3_RenderDrawData( ImGui::GetDrawData(), g_main_renderer );
+		ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 
-		SDL_RenderPresent( g_main_renderer );
-
-		if ( g_image_data_free.texture )
-		{
-			SDL_DestroyTexture( g_image_data_free.texture );
-			SDL_DestroySurface( g_image_data_free.surface );
-
-			g_image_data_free.texture = nullptr;
-			g_image_data_free.surface = nullptr;
-		}
+		SDL_GL_SwapWindow( g_main_window );
 
 		//auto  currentTime = std::chrono::high_resolution_clock::now();
 		//float time     = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 		//if ( show_frame_time )
 		// printf( "%f FRAMETIME\n", time );
 	}
+
+	SDL_GL_DestroyContext( g_gl_context );
 
 	args_free();
 	sys_shutdown();

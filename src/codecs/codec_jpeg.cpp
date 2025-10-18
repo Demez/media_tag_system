@@ -79,7 +79,7 @@ struct CodecJPEG: public ICodec
 			return false;
 		}
 
-		int pixelFmt     = TJPF_BGR;
+		int pixelFmt     = TJPF_RGB;
 
 		int                               scaling_factor_count;
 		tjscalingfactor* scaling_factor = tjGetScalingFactors( &scaling_factor_count );
@@ -173,7 +173,7 @@ struct CodecJPEG: public ICodec
 		image->width = best_width;
 		image->height = best_height;
 
-		image->format   = SDL_PIXELFORMAT_BGR24;
+		image->format = GL_RGB;
 		image->bit_depth = 4;  // uhhhh
 		image->pitch     = pitch;
 
@@ -210,7 +210,7 @@ struct CodecJPEG: public ICodec
 			return false;
 		}
 
-		int pixelFmt     = TJPF_BGR;
+		int pixelFmt     = TJPF_RGB;
 
 		image->data      = ch_realloc< unsigned char >( image->data, image->width * image->height * tjPixelSize[ pixelFmt ] );
 
@@ -237,7 +237,7 @@ struct CodecJPEG: public ICodec
 			return false;
 		}
 
-		image->format    = SDL_PIXELFORMAT_BGR24;
+		image->format = GL_RGB;
 		// imageInfo->aFormat = FMT_RGBA8;
 		image->bit_depth = 4;  // uhhhh
 		image->pitch     = pitch;
@@ -271,7 +271,7 @@ struct CodecJPEG: public ICodec
 			return nullptr;
 		}
 
-		int pixelFmt = TJPF_RGBA;
+		int pixelFmt = TJPF_RGB;
 
 		// srData.resize( imageInfo->aWidth * imageInfo->aHeight * tjPixelSize[ pixelFmt ] );
 
@@ -298,7 +298,7 @@ struct CodecJPEG: public ICodec
 			return nullptr;
 		}
 
-		image->format    = SDL_PIXELFORMAT_BGR24;
+		image->format = GL_RGB;
 		// imageInfo->aFormat = FMT_RGBA8;
 		image->bit_depth = 4;  // uhhhh
 
