@@ -124,6 +124,8 @@ extern bool                         g_window_resized;
 extern ivec2                        g_mouse_delta;
 extern ivec2                        g_mouse_pos;
 
+extern fs::path                     g_folder;
+extern fs::path                     g_folder_queued;  // will change to this folder start of next frame
 extern std::vector< media_entry_t > g_folder_media_list;
 extern std::vector< h_thumbnail >   g_folder_thumbnail_list;
 extern size_t                       g_folder_index;
@@ -150,6 +152,7 @@ void                                media_view_window_resize();
 void                                gallery_view_scroll_to_selected();
 void                                gallery_view_input();
 void                                gallery_view_draw();
+void                                gallery_view_dir_change();
 
 void                                gallery_view_toggle();
 

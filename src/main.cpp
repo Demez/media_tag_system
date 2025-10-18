@@ -9,15 +9,6 @@
 // TEMPORARY
 ICodec*                      g_test_codec  = nullptr;
 
-fs::path                     TEST_VIDEO    = "D:\\demez_archive\\media\\downloads\\animation\\[twitter] Firefwex—2025.09.08—1964945929297183176—1OJiHkcntDGT4NR5.mp4";
-fs::path                     TEST_IMAGE    = "D:\\demez_archive\\media\\downloads\\art\\[bsky] camothetiger.bsky.social—2025.04.14—3lmqydllpak2a—bafkreidjzm36t5zwx7drrmioalhswola36t3hngwmtqbolfriogffzclbe.jpg";
-// fs::path TEST_IMAGE      = "D:\\demez_archive\\media\\downloads\\art\\WsWLHtGJ_400x400.jpg";
-//fs::path                     TEST_FOLDER   = "D:\\demez_archive\\media\\downloads\\art";
-fs::path                     TEST_FOLDER   = "D:\\demez_archive\\media\\downloads";
-// fs::path                   TEST_FOLDER          = "D:\\demez_archive\\media\\downloads\\_unsorted";
-// fs::path                   TEST_FOLDER          = "D:\\demez_archive\\media\\downloads\\photos_furry";
-
-
 SDL_Window*                  g_main_window = nullptr;
 // SDL_Renderer*              g_main_renderer       = nullptr;
 SDL_GLContext                g_gl_context;
@@ -41,6 +32,8 @@ size_t                       g_image_index = 0;
 // Previous Image to Free
 main_image_data_t            g_image_data_free;
 
+fs::path                     g_folder;
+fs::path                     g_folder_queued;
 std::vector< media_entry_t > g_folder_media_list;
 std::vector< h_thumbnail >   g_folder_thumbnail_list;
 size_t                       g_folder_index = 0;
@@ -58,11 +51,14 @@ void update_window_title()
 
 	if ( g_gallery_view )
 	{
-		snprintf( buf, 512, "Media Tag System - %s", TEST_FOLDER.string().c_str() );
+		snprintf( buf, 512, "Media Tag System - %s", g_folder.string().c_str() );
 	}
 	else
 	{
-		snprintf( buf, 512, "Media Tag System - %s", g_folder_media_list[ g_folder_index ].path.string().c_str() );
+		if ( g_folder_media_list.size() > g_folder_index )
+			snprintf( buf, 512, "Media Tag System - %s", g_folder_media_list[ g_folder_index ].path.string().c_str() );
+		else
+			snprintf( buf, 512, "Media Tag System" );
 	}
 
 	SDL_SetWindowTitle( g_main_window, buf );
@@ -77,7 +73,7 @@ void folder_load_media_list()
 	g_folder_media_list.reserve( 5000 );
 	g_folder_thumbnail_list.reserve( 5000 );
 
-	for ( const auto& entry : fs::directory_iterator( TEST_FOLDER ) )
+	for ( const auto& entry : fs::directory_iterator( g_folder ) )
 	{
 		const fs::path& path = entry.path();
 
@@ -121,6 +117,8 @@ void folder_load_media_list()
 	}
 
 	g_folder_thumbnail_list.resize( g_folder_media_list.size() );
+
+	gallery_view_dir_change();
 }
 
 
@@ -194,6 +192,30 @@ void gl_free_texture( GLuint texture )
 }
 
 
+void on_new_file( char* file )
+{
+	fs::path file_path = file;
+
+	// TODO: CHECK IF WE CAN OPEN THIS FILE FIRST
+
+	g_folder           = file_path.parent_path();
+
+	folder_load_media_list();
+
+	for ( size_t i = 0; i < g_folder_media_list.size(); i++ )
+	{
+		if ( g_folder_media_list[ i ].path == file_path )
+		{
+			g_folder_index = i;
+			break;
+		}
+	}
+
+	// probably not a supported file
+	g_folder_index = 0;
+}
+
+
 int main( int argc, char* argv[] )
 {
 	args_init( argc, argv );
@@ -260,8 +282,6 @@ int main( int argc, char* argv[] )
 	io.DisplaySize.x   = width;
 	io.DisplaySize.y   = height;
 
-	ImVec4 clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
-
 	if ( !load_mpv_dll() )
 	{
 		printf( "Failed to load MPV\n" );
@@ -282,14 +302,67 @@ int main( int argc, char* argv[] )
 	
 	glGenTextures( 1, &g_image_data.texture );
 
-	folder_load_media_list();
+	// ----------------------------------------------------------------
+
+	g_folder_queued = sys_get_cwd();
+
+	if ( argc > 1 )
+	{
+		// take the first path here
+		for ( int i = 0; i < argc; i++ )
+		{
+			char* arg = argv[ i ];
+
+			if ( fs_exists( arg ) )
+			{
+				if ( fs_is_dir( arg ) )
+				{
+					g_folder_queued = arg;
+				}
+				else
+				{
+					on_new_file( arg );
+				}
+
+				break;
+			}
+		}
+	}
+
+	if ( !g_folder_queued.empty() )
+	{
+		g_folder = g_folder_queued;
+
+		folder_load_media_list();
+		g_folder_queued.clear();
+	}
+
 	media_view_load();
+
+	// ----------------------------------------------------------------
+
+	ImVec4 clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
 
 	while ( g_running )
 	{
 		// don't go full speed lol
 		// SDL_Delay( 5 );
 		SDL_Delay( 1 );
+
+		if ( !g_folder_queued.empty() )
+		{
+			if ( fs_is_dir( g_folder_queued.string().c_str() ) )
+			{
+				g_folder = g_folder_queued;
+				folder_load_media_list();
+			}
+			else
+			{
+				gallery_view_dir_change();
+			}
+
+			g_folder_queued.clear();
+		}
 		
 		thumbnail_loader_update();
 

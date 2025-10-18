@@ -7,11 +7,6 @@ struct gallery_item_t
 };
 
 
-extern fs::path TEST_FOLDER;
-
-extern std::vector< h_thumbnail > g_folder_thumbnail_list;
-extern size_t                     g_folder_index;
-
 extern bool                       g_gallery_view;
 
 std::vector< gallery_item_t >     g_gallery_items;
@@ -75,6 +70,8 @@ void gallery_view_input()
 }
 
 
+static char g_folder_buf[ 512 ]{};
+
 void gallery_view_draw_header()
 {
 	int window_width, window_height;
@@ -88,10 +85,37 @@ void gallery_view_draw_header()
 		ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
 
 		ImGui::SameLine();
-		ImGui::TextUnformatted( TEST_FOLDER.string().c_str() );
 
-		ImGui::EndChild();
+		if ( ImGui::Button( "^" ) )
+		{
+			g_folder_queued = g_folder.parent_path();
+		}
+
+		ImGui::SameLine();
+
+		// ImGui::TextUnformatted( g_folder.string().c_str() );
+
+		if ( ImGui::InputText( "Directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
+		{
+			// g_folder_queued = g_folder_buf;
+		}
+
+		ImGui::SameLine();
+
+		// Enter returns true doesn't work because of gallery view hooking that input currently, need to add a check later for if focused in text input
+		if ( ImGui::Button( "->" ) )
+		{
+			g_folder_queued = g_folder_buf;
+		}
 	}
+
+	ImGui::EndChild();
+}
+
+
+void gallery_view_dir_change()
+{
+	snprintf( g_folder_buf, 512, "%s", g_folder.string().c_str() );
 }
 
 
@@ -312,7 +336,7 @@ void gallery_view_draw_content()
 			}
 			else
 			{
-				if ( !thumbnail )
+				if ( !thumbnail && media.type != e_media_type_directory )
 					thumbnail_requests.emplace_back( media.path, i );
 				// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
@@ -336,7 +360,16 @@ void gallery_view_draw_content()
 			g_folder_index = i;
 
 			if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
-				gallery_view_toggle();
+			{
+				if ( media.type == e_media_type_directory )
+				{
+					g_folder_queued = media.path;
+				}
+				else
+				{
+					gallery_view_toggle();
+				}
+			}
 		}
 
 		grid_pos_x++;

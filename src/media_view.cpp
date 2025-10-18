@@ -27,6 +27,9 @@ constexpr double         ZOOM_MIN    = 0.01;
 
 static e_media_type get_media_type()
 {
+	if ( g_folder_media_list.size() <= g_folder_index )
+		return e_media_type_none;
+
 	return g_folder_media_list[ g_folder_index ].type;
 }
 
@@ -367,6 +370,12 @@ void media_view_window_resize()
 
 void media_view_load()
 {
+	if ( g_folder_media_list.empty() )
+		return;
+
+	if ( g_folder_index >= g_folder_media_list.size() )
+		return;
+
 	float          load_time = 0.f;
 	media_entry_t& entry = g_folder_media_list[ g_folder_index ];
 
@@ -413,7 +422,7 @@ void media_view_load()
 
 void media_view_advance( bool prev )
 {
-	if ( g_folder_media_list.size() == 1 )
+	if ( g_folder_media_list.size() <= 1 )
 		return;
 
 	if ( get_media_type() == e_media_type_video )
