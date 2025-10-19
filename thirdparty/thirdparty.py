@@ -272,7 +272,7 @@ def post_mozjpeg_extract():
 
     os.chdir("mozjpeg")
 
-    build_options = "-DPNG_SUPPORTED=0"
+    build_options = "-DPNG_SUPPORTED=0 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
     if not syscmd(f"cmake -B build {build_options} .", "Failed to run cmake"):
         return
