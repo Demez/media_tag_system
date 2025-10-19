@@ -503,6 +503,9 @@ static void media_view_draw_image()
 	int width, height;
 	SDL_GetWindowSize( g_main_window, &width, &height );
 
+	glEnable( GL_BLEND );
+	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
 	glEnable( GL_TEXTURE_2D );
 	glBindTexture( GL_TEXTURE_2D, g_image_data.texture );
 
@@ -531,6 +534,7 @@ static void media_view_draw_image()
  	glEnd();
 
 	glDisable( GL_TEXTURE_2D );
+	glDisable( GL_BLEND );
 
 	// SDL_RenderTexture( g_main_renderer, g_image_data.texture, NULL, &dst_rect );
 
