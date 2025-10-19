@@ -23,10 +23,10 @@ constexpr double         ZOOM_MIN    = 0.01;
 
 static e_media_type get_media_type()
 {
-	if ( g_folder_media_list.size() <= g_folder_index )
+	if ( g_folder_media_list.size() <= g_gallery_index )
 		return e_media_type_none;
 
-	return g_folder_media_list[ g_folder_index ].type;
+	return g_folder_media_list[ g_gallery_index ].type;
 }
 
 
@@ -224,7 +224,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
 	{
-		sys_browse_to_file( g_folder_media_list[ g_folder_index ].path.string().c_str() );
+		sys_browse_to_file( g_folder_media_list[ g_gallery_index ].path.string().c_str() );
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -373,11 +373,11 @@ void media_view_load()
 	if ( g_folder_media_list.empty() )
 		return;
 
-	if ( g_folder_index >= g_folder_media_list.size() )
+	if ( g_gallery_index >= g_folder_media_list.size() )
 		return;
 
 	float          load_time = 0.f;
-	media_entry_t& entry = g_folder_media_list[ g_folder_index ];
+	media_entry_t& entry = g_folder_media_list[ g_gallery_index ];
 
 	image_load_info_t image_load_info{};
 	image_load_info.image = &g_image;
@@ -412,10 +412,10 @@ void media_view_load()
 		// auto  currentTime    = std::chrono::high_resolution_clock::now();
 		// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 		//printf( "%f Load - %f Up - %s\n", load_time, up_time, g_folder_media_list[ g_folder_index ].string().c_str() );
-		printf( "%f Load - %s\n", load_time, g_folder_media_list[ g_folder_index ].path.string().c_str() );
+		printf( "%f Load - %s\n", load_time, g_folder_media_list[ g_gallery_index ].path.string().c_str() );
 	}
 
-	g_image_index = g_folder_index;
+	g_media_index = g_gallery_index;
 
 	media_view_fit_in_view();
 
@@ -436,20 +436,20 @@ void media_view_advance( bool prev )
 advance:
 	if ( prev )
 	{
-		if ( g_folder_index == 0 )
-			g_folder_index = g_folder_media_list.size();
+		if ( g_gallery_index == 0 )
+			g_gallery_index = g_folder_media_list.size();
 
-		g_folder_index--;
+		g_gallery_index--;
 	}
 	else
 	{
-		g_folder_index++;
+		g_gallery_index++;
 
-		if ( g_folder_index == g_folder_media_list.size() )
-			g_folder_index = 0;
+		if ( g_gallery_index == g_folder_media_list.size() )
+			g_gallery_index = 0;
 	}
 
-	if ( g_folder_media_list[ g_folder_index ].type == e_media_type_directory )
+	if ( g_folder_media_list[ g_gallery_index ].type == e_media_type_directory )
 		goto advance;
 
 	media_view_load();

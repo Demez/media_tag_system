@@ -26,7 +26,7 @@ ivec2                        g_mouse_pos{};
 // Main Image
 image_t                      g_image;
 main_image_data_t            g_image_data;
-size_t                       g_image_index = 0;
+size_t                       g_media_index = 0;
 
 // Previous Image to Free
 main_image_data_t            g_image_data_free;
@@ -35,7 +35,7 @@ fs::path                     g_folder;
 fs::path                     g_folder_queued;
 std::vector< media_entry_t > g_folder_media_list;
 std::vector< h_thumbnail >   g_folder_thumbnail_list;
-size_t                       g_folder_index = 0;
+size_t                       g_gallery_index = 0;
 
 
 void image_register_codec( IImageLoader* codec )
@@ -116,8 +116,8 @@ void update_window_title()
 	}
 	else
 	{
-		if ( g_folder_media_list.size() > g_folder_index )
-			snprintf( buf, 512, "Media Tag System - %s", g_folder_media_list[ g_folder_index ].path.string().c_str() );
+		if ( g_folder_media_list.size() > g_gallery_index )
+			snprintf( buf, 512, "Media Tag System - %s", g_folder_media_list[ g_gallery_index ].path.string().c_str() );
 		else
 			snprintf( buf, 512, "Media Tag System" );
 	}
@@ -164,6 +164,8 @@ void folder_load_media_list()
 			valid_ext |= ext == ".mkv";
 			valid_ext |= ext == ".webm";
 			valid_ext |= ext == ".mov";
+			valid_ext |= ext == ".3gp";
+			valid_ext |= ext == ".avi";
 
 			if ( valid_ext )
 			{
@@ -201,7 +203,7 @@ void gallery_view_toggle()
 {
 	if ( g_gallery_view )
 	{
-		if ( g_image_index != g_folder_index )
+		if ( g_media_index != g_gallery_index )
 			media_view_load();
 	}
 	else
@@ -273,13 +275,13 @@ void on_new_file( char* file )
 	{
 		if ( g_folder_media_list[ i ].path == file_path )
 		{
-			g_folder_index = i;
+			g_gallery_index = i;
 			break;
 		}
 	}
 
 	// probably not a supported file
-	g_folder_index = 0;
+	g_gallery_index = 0;
 }
 
 

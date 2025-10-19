@@ -129,14 +129,14 @@ extern fs::path                     g_folder;
 extern fs::path                     g_folder_queued;  // will change to this folder start of next frame
 extern std::vector< media_entry_t > g_folder_media_list;
 extern std::vector< h_thumbnail >   g_folder_thumbnail_list;
-extern size_t                       g_folder_index;
+extern size_t                       g_gallery_index;
 
 
 // Main Image
 extern e_zoom_mode                  g_image_zoom_mode;
 extern image_t                      g_image;
 extern main_image_data_t            g_image_data;
-extern size_t                       g_image_index;
+extern size_t                       g_media_index;
 
 // Previous Image to Free
 extern main_image_data_t            g_image_data_free;

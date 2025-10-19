@@ -20,49 +20,49 @@ void gallery_view_input()
 {
 	if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) )
 	{
-		if ( g_folder_index == 0 )
-			g_folder_index = g_folder_media_list.size();
+		if ( g_gallery_index == 0 )
+			g_gallery_index = g_folder_media_list.size();
 
-		g_folder_index--;
+		g_gallery_index--;
 		gallery_view_scroll_to_selected();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) )
 	{
-		g_folder_index = ( g_folder_index + 1 ) % g_folder_media_list.size();
+		g_gallery_index = ( g_gallery_index + 1 ) % g_folder_media_list.size();
 		gallery_view_scroll_to_selected();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_UpArrow ) )
 	{
-		if ( g_folder_index < GALLERY_GRID_X_COUNT )
+		if ( g_gallery_index < GALLERY_GRID_X_COUNT )
 		{
 			size_t count_in_row   = g_folder_media_list.size() % GALLERY_GRID_X_COUNT;
 			size_t missing_in_row = GALLERY_GRID_X_COUNT - count_in_row;
-			size_t row_diff       = GALLERY_GRID_X_COUNT - g_folder_index;
+			size_t row_diff       = GALLERY_GRID_X_COUNT - g_gallery_index;
 
 			// advance up a row
 			if ( missing_in_row >= row_diff )
 				row_diff += GALLERY_GRID_X_COUNT;
 
-			g_folder_index = g_folder_media_list.size() - ( row_diff - missing_in_row );
+			g_gallery_index = g_folder_media_list.size() - ( row_diff - missing_in_row );
 		}
 		else
 		{
-			g_folder_index = ( g_folder_index - GALLERY_GRID_X_COUNT ) % g_folder_media_list.size();
+			g_gallery_index = ( g_gallery_index - GALLERY_GRID_X_COUNT ) % g_folder_media_list.size();
 		}
 
 		gallery_view_scroll_to_selected();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_DownArrow ) )
 	{
-		if ( g_folder_index + GALLERY_GRID_X_COUNT >= g_folder_media_list.size() )
+		if ( g_gallery_index + GALLERY_GRID_X_COUNT >= g_folder_media_list.size() )
 		{
 			size_t count_in_row = g_folder_media_list.size() % GALLERY_GRID_X_COUNT;
-			size_t row_pos      = g_folder_index % GALLERY_GRID_X_COUNT;
-			g_folder_index      = row_pos;
+			size_t row_pos      = g_gallery_index % GALLERY_GRID_X_COUNT;
+			g_gallery_index      = row_pos;
 		}
 		else
 		{
-			g_folder_index = ( g_folder_index + GALLERY_GRID_X_COUNT ) % g_folder_media_list.size();
+			g_gallery_index = ( g_gallery_index + GALLERY_GRID_X_COUNT ) % g_folder_media_list.size();
 		}
 
 		gallery_view_scroll_to_selected();
@@ -240,7 +240,7 @@ void gallery_view_draw_content()
 		ImVec2 mouse_pos         = ImGui::GetMousePos();
 		bool   item_hovered      = false;
 
-		if ( g_folder_index == i && g_scroll_to_selected )
+		if ( g_gallery_index == i && g_scroll_to_selected )
 		{
 			bool   scroll_needed  = false;
 			bool   scroll_up      = false;
@@ -286,7 +286,7 @@ void gallery_view_draw_content()
 
 		item_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + item_size_y } );
 
-		if ( g_folder_index == i )
+		if ( g_gallery_index == i )
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBg ] );
 		else if ( item_hovered )
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBgHovered ] );
@@ -352,12 +352,12 @@ void gallery_view_draw_content()
 
 		ImGui::EndChild();
 
-		if ( g_folder_index == i || item_hovered )
+		if ( g_gallery_index == i || item_hovered )
 			ImGui::PopStyleColor();
 
 		if ( item_hovered && ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
 		{
-			g_folder_index = i;
+			g_gallery_index = i;
 
 			if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
 			{
