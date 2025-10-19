@@ -284,6 +284,64 @@ def post_mozjpeg_extract():
     print("Building MozJPEG - Debug\n")
     if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
         return
+
+
+# =================================================================================================
+
+
+def post_zlib_extract():
+    if ARGS.no_build:
+        return
+
+    set_project("zlib-ng")
+
+    os.chdir("zlib-ng")
+
+    build_options = "-DWITH_GTEST=OFF -DZLIB_COMPAT=ON"
+
+    if not syscmd(f"cmake -B build {build_options} .", "Failed to run cmake"):
+        return
+
+    print("Building zlib-ng - Release\n")
+    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+        return
+
+    print("Building zlib-ng - Debug\n")
+    if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
+        return
+
+
+# =================================================================================================
+
+
+def post_libspng_extract():
+    if ARGS.no_build:
+        return
+
+    set_project("libspng")
+
+    os.chdir("libspng")
+
+    print(os.getcwd())
+
+    zlib_path = os.getcwd() + "/../zlib-ng/build"
+    zlib_build = os.getcwd()+ "/../zlib-ng/build"
+
+    if SYS_OS == OS.Windows:
+        zlib_build += "/Release/zlibstatic.lib"
+
+    build_options = f"-DBUILD_EXAMPLES=OFF -DSPNG_SHARED=ON -DZLIB_LIBRARY={zlib_build} -DZLIB_INCLUDE_DIR={zlib_path}"
+
+    if not syscmd(f"cmake -B build {build_options} .", "Failed to run cmake"):
+        return
+
+    print("Building libspng - Release\n")
+    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+        return
+
+    #print("Building libspng - Debug\n")
+    #if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
+    #    return
     
 
 # =================================================================================================
@@ -369,6 +427,18 @@ FILE_LIST = {
             "file": "mozjpeg-4.1.1.zip",
             "name": "mozjpeg",
             "func": post_mozjpeg_extract,
+        },
+        {
+            "url":  "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/2.2.5.zip",
+            "file": "zlib-ng-2.2.5.zip",
+            "name": "zlib-ng",
+            "func": post_zlib_extract,
+        },
+        {
+            "url":  "https://github.com/randy408/libspng/archive/v0.7.4.zip",
+            "file": "libspng-0.7.4.zip",
+            "name": "libspng",
+            "func": post_libspng_extract,
         },
         {
             "url":  "https://github.com/btzy/nativefiledialog-extended/archive/refs/tags/v1.2.1.zip",

@@ -16,7 +16,6 @@ std::thread*          g_thumbnail_worker[ THUMBNAIL_THREADS ];
 std::mutex            g_thumbnail_mutex;
 
 extern SDL_Renderer*  g_main_renderer;
-extern ICodec* g_test_codec;
 
 
 enum e_job_state
@@ -231,7 +230,14 @@ void thumbnail_loader_worker( u32 thread_id )
 		thumbnail->status.store( e_thumbnail_status_loading, std::memory_order_release );
 		thumbnail->data   = ch_calloc< image_t >( 1 );
 
-		if ( !g_test_codec->image_load_scaled( job->path, thumbnail->data, 400, 400 ) )
+		image_load_info_t load_info{};
+		load_info.image         = thumbnail->data;
+		load_info.load_quick    = true;
+		load_info.threaded_load = true;
+		load_info.target_size.x = 400;
+		load_info.target_size.y = 400;
+
+		if ( !image_load( job->path, load_info ) )
 		{
 			printf( "FAILED TO LOAD IMAGE: %s\n", job->path );
 			thumbnail->status = e_thumbnail_status_failed;

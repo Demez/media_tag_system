@@ -17,10 +17,6 @@ bool                     g_image_pan    = false;
 extern main_image_data_t g_image_data;
 extern main_image_data_t g_image_data_free;
 
-
-// TEMPORARY
-extern ICodec*           g_test_codec;
-
 constexpr double         ZOOM_AMOUNT = 0.1;
 constexpr double         ZOOM_MIN    = 0.01;
 
@@ -178,6 +174,10 @@ void media_view_context_menu()
 
 	if ( ImGui::Button( "V" ) )
 		g_image_flip_v = !g_image_flip_v;
+
+	ImGui::Separator();
+
+	ImGui::SliderFloat( "rotate", &g_image_rot, 0, 360 );
 
 	ImGui::Separator();
 
@@ -379,13 +379,16 @@ void media_view_load()
 	float          load_time = 0.f;
 	media_entry_t& entry = g_folder_media_list[ g_folder_index ];
 
+	image_load_info_t image_load_info{};
+	image_load_info.image = &g_image;
+
 	{
 		auto startTime = std::chrono::high_resolution_clock::now();
 
 		if ( entry.type == e_media_type_image )
 		{
 			// g_image_view.image = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
-			g_test_codec->image_load( entry.path, &g_image );
+			image_load( entry.path, image_load_info );
 		}
 		else
 		{
@@ -504,30 +507,27 @@ static void media_view_draw_image()
 	glBindTexture( GL_TEXTURE_2D, g_image_data.texture );
 
  	glMatrixMode( GL_PROJECTION );
- 	glLoadIdentity();
+	glLoadIdentity();
+
  	//glOrtho( g_image_pos.x, g_image_pos.x + g_image_size.x, g_image_pos.y, g_image_pos.y + g_image_size.y, -1, 1 );
- 	glOrtho( 0, width, height, 0, -1, 1 );
+	glOrtho( 0, width, height, 0, -1, 1 );
+
+	glTranslatef( dst_rect.w / 2, dst_rect.h / 2, 0 );  // M1 - 2nd translation
+	glRotatef( g_image_rot, 0.0f, 0.0f, 1.0f );
+	glTranslatef( -dst_rect.w / 2, -dst_rect.h / 2, 0 );  // M3 - 1st translation
+
  	glMatrixMode( GL_MODELVIEW );
- 	glLoadIdentity();
+	glLoadIdentity();
  
  	glBegin( GL_QUADS );
-//	glTexCoord2f( 0, 1 );
-//	glVertex2f( g_image_pos.x, g_image_pos.y );
-//	glTexCoord2f( 1, 1 );
-//	glVertex2f( g_image_pos.x + 50, g_image_pos.y );
-//	glTexCoord2f( 1, 0 );
-//	glVertex2f( g_image_pos.x + 50, g_image_pos.y + 50 );
-//	glTexCoord2f( 0, 0 );
-//	glVertex2f( g_image_pos.x, g_image_pos.y + 50 );
-
  	glTexCoord2f( 0, 0 );
-	glVertex2f( g_image_pos.x, g_image_pos.y );
+	glVertex2f( dst_rect.x, dst_rect.y );
  	glTexCoord2f( 1, 0 );
-	glVertex2f( g_image_pos.x + g_image_size.x, g_image_pos.y );
+	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y );
  	glTexCoord2f( 1, 1 );
-	glVertex2f( g_image_pos.x + g_image_size.x, g_image_pos.y + g_image_size.y );
+	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y + dst_rect.h );
  	glTexCoord2f( 0, 1 );
-	glVertex2f( g_image_pos.x, g_image_pos.y + g_image_size.y );
+	glVertex2f( dst_rect.x, dst_rect.y + dst_rect.h );
  	glEnd();
 
 	glDisable( GL_TEXTURE_2D );

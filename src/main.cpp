@@ -6,8 +6,7 @@
 
 #define DATABASE_FILE "tag_database.txt"
 
-// TEMPORARY
-ICodec*                      g_test_codec  = nullptr;
+std::vector< IImageLoader* >       g_codecs;
 
 SDL_Window*                  g_main_window = nullptr;
 // SDL_Renderer*              g_main_renderer       = nullptr;
@@ -39,9 +38,71 @@ std::vector< h_thumbnail >   g_folder_thumbnail_list;
 size_t                       g_folder_index = 0;
 
 
-void register_codec( ICodec* codec )
+void image_register_codec( IImageLoader* codec )
 {
-	g_test_codec = codec;
+	if ( codec )
+		g_codecs.push_back( codec );
+}
+
+
+bool image_load( const fs::path& path, image_load_info_t& load_info )
+{
+	std::string path_std_string = path.string();
+	const char* path_str        = path_std_string.c_str();
+	std::string ext_str         = path.extension().string();
+
+	if ( !fs_is_file( path_str ) || fs_file_size( path_str ) == 0 )
+	{
+		printf( "File is Empty or Doesn't exist: %s\n", path_str );
+		return false;
+	}
+
+	bool allocated_image = false;
+
+	if ( !load_info.image )
+	{
+		load_info.image = ch_calloc< image_t >( 1 );
+
+		if ( !load_info.image )
+		{
+			printf( "Failed to allocate image data!\n" );
+			return false;
+		}
+
+		allocated_image = true;
+	}
+
+	size_t file_len  = 0;
+	char*  file_data = fs_read_file( path.string().c_str(), &file_len );
+
+	if ( !file_data )
+	{
+		printf( "Failed to read file: %s\n", path_str );
+		return false;
+	}
+
+	bool loaded_image = false;
+
+	for ( IImageLoader* codec : g_codecs )
+	{
+		if ( !codec->check_extension( ext_str ) )
+			continue;
+
+		loaded_image = codec->image_load( path, load_info, file_data, file_len );
+
+		if ( loaded_image )
+			break;
+	}
+
+	free( file_data );
+
+	if ( !loaded_image && allocated_image )
+	{
+		free( load_info.image );
+		load_info.image = nullptr;
+	}
+
+	return loaded_image;
 }
 
 
@@ -90,6 +151,7 @@ void folder_load_media_list()
 		// Image Formats
 		valid_ext |= ext == ".jpg";
 		valid_ext |= ext == ".jpeg";
+		valid_ext |= ext == ".png";
 
 		if ( valid_ext )
 		{
@@ -170,6 +232,11 @@ void gl_update_texture( GLuint texture, image_t* image )
 	// Upload pixels into texture
 	glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
 	glTexImage2D( GL_TEXTURE_2D, 0, image->format, image->width, image->height, 0, image->format, GL_UNSIGNED_BYTE, image->data );
+
+	auto err = glGetError();
+
+	if ( err != 0 )
+		printf( "FUCK: %d\n", err );
 
 	glBindTexture( GL_TEXTURE_2D, 0 );
 }
@@ -309,7 +376,7 @@ int main( int argc, char* argv[] )
 	if ( argc > 1 )
 	{
 		// take the first path here
-		for ( int i = 0; i < argc; i++ )
+		for ( int i = 1; i < argc; i++ )
 		{
 			char* arg = argv[ i ];
 

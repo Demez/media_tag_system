@@ -356,7 +356,7 @@ bool start_mpv()
 		return false;
 	}
 
-	// (3) Create render context
+	// create render context
 	mpv_opengl_init_params gl_init = {
 		.get_proc_address = mpv_get_proc,  // e.g. SDL_GL_GetProcAddress
 	};

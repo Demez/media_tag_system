@@ -40,13 +40,13 @@ struct image_t
 };
 
 
-struct image_load_settings_t
+struct image_load_info_t
 {
+	// Image data, this will be reused if valid data, result is also stored in here
+	image_t* image;
+
 	// When not 0, The codec will load the smallest version of an image that's larger than this resolution
 	ImVec2   target_size;
-
-	// Old image data, this will be reused if valid data
-	image_t* image;
 
 	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
 	bool     load_quick;
@@ -56,20 +56,21 @@ struct image_load_settings_t
 };
 
 
-struct ICodec
+struct IImageLoader
 {
-	virtual bool     check_extension( const char* ext )                                                              = 0;
-	virtual bool     check_header( const fs::path& path )                                                            = 0;
+	virtual bool     check_extension( std::string_view ext )                                                       = 0;
+	virtual bool     check_header( const fs::path& path )                                                          = 0;
 
 	// Load the smallest version of an image that's larger than the inputted size
-	virtual bool     image_load_scaled( const fs::path& path, image_t* image_info, int area_width, int area_height ) = 0;
+	//virtual bool     image_load_scaled( const fs::path& path, image_t* image_info, int area_width, int area_height ) = 0;
 
-	virtual bool     image_load( const fs::path& path, image_t* old_data )                                           = 0;
-	virtual image_t* image_load( const fs::path& path )                                                              = 0;
+	virtual bool     image_load( const fs::path& path, image_load_info_t& load_info, char* data, size_t data_len ) = 0;
+	//virtual image_t* image_load( const fs::path& path )                                                              = 0;
 };
 
 
-void register_codec( ICodec* codec );
+void image_register_codec( IImageLoader* codec );
+bool image_load( const fs::path& path, image_load_info_t& load_info );
 
 
 // TODO: add image load functions here

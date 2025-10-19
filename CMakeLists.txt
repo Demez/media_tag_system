@@ -131,12 +131,16 @@ if ( MSVC )
 	)
 
 	link_libraries( opengl32 )
+	link_directories( replay_maker PRIVATE "thirdparty/SDL3/lib/x64" )
 	
 	message( "Copying SDL3" )
 	configure_file( "thirdparty/SDL3/lib/x64/SDL3.dll" "${PROJ_OUT}/SDL3.dll" COPYONLY )
 	
 	message( "Copying MPV" )
 	configure_file( "thirdparty/mpv/libmpv-2.dll" "${PROJ_OUT}/libmpv-2.dll" COPYONLY )
+	
+	message( "Copying SPNG" )
+	configure_file( "thirdparty/libspng/build/Release/spng.dll" "${PROJ_OUT}/spng.dll" COPYONLY )
 	
 else()  # linux
 	link_libraries( GL )
@@ -162,16 +166,16 @@ set(
     src/handles.h
 
     src/codecs/codec_jpeg.cpp
+    src/codecs/codec_png.cpp
 
     src/sys_win32.cpp
 
+    src/imgui/imconfig.h
     src/imgui/imgui.cpp
     src/imgui/imgui_demo.cpp
     src/imgui/imgui_draw.cpp
     src/imgui/imgui_impl_opengl3.cpp
     src/imgui/imgui_impl_sdl3.cpp
-    src/imgui/imgui_impl_sdlgpu3.cpp
-    src/imgui/imgui_impl_sdlrenderer3.cpp
     src/imgui/imgui_impl_win32.cpp
     src/imgui/imgui_tables.cpp
     src/imgui/imgui_widgets.cpp
@@ -203,33 +207,39 @@ include_directories(
 	"thirdparty/nativefiledialog/src/include"
 	"thirdparty/SDL3/include"
 	"thirdparty/mozjpeg"
+	"thirdparty/libspng/spng"
 	"thirdparty/mpv/include"
 )
 
 add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} )
 
-# native file dialog
-target_link_libraries( media_tag_system PRIVATE nfd SDL3 turbojpeg-static )
-target_link_directories( media_tag_system PRIVATE "thirdparty/nativefiledialog/build/src" "thirdparty/SDL3/lib/x64" "thirdparty/mozjpeg/build" )
+target_link_libraries(
+	media_tag_system PRIVATE
+	freetype
+	nfd
+	SDL3
+	turbojpeg-static
+	spng
+)
 
-if ( FREETYPE )
-	target_link_libraries( media_tag_system PRIVATE "freetype" )
-	# target_link_directories( media_tag_system "${FREETYPE_DIR}/include" )
+target_link_directories(
+	media_tag_system PRIVATE
+	"thirdparty/nativefiledialog/build/src"
+	"thirdparty/mozjpeg/build"
+	"thirdparty/libspng/build"
+)
 
-	foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
-	target_link_directories(
-		media_tag_system PRIVATE
-		target_link_directories( media_tag_system PRIVATE "${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static" )
-	)
-	endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
-
+if ( WIN32 )
+	target_link_directories( media_tag_system PRIVATE "thirdparty/libspng/build/Release" )
 endif()
 
 foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	target_link_directories(
 		media_tag_system PRIVATE
+		"${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static"
 		"thirdparty/nativefiledialog/build/src/${OUTPUT_CONFIG}"
 		"thirdparty/mozjpeg/build/${OUTPUT_CONFIG}"
+		# "thirdparty/libspng/build/${OUTPUT_CONFIG}"
 	)
 endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 
@@ -238,5 +248,4 @@ source_group(
 	PREFIX "Source Files"
 	FILES ${SRC_FILES} ${FREETYPE_IMGUI_SRC}
 )
-
 
