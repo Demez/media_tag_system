@@ -94,6 +94,18 @@ enum e_media_type
 };
 
 
+enum e_icon : u8
+{
+	e_icon_none,
+	e_icon_invalid,
+	e_icon_folder,
+	e_icon_loading,
+	e_icon_video,
+
+	e_icon_count,
+};
+
+
 enum e_zoom_mode
 {
 	e_zoom_mode_fit,
@@ -159,6 +171,11 @@ void                                gallery_view_toggle();
 
 void                                update_window_title();
 void                                folder_load_media_list();
+
+bool                                icon_preload();
+void                                icon_free();
+image_t*                            icon_get_image( e_icon icon_type );
+ImTextureRef                        icon_get_imtexture( e_icon icon_type );
 
 GLuint                              gl_upload_texture( image_t* image );
 void                                gl_update_texture( GLuint texture, image_t* image );

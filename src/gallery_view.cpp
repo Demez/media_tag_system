@@ -127,6 +127,34 @@ void gallery_view_scroll_to_selected()
 }
 
 
+void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, float image_bounds, bool upscale )
+{
+	// Fit image in window size, scaling up if needed
+	float factor[ 2 ] = { 1.f, 1.f };
+
+	if ( upscale || image->width > image_bounds )
+		factor[ 0 ] = (float)image_bounds / (float)image->width;
+
+	if ( upscale || image->height > image_bounds )
+		factor[ 1 ] = (float)image_bounds / (float)image->height;
+
+	float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
+
+	ImVec2 scaled_image_size;
+	scaled_image_size.x = image->width * zoom_level;
+	scaled_image_size.y = image->height * zoom_level;
+
+	// center the image
+	ImVec2 image_offset = ImGui::GetCursorPos();
+	image_offset.x += ( image_bounds - scaled_image_size.x ) / 2;
+	image_offset.y += ( image_bounds - scaled_image_size.y ) / 2;
+
+	ImGui::SetCursorPos( image_offset );
+
+	ImGui::Image( im_texture, scaled_image_size );
+}
+
+
 void gallery_view_draw_content()
 {
 	int window_width, window_height;
@@ -302,45 +330,68 @@ void gallery_view_draw_content()
 
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, { 0.25f, 0.25f, 0.25f, 1.f } );
 
-			thumbnail_t* thumbnail = thumbnail_get_data( g_folder_thumbnail_list[ i ] );
-
-			if ( thumbnail )
+			if ( media.type == e_media_type_directory )
 			{
-				if ( thumbnail->status == e_thumbnail_status_finished )
-				{
-					// Fit image in window size, scaling up if needed
-					float factor[ 2 ] = { 1.f, 1.f };
-
-					factor[ 0 ]       = (float)image_bounds / (float)thumbnail->data->width;
-					factor[ 1 ]       = (float)image_bounds / (float)thumbnail->data->height;
-
-					float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
-
-					ImVec2 scaled_image_size;
-					scaled_image_size.x = thumbnail->data->width * zoom_level;
-					scaled_image_size.y = thumbnail->data->height * zoom_level;
-
-					// center the image
-					ImVec2 image_offset = ImGui::GetCursorPos();
-					image_offset.x += ( image_bounds - scaled_image_size.x ) / 2;
-					image_offset.y += ( image_bounds - scaled_image_size.y ) / 2;
-
-					ImGui::SetCursorPos( image_offset );
-
-					ImGui::Image( thumbnail->im_texture, scaled_image_size );
-				}
-				else
-				{
-					ImGui::Dummy( { image_bounds, image_bounds } );
-				}
+				gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), image_bounds, false );
+			}
+			// videos don't have thumbnail generation yet
+			else if ( media.type == e_media_type_video )
+			{
+				gallery_view_draw_image( icon_get_image( e_icon_video ), icon_get_imtexture( e_icon_video ), image_bounds, false );
 			}
 			else
 			{
-				if ( !thumbnail && media.type != e_media_type_directory )
-					thumbnail_requests.emplace_back( media.path, i );
-				// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
+				thumbnail_t* thumbnail = thumbnail_get_data( g_folder_thumbnail_list[ i ] );
 
-				ImGui::Dummy( { image_bounds, image_bounds } );
+				if ( thumbnail )
+				{
+					if ( thumbnail->status == e_thumbnail_status_finished )
+					{
+						gallery_view_draw_image( thumbnail->data, thumbnail->im_texture, image_bounds, true );
+	  #if 0
+						// Fit image in window size, scaling up if needed
+						float factor[ 2 ] = { 1.f, 1.f };
+
+						factor[ 0 ]       = (float)image_bounds / (float)thumbnail->data->width;
+						factor[ 1 ]       = (float)image_bounds / (float)thumbnail->data->height;
+
+						float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
+
+						ImVec2 scaled_image_size;
+						scaled_image_size.x = thumbnail->data->width * zoom_level;
+						scaled_image_size.y = thumbnail->data->height * zoom_level;
+
+						// center the image
+						ImVec2 image_offset = ImGui::GetCursorPos();
+						image_offset.x += ( image_bounds - scaled_image_size.x ) / 2;
+						image_offset.y += ( image_bounds - scaled_image_size.y ) / 2;
+
+						ImGui::SetCursorPos( image_offset );
+
+						ImGui::Image( thumbnail->im_texture, scaled_image_size );
+	#endif
+					}
+					else if ( thumbnail->status == e_thumbnail_status_failed )
+					{
+						gallery_view_draw_image( icon_get_image( e_icon_invalid ), icon_get_imtexture( e_icon_invalid ), image_bounds, false );
+					}
+					else if ( thumbnail->status == e_thumbnail_status_queued || thumbnail->status == e_thumbnail_status_loading || thumbnail->status == e_thumbnail_status_uploading )
+					{
+						gallery_view_draw_image( icon_get_image( e_icon_loading ), icon_get_imtexture( e_icon_loading ), image_bounds, false );
+					}
+					else // if ( thumbnail->status == e_thumbnail_status_free )
+					{
+						ImGui::Dummy( { image_bounds, image_bounds } );
+					}
+				}
+				else
+				{
+					if ( !thumbnail && media.type != e_media_type_directory )
+						thumbnail_requests.emplace_back( media.path, i );
+					// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
+
+					ImGui::Dummy( { image_bounds, image_bounds } );
+				}
 			}
 
 			// if ( visible )

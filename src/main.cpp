@@ -285,6 +285,106 @@ void on_new_file( char* file )
 }
 
 
+
+static const char* g_icon_names[] = {
+	"none",
+	"invalid",
+	"folder",
+	"loading",
+	"video",
+};
+
+
+
+static const char* g_icon_paths[] = {
+	"icons/none.png",
+	"icons/invalid.png",
+	"icons/folder.png",
+	"icons/loading.png",
+	"icons/video.png",
+};
+
+
+static image_t g_icon_image[ e_icon_count ]{};
+static GLuint  g_icon_texture[ e_icon_count ]{};
+
+static_assert( ARR_SIZE( g_icon_names ) == e_icon_count );
+static_assert( ARR_SIZE( g_icon_paths ) == e_icon_count );
+
+
+bool icon_preload()
+{
+	for ( u8 i = 0; i < e_icon_count; i++ )
+	{
+		image_load_info_t load_info{};
+		load_info.image = &g_icon_image[ i ];
+
+		if ( !image_load( g_icon_paths[ i ], load_info ) )
+		{
+			printf( "Failed to load %s icon \"%s\"\n", g_icon_names[ i ], g_icon_paths[ i ] );
+			continue;
+		}
+
+		g_icon_texture[ i ] = gl_upload_texture( &g_icon_image[ i ] );
+
+		if ( !g_icon_texture[ i ] )
+		{
+			printf( "Failed to upload %s icon \"%s\"\n", g_icon_names[ i ], g_icon_paths[ i ] );
+			continue;
+		}
+
+		printf( "Loaded icon %s\n", g_icon_names[ i ] );
+	}
+
+	return true;
+}
+
+
+void icon_free()
+{
+	for ( u8 i = 0; i < e_icon_count; i++ )
+	{
+	}
+}
+
+
+image_t* icon_get_image( e_icon icon_type )
+{
+	if ( icon_type > e_icon_count )
+		return {};
+
+	return &g_icon_image[ icon_type ];
+}
+
+
+ImTextureRef icon_get_imtexture( e_icon icon_type )
+{
+	if ( icon_type > e_icon_count )
+		return {};
+
+	return static_cast< ImTextureRef >( g_icon_texture[ icon_type ] );
+}
+
+
+void style_imgui()
+{
+	ImGuiStyle& style        = ImGui::GetStyle();
+
+	style.WindowPadding.x    = 6;
+	style.WindowPadding.y    = 6;
+	style.ItemSpacing.x      = 6;
+	style.ItemSpacing.y      = 6;
+	style.ItemInnerSpacing.x = 6;
+	style.ItemInnerSpacing.y = 6;
+
+	style.ChildRounding      = 3;
+	style.FrameRounding      = 3;
+	style.GrabRounding       = 3;
+	style.PopupRounding      = 3;
+	// style.ScrollbarRounding = 3;
+}
+
+
 int main( int argc, char* argv[] )
 {
 	args_init( argc, argv );
@@ -351,6 +451,8 @@ int main( int argc, char* argv[] )
 	io.DisplaySize.x   = width;
 	io.DisplaySize.y   = height;
 
+	style_imgui();
+
 	if ( !load_mpv_dll() )
 	{
 		printf( "Failed to load MPV\n" );
@@ -370,6 +472,8 @@ int main( int argc, char* argv[] )
 	}
 	
 	glGenTextures( 1, &g_image_data.texture );
+
+	icon_preload();
 
 	// ----------------------------------------------------------------
 
@@ -529,6 +633,8 @@ int main( int argc, char* argv[] )
 		//if ( show_frame_time )
 		// printf( "%f FRAMETIME\n", time );
 	}
+
+	icon_free();
 
 	SDL_GL_DestroyContext( g_gl_context );
 

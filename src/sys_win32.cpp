@@ -682,7 +682,7 @@ sys_font_data_t sys_get_font()
 
 	font_data.font_path = sys_to_utf8( buf );
 	// font_data.height    = abs( metrics.lfCaptionFont.lfHeight );
-	font_data.height    = 16;
+	font_data.height    = 17;
 	font_data.weight    = abs( metrics.lfCaptionFont.lfWeight );
 
 	return font_data;
