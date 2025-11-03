@@ -125,9 +125,12 @@ struct CodecJPEG: public IImageLoader
 		if ( best_height == 0 )
 			best_height = image->height;
 
-		image->data = ch_realloc( image->data, best_width * best_height * tjPixelSize[ pixelFmt ] );
+		// one frame
+		// image->frame      = ch_realloc( image->frame, 1 );
+		image->frame.resize( 1 );
+		image->frame[ 0 ] = ch_realloc( image->frame[ 0 ], best_width * best_height * tjPixelSize[ pixelFmt ] );
 
-		if ( !image->data )
+		if ( !image->frame[ 0 ] )
 		{
 			fprintf( stderr, "CODEC_JPEG: Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
 			if ( load_info.threaded_load )
@@ -141,7 +144,7 @@ struct CodecJPEG: public IImageLoader
           local_tjpg,
           (const unsigned char*)data,
           data_len,
-          (unsigned char*)image->data,
+          (unsigned char*)image->frame[ 0 ],
           0,
           pitch,
           best_height,
@@ -154,17 +157,17 @@ struct CodecJPEG: public IImageLoader
 			fprintf( stderr, "CODEC_JPEG: Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
 			if ( load_info.threaded_load )
 				tjDestroy( local_tjpg );
-			free( image->data );
+			free( image->frame[ 0 ] );
 			return false;
 		}
 
 		if ( load_info.threaded_load )
 			tjDestroy( local_tjpg );
 
-		if ( !image->data )
+		if ( !image->frame[ 0 ] )
 		{
 			printf( "CODEC_JPEG: Decompress returned a nullptr?\n" );
-			free( image->data );
+			free( image->frame[ 0 ] );
 			return false;
 		}
 
@@ -262,9 +265,9 @@ struct CodecJPEG: public IImageLoader
 		if ( best_height == 0 )
 			best_height = image->height;
 
-		image->data = ch_calloc< unsigned char >( best_width * best_height * tjPixelSize[ pixelFmt ] );
+		image->frame = ch_calloc< unsigned char >( best_width * best_height * tjPixelSize[ pixelFmt ] );
 
-		if ( !image->data )
+		if ( !image->frame )
 		{
 			fprintf( stderr, "CODEC_JPEG: Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
 			free( fileData );
@@ -278,7 +281,7 @@ struct CodecJPEG: public IImageLoader
           local_tjpg,
           (const unsigned char*)fileData,
           fileDataLen,
-          (unsigned char*)image->data,
+          (unsigned char*)image->frame,
           0,
           pitch,
           best_height,
@@ -293,16 +296,16 @@ struct CodecJPEG: public IImageLoader
 			// fprintf( stderr, "[FormatJpeg] Failed to decompress image: %ws\n%s\n", path.c_str(), tjGetErrorStr2( tjpg ) );
 			fprintf( stderr, "CODEC_JPEG: Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
 			tjDestroy( local_tjpg );
-			free( image->data );
+			free( image->frame );
 			return false;
 		}
 
 		tjDestroy( local_tjpg );
 
-		if ( !image->data )
+		if ( !image->frame )
 		{
 			printf( "Jpeg Decompress returned a nullptr?\n" );
-			free( image->data );
+			free( image->frame );
 			return false;
 		}
 
@@ -348,7 +351,7 @@ struct CodecJPEG: public IImageLoader
 
 		int pixelFmt     = TJPF_RGB;
 
-		image->data      = ch_realloc< unsigned char >( image->data, image->width * image->height * tjPixelSize[ pixelFmt ] );
+		image->frame      = ch_realloc< unsigned char >( image->frame, image->width * image->height * tjPixelSize[ pixelFmt ] );
 
 		int pitch        = image->width * tjPixelSize[ pixelFmt ];
 
@@ -356,7 +359,7 @@ struct CodecJPEG: public IImageLoader
           tjpg,
           (const unsigned char*)fileData,
           fileDataLen,
-          (unsigned char*)image->data,
+          (unsigned char*)image->frame,
           0,
           pitch,
           0,
@@ -411,13 +414,13 @@ struct CodecJPEG: public IImageLoader
 
 		// srData.resize( imageInfo->aWidth * imageInfo->aHeight * tjPixelSize[ pixelFmt ] );
 
-		image->data = ch_calloc< unsigned char >( image->width * image->height * tjPixelSize[ pixelFmt ] );
+		image->frame = ch_calloc< unsigned char >( image->width * image->height * tjPixelSize[ pixelFmt ] );
 
 		ret = tjDecompress2(
 		    tjpg,
 		    (const unsigned char*)fileData,
 			fileDataLen,
-          (unsigned char*)image->data,
+          (unsigned char*)image->frame,
 			0,
 		  image->width * 4,
 			0,

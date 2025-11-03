@@ -70,7 +70,7 @@ void thumbnail_loader_free_data( u32 index )
 
 	gl_free_texture( thumbnail.texture );
 
-	free( thumbnail.data );
+	free( thumbnail.image );
 	free( thumbnail.path );
 
 	memset( &thumbnail, 0, sizeof( thumbnail_t ) );
@@ -228,10 +228,10 @@ void thumbnail_loader_worker( u32 thread_id )
 		printf( "[THUMBNAIL %d][JOB %d][THREAD %d] STARTING LOAD OF IMAGE: %s\n", job->thumbnail.index, job_id, thread_id, job->path );
 
 		thumbnail->status.store( e_thumbnail_status_loading, std::memory_order_release );
-		thumbnail->data   = ch_calloc< image_t >( 1 );
+		thumbnail->image   = ch_calloc< image_t >( 1 );
 
 		image_load_info_t load_info{};
-		load_info.image         = thumbnail->data;
+		load_info.image         = thumbnail->image;
 		load_info.load_quick    = true;
 		load_info.threaded_load = true;
 		load_info.target_size.x = 400;
@@ -244,7 +244,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			continue;
 		}
 
-		if ( !thumbnail->data->data )
+		if ( !thumbnail->image->frame[ 0 ] )
 		{
 			printf( "data is nullptr in worker?\n" );
 			thumbnail->status = e_thumbnail_status_failed;
@@ -331,17 +331,17 @@ void thumbnail_loader_update()
 
 		// printf( "UPLOADING IMAGE: %s\n", thumbnail.path );
 
-		if ( !thumbnail.data->data )
+		if ( !thumbnail.image->frame[ 0 ] )
 		{
 			printf( "data is nullptr\n" );
 		}
 
-		thumbnail.texture    = gl_upload_texture( thumbnail.data );
+		thumbnail.texture    = gl_upload_texture( thumbnail.image );
 		thumbnail.im_texture = thumbnail.texture;
 
 		{
-			free( thumbnail.data->data );
-			thumbnail.data->data = nullptr;
+			free( thumbnail.image->frame[ 0 ] );
+			thumbnail.image->frame[ 0 ] = nullptr;
 			printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
 		}
 

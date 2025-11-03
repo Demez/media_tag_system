@@ -69,7 +69,7 @@ bool mouse_hovering_imgui_window()
 			continue;
 
 		// Support for one rectangular hole in any given window
-		// FIXME: Consider generalizing hit-testing override (with more generic data, callback, etc.) (#1512)
+		// FIXME: Consider generalizing hit-testing override (with more generic frame, callback, etc.) (#1512)
 		if ( window->HitTestHoleSize.x != 0 )
 		{
 			ImVec2 hole_pos( window->Pos.x + (float)window->HitTestHoleOffset.x, window->Pos.y + (float)window->HitTestHoleOffset.y );
@@ -213,6 +213,7 @@ void folder_load_media_list()
 		valid_ext |= ext == ".jpg";
 		valid_ext |= ext == ".jpeg";
 		valid_ext |= ext == ".png";
+	//	valid_ext |= ext == ".gif";
 
 		if ( valid_ext )
 		{
@@ -227,7 +228,7 @@ void folder_load_media_list()
 			valid_ext |= ext == ".mov";
 			valid_ext |= ext == ".3gp";
 			valid_ext |= ext == ".avi";
-
+	
 			if ( valid_ext )
 			{
 				type = e_media_type_video;
@@ -294,7 +295,7 @@ void gl_update_texture( GLuint texture, image_t* image )
 
 	// Upload pixels into texture
 	glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
-	glTexImage2D( GL_TEXTURE_2D, 0, image->format, image->width, image->height, 0, image->format, GL_UNSIGNED_BYTE, image->data );
+	glTexImage2D( GL_TEXTURE_2D, 0, image->format, image->width, image->height, 0, image->format, GL_UNSIGNED_BYTE, image->frame[ 0 ] );
 
 	auto err = glGetError();
 

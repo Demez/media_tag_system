@@ -4,10 +4,9 @@
 
 #if 1
 
-class LoaderPNG: public IImageLoader
+struct LoaderPNG: public IImageLoader
 {
-public:
-    std::string match_ext = ".png";
+	std::string match_ext  = ".png";
 
 	LoaderPNG()
 	{
@@ -29,7 +28,7 @@ public:
 		spng_ctx* ctx = spng_ctx_new( 0 );
 		if ( !ctx )
 		{
-			fprintf( stderr, "[FormatPNG] Failed to allocate memory for png context.\n" );
+			fprintf( stderr, "LOADER_PNG Failed to allocate memory for png context.\n" );
 			return false;
 		}
 
@@ -103,14 +102,17 @@ public:
 		err = spng_decoded_image_size( ctx, pngFmt, (size_t*)&size );
 		if ( err != 0 )
 		{
-			printf( "[FormatPNG] Failed to decode image size: %s\n", spng_strerror( err ) );
+			printf( "LOADER_PNG Failed to decode image size: %s\n", spng_strerror( err ) );
 			spng_ctx_free( ctx );
 			return false;
 		}
 
-		load_info.image->data = ch_realloc( load_info.image->data, size );
+		// one frame
+		// load_info.image->frame      = ch_realloc( load_info.image->frame, 1 );
+		load_info.image->frame.resize( 1 );
+		load_info.image->frame[ 0 ] = ch_realloc( load_info.image->frame[ 0 ], size );
 
-		err                   = spng_decode_image( ctx, load_info.image->data, size, pngFmt, SPNG_DECODE_TRNS );
+		err                        = spng_decode_image( ctx, load_info.image->frame[ 0 ], size, pngFmt, SPNG_DECODE_TRNS );
 		if ( err != 0 )
 		{
 			printf( "LOADER_PNG: Failed to decode image: %s\n", spng_strerror( err ) );

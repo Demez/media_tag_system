@@ -73,7 +73,7 @@ void media_view_zoom_reset()
 
 	g_image_zoom  = 1.0;
 
-	if ( !g_image.data )
+	if ( !g_image.frame[ 0 ] )
 		return;
 
 	g_image_size.x = g_image.width;
@@ -407,7 +407,7 @@ void media_view_load()
 			gl_update_texture( g_image_data.texture, &g_image );
 		}
 
-	//	g_image_data.surface = SDL_CreateSurfaceFrom( g_image.width, g_image.height, g_image.format, g_image.data, g_image.pitch );
+	//	g_image_data.surface = SDL_CreateSurfaceFrom( g_image.width, g_image.height, g_image.format, g_image.frame, g_image.pitch );
 	//	g_image_data.texture = SDL_CreateTextureFromSurface( g_main_renderer, g_image_data.surface );
 
 		// auto  currentTime    = std::chrono::high_resolution_clock::now();
@@ -459,11 +459,7 @@ advance:
 
 void media_view_draw_video_controls()
 {
-	// Keybindings and mouse input
-
-	bool window_hovered = mouse_hovering_imgui_window();
-
-	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !window_hovered && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
+	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !mouse_hovering_imgui_window() && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
 	{
 		const char* cmd[]   = { "cycle", "pause", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
@@ -488,7 +484,7 @@ void media_view_draw_video_controls()
 	// pivot aligns it to the center and the bottom of the window
 	ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.5f, 1.0f ) );
 
-	if ( !ImGui::Begin( "##video_controls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize ) )
+	if ( !ImGui::Begin( "##video_controls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
 	{
 		ImGui::End();
 		return;
@@ -597,6 +593,27 @@ void media_view_draw_video_controls()
 
 		const char* cmd[]   = { "seek", time_pos_str, "absolute", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+
+	ImGui::SameLine();
+
+	int muted = 0;
+	p_mpv_get_property( g_mpv, "mute", MPV_FORMAT_FLAG, &muted );
+
+	if ( muted )
+	{
+		ImGui::PushStyleColor( ImGuiCol_Button, ImGui::GetStyleColorVec4( ImGuiCol_ButtonActive ) );
+	}
+
+	if ( ImGui::Button( "M" ) )
+	{
+		const char* cmd[]   = { "cycle", "mute", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+
+	if ( muted )
+	{
+		ImGui::PopStyleColor();
 	}
 
 	double volume = 0;

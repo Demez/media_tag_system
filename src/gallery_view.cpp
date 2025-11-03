@@ -347,7 +347,7 @@ void gallery_view_draw_content()
 				{
 					if ( thumbnail->status == e_thumbnail_status_finished )
 					{
-						gallery_view_draw_image( thumbnail->data, thumbnail->im_texture, image_bounds, true );
+						gallery_view_draw_image( thumbnail->image, thumbnail->im_texture, image_bounds, true );
 					}
 					else if ( thumbnail->status == e_thumbnail_status_failed )
 					{

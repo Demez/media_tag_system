@@ -29,6 +29,16 @@ HANDLE_GEN_32( h_thumbnail );
 // codec handler
 
 
+struct image_frame_t
+{
+	// time to spend on frame
+	float          time;
+
+	// image data
+	unsigned char* data;
+};
+
+
 struct image_t
 {
 	int             width;
@@ -36,13 +46,15 @@ struct image_t
 	int             bit_depth;
 	int             pitch;
 	GLint           format;
-	unsigned char*  data;
+	// int             frames;
+	// unsigned char** frame;
+	std::vector< unsigned char* > frame;
 };
 
 
 struct image_load_info_t
 {
-	// Image data, this will be reused if valid data, result is also stored in here
+	// Image frame, this will be reused if valid frame, result is also stored in here
 	image_t* image;
 
 	// When not 0, The codec will load the smallest version of an image that's larger than this resolution
@@ -53,6 +65,9 @@ struct image_load_info_t
 
 	// Is this being loaded from a thread?
 	bool     threaded_load;
+
+	// Only load the first frame of this image, usually for thumbnails
+	bool     single_frame;
 };
 
 
@@ -216,7 +231,7 @@ struct thumbnail_t
 	std::atomic< e_thumbnail_status > status;
 	u32                               distance;  // higher distances get freed first for other thumbnails
 	char*                             path;      // mainly for debugging
-	image_t*                          data;
+	image_t*                          image;
 	GLuint                            texture;
 	ImTextureRef                      im_texture;
 };

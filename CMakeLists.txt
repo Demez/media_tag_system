@@ -167,6 +167,7 @@ set(
 
     src/codecs/codec_jpeg.cpp
     src/codecs/codec_png.cpp
+    src/codecs/format_gif.cpp
 
     src/sys_win32.cpp
 
@@ -209,6 +210,7 @@ include_directories(
 	"thirdparty/mozjpeg"
 	"thirdparty/libspng/spng"
 	"thirdparty/mpv/include"
+	"thirdparty/gif_load"
 )
 
 add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} )
