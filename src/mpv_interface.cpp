@@ -395,6 +395,9 @@ bool start_mpv()
 
 	mpv_create_texture();
 
+	p_mpv_set_property_string( g_mpv, "keep-open", "always" );
+	p_mpv_set_property_string( g_mpv, "loop", "inf" );
+
 	return true;
 }
 

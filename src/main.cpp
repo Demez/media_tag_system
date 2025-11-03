@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_internal.h"
 
 #define DATABASE_FILE "tag_database.txt"
 
@@ -36,6 +37,66 @@ fs::path                     g_folder_queued;
 std::vector< media_entry_t > g_folder_media_list;
 std::vector< h_thumbnail >   g_folder_thumbnail_list;
 size_t                       g_gallery_index = 0;
+
+
+// Check the function FindHoveredWindowEx() in imgui.cpp to see if you need to update this when updating imgui
+bool mouse_hovering_imgui_window()
+{
+	ImGuiContext& g = *ImGui::GetCurrentContext();
+
+	ImVec2        imMousePos{ (float)g_mouse_pos[ 0 ], (float)g_mouse_pos[ 1 ] };
+
+	ImGuiWindow*  hovered_window                     = NULL;
+	ImGuiWindow*  hovered_window_under_moving_window = NULL;
+
+	if ( g.MovingWindow && !( g.MovingWindow->Flags & ImGuiWindowFlags_NoMouseInputs ) )
+		hovered_window = g.MovingWindow;
+
+	ImVec2 padding_regular    = g.Style.TouchExtraPadding;
+	ImVec2 padding_for_resize = ImMax( g.Style.TouchExtraPadding, ImVec2( g.Style.WindowBorderHoverPadding, g.Style.WindowBorderHoverPadding ) );
+	for ( int i = g.Windows.Size - 1; i >= 0; i-- )
+	{
+		ImGuiWindow* window = g.Windows[ i ];
+		IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
+		if ( !window->WasActive || window->Hidden )
+			continue;
+		if ( window->Flags & ImGuiWindowFlags_NoMouseInputs )
+			continue;
+
+		// Using the clipped AABB, a child window will typically be clipped by its parent (not always)
+		ImVec2 hit_padding = ( window->Flags & ( ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize ) ) ? padding_regular : padding_for_resize;
+		if ( !window->OuterRectClipped.ContainsWithPad( imMousePos, hit_padding ) )
+			continue;
+
+		// Support for one rectangular hole in any given window
+		// FIXME: Consider generalizing hit-testing override (with more generic data, callback, etc.) (#1512)
+		if ( window->HitTestHoleSize.x != 0 )
+		{
+			ImVec2 hole_pos( window->Pos.x + (float)window->HitTestHoleOffset.x, window->Pos.y + (float)window->HitTestHoleOffset.y );
+			ImVec2 hole_size( (float)window->HitTestHoleSize.x, (float)window->HitTestHoleSize.y );
+			if ( ImRect( hole_pos, hole_pos + hole_size ).Contains( imMousePos ) )
+				continue;
+		}
+
+		//if ( find_first_and_in_any_viewport )
+		//{
+		//	hovered_window = window;
+		//	break;
+		//}
+		//else
+		{
+			if ( hovered_window == NULL )
+				hovered_window = window;
+			IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
+			if ( hovered_window_under_moving_window == NULL && ( !g.MovingWindow || window->RootWindow != g.MovingWindow->RootWindow ) )
+				hovered_window_under_moving_window = window;
+			if ( hovered_window && hovered_window_under_moving_window )
+				break;
+		}
+	}
+
+	return hovered_window;
+}
 
 
 void image_register_codec( IImageLoader* codec )

@@ -1,4 +1,5 @@
 #include "main.h"
+#include "imgui_internal.h"
 
 
 // Image Draw Data
@@ -456,13 +457,184 @@ advance:
 }
 
 
+void media_view_draw_video_controls()
+{
+	// Keybindings and mouse input
+
+	bool window_hovered = mouse_hovering_imgui_window();
+
+	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !window_hovered && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
+	{
+		const char* cmd[]   = { "cycle", "pause", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+
+	int width, height;
+	SDL_GetWindowSize( g_main_window, &width, &height );
+
+	ImVec2 playback_control_pos{};
+	playback_control_pos.x = width / 2;
+	//playback_control_pos.y = ( height - 75.f );
+	playback_control_pos.y = ( height - 40.f );
+
+	// check if mouse in rectangle
+
+	static float controls_height = 50.f;
+	if ( !mouse_in_rect( { 0.f, height - (80.f + (controls_height * 2)) }, { (float)width, (float)height } ) )
+		return;
+
+	// ----------------------------------------
+
+	// pivot aligns it to the center and the bottom of the window
+	ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.5f, 1.0f ) );
+
+	if ( !ImGui::Begin( "##video_controls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize ) )
+	{
+		ImGui::End();
+		return;
+	}
+
+	double time_pos = 0;
+	double duration = 0;
+	s32    paused   = 0;
+	p_mpv_get_property( g_mpv, "time-pos", MPV_FORMAT_DOUBLE, &time_pos );
+	p_mpv_get_property( g_mpv, "duration", MPV_FORMAT_DOUBLE, &duration );
+	p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
+
+	ImGuiStyle&  style         = ImGui::GetStyle();
+
+	const ImVec2 label_size    = ImGui::CalcTextSize( "Pause", NULL, true );
+	ImVec2       play_btn_size = ImGui::CalcItemSize( { 0, 0 }, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f );
+
+	if ( paused )
+	{
+		if ( ImGui::Button( "Play", play_btn_size ) )
+		{
+			const char* cmd[]   = { "set", "pause", "no", NULL };
+			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+		}
+	}
+	else
+	{
+		if ( ImGui::Button( "Pause", play_btn_size ) )
+		{
+			const char* cmd[]   = { "set", "pause", "yes", NULL };
+			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+		}
+	}
+
+#if 0
+	ImGui::SameLine();
+	ImGui::Spacing();
+
+	ImGui::SameLine();
+	if ( ImGui::Button( "<|" ) )
+	{
+		const char* cmd[]   = { "seek", "0", "absolute", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+
+	ImGui::SameLine();
+	if ( ImGui::Button( "|>" ) )
+	{
+		char duration_str[ 16 ];
+		gcvt( duration, 4, duration_str );
+
+		// const char* cmd[]   = { "seek", duration_str, "absolute", NULL };
+		const char* cmd[]   = { "seek", "100", "absolute-percent+exact", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+#endif
+
+	ImGui::SameLine();
+	//ImGui::Spacing();
+
+	ImGui::SameLine();
+	if ( ImGui::Button( "<" ) )
+	{
+		const char* cmd[]   = { "frame-back-step", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+
+	ImGui::SameLine();
+	if ( ImGui::Button( ">" ) )
+	{
+		const char* cmd[]   = { "frame-step", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+	
+	ImGui::SameLine();
+
+	// https://stackoverflow.com/questions/3673226/how-to-print-time-in-format-2009-08-10-181754-811
+
+	char str_time_pos[ TIME_BUFFER ]{ 0 };
+	char str_duration[ TIME_BUFFER ]{ 0 };
+
+	util_format_time( str_time_pos, time_pos );
+	util_format_time( str_duration, duration );
+
+	char         str_time[ TIME_BUFFER + TIME_BUFFER + 4 ]{};
+
+	snprintf( str_time, TIME_BUFFER + TIME_BUFFER + 4, "%s / %s", str_time_pos, str_duration );
+
+	// const ImVec2 time_size       = ImGui::CalcTextSize( str_time, NULL, true );
+
+	// float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 2 );
+	// float        avaliable_width = 500.f - ( style.ItemSpacing.x * 2 );
+	float        vol_bar_width   = 96.f;
+
+	// float        seek_bar_width  = avaliable_width;
+	// seek_bar_width -= ( vol_bar_width + time_size.x + ( style.ItemSpacing.x * 2 ) );
+
+	ImGui::SetNextItemWidth( 200.f );
+
+	float time_pos_f = (float)time_pos;
+	if ( ImGui::SliderFloat( "##seek", &time_pos_f, 0.f, (float)duration ) )
+	{
+		// convert float to string in c
+		char time_pos_str[ 16 ];
+		gcvt( time_pos_f, 4, time_pos_str );
+
+		const char* cmd[]   = { "seek", time_pos_str, "absolute", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+
+	double volume = 0;
+	p_mpv_get_property( g_mpv, "volume", MPV_FORMAT_DOUBLE, &volume );
+
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth( vol_bar_width );
+
+	float volume_f = volume;
+	if ( ImGui::SliderFloat( "##Volume", &volume_f, 0.f, 130.f ) )
+	{
+		// convert float to string in c
+		char volume_str[ 16 ];
+		gcvt( volume_f, 4, volume_str );
+
+		const char* cmd[]   = { "set", "volume", volume_str, NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+
+	ImGui::SameLine();
+
+	// ImGui::Text( "%s / %s", str_time_pos, str_duration );
+	ImGui::TextUnformatted( str_time );
+	// ImGui::ProgressBar( time_pos / duration );
+
+	controls_height = ImGui::GetWindowContentRegionMax().y;
+
+	ImGui::End();
+}
+
+
 void media_view_draw_imgui()
 {
 	media_view_input();
 
 	if ( get_media_type() == e_media_type_video )
 	{
-		// Draw playback controls
+		media_view_draw_video_controls();
 	}
 	else if ( get_media_type() == e_media_type_image_animated )
 	{

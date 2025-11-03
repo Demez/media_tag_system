@@ -317,6 +317,7 @@ sys_font_data_t sys_get_font();
 // utility functions
 
 bool        point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size );
+bool        mouse_in_rect( ImVec2 min_size, ImVec2 max_size );
 
 #if _WIN32
 char*       strcasestr( const char* s, const char* find );

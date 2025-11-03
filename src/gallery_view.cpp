@@ -348,28 +348,6 @@ void gallery_view_draw_content()
 					if ( thumbnail->status == e_thumbnail_status_finished )
 					{
 						gallery_view_draw_image( thumbnail->data, thumbnail->im_texture, image_bounds, true );
-	  #if 0
-						// Fit image in window size, scaling up if needed
-						float factor[ 2 ] = { 1.f, 1.f };
-
-						factor[ 0 ]       = (float)image_bounds / (float)thumbnail->data->width;
-						factor[ 1 ]       = (float)image_bounds / (float)thumbnail->data->height;
-
-						float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
-
-						ImVec2 scaled_image_size;
-						scaled_image_size.x = thumbnail->data->width * zoom_level;
-						scaled_image_size.y = thumbnail->data->height * zoom_level;
-
-						// center the image
-						ImVec2 image_offset = ImGui::GetCursorPos();
-						image_offset.x += ( image_bounds - scaled_image_size.x ) / 2;
-						image_offset.y += ( image_bounds - scaled_image_size.y ) / 2;
-
-						ImGui::SetCursorPos( image_offset );
-
-						ImGui::Image( thumbnail->im_texture, scaled_image_size );
-	#endif
 					}
 					else if ( thumbnail->status == e_thumbnail_status_failed )
 					{

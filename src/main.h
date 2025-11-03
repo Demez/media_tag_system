@@ -181,6 +181,8 @@ GLuint                              gl_upload_texture( image_t* image );
 void                                gl_update_texture( GLuint texture, image_t* image );
 void                                gl_free_texture( GLuint texture );
 
+bool                                mouse_hovering_imgui_window();
+
 
 // ---------------------------------------------------------
 // Thumbnail System
