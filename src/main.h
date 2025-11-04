@@ -32,7 +32,7 @@ HANDLE_GEN_32( h_thumbnail );
 struct image_frame_t
 {
 	// time to spend on frame
-	float          time;
+	double         time;
 
 	// image data
 	unsigned char* data;
@@ -41,13 +41,15 @@ struct image_frame_t
 
 struct image_t
 {
-	int             width;
-	int             height;
-	int             bit_depth;
-	int             pitch;
-	GLint           format;
-	// int             frames;
-	// unsigned char** frame;
+	int                          width;
+	int                          height;
+
+	int                          bit_depth;
+	int                          pitch;
+	GLint                        format;
+
+	int                          loop_count;
+	// std::vector< image_frame_t > frame;
 	std::vector< unsigned char* > frame;
 };
 

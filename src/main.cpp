@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_freetype.h"
 #include "imgui_internal.h"
 
 #define DATABASE_FILE "tag_database.txt"
@@ -501,9 +502,35 @@ int main( int argc, char* argv[] )
 	
 	if ( font_data.font_path )
 	{
-		ImGui::GetIO().Fonts->AddFontFromFileTTF( font_data.font_path, font_data.height, nullptr );
+		//char* exe_path = sys_get_exe_folder();
+
+		ImFontConfig font_cfg{};
+		font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+
+		// Main Font
+		ImGui::GetIO().Fonts->AddFontFromFileTTF( font_data.font_path, font_data.height, &font_cfg );
+
+		// All fonts will be merged into this one above
+		font_cfg.MergeMode = true;
+
+		// Japanese Characters
+		ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\YuGothM.ttc", font_data.height, &font_cfg );
+
+		// Symbols/Emoji's
+		font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor | ImGuiFreeTypeLoaderFlags_Bitmap;
+
+		// Segoe UI Symbol
+		ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguisym.ttf", font_data.height, &font_cfg );
+
+		//char font_path[ 512 ]{};
+		//snprintf( font_path, 512, "%s/seguiemj.ttf", exe_path );
+
+		// ImGui::GetIO().Fonts->AddFontFromFileTTF( font_path, font_data.height, &font_cfg );
+		ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguiemj.ttf", font_data.height, &font_cfg );
 	
 		ImGui_ImplOpenGL3_CreateDeviceObjects();
+
+		//free( exe_path );
 	}
 
 	ImGuiIO& io = ImGui::GetIO();
