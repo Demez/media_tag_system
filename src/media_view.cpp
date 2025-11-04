@@ -86,6 +86,9 @@ void media_view_scroll_zoom( float scroll )
 	if ( !g_image_data.texture || scroll == 0 )
 		return;
 
+	if ( mouse_hovering_imgui_window() )
+		return;
+
 	double factor = 1.0;
 
 	// Zoom in if scrolling up
@@ -333,6 +336,7 @@ void media_view_context_menu()
 
 void media_view_input()
 {
+
 	if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
 	{
 		media_view_advance();
@@ -344,13 +348,16 @@ void media_view_input()
 
 	media_view_context_menu();
 
+	// if ( !mouse_hovering_imgui_window() )
+	// 	return;
+
 	auto& io = ImGui::GetIO();
 
 	// check if the mouse isn't hovering over any window and we didn't grab it already
 	if ( io.WantCaptureMouseUnlessPopupClose && !g_image_pan )
 		return;
 
-	g_image_pan = ImGui::IsMouseDown( ImGuiMouseButton_Left );
+	g_image_pan = ImGui::IsMouseDown( ImGuiMouseButton_Left ) && !(mouse_hovering_imgui_window() && !g_image_pan);
 
 	if ( g_image_pan )
 	{
