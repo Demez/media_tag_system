@@ -409,9 +409,17 @@ void media_view_load()
 
 		// auto startTime       = std::chrono::high_resolution_clock::now();
 
+		
 		if ( entry.type == e_media_type_image )
 		{
-			gl_update_texture( g_image_data.texture, &g_image );
+			if ( image_load_info.image->frame.size() > 0 )
+			{
+				gl_update_texture( g_image_data.texture, &g_image );
+			}
+			else
+			{
+				printf( "%f FAILED Load - %s\n", load_time, g_folder_media_list[ g_gallery_index ].path.string().c_str() );
+			}
 		}
 
 	//	g_image_data.surface = SDL_CreateSurfaceFrom( g_image.width, g_image.height, g_image.format, g_image.frame, g_image.pitch );

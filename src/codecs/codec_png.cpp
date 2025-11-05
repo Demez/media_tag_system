@@ -91,15 +91,18 @@ struct LoaderPNG: public IImageLoader
 		}
 
 		// look into RGBA16?
-        spng_format pngFmt = SPNG_FMT_RGBA8;
+        //spng_format pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGB8;
+        spng_format pngFmt = SPNG_FMT_RGB8;
+		int decode_flags{};
 
-        // if ( ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR )
-		// {
-		// 	pngFmt = SPNG_FMT_RGB8;
-		// }
+        if ( ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR_ALPHA || ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE_ALPHA )
+		{
+			//pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGBA8;
+			decode_flags |= SPNG_DECODE_TRNS;
+		}
 
         size_t size;
-		err = spng_decoded_image_size( ctx, pngFmt, (size_t*)&size );
+		err = spng_decoded_image_size( ctx, pngFmt, &size );
 		if ( err != 0 )
 		{
 			printf( "LOADER_PNG Failed to decode image size: %s\n", spng_strerror( err ) );
@@ -112,7 +115,7 @@ struct LoaderPNG: public IImageLoader
 		load_info.image->frame.resize( 1 );
 		load_info.image->frame[ 0 ] = ch_realloc( load_info.image->frame[ 0 ], size );
 
-		err                        = spng_decode_image( ctx, load_info.image->frame[ 0 ], size, pngFmt, SPNG_DECODE_TRNS );
+		err                         = spng_decode_image( ctx, load_info.image->frame[ 0 ], size, pngFmt, decode_flags );
 		if ( err != 0 )
 		{
 			printf( "LOADER_PNG: Failed to decode image: %s\n", spng_strerror( err ) );
@@ -122,9 +125,24 @@ struct LoaderPNG: public IImageLoader
 		
 		load_info.image->width     = ihdr.width;
 		load_info.image->height    = ihdr.height;
-		load_info.image->format    = GL_RGBA;
+		// load_info.image->format    = GL_RGBA;
 		load_info.image->bit_depth = ihdr.bit_depth;
-		load_info.image->pitch     = ihdr.bit_depth;
+		load_info.image->pitch     = 8;
+
+		switch ( pngFmt )
+		{
+			case SPNG_FMT_RGB8:
+				load_info.image->format = GL_RGB;
+				break;
+
+			case SPNG_FMT_RGBA8:
+				load_info.image->format = GL_RGBA;
+				break;
+
+			case SPNG_FMT_RGBA16:
+				load_info.image->format = GL_RGBA16;
+				break;
+		}
 
         spng_ctx_free( ctx );
 
@@ -133,6 +151,6 @@ struct LoaderPNG: public IImageLoader
 };
 
 
-LoaderPNG gPNG;
+//static LoaderPNG gPNG;
 
 #endif

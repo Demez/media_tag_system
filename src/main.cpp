@@ -168,6 +168,18 @@ bool image_load( const fs::path& path, image_load_info_t& load_info )
 }
 
 
+bool image_check_extension( std::string_view ext )
+{
+	for ( IImageLoader* codec : g_codecs )
+	{
+		if ( codec->check_extension( ext ) )
+			return true;
+	}
+
+	return false;
+}
+
+
 void update_window_title()
 {
 	char buf[ 512 ];
@@ -208,12 +220,12 @@ void folder_load_media_list()
 
 		const fs::path& ext       = path.extension();
 		e_media_type    type      = e_media_type_none;
-		bool            valid_ext = false;
+		bool            valid_ext = image_check_extension( ext.string() );
 
 		// Image Formats
-		valid_ext |= ext == ".jpg";
-		valid_ext |= ext == ".jpeg";
-		valid_ext |= ext == ".png";
+	//	valid_ext |= ext == ".jpg";
+	//	valid_ext |= ext == ".jpeg";
+	//	valid_ext |= ext == ".png";
 	//	valid_ext |= ext == ".gif";
 
 		if ( valid_ext )
@@ -295,8 +307,39 @@ void gl_update_texture( GLuint texture, image_t* image )
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 
 	// Upload pixels into texture
-	glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
-	glTexImage2D( GL_TEXTURE_2D, 0, image->format, image->width, image->height, 0, image->format, GL_UNSIGNED_BYTE, image->frame[ 0 ] );
+	// glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
+
+	//if ( image->bytes_per_pixel > 1 )
+	glPixelStorei( GL_UNPACK_ROW_LENGTH, image->pitch / image->bytes_per_pixel );
+	// glPixelStorei( GL_UNPACK_ROW_LENGTH, image->width );
+
+	//glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
+	glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
+
+	if ( image->format == GL_RGBA16 )
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, image->width, image->height, 0, GL_RGBA, GL_UNSIGNED_SHORT, (u16*)image->frame[ 0 ] );
+	}
+	else if ( image->format == GL_R16UI )
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, image->width, image->height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, (u16*)image->frame[ 0 ] );
+	}
+	else if ( image->format == GL_R16I )
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, image->width, image->height, 0, GL_LUMINANCE, GL_SHORT, (s16*)image->frame[ 0 ] );
+	}
+	else if ( image->format == GL_R8 )
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, image->width, image->height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ 0 ] );
+	}
+	else if ( image->format == GL_RGBA32F )
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, image->width, image->height, 0, GL_RGBA, GL_FLOAT, image->frame[ 0 ] );
+	}
+	else
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, image->format, image->width, image->height, 0, image->format, GL_UNSIGNED_BYTE, image->frame[ 0 ] );
+	}
 
 	auto err = glGetError();
 
@@ -339,7 +382,8 @@ void on_new_file( char* file )
 		if ( g_folder_media_list[ i ].path == file_path )
 		{
 			g_gallery_index = i;
-			break;
+			g_folder_queued.clear();
+			return;
 		}
 	}
 

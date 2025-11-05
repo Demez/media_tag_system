@@ -231,11 +231,12 @@ void thumbnail_loader_worker( u32 thread_id )
 		thumbnail->image   = ch_calloc< image_t >( 1 );
 
 		image_load_info_t load_info{};
-		load_info.image         = thumbnail->image;
-		load_info.load_quick    = true;
-		load_info.threaded_load = true;
-		load_info.target_size.x = 400;
-		load_info.target_size.y = 400;
+		load_info.image          = thumbnail->image;
+		load_info.load_quick     = true;
+		load_info.threaded_load  = true;
+		load_info.thumbnail_load = true;
+		load_info.target_size.x  = 400;
+		load_info.target_size.y  = 400;
 
 		if ( !image_load( job->path, load_info ) )
 		{

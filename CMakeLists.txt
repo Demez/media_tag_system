@@ -142,6 +142,10 @@ if ( MSVC )
 	message( "Copying SPNG" )
 	configure_file( "thirdparty/libspng/build/Release/spng.dll" "${PROJ_OUT}/spng.dll" COPYONLY )
 	
+	message( "Copying FreeImage" )
+	configure_file( "thirdparty/FreeImageRe/bin/FreeImage.dll" "${PROJ_OUT}/FreeImage.dll" COPYONLY )
+	configure_file( "thirdparty/FreeImageRe/bin/heif.dll" "${PROJ_OUT}/heif.dll" COPYONLY )
+	
 else()  # linux
 	link_libraries( GL )
 endif()
@@ -167,7 +171,8 @@ set(
 
     src/codecs/codec_jpeg.cpp
     src/codecs/codec_png.cpp
-    src/codecs/format_gif.cpp
+    # src/codecs/format_gif.cpp
+    src/codecs/loader_freeimage.cpp
 
     src/sys_win32.cpp
 
@@ -201,6 +206,12 @@ else()
 	set( FREETYPE_IMGUI_SRC )
 endif()
 
+file(
+	GLOB_RECURSE THIRDPARTY_FILES CONFIGURE_DEPENDS
+	thirdparty/*.h
+	thirdparty/*.hpp
+)
+
 include_directories(
 	"src/"
 	"src/imgui"
@@ -211,9 +222,10 @@ include_directories(
 	"thirdparty/libspng/spng"
 	"thirdparty/mpv/include"
 	"thirdparty/gif_load"
+	"thirdparty/FreeImageRe/include"
 )
 
-add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} )
+add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
 
 target_link_libraries(
 	media_tag_system PRIVATE
@@ -222,6 +234,7 @@ target_link_libraries(
 	SDL3
 	turbojpeg-static
 	spng
+	FreeImage
 )
 
 target_link_directories(
@@ -229,6 +242,7 @@ target_link_directories(
 	"thirdparty/nativefiledialog/build/src"
 	"thirdparty/mozjpeg/build"
 	"thirdparty/libspng/build"
+	"thirdparty/FreeImageRe/lib"
 )
 
 if ( WIN32 )
@@ -249,5 +263,11 @@ source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}/src
 	PREFIX "Source Files"
 	FILES ${SRC_FILES} ${FREETYPE_IMGUI_SRC}
+)
+
+source_group(
+	TREE ${CMAKE_CURRENT_LIST_DIR}/thirdparty
+	PREFIX "Thirdparty Files"
+	FILES ${THIRDPARTY_FILES}
 )
 

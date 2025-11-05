@@ -90,6 +90,8 @@ FUNC_PTR( mpv_render_context_free );
 
 bool load_mpv_dll()
 {
+	// return false;
+
 	g_mpv_module = sys_load_library( L"libmpv-2.dll" );
 
 	if ( g_mpv_module == nullptr )
@@ -163,6 +165,9 @@ bool load_mpv_dll()
 
 void unload_mpv_dll()
 {
+	if ( !g_mpv )
+		return;
+
 	p_mpv_destroy( g_mpv );
 	g_mpv                    = nullptr;
 
@@ -182,6 +187,9 @@ static void on_mpv_events( void* ctx )
 
 void mpv_draw_frame()
 {
+	if ( !g_mpv )
+		return;
+
 	int width, height;
 	SDL_GetWindowSize( g_main_window, &width, &height );
 
@@ -276,6 +284,9 @@ void mpv_draw_frame()
 
 void mpv_update_texture()
 {
+	if ( !g_mpv )
+		return;
+
 	int width, height;
 	SDL_GetWindowSize( g_main_window, &width, &height );
 
@@ -296,6 +307,9 @@ void mpv_update_texture()
 
 void mpv_create_texture()
 {
+	if ( !g_mpv )
+		return;
+
 	//glDeleteTextures( 1, &g_mpv_fbo_tex );
 	//g_mpv_fbo_tex = 0;
 
@@ -424,6 +438,9 @@ char* mpv_get_current_video()
 
 void mpv_cmd_set_video_zoom( float zoom )
 {
+	if ( !g_mpv )
+		return;
+
 	// convert float to string
 	char zoom_str[ 16 ];
 	gcvt( zoom, 4, zoom_str );
@@ -435,6 +452,9 @@ void mpv_cmd_set_video_zoom( float zoom )
 
 void mpv_cmd_add_video_zoom( float zoom )
 {
+	if ( !g_mpv )
+		return;
+
 	// convert float to string
 	char zoom_str[ 16 ];
 	gcvt( zoom, 4, zoom_str );
@@ -446,6 +466,9 @@ void mpv_cmd_add_video_zoom( float zoom )
 
 void mpv_cmd_loadfile( const char* file )
 {
+	if ( !g_mpv )
+		return;
+
 	printf( "loading file: %s\n", file );
 
 	const char* cmd[]   = { "loadfile", file, NULL };
@@ -468,6 +491,9 @@ void mpv_cmd_loadfile( const char* file )
 
 void mpv_cmd_toggle_playback()
 {
+	if ( !g_mpv )
+		return;
+
 	const char* cmd[]   = { "cycle", "pause", NULL };
 	int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 }
@@ -475,6 +501,9 @@ void mpv_cmd_toggle_playback()
 
 void mpv_cmd_seek_offset( double seconds )
 {
+	if ( !g_mpv )
+		return;
+
 	double duration = 0;
 	double time_pos = 0;
 	p_mpv_get_property( g_mpv, "duration", MPV_FORMAT_DOUBLE, &duration );
@@ -493,6 +522,9 @@ void mpv_cmd_seek_offset( double seconds )
 
 void mpv_cmd_hook_window( void* window )
 {
+	if ( !g_mpv )
+		return;
+
 	int64_t wid = (s64)window;
 	int ret = p_mpv_set_property( g_mpv, "wid", MPV_FORMAT_INT64, &wid );
 

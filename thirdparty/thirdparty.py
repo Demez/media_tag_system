@@ -407,6 +407,9 @@ Basic Structure for a file here:
     # OPTIONAL: Name of the folder the file is extracted to, and will be renamed to what "name" is, usually not needed
     "extracted_folder": "",
     
+    # OPTIONAL: Name of the folder to extract into
+    "extract_folder": "",
+    
     # OPTIONAL: If we can't extract this, tell the user to extract it manually, thanks p7zr and mpv...
     "user_extract": False,
 },
@@ -469,10 +472,22 @@ FILE_LIST = {
             "name": "SDL3",
             "file": "SDL3-3.2.24.zip",
         },
+        {
+            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/latest/FreeImageRe-win64.zip",
+            "name": "FreeImageRe",
+            "extract_folder": "FreeImageRe",
+            "file": "FreeImageRe-win64.zip",
+        },
     ],
 
     # Linux Only
     OS.Linux: [
+        {
+            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/latest/FreeImageRe-linux64.zip",
+            "name": "FreeImageRe",
+            "extract_folder": "FreeImageRe",
+            "file": "FreeImageRe-linux64.zip",
+        },
     ],
 }
 
@@ -556,6 +571,7 @@ def handle_item(item: dict):
     name = item["name"] if "name" in item else ""
     func = item["func"] if "func" in item else None
     extracted_folder = item["extracted_folder"] if "extracted_folder" in item else None
+    extract_folder = item["extract_folder"] if "extract_folder" in item else "."
     user_extract = item["user_extract"] if "user_extract" in item else False
 
     # Check if we want this item
@@ -591,11 +607,11 @@ def handle_item(item: dict):
                 return False
 
             if is_zip:
-                if not extract_file(tmp_file, file_ext, folder,".", user_extract):
+                if not extract_file(tmp_file, file_ext, folder, extract_folder, user_extract):
                     return
 
                 # rename it
-                if folder != name:
+                if folder != name and extract_folder == ".":
                     os.rename(folder, name)
 
         else:

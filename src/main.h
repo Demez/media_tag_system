@@ -46,11 +46,12 @@ struct image_t
 
 	int                          bit_depth;
 	int                          pitch;
+	int                          bytes_per_pixel;
 	GLint                        format;
 
 	int                          loop_count;
 	// std::vector< image_frame_t > frame;
-	std::vector< unsigned char* > frame;
+	std::vector< u8* > frame;
 };
 
 
@@ -64,6 +65,9 @@ struct image_load_info_t
 
 	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
 	bool     load_quick;
+
+	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
+	bool     thumbnail_load;
 
 	// Is this being loaded from a thread?
 	bool     threaded_load;
@@ -88,6 +92,7 @@ struct IImageLoader
 
 void image_register_codec( IImageLoader* codec );
 bool image_load( const fs::path& path, image_load_info_t& load_info );
+bool image_check_extension( std::string_view ext );
 
 
 // TODO: add image load functions here
