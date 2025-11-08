@@ -147,7 +147,8 @@ bool image_load( const fs::path& path, image_load_info_t& load_info )
 
 	for ( IImageLoader* codec : g_codecs )
 	{
-		if ( !codec->check_extension( ext_str ) )
+		// if ( !codec->check_extension( ext_str ) )
+		if ( !codec->check_extension( path_str ) )
 			continue;
 
 		loaded_image = codec->image_load( path, load_info, file_data, file_len );
@@ -220,7 +221,8 @@ void folder_load_media_list()
 
 		const fs::path& ext       = path.extension();
 		e_media_type    type      = e_media_type_none;
-		bool            valid_ext = image_check_extension( ext.string() );
+		// bool            valid_ext = image_check_extension( ext.string() );
+		bool            valid_ext = image_check_extension( path.filename().string() );
 
 		// Image Formats
 	//	valid_ext |= ext == ".jpg";
@@ -421,12 +423,16 @@ static_assert( ARR_SIZE( g_icon_paths ) == e_icon_count );
 
 bool icon_preload()
 {
+	char* exe_dir = sys_get_exe_folder();
+	fs::path exe_path = exe_dir;
+	free( exe_dir );
+
 	for ( u8 i = 0; i < e_icon_count; i++ )
 	{
 		image_load_info_t load_info{};
 		load_info.image = &g_icon_image[ i ];
 
-		if ( !image_load( g_icon_paths[ i ], load_info ) )
+		if ( !image_load( exe_path / g_icon_paths[ i ], load_info ) )
 		{
 			printf( "Failed to load %s icon \"%s\"\n", g_icon_names[ i ], g_icon_paths[ i ] );
 			continue;
@@ -489,6 +495,17 @@ void style_imgui()
 	style.GrabRounding       = 3;
 	style.PopupRounding      = 3;
 	// style.ScrollbarRounding = 3;
+
+
+	// TEST
+#if 0
+	style.WindowPadding.x    = 0.f;
+	style.WindowPadding.y    = 0.f;
+	style.ItemSpacing.x      = 0.f;
+	style.ItemSpacing.y      = 0.f;
+	style.ItemInnerSpacing.x = 0.f;
+	style.ItemInnerSpacing.y = 0.f;
+#endif
 }
 
 
@@ -653,7 +670,7 @@ int main( int argc, char* argv[] )
 	{
 		// don't go full speed lol
 		// SDL_Delay( 5 );
-		SDL_Delay( 1 );
+		// SDL_Delay( 1 );
 
 		if ( !g_folder_queued.empty() )
 		{

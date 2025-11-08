@@ -1,5 +1,6 @@
 #include "main.h"
 
+#include "imgui_internal.h"
 
 struct gallery_item_t
 {
@@ -11,9 +12,14 @@ extern bool                       g_gallery_view;
 
 std::vector< gallery_item_t >     g_gallery_items;
 
-const int                         GALLERY_GRID_X_COUNT = 12;
+// const int                         GALLERY_GRID_X_COUNT    = 12;
 
-const int                         MOUSE_SCROLL_AMOUNT  = 150;
+int                               g_gallery_row_count     = 0;
+int                               g_gallery_item_size     = 150;
+int                               g_gallery_item_size_min = 50;
+int                               g_gallery_item_size_max = 600;
+
+bool                              g_gallery_sidebar_draw  = true;
 
 
 void gallery_view_input()
@@ -33,36 +39,36 @@ void gallery_view_input()
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_UpArrow ) )
 	{
-		if ( g_gallery_index < GALLERY_GRID_X_COUNT )
+		if ( g_gallery_index < g_gallery_row_count )
 		{
-			size_t count_in_row   = g_folder_media_list.size() % GALLERY_GRID_X_COUNT;
-			size_t missing_in_row = GALLERY_GRID_X_COUNT - count_in_row;
-			size_t row_diff       = GALLERY_GRID_X_COUNT - g_gallery_index;
+			size_t count_in_row   = g_folder_media_list.size() % g_gallery_row_count;
+			size_t missing_in_row = g_gallery_row_count - count_in_row;
+			size_t row_diff       = g_gallery_row_count - g_gallery_index;
 
 			// advance up a row
 			if ( missing_in_row >= row_diff )
-				row_diff += GALLERY_GRID_X_COUNT;
+				row_diff += g_gallery_row_count;
 
 			g_gallery_index = g_folder_media_list.size() - ( row_diff - missing_in_row );
 		}
 		else
 		{
-			g_gallery_index = ( g_gallery_index - GALLERY_GRID_X_COUNT ) % g_folder_media_list.size();
+			g_gallery_index = ( g_gallery_index - g_gallery_row_count ) % g_folder_media_list.size();
 		}
 
 		gallery_view_scroll_to_selected();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_DownArrow ) )
 	{
-		if ( g_gallery_index + GALLERY_GRID_X_COUNT >= g_folder_media_list.size() )
+		if ( g_gallery_index + g_gallery_row_count >= g_folder_media_list.size() )
 		{
-			size_t count_in_row = g_folder_media_list.size() % GALLERY_GRID_X_COUNT;
-			size_t row_pos      = g_gallery_index % GALLERY_GRID_X_COUNT;
+			size_t count_in_row = g_folder_media_list.size() % g_gallery_row_count;
+			size_t row_pos      = g_gallery_index % g_gallery_row_count;
 			g_gallery_index      = row_pos;
 		}
 		else
 		{
-			g_gallery_index = ( g_gallery_index + GALLERY_GRID_X_COUNT ) % g_folder_media_list.size();
+			g_gallery_index = ( g_gallery_index + g_gallery_row_count ) % g_folder_media_list.size();
 		}
 
 		gallery_view_scroll_to_selected();
@@ -77,39 +83,65 @@ void gallery_view_draw_header()
 	int window_width, window_height;
 	SDL_GetWindowSize( g_main_window, &window_width, &window_height );
 
+	ImGuiStyle&  style         = ImGui::GetStyle();
+
 	ImGui::SetNextWindowPos( { 0, 0 } );
-	ImGui::SetNextWindowSize( { (float)window_width, 32.f } );
+	// ImGui::SetNextWindowSize( { (float)window_width, 32.f } );
+	// ImGui::SetNextWindowSizeConstraints( { (float)window_width, 0.f }, { (float)window_width, 64.f } );
 
-	if ( ImGui::BeginChild( "##gallery_header", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AlwaysUseWindowPadding ) )
+	if ( !ImGui::BeginChild( "##gallery_header", { (float)window_width, 0.f }, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AlwaysUseWindowPadding ) )
 	{
-		ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-
-		ImGui::SameLine();
-
-		if ( ImGui::Button( "^" ) )
-		{
-			g_folder_queued = g_folder.parent_path();
-		}
-
-		ImGui::SameLine();
-
-		// ImGui::TextUnformatted( g_folder.string().c_str() );
-
-		if ( ImGui::InputText( "Directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
-		{
-			// g_folder_queued = g_folder_buf;
-		}
-
-		ImGui::SameLine();
-
-		// Enter returns true doesn't work because of gallery view hooking that input currently, need to add a check later for if focused in text input
-		if ( ImGui::Button( "->" ) )
-		{
-			g_folder_queued = g_folder_buf;
-		}
+		ImGui::EndChild();
+		return;
 	}
 
+	if ( ImGui::Button( "Sidebar" ) )
+	{
+		g_gallery_sidebar_draw = !g_gallery_sidebar_draw;
+	}
+
+	// ImGui::Selectable( "Sidebar", &g_gallery_sidebar_draw );
+	ImGui::SameLine();
+
+	ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
+
+	ImGui::SameLine();
+	ImGui::Spacing();
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "^" ) )
+	{
+		g_folder_queued = g_folder.parent_path();
+	}
+
+	ImGui::SameLine();
+
+	// ImGui::TextUnformatted( g_folder.string().c_str() );
+
+	if ( ImGui::InputText( "##directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
+	{
+		// g_folder_queued = g_folder_buf;
+	}
+
+	ImGui::SameLine();
+
+	// Enter returns true doesn't work because of gallery view hooking that input currently, need to add a check later for if focused in text input
+	if ( ImGui::Button( "->" ) )
+	{
+		g_folder_queued = g_folder_buf;
+	}
+
+	ImGui::SameLine();
+	ImGui::Spacing();
+	ImGui::SameLine();
+
+	ImGui::SliderInt( "Zoom", &g_gallery_item_size, g_gallery_item_size_min, g_gallery_item_size_max );
+
+	ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
+
 	ImGui::EndChild();
+
+	ImGui::PopStyleVar();
 }
 
 
@@ -127,16 +159,16 @@ void gallery_view_scroll_to_selected()
 }
 
 
-void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, float image_bounds, bool upscale )
+void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 image_bounds, bool upscale )
 {
 	// Fit image in window size, scaling up if needed
 	float factor[ 2 ] = { 1.f, 1.f };
 
-	if ( upscale || image->width > image_bounds )
-		factor[ 0 ] = (float)image_bounds / (float)image->width;
+	if ( upscale || image->width > image_bounds.x )
+		factor[ 0 ] = (float)image_bounds.x / (float)image->width;
 
-	if ( upscale || image->height > image_bounds )
-		factor[ 1 ] = (float)image_bounds / (float)image->height;
+	if ( upscale || image->height > image_bounds.y )
+		factor[ 1 ] = (float)image_bounds.y / (float)image->height;
 
 	float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
@@ -146,8 +178,8 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, float ima
 
 	// center the image
 	ImVec2 image_offset = ImGui::GetCursorPos();
-	image_offset.x += ( image_bounds - scaled_image_size.x ) / 2;
-	image_offset.y += ( image_bounds - scaled_image_size.y ) / 2;
+	image_offset.x += ( image_bounds.x - scaled_image_size.x ) / 2;
+	image_offset.y += ( image_bounds.y - scaled_image_size.y ) / 2;
 
 	ImGui::SetCursorPos( image_offset );
 
@@ -160,30 +192,44 @@ void gallery_view_draw_content()
 	int window_width, window_height;
 	SDL_GetWindowSize( g_main_window, &window_width, &window_height );
 
-	ImVec2      region_avail = ImGui::GetContentRegionAvail();
+	ImGuiStyle& style              = ImGui::GetStyle();
+	ImVec2      content_cursor_pos = ImGui::GetCursorPos();
 
-	ImGuiStyle& style        = ImGui::GetStyle();
+	ImGui::SetCursorPosX( std::max( 0.f, content_cursor_pos.x - style.ItemSpacing.x ) );
+
+	ImVec2      region_avail       = ImGui::GetContentRegionAvail();
 
 	// weirdly sized still
-	ImGui::SetNextWindowPos( { 0, 32.f } );
-	ImGui::SetNextWindowSize( { (float)window_width, region_avail.y + style.ItemSpacing.y } );
+	// ImGui::SetNextWindowPos( { window_width - region_avail_true, 32.f } );
+	// ImGui::SetNextWindowSize( { (float)window_width, region_avail.y + style.ItemSpacing.y } );
+	// ImGui::SetNextWindowSize( { region_avail.x + style.WindowPadding.x, region_avail.y + style.ItemSpacing.y } );
+	ImGui::SetNextWindowSize( { region_avail.x + style.WindowPadding.x, region_avail.y + style.WindowPadding.y } );
 
-	if ( !ImGui::BeginChild( "##gallery_content", {}, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollWithMouse ) )
+	// if ( !ImGui::BeginChild( "##gallery_content", { region_avail.x + style.WindowPadding.x, region_avail.y }, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollWithMouse ) )
+	if ( !ImGui::BeginChild( "##gallery_content", {}, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollWithMouse ) )
 	{
 		ImGui::EndChild();
 		return;
 	}
 
+	//ImGui::SetCursorPosY( ImGui::GetCursorPosY() + style.ItemSpacing.y );
+
+	// calc row count
+
 	float  text_height         = ImGui::CalcTextSize( "TEST" ).y;
 
 	// ScrollToBringRectIntoView
 
-	int    grid_item_padding   = style.ItemSpacing.x + style.ScrollbarPadding;
+	int    grid_item_padding   = style.ItemSpacing.x;
+
+	g_gallery_row_count        = (int)(region_avail.x - style.ScrollbarSize) / ( g_gallery_item_size );
 
 	// float       item_size_x       = ( region_avail.x / GALLERY_GRID_X_COUNT ) - ( GALLERY_GRID_X_COUNT * grid_item_padding ) - ( grid_item_padding * 2 );
 	// float  item_size_x         = ( region_avail.x / GALLERY_GRID_X_COUNT ) - ( ( GALLERY_GRID_X_COUNT - 1 ) * grid_item_padding );
-	float  item_size_x         = ( window_width / GALLERY_GRID_X_COUNT ) - ( grid_item_padding );
-	float  item_size_y         = item_size_x + text_height + style.ItemInnerSpacing.y;
+	// float  item_size_x         = ( window_width / g_gallery_row_count ) - ( grid_item_padding );
+	// float  item_size_x         = g_gallery_item_size - ( grid_item_padding );
+	float  item_size_x         = g_gallery_item_size - ( grid_item_padding );
+	float  item_size_y         = item_size_x + text_height + style.ItemSpacing.y;
 
 	int    grid_pos_x          = 0;
 	size_t i                   = 0;
@@ -227,16 +273,34 @@ void gallery_view_draw_content()
 
 		float                scroll = ImGui::GetScrollY();
 
-		ImGui::SetNextWindowSize( { item_size_x, item_size_y } );
+		ImVec2               media_text_size     = ImGui::CalcTextSize( media.filename.c_str(), 0, false, item_size_x - ( style.WindowPadding.x * 2 ) );
+
+		//ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, { 0.f, 0.f } );
+
+		// float  image_bounds = item_size_x - ( style.ItemInnerSpacing.y * 4 );
+		// float  image_bounds = item_size_x - ( style.ItemInnerSpacing.x * 2 );
+		// float  image_bounds = item_size_x - ( style.WindowPadding.x * 2 );
+		ImVec2               image_bounds        = { item_size_x - ( style.WindowPadding.x * 2 ), item_size_x - ( style.WindowPadding.x * 2 ) };
+
+		// float                current_item_size_y = std::min( item_size_x + media_text_size.y + style.ItemInnerSpacing.y, item_size_y * 1.75f );
+		float                current_item_size_y = image_bounds.y + media_text_size.y + style.ItemSpacing.y + ( style.WindowPadding.y * 2 );
+
+		current_item_size_y                      = std::min( current_item_size_y, item_size_y * 1.75f );
+
+		ImGui::SetNextWindowSize( { item_size_x, current_item_size_y } );
+		// ImGui::SetNextWindowSize( { item_size_x, 0 } );
+		ImGui::SetNextWindowSizeConstraints( { item_size_x, item_size_x }, { -1.f, -1.f } );
 
 		// check if i is 0, for some reason it adds like extra spacing for some reason on the first item
-		if ( grid_pos_x == GALLERY_GRID_X_COUNT || i == 0 )
+		if ( grid_pos_x == g_gallery_row_count || i == 0 )
 		{
 			grid_pos_x = 0;
 			//float new_pos = std::min( region_avail.x, ImGui::GetCursorPosX() + style.ItemSpacing.x );
 			//ImGui::SetCursorPosX( style.ItemSpacing.x );
 			// ImGui::SetCursorPosX( ImGui::GetCursorPosX() + style.ItemSpacing.x );
+			// ImGui::SetCursorPosX( ImGui::GetCursorPosX() + style.WindowPadding.x );
 			ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
+			// ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
 		}
 		else
 		{
@@ -253,8 +317,8 @@ void gallery_view_draw_content()
 			float  visible_bottom = visible_top + ImGui::GetWindowHeight();
 
 			// check if the bottom of the item is still visible at the top of the content window
-			if ( cursor_pos.y + item_size_y < visible_top )
-				distance = visible_top - ( cursor_pos.y + item_size_y );
+			if ( cursor_pos.y + current_item_size_y < visible_top )
+				distance = visible_top - ( cursor_pos.y + current_item_size_y );
 
 			// check if the top of the item is still visible at the bottom of the content window
 			else if ( cursor_pos.y > visible_bottom )
@@ -276,7 +340,7 @@ void gallery_view_draw_content()
 			float  visible_bottom = visible_top + ImGui::GetWindowHeight();
 
 			// check if the bottom of the item is off-screen at the bottom of the content window
-			if ( cursor_pos.y + item_size_y > visible_bottom )
+			if ( cursor_pos.y + current_item_size_y > visible_bottom )
 			{
 				scroll_up     = false;
 				scroll_needed = true;
@@ -297,38 +361,42 @@ void gallery_view_draw_content()
 				if ( scroll_up )
 					scroll_offset = ( cursor_pos.y - style.ItemSpacing.y ) - visible_top;
 				else
-					scroll_offset = ( cursor_pos.y + item_size_y + style.ItemSpacing.y ) - visible_bottom;
+					scroll_offset = ( cursor_pos.y + current_item_size_y + style.ItemSpacing.y ) - visible_bottom;
 
 				ImGui::SetScrollY( ImGui::GetScrollY() + scroll_offset );
 			}
 		}
 
 		// is this item even visible?
-		if ( !ImGui::IsRectVisible( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + item_size_y } ) )
+		if ( !ImGui::IsRectVisible( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + current_item_size_y } ) )
 		{
 			// use a dummy instead of a full child window, cheaper
-			ImGui::Dummy( { item_size_x, item_size_y } );
+			ImGui::Dummy( { item_size_x, current_item_size_y } );
 			grid_pos_x++;
 			continue;
 		}
 
-		item_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + item_size_y } );
+		item_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + current_item_size_y } );
 
 		if ( g_gallery_index == i )
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBg ] );
 		else if ( item_hovered )
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBgHovered ] );
 
-		if ( ImGui::BeginChild( i + 1, {}, ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar ) )
+		// if ( ImGui::BeginChild( i + 1, {}, ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings ) )
+		if ( ImGui::BeginChild( i + 1, {}, ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings ) )
 		{
+			ImVec2 current_pos  = ImGui::GetCursorPos();
 #if 1
 			image_visible_count++;
 
-			float  image_bounds = item_size_x - ( style.ItemInnerSpacing.y * 4 );
-			ImVec2 current_pos  = ImGui::GetCursorPos();
-			ImGui::SetNextWindowSize( { image_bounds, image_bounds } );
+			//ImGui::SetNextWindowSize( { image_bounds, image_bounds } );
 
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, { 0.25f, 0.25f, 0.25f, 1.f } );
+
+			#if 0
+			ImGui::Dummy( image_bounds, image_bounds );
+			#else
 
 			if ( media.type == e_media_type_directory )
 			{
@@ -359,7 +427,7 @@ void gallery_view_draw_content()
 					}
 					else // if ( thumbnail->status == e_thumbnail_status_free )
 					{
-						ImGui::Dummy( { image_bounds, image_bounds } );
+						ImGui::Dummy( image_bounds );
 					}
 				}
 				else
@@ -368,18 +436,36 @@ void gallery_view_draw_content()
 						thumbnail_requests.emplace_back( media.path, i );
 					// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
-					ImGui::Dummy( { image_bounds, image_bounds } );
+					ImGui::Dummy( image_bounds );
 				}
 			}
+			#endif
 
 			// if ( visible )
 			ImGui::PopStyleColor();
+
+			// center align text
+			ImGui::SetCursorPosX( ImGui::GetCursorPosX() + ( ( g_gallery_item_size - ( media_text_size.x + style.WindowPadding.x * 2 + style.ItemSpacing.x ) ) * 0.5f ) );
+
+			// ImGui::SetCursorPosY( current_pos.y + image_bounds + style.ItemSpacing.y );
+			ImGui::SetCursorPosY( current_pos.y + image_bounds.x + style.ItemSpacing.y );
+			// ImGui::SetCursorPosY( current_pos.y + item_size_x + style.ItemSpacing.y );
+
+			ImGui::PushTextWrapPos();
+
+			ImGui::TextUnformatted( media.filename.c_str() );
+
+			ImGui::PopTextWrapPos();
 #endif
 		}
 
-		ImGui::TextUnformatted( media.filename.c_str() );
+
+		ImVec2 test_window_size = ImGui::GetWindowSize();
+
 
 		ImGui::EndChild();
+
+		//ImGui::PopStyleVar();
 
 		if ( g_gallery_index == i || item_hovered )
 			ImGui::PopStyleColor();
@@ -415,6 +501,41 @@ void gallery_view_draw_content()
 }
 
 
+void gallery_view_draw_sidebar()
+{
+	int window_width, window_height;
+	SDL_GetWindowSize( g_main_window, &window_width, &window_height );
+
+	ImVec2      region_avail = ImGui::GetContentRegionAvail();
+	ImGuiStyle& style        = ImGui::GetStyle();
+
+	ImVec2      cursor_pos   = ImGui::GetCursorPos();
+	ImGui::SetCursorPosX( 0.f );
+
+	// weirdly sized still
+	// ImGui::SetNextWindowPos( { 0, 32.f } );
+	ImGui::SetNextWindowSizeConstraints(
+		{ 40.f, region_avail.y + style.ItemSpacing.y + style.ItemSpacing.y },
+		{ (float)window_width / 2.f, region_avail.y + style.ItemSpacing.y + style.ItemSpacing.y } );
+
+	if ( !ImGui::BeginChild( "##gallery_sidebar", {}, ImGuiChildFlags_ResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar ) )
+	{
+		//ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
+		ImGui::EndChild();
+		//ImGui::PopStyleVar();
+		return;
+	}
+
+	//ImGui::Text( "test" );
+
+	ImGui::ShowStyleEditor();
+
+	//ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
+	ImGui::EndChild();
+	//ImGui::PopStyleVar();
+}
+
+
 void gallery_view_draw()
 {
 	gallery_view_input();
@@ -425,7 +546,7 @@ void gallery_view_draw()
 	ImGui::SetNextWindowPos( { 0, 0 } );
 	ImGui::SetNextWindowSize( { (float)window_width, (float)window_height } );
 
-	if ( !ImGui::Begin( "##gallery_main", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings ) )
+	if ( !ImGui::Begin( "##gallery_main", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar ) )
 	{
 		ImGui::End();
 		return;
@@ -435,6 +556,11 @@ void gallery_view_draw()
 	gallery_view_draw_header();
 
 	// Sidebar
+	if ( g_gallery_sidebar_draw )
+	{
+		gallery_view_draw_sidebar();
+		ImGui::SameLine();
+	}
 
 	// Gallery View
 	gallery_view_draw_content();
