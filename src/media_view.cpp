@@ -13,6 +13,8 @@ float                    g_image_rot    = 0.f;
 
 // Image Panning
 bool                     g_image_pan    = false;
+bool                     g_draw_media_info = false;
+bool                     g_draw_imgui_demo = false;
 
 
 extern main_image_data_t g_image_data;
@@ -133,6 +135,28 @@ void media_view_scroll_zoom( float scroll )
 	// New Position = Scale Origin + ( Scale Point - Scale Origin ) * Scale Factor
 	g_image_pos.x  = g_mouse_pos[ 0 ] + ( g_image_pos.x - g_mouse_pos[ 0 ] ) * factor;
 	g_image_pos.y  = g_mouse_pos[ 1 ] + ( g_image_pos.y - g_mouse_pos[ 1 ] ) * factor;
+}
+
+
+void media_view_draw_media_info()
+{
+	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar ) )
+	{
+		ImGui::End();
+		return;
+	}
+
+	if ( get_media_type() == e_media_type_video )
+	{
+	}
+	else
+	{
+		// Image Type
+		ImGui::Text( "Size: %dx%d", g_image.width, g_image.height );
+		ImGui::Text( "Type: %s", g_image.image_format );
+	}
+
+	ImGui::End();
 }
 
 
@@ -276,6 +300,9 @@ void media_view_context_menu()
 		// Plat_OpenFileProperties( ImageView_GetImagePath() );
 	}
 
+	// TODO: side menu to show information on the image or video overlayed next to the image in a window
+	ImGui::MenuItem( "Media Info", nullptr, &g_draw_media_info, true );
+
 	ImGui::Separator();
 
 	if ( ImGui::BeginMenu( "Sort Mode" ) )
@@ -324,6 +351,10 @@ void media_view_context_menu()
 	if ( ImGui::MenuItem( "Settings", nullptr, false, false ) )
 	{
 	}
+
+	ImGui::Separator();
+
+	ImGui::MenuItem( "Demo Window", nullptr, &g_draw_imgui_demo, true );
 
 	// 	if ( ImGui::MenuItem( "Show ImGui Demo", nullptr, gShowImGuiDemo ) )
 	// 	{
@@ -412,7 +443,7 @@ void media_view_load()
 		
 		if ( entry.type == e_media_type_image )
 		{
-			if ( image_load_info.image->frame.size() > 0 )
+			if ( image_load_info.image->frame.size() > 0 && image_load_info.image->bytes_per_pixel > 0 )
 			{
 				gl_update_texture( g_image_data.texture, &g_image );
 			}
@@ -663,6 +694,12 @@ void media_view_draw_video_controls()
 void media_view_draw_imgui()
 {
 	media_view_input();
+
+	if ( g_draw_media_info )
+		media_view_draw_media_info();
+
+	if ( g_draw_imgui_demo )
+		ImGui::ShowDemoWindow();
 
 	if ( get_media_type() == e_media_type_video )
 	{

@@ -54,6 +54,7 @@ struct LoaderFreeImage : public IImageLoader
 
 		if ( format == FIF_UNKNOWN )
 		{
+			FreeImage_CloseMemory( memory );
 			return false;
 		}
 
@@ -108,6 +109,12 @@ struct LoaderFreeImage : public IImageLoader
 			bpp = FreeImage_GetBPP( bitmap );
 		}
 
+		if ( bitmap == nullptr )
+		{
+			printf( "LOADER_FREEIMAGE: Failed to load image from memory\n" );
+			FreeImage_CloseMemory( memory );
+			return false;
+		}
 
 		FREE_IMAGE_COLOR_TYPE color_type = FreeImage_GetColorType( bitmap );
 		FREE_IMAGE_TYPE       image_type = FreeImage_GetImageType( bitmap );
@@ -118,21 +125,25 @@ struct LoaderFreeImage : public IImageLoader
 			// return false;
 		}
 
-		load_info.image->width            = FreeImage_GetWidth( bitmap );
-		load_info.image->height           = FreeImage_GetHeight( bitmap );
-		load_info.image->pitch            = FreeImage_GetPitch( bitmap );
-		u32                   channel_num = FreeImage_GetChannelsNumber( bitmap );
+		load_info.image->width           = FreeImage_GetWidth( bitmap );
+		load_info.image->height          = FreeImage_GetHeight( bitmap );
+		load_info.image->pitch           = FreeImage_GetPitch( bitmap );
+		load_info.image->image_format    = strdup( FreeImage_GetFormatFromFIF( format ) );
+		u32 channel_num                  = FreeImage_GetChannelsNumber( bitmap );
 
-		int                   bit_depth   = load_info.image->pitch / load_info.image->width;
-		int                   bit_depth2  = bpp / channel_num;
+		int bit_depth                    = load_info.image->pitch / load_info.image->width;
+		int bit_depth2                   = bpp / channel_num;
 		int bit_depth3                   = load_info.image->pitch / bpp;
 
 		// load_info.image->bytes_per_pixel = bpp / bit_depth2;
 		load_info.image->bytes_per_pixel = bit_depth;
-		
+
 		if ( load_info.image->bytes_per_pixel == 0 )
 		{
 			// huh????
+			FreeImage_Unload( bitmap );
+			FreeImage_CloseMemory( memory );
+
 			return false;
 		}
 

@@ -52,6 +52,8 @@ struct image_t
 	int                          loop_count;
 	// std::vector< image_frame_t > frame;
 	std::vector< u8* > frame;
+
+	char*                        image_format;
 };
 
 

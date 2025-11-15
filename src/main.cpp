@@ -446,6 +446,9 @@ bool icon_preload()
 			continue;
 		}
 
+		free( g_icon_image[ i ].frame[ 0 ] );
+		g_icon_image[ i ].frame.clear();
+
 		printf( "Loaded icon %s\n", g_icon_names[ i ] );
 	}
 
@@ -457,6 +460,7 @@ void icon_free()
 {
 	for ( u8 i = 0; i < e_icon_count; i++ )
 	{
+		gl_free_texture( g_icon_texture[ i ] );
 	}
 }
 
@@ -764,7 +768,6 @@ int main( int argc, char* argv[] )
 		glClearColor( clear_color.x, clear_color.y, clear_color.z, clear_color.w );
 		glClear( GL_COLOR_BUFFER_BIT );
 
-		ImGui::ShowDemoWindow();
 		imgui_draw();
 
 		ImGui::Render();
