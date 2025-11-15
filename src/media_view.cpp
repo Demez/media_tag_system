@@ -530,6 +530,8 @@ void media_view_draw_video_controls()
 	// pivot aligns it to the center and the bottom of the window
 	ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.5f, 1.0f ) );
 
+	ImGui::SetNextWindowSizeConstraints( { width - 80.f, -1.f }, { width - 80.f, -1.f } );
+
 	if ( !ImGui::Begin( "##video_controls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
 	{
 		ImGui::End();
@@ -619,19 +621,22 @@ void media_view_draw_video_controls()
 
 	snprintf( str_time, TIME_BUFFER + TIME_BUFFER + 4, "%s / %s", str_time_pos, str_duration );
 
-	// const ImVec2 time_size       = ImGui::CalcTextSize( str_time, NULL, true );
+	const ImVec2 time_size       = ImGui::CalcTextSize( str_time, NULL, true );
+	const ImVec2 other_text_size       = ImGui::CalcTextSize( "M", NULL, true );
 
-	// float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 2 );
+	float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 2 );
 	// float        avaliable_width = 500.f - ( style.ItemSpacing.x * 2 );
-	float        vol_bar_width   = 96.f;
+	float        vol_bar_width         = 96.f;
+	ImVec2       other_text_area       = ImGui::CalcItemSize( { 0, 0 }, other_text_size.x + style.FramePadding.x * 2.0f, other_text_size.y + style.FramePadding.y * 2.0f );
 
-	// float        seek_bar_width  = avaliable_width;
-	// seek_bar_width -= ( vol_bar_width + time_size.x + ( style.ItemSpacing.x * 2 ) );
+	float        seek_bar_width        = width - 80.f;
+	seek_bar_width -= ( play_btn_size.x + vol_bar_width + time_size.x + ( other_text_area.x * 3 ) + ( style.ItemSpacing.x * 7 ) );
+	// seek_bar_width -= ( play_btn_size.x + vol_bar_width + time_size.x + ( style.ItemSpacing.x * 2 ) );
 
-	ImGui::SetNextItemWidth( 200.f );
+	ImGui::SetNextItemWidth( seek_bar_width );
 
 	float time_pos_f = (float)time_pos;
-	if ( ImGui::SliderFloat( "##seek", &time_pos_f, 0.f, (float)duration ) )
+	if ( ImGui::SliderFloat( "##seek", &time_pos_f, 0.f, (float)duration, "" ) )
 	{
 		// convert float to string in c
 		char time_pos_str[ 16 ];
@@ -640,6 +645,9 @@ void media_view_draw_video_controls()
 		const char* cmd[]   = { "seek", time_pos_str, "absolute", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 	}
+
+	ImGui::SameLine();
+	ImGui::TextUnformatted( str_time );
 
 	ImGui::SameLine();
 
@@ -668,21 +676,17 @@ void media_view_draw_video_controls()
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth( vol_bar_width );
 
-	float volume_f = volume;
-	if ( ImGui::SliderFloat( "##Volume", &volume_f, 0.f, 130.f ) )
+	int volume_value = volume;
+	if ( ImGui::SliderInt( "##Volume", &volume_value, 0, 130 ) )
 	{
-		// convert float to string in c
 		char volume_str[ 16 ];
-		gcvt( volume_f, 4, volume_str );
+		snprintf( volume_str, 16, "%d", volume_value );
 
 		const char* cmd[]   = { "set", "volume", volume_str, NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 	}
 
-	ImGui::SameLine();
-
 	// ImGui::Text( "%s / %s", str_time_pos, str_duration );
-	ImGui::TextUnformatted( str_time );
 	// ImGui::ProgressBar( time_pos / duration );
 
 	controls_height = ImGui::GetWindowContentRegionMax().y;
