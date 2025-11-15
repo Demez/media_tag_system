@@ -532,6 +532,8 @@ int main( int argc, char* argv[] )
 		return 1;
 	}
 
+	SDL_SetWindowMinimumSize( g_main_window, 640, 480 );
+
 	g_gl_context = SDL_GL_CreateContext( g_main_window );
 	
 	if ( !g_gl_context )
