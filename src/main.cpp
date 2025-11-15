@@ -674,9 +674,6 @@ int main( int argc, char* argv[] )
 
 	while ( g_running )
 	{
-		// called so mpv doesn't get flooded with too many events, and becomes unresponsive
-		mpv_event* video_event = p_mpv_wait_event( g_mpv, 0.01f );
-
 		// don't go full speed lol
 		// SDL_Delay( 5 );
 		// SDL_Delay( 1 );
