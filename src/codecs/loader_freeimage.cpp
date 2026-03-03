@@ -248,7 +248,8 @@ struct LoaderFreeImage : public IImageLoader
 		size_t image_size           = load_info.image->pitch * load_info.image->height;
 		// size_t image_size           = load_info.image->width * load_info.image->height * load_info.image->bytes_per_pixel;
 
-		load_info.image->frame[ 0 ] = ch_calloc< u8 >( image_size );
+		load_info.image->frame[ 0 ] = ch_realloc< u8 >( load_info.image->frame[ 0 ], image_size );
+		memset( load_info.image->frame[ 0 ], 0, image_size * sizeof( u8 ) );
 
 		memcpy( load_info.image->frame[ 0 ], image_bits, image_size );
 
