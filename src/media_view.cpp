@@ -1,6 +1,10 @@
 #include "main.h"
 #include "imgui_internal.h"
 
+#include "stb_image_resize2.h"
+
+#include <thread>
+#include <mutex>
 
 // Image Draw Data
 e_zoom_mode              g_image_zoom_mode;
@@ -15,6 +19,7 @@ float                    g_image_rot    = 0.f;
 bool                     g_image_pan    = false;
 bool                     g_draw_media_info = false;
 bool                     g_draw_imgui_demo = false;
+bool                     g_update_image_filtering = false;
 
 
 extern main_image_data_t g_image_data;
@@ -22,6 +27,132 @@ extern main_image_data_t g_image_data_free;
 
 constexpr double         ZOOM_AMOUNT = 0.1;
 constexpr double         ZOOM_MIN    = 0.01;
+
+
+enum e_scale_state
+{
+	e_scale_state_idle,
+	e_scale_state_start,     // code sets state to this when it wants to scale the current image
+	e_scale_state_working,   // code looks at this state when running, uses full image while waiting
+	e_scale_state_upload,    // code needs to upload to gpu
+	e_scale_state_finished,  // code sets the state back to idle once it sees this
+};
+
+constexpr float      SCALE_WAIT_TIME = 0.25f;
+
+static std::thread*  g_scale_thread;
+static e_scale_state g_scale_state  = e_scale_state_idle;
+static float         g_scale_timer  = -1.f;
+static bool          g_scale_use    = false;
+static bool          g_scale_cancel = false;
+static image_t       g_scale_src{};
+
+std::mutex           g_scale_lock;
+
+
+void media_view_filter_image()
+{
+	g_scale_lock.lock();
+
+	if ( g_image_scaled.frame.size() )
+		free( g_image_scaled.frame[ 0 ] );
+
+	g_image_scaled = g_scale_src;
+
+	g_image_scaled.frame.clear();
+	g_image_scaled.frame.resize( g_scale_src.frame.size() );
+
+	// Downscale image if size is larger than target size
+	if ( g_image_size.x < g_scale_src.width )
+	{
+		//u8*   result_image_data      = stbir_resize_uint8_linear(
+		//  old_frame, thumbnail->image->width, thumbnail->image->height, 0,
+		//  nullptr, new_width, new_height, 0, STBIR_RGBA );
+
+		int new_width     = g_image_size.x;
+		int new_height    = g_image_size.y;
+
+		if ( image_downscale( &g_scale_src, &g_image_scaled, new_width, new_height ) )
+			g_scale_state = e_scale_state_upload;
+
+		if ( g_scale_src.width != g_image.width )
+			printf( "lol knew it, different image being handled\n" );
+	}
+	else
+	{
+		g_scale_state = e_scale_state_idle;
+	}
+
+	g_scale_lock.unlock();
+}
+
+
+void media_view_scale_thread_run()
+{
+	while ( g_running )
+	{
+		while ( g_scale_state != e_scale_state_start )
+		{
+			SDL_Delay( 250 );
+			continue;
+		}
+
+		g_scale_state = e_scale_state_working;
+
+		media_view_filter_image();
+	}
+}
+
+
+void media_view_scale_check_timer( float frame_time )
+{
+	if ( g_scale_timer < 0.f )
+		return;
+
+	g_scale_timer -= frame_time;
+
+	if ( g_scale_timer < 0.f )
+	{
+		g_scale_lock.lock();
+
+		if ( g_scale_src.frame.size() )
+			free( g_scale_src.frame[ 0 ] );
+
+		g_scale_src = g_image;
+
+		g_scale_src.frame.clear();
+		g_scale_src.frame.resize( g_image.frame.size() );
+
+		size_t image_size      = g_image.width * g_image.height * g_image.bytes_per_pixel;
+		g_scale_src.frame[ 0 ] = ch_calloc< u8 >( image_size );
+		memcpy( g_scale_src.frame[ 0 ], g_image.frame[ 0 ], image_size * sizeof( u8 ) );
+
+		g_image_scaled_index = g_gallery_index;
+		g_scale_state        = e_scale_state_start;
+
+		g_scale_lock.unlock();
+	}
+}
+
+
+void media_view_scale_reset_timer()
+{
+	g_scale_timer  = SCALE_WAIT_TIME;
+	g_scale_use    = false;
+	g_scale_cancel = false;
+}
+
+
+void media_view_init()
+{
+	g_scale_thread = new std::thread( media_view_scale_thread_run );
+}
+
+
+void media_view_shutdown()
+{
+	delete g_scale_thread;
+}
 
 
 static e_media_type get_media_type()
@@ -54,6 +185,8 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 
 		g_image_size.x   = g_image.width * zoom_level;
 		g_image_size.y   = g_image.height * zoom_level;
+
+		g_image_zoom     = zoom_level;
 	}
 
 	// TODO: only adjust this if needed, check image zoom type
@@ -64,6 +197,8 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 
 	//if ( factor[ 1 ] < 1.f )
 		g_image_pos.y = height / 2 - ( g_image_size.y / 2 );
+
+	media_view_scale_reset_timer();
 }
 
 
@@ -80,6 +215,8 @@ void media_view_zoom_reset()
 
 	g_image_size.x = g_image.width;
 	g_image_size.y = g_image.height;
+
+	media_view_scale_reset_timer();
 }
 
 
@@ -105,7 +242,7 @@ void media_view_scroll_zoom( float scroll )
 	else
 	{
 		// min zoom level
-		if ( g_image_zoom <= 0.01 )
+		if ( g_image_zoom <= ZOOM_MIN )
 			return;
 
 		factor -= ( ZOOM_AMOUNT * abs( scroll ) );
@@ -114,17 +251,24 @@ void media_view_scroll_zoom( float scroll )
 	// TODO: add zoom levels to snap to here
 	// 100, 200, 400, 500, 50, 25, etc
 
-	auto rounded_zoom = std::max( 0.01f, roundf( g_image_zoom * factor * 100 ) / 100 );
-
-	if ( fmod( rounded_zoom, 1.0 ) == 0 )
-		factor = rounded_zoom / g_image_zoom;
+	// auto rounded_zoom = std::max( 0.01f, roundf( g_image_zoom * factor * 100 ) / 100 );
+	// 
+	// if ( fmod( rounded_zoom, 1.0 ) == 0 )
+	// 	factor = rounded_zoom / g_image_zoom;
 
 	double old_zoom = g_image_zoom;
 
 	g_image_zoom = (double)( std::max( 1.f, g_image_size.x ) * factor ) / (double)g_image.width;
 
 	// round it so we don't get something like 0.9999564598 or whatever instead of 1.0
-	g_image_zoom   = std::max( ZOOM_MIN, round( g_image_zoom * 100 ) / 100 );
+	//if ( g_image_zoom < 0.01 )
+	//{
+	//	g_image_zoom = std::max( ZOOM_MIN, round( g_image_zoom * 10000 ) / 10000 );
+	//}
+	//else
+	{
+		g_image_zoom = std::max( ZOOM_MIN, round( g_image_zoom * 1000 ) / 1000 );
+	}
 
 	// recalculate draw width and height
 	g_image_size.x = (double)g_image.width * g_image_zoom;
@@ -133,8 +277,12 @@ void media_view_scroll_zoom( float scroll )
 	// recalculate image position to keep image where cursor is
 
 	// New Position = Scale Origin + ( Scale Point - Scale Origin ) * Scale Factor
-	g_image_pos.x  = g_mouse_pos[ 0 ] + ( g_image_pos.x - g_mouse_pos[ 0 ] ) * factor;
-	g_image_pos.y  = g_mouse_pos[ 1 ] + ( g_image_pos.y - g_mouse_pos[ 1 ] ) * factor;
+	g_image_pos.x  = (double)g_mouse_pos[ 0 ] + ( g_image_pos.x - (double)g_mouse_pos[ 0 ] ) * factor;
+	g_image_pos.y  = (double)g_mouse_pos[ 1 ] + ( g_image_pos.y - (double)g_mouse_pos[ 1 ] ) * factor;
+
+	g_update_image_filtering = true;
+
+	media_view_scale_reset_timer();
 }
 
 
@@ -384,6 +532,22 @@ void media_view_context_menu()
 
 void media_view_input()
 {
+	if ( g_scale_state == e_scale_state_upload )
+	{
+		if ( g_image_scaled_index == g_gallery_index )
+		{
+			gl_update_texture( g_image_scaled_data.texture, &g_image_scaled );
+			g_scale_use = true;
+			printf( "Scaled Main Image\n" );
+		}
+		else
+		{
+			printf( "SCALE MISMATCH\n" );
+		}
+
+		g_scale_cancel = false;
+		g_scale_state  = e_scale_state_idle;
+	}
 
 	if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
 	{
@@ -426,6 +590,12 @@ void media_view_window_resize()
 
 void media_view_load()
 {
+	//if ( g_scale_state == e_scale_state_working )
+	//{
+	//	g_scale_cancel = true;
+	//	printf( "SCALE CANCEL\n" );
+	//}
+
 	if ( g_folder_media_list.empty() )
 		return;
 
@@ -463,6 +633,7 @@ void media_view_load()
 			if ( image_load_info.image->frame.size() > 0 && image_load_info.image->bytes_per_pixel > 0 )
 			{
 				gl_update_texture( g_image_data.texture, &g_image );
+				media_view_fit_in_view();
 			}
 			else
 			{
@@ -481,9 +652,9 @@ void media_view_load()
 
 	g_media_index = g_gallery_index;
 
-	media_view_fit_in_view();
-
 	update_window_title();
+
+	media_view_scale_reset_timer();
 }
 
 
@@ -772,7 +943,15 @@ static void media_view_draw_image()
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
 	glEnable( GL_TEXTURE_2D );
-	glBindTexture( GL_TEXTURE_2D, g_image_data.texture );
+
+	if ( g_scale_use )
+	{
+		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.texture );
+	}
+	else
+	{
+		glBindTexture( GL_TEXTURE_2D, g_image_data.texture );
+	}
 
  	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();

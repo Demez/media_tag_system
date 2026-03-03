@@ -95,6 +95,7 @@ struct IImageLoader
 void image_register_codec( IImageLoader* codec );
 bool image_load( const fs::path& path, image_load_info_t& load_info );
 bool image_check_extension( std::string_view ext );
+bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int new_height );
 
 
 // TODO: add image load functions here
@@ -152,6 +153,7 @@ struct main_image_data_t
 	GLuint texture;
 };
 
+extern bool                         g_running;
 
 // imgui scroll hack lol
 extern bool                         g_mouse_scrolled_up;
@@ -171,12 +173,19 @@ extern size_t                       g_gallery_index;
 // Main Image
 extern e_zoom_mode                  g_image_zoom_mode;
 extern image_t                      g_image;
+extern image_t                      g_image_scaled;
 extern main_image_data_t            g_image_data;
+extern main_image_data_t            g_image_scaled_data;
+extern size_t                       g_image_scaled_index;
 extern size_t                       g_media_index;
 
 // Previous Image to Free
 extern main_image_data_t            g_image_data_free;
 
+
+void                                media_view_init();
+void                                media_view_shutdown();
+void                                media_view_scale_check_timer( float frame_time );
 
 void                                media_view_load();
 void                                media_view_input();
@@ -259,11 +268,29 @@ thumbnail_t*  thumbnail_get_data( h_thumbnail handle );
 void          thumbnail_add( const fs::path& path );
 void          thumbnail_remove( const fs::path& path );
 
+void          thumbnail_clear_cache();
+
 // distance based cache
 void          thumbnail_update_distance( h_thumbnail handle, u32 distance );
 // void          thumbnail_update_region( ImVec2 scroll_area_size, float scroll_amount );
 
 void          thumbnail_cache_debug_draw();
+
+
+// ---------------------------------------------------------
+// Memory Tracking
+
+
+enum e_memory_category
+{
+	e_memory_category_general,
+	e_memory_category_imgui,
+	e_memory_category_image,
+};
+
+
+void*         imgui_mem_alloc( size_t sz, void* user_data );
+void          imgui_mem_free( void* ptr, void* user_data );
 
 
 // ---------------------------------------------------------

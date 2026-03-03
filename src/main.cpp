@@ -6,9 +6,7 @@
 #include "imgui_freetype.h"
 #include "imgui_internal.h"
 
-#define DATABASE_FILE "tag_database.txt"
-
-std::vector< IImageLoader* > g_codecs;
+#include <chrono>
 
 SDL_Window*                  g_main_window = nullptr;
 SDL_GLContext                g_gl_context;
@@ -26,7 +24,10 @@ ivec2                        g_mouse_pos{};
 
 // Main Image
 image_t                      g_image;
+image_t                      g_image_scaled;
 main_image_data_t            g_image_data;
+main_image_data_t            g_image_scaled_data;
+size_t                       g_image_scaled_index = 0;
 size_t                       g_media_index = 0;
 
 // Previous Image to Free
@@ -106,87 +107,6 @@ bool mouse_hovering_imgui_window()
 }
 
 
-void image_register_codec( IImageLoader* codec )
-{
-	if ( codec )
-		g_codecs.push_back( codec );
-}
-
-
-bool image_load( const fs::path& path, image_load_info_t& load_info )
-{
-	std::string path_std_string = path.string();
-	const char* path_str        = path_std_string.c_str();
-	std::string ext_str         = path.extension().string();
-
-	if ( !fs_is_file( path_str ) || fs_file_size( path_str ) == 0 )
-	{
-		printf( "File is Empty or Doesn't exist: %s\n", path_str );
-		return false;
-	}
-
-	bool allocated_image = false;
-
-	if ( !load_info.image )
-	{
-		load_info.image = ch_calloc< image_t >( 1 );
-
-		if ( !load_info.image )
-		{
-			printf( "Failed to allocate image data!\n" );
-			return false;
-		}
-
-		allocated_image = true;
-	}
-
-	size_t file_len  = 0;
-	char*  file_data = fs_read_file( path.string().c_str(), &file_len );
-
-	if ( !file_data )
-	{
-		printf( "Failed to read file: %s\n", path_str );
-		return false;
-	}
-
-	bool loaded_image = false;
-
-	for ( IImageLoader* codec : g_codecs )
-	{
-		// if ( !codec->check_extension( ext_str ) )
-		if ( !codec->check_extension( path_str ) )
-			continue;
-
-		loaded_image = codec->image_load( path, load_info, file_data, file_len );
-
-		if ( loaded_image )
-			break;
-	}
-
-	free( file_data );
-
-	if ( !loaded_image && allocated_image )
-	{
-		free( load_info.image );
-		load_info.image = nullptr;
-	}
-
-	return loaded_image;
-}
-
-
-bool image_check_extension( std::string_view ext )
-{
-	for ( IImageLoader* codec : g_codecs )
-	{
-		if ( codec->check_extension( ext ) )
-			return true;
-	}
-
-	return false;
-}
-
-
 void update_window_title()
 {
 	char buf[ 512 ];
@@ -209,6 +129,8 @@ void update_window_title()
 
 void folder_load_media_list()
 {
+	thumbnail_clear_cache();
+
 	g_folder_media_list.clear();
 	g_folder_thumbnail_list.clear();
 
@@ -309,80 +231,6 @@ void gallery_view_toggle()
 }
 
 
-void gl_update_texture( GLuint texture, image_t* image )
-{
-	glBindTexture( GL_TEXTURE_2D, texture );
-	
-	// disable wrapping
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-
-	// Setup filtering parameters for display
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );   // downscaling image
-	// glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );  // upscaling image
-
-	// Upload pixels into texture
-	// glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
-
-	//if ( image->bytes_per_pixel > 1 )
-	//glPixelStorei( GL_UNPACK_ROW_LENGTH, image->pitch / image->bytes_per_pixel );
-	//glPixelStorei( GL_UNPACK_ROW_LENGTH, image->width );
-
-	//glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
-	//glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
-
-	if ( image->format == GL_RGBA16 )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, image->width, image->height, 0, GL_RGBA, GL_UNSIGNED_SHORT, (u16*)image->frame[ 0 ] );
-	}
-	else if ( image->format == GL_R16UI )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, image->width, image->height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, (u16*)image->frame[ 0 ] );
-	}
-	else if ( image->format == GL_R16I )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, image->width, image->height, 0, GL_LUMINANCE, GL_SHORT, (s16*)image->frame[ 0 ] );
-	}
-	else if ( image->format == GL_R8 )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, image->width, image->height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ 0 ] );
-	}
-	else if ( image->format == GL_RGBA32F )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, image->width, image->height, 0, GL_RGBA, GL_FLOAT, image->frame[ 0 ] );
-	}
-	else
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, image->format, image->width, image->height, 0, image->format, GL_UNSIGNED_BYTE, image->frame[ 0 ] );
-	}
-
-	auto err = glGetError();
-
-	if ( err != 0 )
-		printf( "FUCK: %d\n", err );
-
-	glBindTexture( GL_TEXTURE_2D, 0 );
-}
-
-
-GLuint gl_upload_texture( image_t* image )
-{
-	GLuint image_texture;
-	glGenTextures( 1, &image_texture );
-
-	gl_update_texture( image_texture, image );
-
-	return image_texture;
-}
-
-
-void gl_free_texture( GLuint texture )
-{
-	glDeleteTextures( 1, &texture );
-}
-
-
 void on_new_file( char* file )
 {
 	fs::path file_path = file;
@@ -405,95 +253,6 @@ void on_new_file( char* file )
 
 	// probably not a supported file
 	g_gallery_index = 0;
-}
-
-
-
-static const char* g_icon_names[] = {
-	"none",
-	"invalid",
-	"folder",
-	"loading",
-	"video",
-};
-
-
-
-static const char* g_icon_paths[] = {
-	"icons/none.png",
-	"icons/invalid.png",
-	"icons/folder.png",
-	"icons/loading.png",
-	"icons/video.png",
-};
-
-
-static image_t g_icon_image[ e_icon_count ]{};
-static GLuint  g_icon_texture[ e_icon_count ]{};
-
-static_assert( ARR_SIZE( g_icon_names ) == e_icon_count );
-static_assert( ARR_SIZE( g_icon_paths ) == e_icon_count );
-
-
-bool icon_preload()
-{
-	char* exe_dir = sys_get_exe_folder();
-	fs::path exe_path = exe_dir;
-	free( exe_dir );
-
-	for ( u8 i = 0; i < e_icon_count; i++ )
-	{
-		image_load_info_t load_info{};
-		load_info.image = &g_icon_image[ i ];
-
-		if ( !image_load( exe_path / g_icon_paths[ i ], load_info ) )
-		{
-			printf( "Failed to load %s icon \"%s\"\n", g_icon_names[ i ], g_icon_paths[ i ] );
-			continue;
-		}
-
-		g_icon_texture[ i ] = gl_upload_texture( &g_icon_image[ i ] );
-
-		if ( !g_icon_texture[ i ] )
-		{
-			printf( "Failed to upload %s icon \"%s\"\n", g_icon_names[ i ], g_icon_paths[ i ] );
-			continue;
-		}
-
-		free( g_icon_image[ i ].frame[ 0 ] );
-		g_icon_image[ i ].frame.clear();
-
-		printf( "Loaded icon %s\n", g_icon_names[ i ] );
-	}
-
-	return true;
-}
-
-
-void icon_free()
-{
-	for ( u8 i = 0; i < e_icon_count; i++ )
-	{
-		gl_free_texture( g_icon_texture[ i ] );
-	}
-}
-
-
-image_t* icon_get_image( e_icon icon_type )
-{
-	if ( icon_type > e_icon_count )
-		return {};
-
-	return &g_icon_image[ icon_type ];
-}
-
-
-ImTextureRef icon_get_imtexture( e_icon icon_type )
-{
-	if ( icon_type > e_icon_count )
-		return {};
-
-	return static_cast< ImTextureRef >( g_icon_texture[ icon_type ] );
 }
 
 
@@ -550,7 +309,7 @@ void style_imgui()
 }
 
 
-void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& font_cfg )
+void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& font_cfg, bool load_symbols )
 {
 	font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
 
@@ -564,21 +323,19 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\YuGothM.ttc", font_data.height, &font_cfg );
 
 	// Symbols/Emoji's
-	font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor | ImGuiFreeTypeLoaderFlags_Bitmap;
+	if ( load_symbols )
+	{
+		font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor | ImGuiFreeTypeLoaderFlags_Bitmap;
 
-	// Segoe UI Symbol
-	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguisym.ttf", font_data.height, &font_cfg );
+		// Segoe UI Symbol
+		dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguisym.ttf", font_data.height, &font_cfg );
 
-	//char font_path[ 512 ]{};
-	//snprintf( font_path, 512, "%s/seguiemj.ttf", exe_path );
+		//char font_path[ 512 ]{};
+		//snprintf( font_path, 512, "%s/seguiemj.ttf", exe_path );
 
-	// ImGui::GetIO().Fonts->AddFontFromFileTTF( font_path, font_data.height, &font_cfg );
-	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguiemj.ttf", font_data.height, &font_cfg );
-}
-
-
-void main_loop()
-{
+		// ImGui::GetIO().Fonts->AddFontFromFileTTF( font_path, font_data.height, &font_cfg );
+		dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguiemj.ttf", font_data.height, &font_cfg );
+	}
 }
 
 
@@ -620,6 +377,9 @@ int main( int argc, char* argv[] )
 	}
 
 	IMGUI_CHECKVERSION();
+
+	ImGui::SetAllocatorFunctions( imgui_mem_alloc, imgui_mem_free );
+
 	ImGui::CreateContext();
 
 	if ( !ImGui_ImplSDL3_InitForOpenGL( g_main_window, g_gl_context ) )
@@ -642,21 +402,21 @@ int main( int argc, char* argv[] )
 
 		{
 			ImFontConfig font_cfg{};
-			load_default_font( font_data, g_default_font, font_cfg );
+			load_default_font( font_data, g_default_font, font_cfg, true );
 		}
 
 		{
 			ImFontConfig font_cfg{};
 			snprintf( font_cfg.Name, 40, "Default - Bold" );
 			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bold;
-			load_default_font( font_data, g_default_font_bold, font_cfg );
+			load_default_font( font_data, g_default_font_bold, font_cfg, false );
 		}
 
 		{
 			ImFontConfig font_cfg{};
 			snprintf( font_cfg.Name, 40, "Default - Oblique" );
 			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Oblique;
-			load_default_font( font_data, g_default_font_italic, font_cfg );
+			load_default_font( font_data, g_default_font_italic, font_cfg, false );
 		}
 	
 		ImGui_ImplOpenGL3_CreateDeviceObjects();
@@ -690,8 +450,11 @@ int main( int argc, char* argv[] )
 		printf( "Failed to init thumbnail loader\n" );
 		return 1;
 	}
+
+	media_view_init();
 	
 	glGenTextures( 1, &g_image_data.texture );
+	glGenTextures( 1, &g_image_scaled_data.texture );
 
 	// ----------------------------------------------------------------
 
@@ -732,13 +495,35 @@ int main( int argc, char* argv[] )
 
 	// ----------------------------------------------------------------
 
-	ImVec4 clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
+	ImVec4 clear_color               = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
+
+	auto   start_time                = std::chrono::high_resolution_clock::now();
+	auto   current_time              = start_time;
+	float  time                      = 0.f;
 
 	while ( g_running )
 	{
-		// don't go full speed lol
-		// SDL_Delay( 5 );
-		// SDL_Delay( 1 );
+		// Update Frame Time
+		{
+			current_time         = std::chrono::high_resolution_clock::now();
+			time                 = std::chrono::duration< float, std::chrono::seconds::period >( current_time - start_time ).count();
+
+			// don't let the time go too crazy, usually happens when in a breakpoint
+			time                 = std::min( time, 0.1f );
+
+			// TODO: GET MONITOR REFRESH RATE
+			float fps_limit      = 144.f;
+			float max_fps        = CLAMP( fps_limit, 10.f, 5000.f );
+
+			// check if we still have more than 2ms till next frame and if so, wait for "1ms"
+			float min_frame_time = 1.0f / max_fps;
+			if ( ( min_frame_time - time ) > ( 2.0f / 1000.f ) )
+				SDL_Delay( 1 );
+
+			// framerate is above max
+			if ( time < min_frame_time )
+				continue;
+		}
 
 		if ( !g_folder_queued.empty() )
 		{
@@ -836,6 +621,8 @@ int main( int argc, char* argv[] )
 
 		ImGui::Render();
 
+		media_view_scale_check_timer( time );
+
 		if ( !g_gallery_view )
 		{
 			media_view_draw();
@@ -857,8 +644,11 @@ int main( int argc, char* argv[] )
 			media_view_load();
 			run_after_first_loop_hack = false;
 		}
+
+		start_time = current_time;
 	}
 
+	media_view_shutdown();
 	icon_free();
 
 	SDL_GL_DestroyContext( g_gl_context );

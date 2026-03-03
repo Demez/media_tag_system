@@ -47,10 +47,10 @@ if ( MSVC )
 	# actually this is useless right now because of core.dll, god dammit
 	# set_property( GLOBAL PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" )
 	
-	set( CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" )
-	set_property( GLOBAL PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" )
+	# set( CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" )
+	# set_property( GLOBAL PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" )
 
-	set( MSVC_VERSION 1939 )
+	# set( MSVC_VERSION 1939 )
 
 	add_compile_options(
 		# "/Wall"             # Show ALL Warnings
@@ -97,9 +97,9 @@ if ( MSVC )
 
 	set( COMPILE_OPTIONS_DEBUG
 		"/Od"        # no optimizations
-		"/ZI"        # edit and continue
+		# "/ZI"        # edit and continue
 		"/fp:except" # raise floating point exceptions
-		#"/fsanitize=address" # use address sanitizing in Debug (incompatible with /INCREMENTAL)
+		# "/fsanitize=address" # use address sanitizing in Debug (incompatible with /INCREMENTAL and /ZI)
 	)
 	
 	set( COMPILE_OPTIONS_RELEASE
@@ -127,7 +127,7 @@ if ( MSVC )
 	)
 	
 	add_link_options(
-		"/INCREMENTAL"
+		# "/INCREMENTAL"
 	)
 
 	link_libraries( opengl32 )
@@ -162,6 +162,9 @@ set(
     src/media_view.cpp
     src/mpv_interface.cpp
     src/mpv_interface.h
+    src/render.cpp
+    src/image_loader.cpp
+    src/memory.cpp
 	
     src/util.cpp
     src/util.h
@@ -216,6 +219,7 @@ include_directories(
 	"src/"
 	"src/imgui"
 	"src/glad"
+	"thirdparty"
 	"thirdparty/nativefiledialog/src/include"
 	"thirdparty/SDL3/include"
 	"thirdparty/mozjpeg"
@@ -223,6 +227,7 @@ include_directories(
 	"thirdparty/mpv/include"
 	"thirdparty/gif_load"
 	"thirdparty/FreeImageRe/include"
+	"thirdparty/stb"
 )
 
 add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )

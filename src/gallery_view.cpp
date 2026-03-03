@@ -21,6 +21,8 @@ int                               g_gallery_item_size_max     = 600;
 bool                              g_gallery_item_size_changed = true;
 std::vector< ImVec2 >             g_gallery_item_text_size;
 
+int                               g_gallery_image_size        = g_gallery_item_size;
+
 bool                              g_gallery_sidebar_draw      = true;
 
 
@@ -142,6 +144,8 @@ void gallery_view_draw_header()
 		g_gallery_item_size_changed = true;
 		g_gallery_item_text_size.clear();
 		g_gallery_item_text_size.resize( g_folder_media_list.size() );
+
+		thumbnail_clear_cache();
 	}
 
 	ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
@@ -347,6 +351,9 @@ void gallery_view_draw_content()
 		ImGui::SetScrollY( scroll );
 	}
 
+	ImVec2 image_bounds  = { item_size_x - ( style.WindowPadding.x * 2 ), item_size_x - ( style.WindowPadding.x * 2 ) };
+	g_gallery_image_size = image_bounds.x;
+
 	for ( size_t i = 0; i < g_folder_media_list.size(); i++ )
 	{
 		const media_entry_t& media  = g_folder_media_list[ i ];
@@ -370,7 +377,6 @@ void gallery_view_draw_content()
 		// float  image_bounds = item_size_x - ( style.ItemInnerSpacing.y * 4 );
 		// float  image_bounds = item_size_x - ( style.ItemInnerSpacing.x * 2 );
 		// float  image_bounds = item_size_x - ( style.WindowPadding.x * 2 );
-		ImVec2               image_bounds        = { item_size_x - ( style.WindowPadding.x * 2 ), item_size_x - ( style.WindowPadding.x * 2 ) };
 
 		// float                current_item_size_y = std::min( item_size_x + media_text_size.y + style.ItemInnerSpacing.y, item_size_y * 1.75f );
 		float                current_item_size_y = image_bounds.y + media_text_size.y + style.ItemSpacing.y + ( style.WindowPadding.y * 2 );
@@ -514,6 +520,13 @@ void gallery_view_draw_content()
 					else if ( thumbnail->status == e_thumbnail_status_queued || thumbnail->status == e_thumbnail_status_loading || thumbnail->status == e_thumbnail_status_uploading )
 					{
 						gallery_view_draw_image( icon_get_image( e_icon_loading ), icon_get_imtexture( e_icon_loading ), image_bounds, false );
+					}
+					else if ( thumbnail->status == e_thumbnail_status_free )
+					{
+						if ( media.type != e_media_type_directory )
+							thumbnail_requests.emplace_back( media.path, i );
+
+						ImGui::Dummy( image_bounds );
 					}
 					else // if ( thumbnail->status == e_thumbnail_status_free )
 					{
