@@ -5,6 +5,12 @@
 #include <cstdio>
 #include <cstring>
 #include <stdlib.h>
+#include <vector>
+#include <string>
+
+#include <filesystem>
+
+namespace fs   = std::filesystem;
 
 
 // --------------------------------------------------------------------------------------------------------
@@ -312,6 +318,7 @@ sys_font_data_t sys_get_font();
 // print color with \aFFF escape codes for color values
 //void        sys_print_color( const char* string );
 
+std::vector< fs::path > sys_get_drives();
 
 // --------------------------------------------------------------------------------------------------------
 // utility functions

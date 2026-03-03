@@ -19,7 +19,8 @@ struct LoaderPNG: public IImageLoader
 
     bool check_extension( std::string_view ext ) override
     {
-        return ext == match_ext;
+        // return ext == match_ext;
+		return ext.ends_with( match_ext );
     }
 
 	bool check_header( const fs::path& path ) override
@@ -97,8 +98,9 @@ struct LoaderPNG: public IImageLoader
 
         if ( ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR_ALPHA || ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE_ALPHA )
 		{
-			//pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGBA8;
+			pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGBA8;
 			decode_flags |= SPNG_DECODE_TRNS;
+			//pngFmt = SPNG_FMT_RGBA8;
 		}
 
         size_t size;
@@ -122,27 +124,30 @@ struct LoaderPNG: public IImageLoader
 			spng_ctx_free( ctx );
 			return false;
 		}
-		
-		load_info.image->width     = ihdr.width;
-		load_info.image->height    = ihdr.height;
-		// load_info.image->format    = GL_RGBA;
-		load_info.image->bit_depth = ihdr.bit_depth;
-		load_info.image->pitch     = 8;
 
 		switch ( pngFmt )
 		{
 			case SPNG_FMT_RGB8:
-				load_info.image->format = GL_RGB;
+				load_info.image->format          = GL_RGB;
+				load_info.image->bytes_per_pixel = 3;
 				break;
 
 			case SPNG_FMT_RGBA8:
-				load_info.image->format = GL_RGBA;
+				load_info.image->format          = GL_RGBA;
+				load_info.image->bytes_per_pixel = 4;
 				break;
 
 			case SPNG_FMT_RGBA16:
-				load_info.image->format = GL_RGBA16;
+				load_info.image->format          = GL_RGBA16;
+				load_info.image->bytes_per_pixel = 8; // ??
 				break;
 		}
+
+		load_info.image->width           = ihdr.width;
+		load_info.image->height          = ihdr.height;
+		// load_info.image->format    = GL_RGBA;
+		load_info.image->bit_depth       = ihdr.bit_depth;
+		load_info.image->pitch           = load_info.image->width * load_info.image->bytes_per_pixel;
 
         spng_ctx_free( ctx );
 
@@ -151,6 +156,6 @@ struct LoaderPNG: public IImageLoader
 };
 
 
-//static LoaderPNG gPNG;
+// static LoaderPNG gPNG;
 
 #endif

@@ -18,6 +18,11 @@ s64                 g_video_width = 0, g_video_height = 0;
 
 bool                g_scale_up_video = true;
 
+
+extern bool         g_image_flip_v;
+extern bool         g_image_flip_h;
+extern float        g_image_rot;
+
 #define FUNC_PTR( func ) func##_t p_##func = nullptr
 
 // function pointers
@@ -247,13 +252,40 @@ void mpv_draw_frame()
 	//
 	//glBlitFramebuffer( 0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_LINEAR );
 	
+	SDL_FRect dst_area{};
+	dst_area.w = 1;
+	dst_area.h = 1;
+	dst_area.x = 0;
+	dst_area.y = 0;
+	
+	SDL_FRect dst_rect{};
+	dst_rect.w = 1;
+	dst_rect.h = 1;
+	dst_rect.x = 0;
+	dst_rect.y = 0;
+	
+	if ( g_image_flip_h )
+	{
+		dst_rect.w = -1;
+		dst_rect.x = 1;
+	}
+
+	if ( g_image_flip_v )
+	{
+		dst_rect.h = -1;
+		dst_rect.y = 1;
+	}
+	
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 	//glBindRenderbuffer( GL_RENDERBUFFER, 0 );
-	
-	glViewport( pos_x, pos_y, width, height );
 
-	glEnable( GL_SCISSOR_TEST );
-	glScissor( pos_x, pos_y, new_width, new_height );
+	if ( g_image_flip_h )
+		glViewport( pos_x + width, pos_y, -width, height );
+	else
+		glViewport( pos_x, pos_y, width, height );
+
+	//glEnable( GL_SCISSOR_TEST );
+	//glScissor( pos_x, pos_y, new_width, new_height );
 
 	glClearColor( 0.15, 0.15, 0.15, 1.0 );
 	glClear( GL_COLOR_BUFFER_BIT );
@@ -264,23 +296,34 @@ void mpv_draw_frame()
 	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();
 	glOrtho( 0, 1, 0, 1, -1, 1 );
+	// glOrtho( 0, 1, 1, 0, -1, 1 );
+
 	glMatrixMode( GL_MODELVIEW );
 	glLoadIdentity();
 
 	glBegin( GL_QUADS );
 
+	// glTexCoord2f( 0, 0 );
+	// glVertex2f( 0, 0 );
+	// glTexCoord2f( 1, 0 );
+	// glVertex2f( 1, 0 );
+	// glTexCoord2f( 1, 1 );
+	// glVertex2f( 1, 1 );
+	// glTexCoord2f( 0, 1 );
+	// glVertex2f( 0, 1 );
+
 	glTexCoord2f( 0, 0 );
-	glVertex2f( 0, 0 );
+	glVertex2f( dst_rect.x, dst_rect.y );
 	glTexCoord2f( 1, 0 );
-	glVertex2f( 1, 0 );
+	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y );
 	glTexCoord2f( 1, 1 );
-	glVertex2f( 1, 1 );
+	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y + dst_rect.h );
 	glTexCoord2f( 0, 1 );
-	glVertex2f( 0, 1 );
+	glVertex2f( dst_rect.x, dst_rect.y + dst_rect.h );
 
 	glEnd();
 
-	glDisable( GL_SCISSOR_TEST );
+	//glDisable( GL_SCISSOR_TEST );
 	glDisable( GL_TEXTURE_2D );
 }
 
@@ -325,6 +368,9 @@ void mpv_create_texture()
 
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
 
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 	glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_mpv_fbo_tex, 0 );
@@ -351,6 +397,9 @@ static void* mpv_get_proc( void* ctx, const char* name )
 
 bool start_mpv()
 {
+	if ( !g_mpv_module )
+		return false;
+
 	// get the mpv version
 	unsigned long mpv_version = p_mpv_client_api_version();
 	printf( "mpv version: %lu\n", mpv_version );

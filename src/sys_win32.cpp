@@ -689,6 +689,34 @@ sys_font_data_t sys_get_font()
 }
 
 
+std::vector< fs::path > sys_get_drives()
+{
+	std::vector< fs::path > drives;
+
+	wchar_t                 drive_str[ MAX_PATH ];
+	memset( drive_str, 0, sizeof( drive_str ) );
+
+	// doesn't see network drives? try GetDriveType?
+	if ( !GetLogicalDriveStrings( MAX_PATH, drive_str ) )
+	{
+		sys_print_last_error();
+		printf( "Failed to get logical drives!\n" );
+		return drives;
+	}
+
+	for ( u32 i = 0; i < MAX_PATH; i += 4 )
+	{
+		if ( drive_str[ i ] == L'\0' )
+			break;
+
+		fs::path drive( &drive_str[ i ], &drive_str[ i + 4 ] );
+		drives.push_back( drive );
+	}
+
+	return drives;
+}
+
+
 static LARGE_INTEGER g_win_perf_freq;
 
 int sys_init()

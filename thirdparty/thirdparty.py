@@ -473,10 +473,10 @@ FILE_LIST = {
             "file": "SDL3-3.2.24.zip",
         },
         {
-            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/latest/FreeImageRe-win64.zip",
+            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/latest/FreeImageRe-v4.0.1-win64.zip",
             "name": "FreeImageRe",
             "extract_folder": "FreeImageRe",
-            "file": "FreeImageRe-win64.zip",
+            "file": "FreeImageRe-v4.0.1-win64.zip",
         },
     ],
 

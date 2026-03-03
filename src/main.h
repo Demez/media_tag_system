@@ -13,13 +13,13 @@
 #include <vector>
 #include <atomic>
 
-#include <filesystem>
 
-namespace fs = std::filesystem;
-
-
-extern SDL_Window*   g_main_window;
+extern SDL_Window* g_main_window;
 // extern SDL_Renderer* g_main_renderer;
+
+extern ImFont*     g_default_font;
+extern ImFont*     g_default_font_bold;
+extern ImFont*     g_default_font_italic;
 
 
 HANDLE_GEN_32( h_thumbnail );
@@ -185,6 +185,8 @@ void                                media_view_draw();
 void                                media_view_scroll_zoom( float amount );
 void                                media_view_advance( bool prev = false );
 void                                media_view_window_resize();
+void                                media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true );
+void                                media_view_zoom_reset();
 
 void                                gallery_view_scroll_to_selected();
 void                                gallery_view_input();
@@ -253,6 +255,9 @@ void          thumbnail_loader_update();
 h_thumbnail   thumbnail_queue_image( const fs::path& path );
 thumbnail_t*  thumbnail_get_data( h_thumbnail handle );
 // void          thumbnail_free( const fs::path& path, h_thumbnail handle );
+
+void          thumbnail_add( const fs::path& path );
+void          thumbnail_remove( const fs::path& path );
 
 // distance based cache
 void          thumbnail_update_distance( h_thumbnail handle, u32 distance );

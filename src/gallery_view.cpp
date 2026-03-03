@@ -14,12 +14,14 @@ std::vector< gallery_item_t >     g_gallery_items;
 
 // const int                         GALLERY_GRID_X_COUNT    = 12;
 
-int                               g_gallery_row_count     = 0;
-int                               g_gallery_item_size     = 150;
-int                               g_gallery_item_size_min = 50;
-int                               g_gallery_item_size_max = 600;
+int                               g_gallery_row_count         = 0;
+int                               g_gallery_item_size         = 150;
+int                               g_gallery_item_size_min     = 50;
+int                               g_gallery_item_size_max     = 600;
+bool                              g_gallery_item_size_changed = true;
+std::vector< ImVec2 >             g_gallery_item_text_size;
 
-bool                              g_gallery_sidebar_draw  = true;
+bool                              g_gallery_sidebar_draw      = true;
 
 
 void gallery_view_input()
@@ -135,7 +137,12 @@ void gallery_view_draw_header()
 	ImGui::Spacing();
 	ImGui::SameLine();
 
-	ImGui::SliderInt( "Zoom", &g_gallery_item_size, g_gallery_item_size_min, g_gallery_item_size_max );
+	if ( ImGui::SliderInt( "Zoom", &g_gallery_item_size, g_gallery_item_size_min, g_gallery_item_size_max ) )
+	{
+		g_gallery_item_size_changed = true;
+		g_gallery_item_text_size.clear();
+		g_gallery_item_text_size.resize( g_folder_media_list.size() );
+	}
 
 	ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 
@@ -156,6 +163,79 @@ bool g_scroll_to_selected = false;
 void gallery_view_scroll_to_selected()
 {
 	g_scroll_to_selected = true;
+}
+
+
+void gallery_view_context_menu()
+{
+	if ( !ImGui::BeginPopupContextVoid( "gallery ctx menu" ) )
+		return;
+
+	ImGuiStyle& style        = ImGui::GetStyle();
+	ImVec2      region_avail = ImGui::GetContentRegionAvail();
+
+	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
+	{
+		sys_browse_to_file( g_folder_media_list[ g_gallery_index ].path.string().c_str() );
+	}
+
+	if ( ImGui::BeginMenu( "Open With" ) )
+	{
+		// TODO: list programs to open the file with, like fragment image viewer
+		// how would this work on linux actually? hmm
+		ImGui::MenuItem( "nothing lol", nullptr, false, false );
+		ImGui::EndMenu();
+	}
+
+	if ( ImGui::MenuItem( "Copy Image", nullptr, false, false ) )
+	{
+	}
+
+	if ( ImGui::MenuItem( "Copy Image Data", nullptr, false, false ) )
+	{
+	}
+
+	if ( ImGui::MenuItem( "Set As Desktop Background", nullptr, false, false ) )
+	{
+	}
+
+	if ( ImGui::MenuItem( "Undo", nullptr, false, 0 ) )
+	{
+		//UndoSys_Undo();
+	}
+
+	if ( ImGui::MenuItem( "Redo", nullptr, false, 0 ) )
+	{
+		//UndoSys_Redo();
+	}
+
+	if ( ImGui::MenuItem( "Delete", nullptr, false, 0 ) )
+	{
+		//ImageView_DeleteImage();
+	}
+
+	if ( ImGui::MenuItem( "File Info", nullptr, false, false ) )
+	{
+	}
+
+	if ( ImGui::MenuItem( "File Properties", nullptr, false, 0 ) )
+	{
+		// TODO: create our own imgui file properties for more info
+		// Plat_OpenFileProperties( ImageView_GetImagePath() );
+	}
+
+	if ( ImGui::MenuItem( "Reload Folder", nullptr, false ) )
+	{
+		folder_load_media_list();
+	}
+
+	ImGui::Separator();
+
+	if ( ImGui::MenuItem( "Settings", nullptr, false, false ) )
+	{
+	}
+
+	ImGui::EndPopup();
 }
 
 
@@ -273,7 +353,17 @@ void gallery_view_draw_content()
 
 		float                scroll = ImGui::GetScrollY();
 
-		ImVec2               media_text_size     = ImGui::CalcTextSize( media.filename.c_str(), 0, false, item_size_x - ( style.WindowPadding.x * 2 ) );
+		ImVec2               media_text_size{};
+
+		if ( g_gallery_item_size_changed )
+		{
+			media_text_size = ImGui::CalcTextSize( media.filename.c_str(), 0, false, item_size_x - ( style.WindowPadding.x * 2 ) );
+			g_gallery_item_text_size[ i ] = media_text_size;
+		}
+		else
+		{
+			media_text_size = g_gallery_item_text_size[ i ];
+		}
 
 		//ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, { 0.f, 0.f } );
 
@@ -497,7 +587,62 @@ void gallery_view_draw_content()
 	for ( size_t i = 0; i < thumbnail_requests.size(); i++ )
 		g_folder_thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_queue_image( thumbnail_requests[ i ].path );
 
-	g_scroll_to_selected = false;
+	g_scroll_to_selected        = false;
+	g_gallery_item_size_changed = false;
+}
+
+
+void sidebar_draw_filesystem()
+{
+	// get mounted drives
+	// TODO: MOVE ME TO STARTUP, AND CHECK FOR NEW DRIVES BEING MOUNTED/UNMOUNTED ONCE IN A WHILE
+	static bool first_run = true;
+	static std::vector< fs::path > drives;
+
+	if ( first_run )
+	{
+		drives    = sys_get_drives();
+		first_run = false;
+	}
+
+	u32 drive_i = 0;
+	for ( const fs::path& drive : drives )
+	{
+		std::string drive_str = drive.string();
+		if ( ImGui::CollapsingHeader( drive_str.data() ) )
+		{
+			ImGui::PushID( drive_i + 1 );
+
+			// ImGuiTreeNodeFlags_SpanAvailWidth
+			if ( ImGui::TreeNodeEx( "test", ImGuiTreeNodeFlags_SpanAvailWidth ) )
+			{
+				if ( ImGui::TreeNodeEx( "test", ImGuiTreeNodeFlags_SpanAvailWidth ) )
+				{
+					if ( ImGui::TreeNodeEx( "test", ImGuiTreeNodeFlags_SpanAvailWidth ) )
+					{
+						if ( ImGui::TreeNodeEx( "test", ImGuiTreeNodeFlags_SpanAvailWidth ) )
+						{
+							ImGui::TreePop();
+						}
+						ImGui::TreePop();
+					}
+
+					ImGui::TreePop();
+				}
+
+				if ( ImGui::TreeNodeEx( "test2", ImGuiTreeNodeFlags_SpanAvailWidth ) )
+				{
+					ImGui::TreePop();
+				}
+
+				ImGui::TreePop();
+			}
+
+			ImGui::PopID();
+		}
+
+		drive_i++;
+	}
 }
 
 
@@ -526,9 +671,96 @@ void gallery_view_draw_sidebar()
 		return;
 	}
 
-	//ImGui::Text( "test" );
+	if ( ImGui::BeginTabBar( "##sidebar_tabs" ) )
+	{
+		if ( ImGui::BeginTabItem( "Tags" ) )
+		{
+			ImGui::PushFont( g_default_font_bold, style.FontSizeBase + 2.f );
 
-	ImGui::ShowStyleEditor();
+			ImGui::TextUnformatted( "Tag Databases" );
+			ImGui::Separator();
+
+			ImGui::PopFont();
+
+			if ( ImGui::BeginListBox( "##TagDatabases" ) )
+			{
+			}
+
+			ImGui::EndListBox();
+
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Filesystem" ) )
+		{
+			ImGui::PushFont( g_default_font_bold, style.FontSizeBase + 2.f );
+
+			if ( ImGui::CollapsingHeader( "Bookmarks" ) )
+			{
+				ImGui::PopFont();
+
+				if ( ImGui::Button( "Add Current Directory" ) )
+				{
+				}
+
+				if ( ImGui::BeginListBox( "##Bookmarks" ) )
+				{
+					// TODO: format like this?
+					// 
+					// =================================================
+					// | drawings                                    X |
+					// =================================================
+					// 
+
+					// examples
+					if ( ImGui::Selectable( "downloads" ) )
+					{
+						g_folder_queued = "D:\\demez_archive\\media\\downloads";
+					}
+
+					if ( ImGui::Selectable( "drawings" ) )
+					{
+						g_folder_queued = "D:\\demez_archive\\media\\demez\\drawings";
+					}
+
+					if ( ImGui::Selectable( "sync6" ) )
+					{
+						g_folder_queued = "D:\\demez_archive\\phone\\sync6";
+					}
+				}
+
+				ImGui::EndListBox();
+			}
+			else
+			{
+				ImGui::PopFont();
+			}
+
+			ImGui::PushFont( g_default_font_bold, style.FontSizeBase + 2.f );
+
+			ImGui::TextUnformatted( "Files" );
+			ImGui::Separator();
+
+			ImGui::PopFont();
+
+			sidebar_draw_filesystem();
+
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Style Editor" ) )
+		{
+			ImGui::ShowStyleEditor();
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Settings" ) )
+		{
+			ImGui::EndTabItem();
+		}
+	}
+
+	ImGui::EndTabBar();
 
 	//ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 	ImGui::EndChild();
@@ -568,5 +800,7 @@ void gallery_view_draw()
 	thumbnail_cache_debug_draw();
 
 	ImGui::End();
+
+	gallery_view_context_menu();
 }
 

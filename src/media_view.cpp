@@ -33,7 +33,7 @@ static e_media_type get_media_type()
 }
 
 
-void media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true )
+void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 {
 	// new image size
 	int width, height;
@@ -154,6 +154,23 @@ void media_view_draw_media_info()
 		// Image Type
 		ImGui::Text( "Size: %dx%d", g_image.width, g_image.height );
 		ImGui::Text( "Type: %s", g_image.image_format );
+
+		switch ( g_image.format )
+		{
+			default:
+				ImGui::Text( "Format: GL Format %d", g_image.format );
+				break;
+			case GL_RGB:
+				ImGui::TextUnformatted( "Format: RGB" );
+				break;
+			case GL_RGBA:
+				ImGui::TextUnformatted( "Format: RGBA" );
+				break;
+			case GL_RGBA16:
+				ImGui::TextUnformatted( "Format: RGBA16" );
+				break;
+
+		}
 	}
 
 	ImGui::End();
@@ -505,6 +522,9 @@ advance:
 
 void media_view_draw_video_controls()
 {
+	if ( !g_mpv )
+		return;
+
 	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !mouse_hovering_imgui_window() && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
 	{
 		const char* cmd[]   = { "cycle", "pause", NULL };

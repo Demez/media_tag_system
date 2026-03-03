@@ -3,19 +3,15 @@
 #include <thread>
 #include <mutex>
 #include <queue>
+#include <unordered_map>
 
 constexpr int         JOB_QUEUE_SIZE    = 64;
 constexpr int         THUMBNAIL_THREADS = 8;
 constexpr int         MAX_THUMBNAILS    = 512;
 
-// constexpr const char* FAILED_IMAGE_PATH = "super_missing_texture.jpg";
-// image_t*              FAILED_IMAGE      = nullptr;
-
 std::atomic< bool >   g_thumbnails_running;
 std::thread*          g_thumbnail_worker[ THUMBNAIL_THREADS ];
 std::mutex            g_thumbnail_mutex;
-
-extern SDL_Renderer*  g_main_renderer;
 
 
 enum e_job_state
@@ -54,8 +50,20 @@ struct thumbnail_cache_t
 };
 
 
-thumbnail_queue_t g_thumbnail_queue;
-thumbnail_cache_t g_thumbnail_cache;
+// list of thumbnails to try to load
+struct thumbnail_list_value_t
+{
+	u32 distance;         // determines when the thumbnail is loaded distances get loaded first for other thumbnails
+	u32 thumbnail_index;  // index into thumbnail_cache_t::buffer
+};
+
+
+// std::vector< thumbnail_list_entry_t > g_thumbnail_list;
+// value is distance, lower values determine whent he thumbnail is loaded
+std::unordered_map< fs::path, thumbnail_list_value_t > g_thumbnail_list;
+thumbnail_queue_t                   g_thumbnail_queue;
+thumbnail_cache_t                   g_thumbnail_cache;
+
 // handle_list_32< h_thumbnail, thumbnail_t, MAX_THUMBNAILS > g_thumbnail_cache;
 // u32                                                        g_thumbnail_cache_index = 0;
 
@@ -245,7 +253,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			continue;
 		}
 
-		if ( !thumbnail->image->frame[ 0 ] )
+		if ( thumbnail->image->frame.empty() || !thumbnail->image->frame[ 0 ] )
 		{
 			printf( "data is nullptr in worker?\n" );
 			thumbnail->status = e_thumbnail_status_failed;
@@ -310,8 +318,13 @@ void thumbnail_loader_update()
 	// 	max += ( MAX_THUMBNAILS - g_thumbnail_cache.read_pos );
 
 	// for ( u32 i = 0; i < max; i++ )
+	u32 upload_count = 0;
+	u32 upload_max   = 4;
 	for ( u32 i = 0; i < MAX_THUMBNAILS; i++ )
 	{
+		if ( upload_count == upload_max )
+			return;
+
 		// reset all of these
 		g_thumbnail_cache.used_this_frame[ i ] = false;
 
@@ -350,6 +363,8 @@ void thumbnail_loader_update()
 		{
 			thumbnail.status = e_thumbnail_status_finished;
 			//printf( "IMAGE FINISHED: %s\n", thumbnail.path );
+
+			upload_count++;
 		}
 		else
 			thumbnail.status = e_thumbnail_status_failed;

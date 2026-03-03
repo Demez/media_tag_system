@@ -8,10 +8,9 @@
 
 #define DATABASE_FILE "tag_database.txt"
 
-std::vector< IImageLoader* >       g_codecs;
+std::vector< IImageLoader* > g_codecs;
 
 SDL_Window*                  g_main_window = nullptr;
-// SDL_Renderer*              g_main_renderer       = nullptr;
 SDL_GLContext                g_gl_context;
 
 bool                         g_running             = true;
@@ -38,6 +37,13 @@ fs::path                     g_folder_queued;
 std::vector< media_entry_t > g_folder_media_list;
 std::vector< h_thumbnail >   g_folder_thumbnail_list;
 size_t                       g_gallery_index = 0;
+
+extern bool                  g_gallery_item_size_changed;
+extern std::vector< ImVec2 > g_gallery_item_text_size;
+
+ImFont*                      g_default_font        = nullptr;
+ImFont*                      g_default_font_bold   = nullptr;
+ImFont*                      g_default_font_italic = nullptr;
 
 
 // Check the function FindHoveredWindowEx() in imgui.cpp to see if you need to update this when updating imgui
@@ -209,6 +215,9 @@ void folder_load_media_list()
 	g_folder_media_list.reserve( 5000 );
 	g_folder_thumbnail_list.reserve( 5000 );
 
+	g_gallery_item_size_changed = true;
+	g_gallery_item_text_size.clear();
+
 	for ( const auto& entry : fs::directory_iterator( g_folder ) )
 	{
 		const fs::path& path = entry.path();
@@ -234,7 +243,7 @@ void folder_load_media_list()
 		{
 			type = e_media_type_image;
 		}
-		else
+		else if ( g_mpv )
 		{
 			// Video Formats
 			valid_ext |= ext == ".mp4";
@@ -260,6 +269,8 @@ void folder_load_media_list()
 	g_folder_thumbnail_list.resize( g_folder_media_list.size() );
 
 	gallery_view_dir_change();
+	
+	g_gallery_item_text_size.resize( g_folder_media_list.size() );
 }
 
 
@@ -282,6 +293,8 @@ void gallery_view_toggle()
 	{
 		if ( g_media_index != g_gallery_index )
 			media_view_load();
+
+		media_view_fit_in_view();
 	}
 	else
 	{
@@ -305,18 +318,19 @@ void gl_update_texture( GLuint texture, image_t* image )
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 
 	// Setup filtering parameters for display
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );   // downscaling image
+	// glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );  // upscaling image
 
 	// Upload pixels into texture
 	// glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
 
 	//if ( image->bytes_per_pixel > 1 )
-	glPixelStorei( GL_UNPACK_ROW_LENGTH, image->pitch / image->bytes_per_pixel );
-	// glPixelStorei( GL_UNPACK_ROW_LENGTH, image->width );
+	//glPixelStorei( GL_UNPACK_ROW_LENGTH, image->pitch / image->bytes_per_pixel );
+	//glPixelStorei( GL_UNPACK_ROW_LENGTH, image->width );
 
 	//glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
-	glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
+	//glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 
 	if ( image->format == GL_RGBA16 )
 	{
@@ -486,6 +500,7 @@ ImTextureRef icon_get_imtexture( e_icon icon_type )
 void style_imgui()
 {
 	ImGuiStyle& style        = ImGui::GetStyle();
+	ImVec4*     colors       = style.Colors;
 
 	style.WindowPadding.x    = 6;
 	style.WindowPadding.y    = 6;
@@ -510,6 +525,60 @@ void style_imgui()
 	style.ItemInnerSpacing.x = 0.f;
 	style.ItemInnerSpacing.y = 0.f;
 #endif
+
+	colors[ ImGuiCol_FrameBg ]              = ImVec4( 0.00f, 0.21f, 0.52f, 0.54f );
+	colors[ ImGuiCol_WindowBg ]             = ImVec4( 0.06f, 0.06f, 0.06f, 1.00f );
+
+	colors[ ImGuiCol_ScrollbarBg ]          = ImVec4( 0.02f, 0.02f, 0.02f, 1.00f );
+	colors[ ImGuiCol_ScrollbarGrab ]        = ImVec4( 0.00f, 0.28f, 0.65f, 1.00f );
+	colors[ ImGuiCol_ScrollbarGrabHovered ] = ImVec4( 0.00f, 0.43f, 1.00f, 1.00f );
+	colors[ ImGuiCol_ScrollbarGrabActive ]  = ImVec4( 0.00f, 0.35f, 0.78f, 1.00f );
+
+	colors[ ImGuiCol_TabHovered ]           = ImVec4( 0.00f, 0.43f, 1.00f, 1.00f );
+	colors[ ImGuiCol_Tab ]                  = ImVec4( 0.00f, 0.28f, 0.65f, 1.00f );
+	colors[ ImGuiCol_TabSelected ]          = ImVec4( 0.00f, 0.35f, 0.78f, 1.00f );
+	colors[ ImGuiCol_TabSelectedOverline ]  = ImVec4( 0.00f, 0.35f, 0.78f, 1.00f );
+
+	colors[ ImGuiCol_TabDimmed ]            = ImVec4( 0.00f, 0.07f, 0.16f, 0.97f );
+	colors[ ImGuiCol_TabDimmedSelected ]    = ImVec4( 0.00f, 0.18f, 0.42f, 1.00f );
+
+	colors[ ImGuiCol_Button ]               = ImVec4( 0.00f, 0.35f, 0.77f, 1.00f );
+	colors[ ImGuiCol_ButtonHovered ]        = ImVec4( 0.15f, 0.54f, 1.00f, 1.00f );
+	colors[ ImGuiCol_ButtonActive ]         = ImVec4( 0.00f, 0.24f, 0.55f, 1.00f );
+
+	colors[ ImGuiCol_CheckMark ]            = ImVec4( 0.00f, 0.46f, 1.00f, 1.00f );
+}
+
+
+void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& font_cfg )
+{
+	font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+
+	// Main Font
+	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( font_data.font_path, font_data.height, &font_cfg );
+
+	// All fonts will be merged into this one above
+	font_cfg.MergeMode = true;
+
+	// Japanese Characters
+	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\YuGothM.ttc", font_data.height, &font_cfg );
+
+	// Symbols/Emoji's
+	font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor | ImGuiFreeTypeLoaderFlags_Bitmap;
+
+	// Segoe UI Symbol
+	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguisym.ttf", font_data.height, &font_cfg );
+
+	//char font_path[ 512 ]{};
+	//snprintf( font_path, 512, "%s/seguiemj.ttf", exe_path );
+
+	// ImGui::GetIO().Fonts->AddFontFromFileTTF( font_path, font_data.height, &font_cfg );
+	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguiemj.ttf", font_data.height, &font_cfg );
+}
+
+
+void main_loop()
+{
 }
 
 
@@ -571,29 +640,24 @@ int main( int argc, char* argv[] )
 	{
 		//char* exe_path = sys_get_exe_folder();
 
-		ImFontConfig font_cfg{};
-		font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
+		{
+			ImFontConfig font_cfg{};
+			load_default_font( font_data, g_default_font, font_cfg );
+		}
 
-		// Main Font
-		ImGui::GetIO().Fonts->AddFontFromFileTTF( font_data.font_path, font_data.height, &font_cfg );
+		{
+			ImFontConfig font_cfg{};
+			snprintf( font_cfg.Name, 40, "Default - Bold" );
+			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bold;
+			load_default_font( font_data, g_default_font_bold, font_cfg );
+		}
 
-		// All fonts will be merged into this one above
-		font_cfg.MergeMode = true;
-
-		// Japanese Characters
-		ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\YuGothM.ttc", font_data.height, &font_cfg );
-
-		// Symbols/Emoji's
-		font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor | ImGuiFreeTypeLoaderFlags_Bitmap;
-
-		// Segoe UI Symbol
-		ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguisym.ttf", font_data.height, &font_cfg );
-
-		//char font_path[ 512 ]{};
-		//snprintf( font_path, 512, "%s/seguiemj.ttf", exe_path );
-
-		// ImGui::GetIO().Fonts->AddFontFromFileTTF( font_path, font_data.height, &font_cfg );
-		ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguiemj.ttf", font_data.height, &font_cfg );
+		{
+			ImFontConfig font_cfg{};
+			snprintf( font_cfg.Name, 40, "Default - Oblique" );
+			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Oblique;
+			load_default_font( font_data, g_default_font_italic, font_cfg );
+		}
 	
 		ImGui_ImplOpenGL3_CreateDeviceObjects();
 
@@ -628,8 +692,6 @@ int main( int argc, char* argv[] )
 	}
 	
 	glGenTextures( 1, &g_image_data.texture );
-
-	icon_preload();
 
 	// ----------------------------------------------------------------
 
@@ -666,7 +728,7 @@ int main( int argc, char* argv[] )
 		g_folder_queued.clear();
 	}
 
-	media_view_load();
+	bool run_after_first_loop_hack = true;
 
 	// ----------------------------------------------------------------
 
@@ -787,6 +849,14 @@ int main( int argc, char* argv[] )
 		//float time     = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 		//if ( show_frame_time )
 		// printf( "%f FRAMETIME\n", time );
+
+		// startup hack
+		if ( run_after_first_loop_hack )
+		{
+			icon_preload();
+			media_view_load();
+			run_after_first_loop_hack = false;
+		}
 	}
 
 	icon_free();

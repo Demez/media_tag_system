@@ -31,7 +31,8 @@ struct CodecJPEG: public IImageLoader
 	// TODO: have this just be a list of valid extensions on codec register
     bool check_extension( std::string_view ext ) override
     {
-		return ext == ".jpg" || ext == ".jpeg";
+		// return ext == ".jpg" || ext == ".jpeg";
+		return ext.ends_with( ".jpg" ) || ext.ends_with( ".jpeg" );
 	}
 
 	bool check_header( const fs::path& path ) override
@@ -126,7 +127,8 @@ struct CodecJPEG: public IImageLoader
 		// one frame
 		// image->frame      = ch_realloc( image->frame, 1 );
 		image->frame.resize( 1 );
-		image->frame[ 0 ] = ch_realloc( image->frame[ 0 ], best_width * best_height * tjPixelSize[ pixelFmt ] );
+		// image->frame[ 0 ] = ch_realloc( image->frame[ 0 ], best_width * best_height * tjPixelSize[ pixelFmt ] );
+		image->frame[ 0 ] = ch_calloc< u8 >( best_width * best_height * tjPixelSize[ pixelFmt ] );
 
 		if ( !image->frame[ 0 ] )
 		{
@@ -169,12 +171,13 @@ struct CodecJPEG: public IImageLoader
 			return false;
 		}
 
-		image->width     = best_width;
-		image->height    = best_height;
+		image->bytes_per_pixel = tjPixelSize[ pixelFmt ];
+		image->width           = best_width;
+		image->height          = best_height;
 
-		image->format    = GL_RGB;
-		image->bit_depth = 4;  // uhhhh
-		image->pitch     = pitch;
+		image->format          = GL_RGB;
+		image->bit_depth       = 24;  // uhhhh
+		image->pitch           = pitch;
 
 		return true;
 	}
