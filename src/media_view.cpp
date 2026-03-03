@@ -111,7 +111,7 @@ void media_view_scale_check_timer( float frame_time )
 
 	g_scale_timer -= frame_time;
 
-	if ( g_scale_timer < 0.f )
+	if ( g_scale_timer < 0.f && g_image.frame.size() )
 	{
 		g_scale_lock.lock();
 
