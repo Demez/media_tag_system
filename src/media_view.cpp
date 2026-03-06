@@ -7,20 +7,26 @@
 #include <mutex>
 
 // Image Draw Data
-e_zoom_mode              g_image_zoom_mode;
-double                   g_image_zoom = 1.f;
+e_zoom_mode              g_image_zoom_mode = e_zoom_mode_fit;
+double                   g_image_zoom      = 1.f;
 ImVec2                   g_image_pos{};
 ImVec2                   g_image_size{};
-bool                     g_image_flip_v = false;
-bool                     g_image_flip_h = false;
-float                    g_image_rot    = 0.f;
+bool                     g_image_flip_v            = false;
+bool                     g_image_flip_h            = false;
+float                    g_image_rot               = 0.f;
+
+// This doesn't let you move the image outside the window
+// if zoomed in, and you move the image down and to the right, the top left corner of the image will be at the top left
+// or if zoomed out, you can't pan the image, the image is in the middle of the window
+//bool                     g_lock_image_panning_area = false;
 
 // Image Panning
-bool                     g_image_pan    = false;
-bool                     g_draw_media_info = false;
-bool                     g_draw_imgui_demo = false;
-bool                     g_update_image_filtering = false;
+bool                     g_image_pan               = false;
 
+// Draw Information
+bool                     g_draw_media_info         = false;
+bool                     g_draw_imgui_demo         = false;
+bool                     g_draw_zoom_level         = true;
 
 extern main_image_data_t g_image_data;
 extern main_image_data_t g_image_data_free;
@@ -28,23 +34,22 @@ extern main_image_data_t g_image_data_free;
 constexpr double         ZOOM_AMOUNT = 0.1;
 constexpr double         ZOOM_MIN    = 0.01;
 
+// Image Scaling
 
 enum e_scale_state
 {
 	e_scale_state_idle,
-	e_scale_state_start,     // code sets state to this when it wants to scale the current image
-	e_scale_state_working,   // code looks at this state when running, uses full image while waiting
-	e_scale_state_upload,    // code needs to upload to gpu
-	e_scale_state_finished,  // code sets the state back to idle once it sees this
+	e_scale_state_start,     // main thread sets state to this when it wants to scale the current image
+	e_scale_state_working,   // main thread looks at this state when running, uses full image while waiting
+	e_scale_state_upload,    // main thread needs to upload to gpu, after this, it's set back to idle
 };
 
-constexpr float      SCALE_WAIT_TIME = 0.25f;
+constexpr float      SCALE_WAIT_TIME = 0.1f;
 
 static std::thread*  g_scale_thread;
 static e_scale_state g_scale_state  = e_scale_state_idle;
 static float         g_scale_timer  = -1.f;
-static bool          g_scale_use    = false;
-static bool          g_scale_cancel = false;
+static bool          g_scale_use    = false;  // use scaled down image
 static image_t       g_scale_src{};
 
 std::mutex           g_scale_lock;
@@ -137,9 +142,8 @@ void media_view_scale_check_timer( float frame_time )
 
 void media_view_scale_reset_timer()
 {
-	g_scale_timer  = SCALE_WAIT_TIME;
-	g_scale_use    = false;
-	g_scale_cancel = false;
+	g_scale_timer = SCALE_WAIT_TIME;
+	g_scale_use   = false;
 }
 
 
@@ -187,6 +191,8 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 		g_image_size.y   = g_image.height * zoom_level;
 
 		g_image_zoom     = zoom_level;
+
+		g_image_zoom_mode = e_zoom_mode_fit;
 	}
 
 	// TODO: only adjust this if needed, check image zoom type
@@ -209,6 +215,8 @@ void media_view_zoom_reset()
 	g_image_pos.y = 1 / g_image_zoom * ( g_image_pos.y );
 
 	g_image_zoom  = 1.0;
+
+	g_image_zoom_mode = e_zoom_mode_fixed;
 
 	if ( !g_image.frame[ 0 ] )
 		return;
@@ -280,9 +288,9 @@ void media_view_scroll_zoom( float scroll )
 	g_image_pos.x  = (double)g_mouse_pos[ 0 ] + ( g_image_pos.x - (double)g_mouse_pos[ 0 ] ) * factor;
 	g_image_pos.y  = (double)g_mouse_pos[ 1 ] + ( g_image_pos.y - (double)g_mouse_pos[ 1 ] ) * factor;
 
-	g_update_image_filtering = true;
-
 	media_view_scale_reset_timer();
+
+	g_image_zoom_mode = e_zoom_mode_fixed;
 }
 
 
@@ -545,7 +553,6 @@ void media_view_input()
 			printf( "SCALE MISMATCH\n" );
 		}
 
-		g_scale_cancel = false;
 		g_scale_state  = e_scale_state_idle;
 	}
 
@@ -583,19 +590,13 @@ void media_view_window_resize()
 {
 	if ( g_image_zoom_mode == e_zoom_mode_fit || g_image_zoom_mode == e_zoom_mode_fit_width )
 	{
-		media_view_fit_in_view( false );
+		media_view_fit_in_view();
 	}
 }
 
 
 void media_view_load()
 {
-	//if ( g_scale_state == e_scale_state_working )
-	//{
-	//	g_scale_cancel = true;
-	//	printf( "SCALE CANCEL\n" );
-	//}
-
 	if ( g_folder_media_list.empty() )
 		return;
 
@@ -900,9 +901,19 @@ void media_view_draw_imgui()
 	{
 		media_view_draw_video_controls();
 	}
-	else if ( get_media_type() == e_media_type_image_animated )
+	else
 	{
-		// Draw frame controls
+		if ( get_media_type() == e_media_type_image_animated )
+		{
+			// Draw frame controls
+		}
+
+		if ( g_draw_zoom_level )
+		{
+			ImGui::Begin( "##zoom_level", 0, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration );
+			ImGui::Text( "%.1f%%", (float)( g_image_zoom * 100 ) );
+			ImGui::End();
+		}
 	}
 }
 
@@ -956,33 +967,34 @@ static void media_view_draw_image()
  	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();
 
- 	//glOrtho( g_image_pos.x, g_image_pos.x + g_image_size.x, g_image_pos.y, g_image_pos.y + g_image_size.y, -1, 1 );
 	glOrtho( 0, width, height, 0, -1, 1 );
-
-	glTranslatef( dst_rect.w / 2, dst_rect.h / 2, 0 );  // M1 - 2nd translation
-	glRotatef( g_image_rot, 0.0f, 0.0f, 1.0f );
-	glTranslatef( -dst_rect.w / 2, -dst_rect.h / 2, 0 );  // M3 - 1st translation
 
  	glMatrixMode( GL_MODELVIEW );
 	glLoadIdentity();
+
+	// get the center of the image
+	float image_center_x = dst_rect.x + dst_rect.w * 0.5f;
+	float image_center_y = dst_rect.y + dst_rect.h * 0.5f;
+
+	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
+	glRotatef( g_image_rot, 0, 0, 1 );                       // rotate around the image
+	glTranslatef( -image_center_x, -image_center_y, 0.0f );  // move back
  
  	glBegin( GL_QUADS );
- 	glTexCoord2f( 0, 0 );
+
+	glTexCoord2f( 0, 0 );
 	glVertex2f( dst_rect.x, dst_rect.y );
- 	glTexCoord2f( 1, 0 );
+	glTexCoord2f( 1, 0 );
 	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y );
- 	glTexCoord2f( 1, 1 );
+	glTexCoord2f( 1, 1 );
 	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y + dst_rect.h );
- 	glTexCoord2f( 0, 1 );
+	glTexCoord2f( 0, 1 );
 	glVertex2f( dst_rect.x, dst_rect.y + dst_rect.h );
+
  	glEnd();
 
 	glDisable( GL_TEXTURE_2D );
 	glDisable( GL_BLEND );
-
-	// SDL_RenderTexture( g_main_renderer, g_image_data.texture, NULL, &dst_rect );
-
-//	SDL_RenderTextureRotated( g_main_renderer, g_image_data.texture, NULL, &dst_rect, g_image_rot, nullptr, SDL_FLIP_NONE );
 }
 
 

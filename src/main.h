@@ -133,9 +133,9 @@ enum e_icon : u8
 
 enum e_zoom_mode
 {
-	e_zoom_mode_fit,
-	e_zoom_mode_fit_width,
-	e_zoom_mode_fixed,
+	e_zoom_mode_fit,        // image is as large as possible in the window without being cropped
+	e_zoom_mode_fit_width,  // image is as large as possible in the window, but instead is cropped vertically, so the edges of the image touch the sides of the window
+	e_zoom_mode_fixed,      // user specified zoom level
 };
 
 
