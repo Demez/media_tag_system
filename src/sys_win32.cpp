@@ -11,8 +11,10 @@
 #include <direct.h>
 #include <shellapi.h>
 #include <shlwapi.h> 
+#include <shlobj.h>
 #include <shlobj_core.h> 
 #include <time.h>
+#include <atlbase.h>
 
 #include <profileapi.h>
 #include <stdint.h>
@@ -347,8 +349,23 @@ static FILETIME file_time_from_unix( u64 time )
 
 bool sys_get_file_times( const char* path, u64* creation, u64* access, u64* write )
 {
-	wchar_t* path_w = sys_to_wchar_extended( path );
+	// wchar_t* path_w = sys_to_wchar_extended( path );
 
+#if 1
+	struct stat s;
+	if ( stat( path, &s ) != 0 )
+		return false;
+
+	if ( creation )
+		*creation = s.st_ctime;
+
+	if ( write )
+		*write = s.st_mtime;
+
+	if ( access )
+		*access = s.st_atime;
+
+#else
 	HANDLE file     = CreateFile( path_w, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL );
 
 	if ( file == INVALID_HANDLE_VALUE )
@@ -390,6 +407,7 @@ bool sys_get_file_times( const char* path, u64* creation, u64* access, u64* writ
 
 	if ( write )
 		*write = file_time_to_unix( file_write );
+#endif
 
 	return true;
 }
@@ -659,6 +677,70 @@ void sys_browse_to_file( const char* path )
 }
 
 
+void sys_open_file_properties( const char* file )
+{
+	wchar_t* path_w = sys_to_wchar( file );
+
+	if ( !SHObjectProperties( 0, SHOP_FILEPATH, path_w, NULL ) )
+	{
+		wprintf( L"Failed to open File Properties for file: %s\n", path_w );
+	}
+
+	free( path_w );
+}
+
+
+// GetUIObjectOfFile incorporated by reference
+// https://web.archive.org/web/20140424230840/http://blogs.msdn.com/b/oldnewthing/archive/2004/09/21/231739.aspx
+static HRESULT GetUIObjectOfFile( HWND hwnd, LPCWSTR pszPath, REFIID riid, void** ppv )
+{
+	*ppv = NULL;
+	HRESULT      hr;
+	LPITEMIDLIST pidl;
+	SFGAOF       sfgao;
+
+	if ( SUCCEEDED( hr = SHParseDisplayName( pszPath, NULL, &pidl, 0, &sfgao ) ) )
+	{
+		IShellFolder* psf;
+		LPCITEMIDLIST pidlChild;
+
+		if ( SUCCEEDED( hr = SHBindToParent( pidl, IID_IShellFolder, (void**)&psf, &pidlChild ) ) )
+		{
+			hr = psf->GetUIObjectOf( hwnd, 1, &pidlChild, riid, NULL, ppv );
+			psf->Release();
+		}
+
+		CoTaskMemFree( pidl );
+	}
+
+	return hr;
+}
+
+
+bool sys_copy_to_clipboard( const char* path )
+{
+	wchar_t*               path_w = sys_to_wchar( path );
+	bool                   ret    = false;
+
+	CComPtr< IDataObject > spdto;
+
+	if ( !SUCCEEDED( GetUIObjectOfFile( nullptr, path_w, IID_PPV_ARGS( &spdto ) ) ) )
+		goto end;
+
+	if ( !SUCCEEDED( OleSetClipboard( spdto ) ) )
+		goto end;
+
+	if ( !SUCCEEDED( OleFlushClipboard() ) )
+		goto end;
+
+	ret = true;
+
+end:
+	free( path_w );
+	return ret;
+}
+
+
 // TODO: query the registry to get the font path
 // also add freetype to this
 sys_font_data_t sys_get_font()
@@ -731,12 +813,18 @@ int sys_init()
 		return 1;
 	}
 
+	if ( !SUCCEEDED( OleInitialize( NULL ) ) )
+	{
+		return 1;
+	}
+
 	return 0;
 }
 
 
 void sys_shutdown()
 {
+	OleUninitialize();
 }
 
 

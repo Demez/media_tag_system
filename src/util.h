@@ -247,63 +247,68 @@ bool util_array_extend( T*& data, size_t count, size_t extend_amount )
 
 
 // library loading
-module_t    sys_load_library( const wchar_t* path );
-void        sys_close_library( module_t mod );
-void*       sys_load_func( module_t mod, const char* path );
-const char* sys_get_error();
+module_t       sys_load_library( const wchar_t* path );
+void           sys_close_library( module_t mod );
+void*          sys_load_func( module_t mod, const char* path );
+const char*    sys_get_error();
 const wchar_t* sys_get_error_w();
-void        sys_print_last_error();
+void           sys_print_last_error();
 
-int         sys_init();
-void        sys_shutdown();
+int            sys_init();
+void           sys_shutdown();
 
 // also known as "sys_to_utf16"
-wchar_t*    sys_to_wchar( const char* spStr, int sSize );
-wchar_t*    sys_to_wchar( const char* spStr );
+wchar_t*       sys_to_wchar( const char* spStr, int sSize );
+wchar_t*       sys_to_wchar( const char* spStr );
 
 // prepends "\\?\" on the string for windows
 // https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
-wchar_t*    sys_to_wchar_extended( const char* spStr, int sSize );
-wchar_t*    sys_to_wchar_extended( const char* spStr );
+wchar_t*       sys_to_wchar_extended( const char* spStr, int sSize );
+wchar_t*       sys_to_wchar_extended( const char* spStr );
 
-wchar_t*    sys_to_wchar_short( const char* spStr, int sSize );
-wchar_t*    sys_to_wchar_short( const char* spStr );
+wchar_t*       sys_to_wchar_short( const char* spStr, int sSize );
+wchar_t*       sys_to_wchar_short( const char* spStr );
 
-char*       sys_to_utf8( const wchar_t* spStr, int sSize );
-char*       sys_to_utf8( const wchar_t* spStr );
+char*          sys_to_utf8( const wchar_t* spStr, int sSize );
+char*          sys_to_utf8( const wchar_t* spStr );
 
 // get folder exe is stored in
-char*       sys_get_exe_folder( size_t* len = nullptr );
+char*          sys_get_exe_folder( size_t* len = nullptr );
 
 // get the full path of the exe
-char*       sys_get_exe_path( size_t* len = nullptr );
+char*          sys_get_exe_path( size_t* len = nullptr );
 
 // get current working directory
-char*       sys_get_cwd();
+char*          sys_get_cwd();
 
 // on windows, this sends the file to the recycle bin
 // it does the equivalent on other platforms
-bool        sys_recycle_file( const char* path );
+bool           sys_recycle_file( const char* path );
+
+// on windows, this opens the file properties dialog
+void           sys_open_file_properties( const char* path );
+
+bool           sys_copy_to_clipboard( const char* path );
 
 // hack for above
-void        sys_set_main_hwnd( void* hwnd );
+void           sys_set_main_hwnd( void* hwnd );
 
-bool        sys_get_file_times( const char* path, u64* creation, u64* access, u64* write );
-bool        sys_set_file_times( const char* path, u64* creation, u64* access, u64* write );
-bool        sys_copy_file_times( const char* src_path, const char* out_path, bool creation, bool access, bool write );
+bool           sys_get_file_times( const char* path, u64* creation, u64* access, u64* write );
+bool           sys_set_file_times( const char* path, u64* creation, u64* access, u64* write );
+bool           sys_copy_file_times( const char* src_path, const char* out_path, bool creation, bool access, bool write );
 
 // execute a command and read it's output
-bool        sys_execute_read( const char* command, str_buf_t& output );
+bool           sys_execute_read( const char* command, str_buf_t& output );
 
 // execute a command and read it's output, with a callback function everytime more output is read from the file
-using       f_exec_callback = void( char* buf, size_t len );
-bool        sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_callback* p_exec_callback );
+using f_exec_callback = void( char* buf, size_t len );
+bool sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_callback* p_exec_callback );
 
 // execute a command and return the commands return value
-int         sys_execute( const char* command );
+int  sys_execute( const char* command );
 
 // NOTE: path cannot be over MAX_PATH (260 characters), thanks windows shell
-void        sys_browse_to_file( const char* path );
+void sys_browse_to_file( const char* path );
 
 struct sys_font_data_t
 {

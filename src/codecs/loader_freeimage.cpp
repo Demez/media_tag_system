@@ -245,7 +245,7 @@ struct LoaderFreeImage : public IImageLoader
 		u8* image_bits = FreeImage_GetBits( bitmap );
 
 		load_info.image->frame.resize( 1 );
-		size_t image_size           = load_info.image->pitch * load_info.image->height;
+		size_t image_size           = (size_t)load_info.image->pitch * (size_t)load_info.image->height;
 		// size_t image_size           = load_info.image->width * load_info.image->height * load_info.image->bytes_per_pixel;
 
 		load_info.image->frame[ 0 ] = ch_realloc< u8 >( load_info.image->frame[ 0 ], image_size );

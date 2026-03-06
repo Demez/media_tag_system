@@ -116,7 +116,7 @@ void media_view_scale_check_timer( float frame_time )
 
 	g_scale_timer -= frame_time;
 
-	if ( g_scale_timer < 0.f && g_image.frame.size() )
+	if ( g_scale_timer < 0.f && g_image.frame.size() && g_scale_state == e_scale_state_idle )
 	{
 		g_scale_lock.lock();
 
@@ -128,7 +128,7 @@ void media_view_scale_check_timer( float frame_time )
 		g_scale_src.frame.clear();
 		g_scale_src.frame.resize( g_image.frame.size() );
 
-		size_t image_size      = g_image.width * g_image.height * g_image.bytes_per_pixel;
+		size_t image_size      = (size_t)g_image.width * (size_t)g_image.height * (size_t)g_image.bytes_per_pixel;
 		g_scale_src.frame[ 0 ] = ch_calloc< u8 >( image_size );
 		memcpy( g_scale_src.frame[ 0 ], g_image.frame[ 0 ], image_size * sizeof( u8 ) );
 
@@ -436,17 +436,35 @@ void media_view_context_menu()
 		ImGui::EndMenu();
 	}
 
-	if ( ImGui::MenuItem( "Copy Image", nullptr, false, false ) )
+	if ( ImGui::MenuItem( "Copy File", nullptr, false ) )
 	{
+		sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
 	}
 
-	if ( ImGui::MenuItem( "Copy Image Data", nullptr, false, false ) )
+	if ( ImGui::MenuItem( "Copy File Data", nullptr, false, false ) )
 	{
 	}
 
 	if ( ImGui::MenuItem( "Set As Desktop Background", nullptr, false, false ) )
 	{
 	}
+
+	if ( ImGui::MenuItem( "File Info", nullptr, false, false ) )
+	{
+	}
+
+	if ( ImGui::MenuItem( "File Properties", nullptr, false ) )
+	{
+		// TODO: create our own imgui file properties for more info
+		// Plat_OpenFileProperties( ImageView_GetImagePath() );
+
+		sys_open_file_properties( gallery_item_get_path_string( g_gallery_index ).c_str() );
+	}
+
+	// TODO: side menu to show information on the image or video overlayed next to the image in a window
+	ImGui::MenuItem( "Media Info", nullptr, &g_draw_media_info, true );
+
+	ImGui::Separator();
 
 	if ( ImGui::MenuItem( "Undo", nullptr, false, 0 ) )
 	{
@@ -462,19 +480,6 @@ void media_view_context_menu()
 	{
 		//ImageView_DeleteImage();
 	}
-
-	if ( ImGui::MenuItem( "File Info", nullptr, false, false ) )
-	{
-	}
-
-	if ( ImGui::MenuItem( "File Properties", nullptr, false, 0 ) )
-	{
-		// TODO: create our own imgui file properties for more info
-		// Plat_OpenFileProperties( ImageView_GetImagePath() );
-	}
-
-	// TODO: side menu to show information on the image or video overlayed next to the image in a window
-	ImGui::MenuItem( "Media Info", nullptr, &g_draw_media_info, true );
 
 	ImGui::Separator();
 
@@ -565,6 +570,13 @@ void media_view_input()
 		media_view_advance( true );
 	}
 
+	// TODO: Test ImGui::Shortcut()
+	if ( g_window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
+	{
+		sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
+		printf( "Copied to Clipboard (SHOW IN IMGUI)\n" );
+	}
+
 	media_view_context_menu();
 
 	// if ( !mouse_hovering_imgui_window() )
@@ -617,6 +629,7 @@ void media_view_load()
 		{
 			// g_image_view.image = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
 			image_load( entry.path, image_load_info );
+			mpv_cmd_loadfile( "" );
 		}
 		else
 		{
@@ -629,7 +642,6 @@ void media_view_load()
 
 		// auto startTime       = std::chrono::high_resolution_clock::now();
 
-		
 		if ( entry.type == e_media_type_image )
 		{
 			if ( image_load_info.image->frame.size() > 0 && image_load_info.image->bytes_per_pixel > 0 )

@@ -23,6 +23,8 @@ int                                 g_gallery_image_size   = g_gallery_item_size
 
 bool                                g_gallery_sidebar_draw = true;
 
+bool                                g_scroll_to_selected   = false;
+
 
 void gallery_view_input()
 {
@@ -140,6 +142,7 @@ void gallery_view_draw_header()
 	if ( ImGui::SliderInt( "Zoom", &g_gallery_item_size, g_gallery_item_size_min, g_gallery_item_size_max ) )
 	{
 		g_gallery_item_size_changed = true;
+		g_scroll_to_selected        = true;
 		g_gallery_item_text_size.clear();
 		g_gallery_item_text_size.resize( g_folder_media_list.size() );
 
@@ -474,8 +477,6 @@ void gallery_view_dir_change()
 	gallery_view_sort_dir();
 }
 
-
-bool g_scroll_to_selected = false;
 
 void gallery_view_scroll_to_selected()
 {
@@ -886,6 +887,16 @@ void gallery_view_draw_content()
 
 		if ( g_gallery_index == i || item_hovered )
 			ImGui::PopStyleColor();
+
+		if ( g_gallery_index == i )
+		{
+			// TODO: Test ImGui::Shortcut()
+			if ( g_window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
+			{
+				sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
+				printf( "Copied to Clipboard (SHOW IN IMGUI)\n" );
+			}
+		}
 
 		if ( item_hovered && ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
 		{

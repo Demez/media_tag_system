@@ -183,6 +183,7 @@ struct main_image_data_t
 };
 
 extern bool                          g_running;
+extern bool                          g_window_focused;
 
 // imgui scroll hack lol
 extern bool                          g_mouse_scrolled_up;

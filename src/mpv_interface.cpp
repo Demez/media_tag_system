@@ -18,6 +18,7 @@ s64                 g_video_width = 0, g_video_height = 0;
 
 bool                g_scale_up_video = true;
 
+extern ImVec4       g_clear_color;
 
 extern bool         g_image_flip_v;
 extern bool         g_image_flip_h;
@@ -234,7 +235,8 @@ void mpv_draw_frame()
 	// glClearColor( 0.15, 0.15, 0.15, 1.0 );
 	// glClear( GL_COLOR_BUFFER_BIT );
 
-	mpv_opengl_fbo   fbo{ g_mpv_fbo, new_width, new_height, GL_RGB };
+	// mpv_opengl_fbo   fbo{ g_mpv_fbo, new_width, new_height, GL_RGB };
+	mpv_opengl_fbo   fbo{ g_mpv_fbo, width, height, GL_RGB };
 	int              yes  = 1;
 
 	mpv_render_param rp[] = {
@@ -259,8 +261,8 @@ void mpv_draw_frame()
 	dst_area.y = 0;
 	
 	SDL_FRect dst_rect{};
-	dst_rect.w = 1;
-	dst_rect.h = 1;
+	dst_rect.w = width;
+	dst_rect.h = height;
 	dst_rect.x = 0;
 	dst_rect.y = 0;
 	
@@ -279,15 +281,25 @@ void mpv_draw_frame()
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 	//glBindRenderbuffer( GL_RENDERBUFFER, 0 );
 
+	//if ( g_image_flip_h )
+	//	glViewport( pos_x + width, pos_y, -width, height );
+	//else
+	//	glViewport( pos_x, pos_y, width, height );
+
+	//if ( g_image_flip_h )
+	//	glViewport( pos_x - offset_x, pos_y, width, height );
+	//else
+	//	glViewport( pos_x, pos_y, width, height );
+
 	if ( g_image_flip_h )
-		glViewport( pos_x + width, pos_y, -width, height );
+		glViewport( -offset_x, 0, width, height );
 	else
-		glViewport( pos_x, pos_y, width, height );
+		glViewport( 0, 0, width, height );
 
-	//glEnable( GL_SCISSOR_TEST );
-	//glScissor( pos_x, pos_y, new_width, new_height );
+	glEnable( GL_SCISSOR_TEST );
+	glScissor( pos_x, pos_y, new_width, new_height );
 
-	glClearColor( 0.15, 0.15, 0.15, 1.0 );
+	glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
 	glClear( GL_COLOR_BUFFER_BIT );
 
 	glEnable( GL_TEXTURE_2D );
@@ -295,22 +307,25 @@ void mpv_draw_frame()
 
 	glMatrixMode( GL_PROJECTION );
 	glLoadIdentity();
-	glOrtho( 0, 1, 0, 1, -1, 1 );
+	// glOrtho( 0, 1, 0, 1, -1, 1 );
+	glOrtho( 0, dst_rect.w, 0, dst_rect.h, -1, 1 );
 	// glOrtho( 0, 1, 1, 0, -1, 1 );
 
 	glMatrixMode( GL_MODELVIEW );
 	glLoadIdentity();
 
-	glBegin( GL_QUADS );
+	// get the center of the video
+	// float image_center_x = ( ( pos_x + new_width ) / (float)width ) * 0.5f;
+	// float image_center_y = ( ( pos_y + new_height ) / (float)height ) * 0.5f;
+	
+//	float image_center_x = ( pos_x + new_width ) * 0.5f;
+//	float image_center_y = ( pos_y + new_height ) * 0.5f;
+//
+//	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
+//	glRotatef( g_image_rot, 0, 0, 1 );                       // rotate around the image
+//	glTranslatef( -image_center_x, -image_center_y, 0.0f );  // move back
 
-	// glTexCoord2f( 0, 0 );
-	// glVertex2f( 0, 0 );
-	// glTexCoord2f( 1, 0 );
-	// glVertex2f( 1, 0 );
-	// glTexCoord2f( 1, 1 );
-	// glVertex2f( 1, 1 );
-	// glTexCoord2f( 0, 1 );
-	// glVertex2f( 0, 1 );
+	glBegin( GL_QUADS );
 
 	glTexCoord2f( 0, 0 );
 	glVertex2f( dst_rect.x, dst_rect.y );
@@ -323,7 +338,7 @@ void mpv_draw_frame()
 
 	glEnd();
 
-	//glDisable( GL_SCISSOR_TEST );
+	glDisable( GL_SCISSOR_TEST );
 	glDisable( GL_TEXTURE_2D );
 }
 

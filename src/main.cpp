@@ -8,10 +8,13 @@
 
 #include <chrono>
 
+ImVec4                       g_clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
+
 SDL_Window*                  g_main_window = nullptr;
 SDL_GLContext                g_gl_context;
 
 bool                         g_running             = true;
+bool                         g_window_focused      = false;
 bool                         g_gallery_view        = false;
 bool                         g_mpv_ready           = false;
 
@@ -211,17 +214,37 @@ void imgui_draw()
 
 void gallery_view_toggle()
 {
+	static bool   mpv_resume_on_focus = false;
+	media_entry_t entry      = gallery_item_get_media_entry( g_gallery_index );
+
 	if ( g_gallery_view )
 	{
 		if ( g_media_index != g_gallery_index )
 			media_view_load();
+
+		if ( mpv_resume_on_focus )
+		{
+			const char* cmd[]   = { "set", "pause", "no", NULL };
+			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+		}
 
 		media_view_fit_in_view();
 	}
 	else
 	{
 		// clear mpv
-		mpv_cmd_loadfile( "" );
+		// mpv_cmd_loadfile( "" );
+
+		if ( entry.type == e_media_type_video )
+		{
+			s32 paused = 0;
+			p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
+			mpv_resume_on_focus = !paused;
+
+			const char* cmd[]   = { "set", "pause", "yes", NULL };
+			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+		}
+
 		gallery_view_scroll_to_selected();
 	}
 
@@ -495,7 +518,6 @@ int main( int argc, char* argv[] )
 
 	// ----------------------------------------------------------------
 
-	ImVec4 clear_color               = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
 
 	auto   start_time                = std::chrono::high_resolution_clock::now();
 	auto   current_time              = start_time;
@@ -583,6 +605,7 @@ int main( int argc, char* argv[] )
 
 					g_window_resized = true;
 					media_view_window_resize();
+					gallery_view_scroll_to_selected();
 					mpv_window_resize();
 					break;
 
@@ -595,8 +618,19 @@ int main( int argc, char* argv[] )
 
 		if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_MINIMIZED )
 		{
+			g_window_focused = false;
 			SDL_Delay( 10 );
 			continue;
+		}
+
+		if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_INPUT_FOCUS )
+		{
+			g_window_focused = true;
+		}
+		else
+		{
+			g_window_focused = false;
+			SDL_Delay( 5 );
 		}
 
 		ImGui::NewFrame();
@@ -614,7 +648,7 @@ int main( int argc, char* argv[] )
 		SDL_GetWindowSize( g_main_window, &width, &height );
 
 		glViewport( 0, 0, width, height );
-		glClearColor( clear_color.x, clear_color.y, clear_color.z, clear_color.w );
+		glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
 		glClear( GL_COLOR_BUFFER_BIT );
 
 		imgui_draw();
