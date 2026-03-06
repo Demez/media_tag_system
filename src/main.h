@@ -139,11 +139,40 @@ enum e_zoom_mode
 };
 
 
+enum e_gallery_sort_mode
+{
+	e_gallery_sort_mode_name_a_z,
+	e_gallery_sort_mode_name_z_a,
+
+	e_gallery_sort_mode_date_mod_new_to_old,
+	e_gallery_sort_mode_date_mod_old_to_new,
+
+	e_gallery_sort_mode_date_created_new_to_old,
+	e_gallery_sort_mode_date_created_old_to_new,
+
+	e_gallery_sort_mode_size_large_to_small,
+	e_gallery_sort_mode_size_small_to_large,
+
+	e_gallery_sort_mode_count,
+};
+
+
 struct media_entry_t
 {
 	fs::path     path;
 	std::string  filename;
 	e_media_type type;
+};
+
+
+// should this just be part of media_entry_t?
+// also rename media_entry_t to something better, like file_t
+struct gallery_item_t
+{
+	size_t file_index;
+	u64    file_size;
+	u64    date_mod;
+	u64    date_created;
 };
 
 
@@ -153,70 +182,77 @@ struct main_image_data_t
 	GLuint texture;
 };
 
-extern bool                         g_running;
+extern bool                          g_running;
 
 // imgui scroll hack lol
-extern bool                         g_mouse_scrolled_up;
-extern bool                         g_mouse_scrolled_down;
-extern bool                         g_window_resized;
+extern bool                          g_mouse_scrolled_up;
+extern bool                          g_mouse_scrolled_down;
+extern bool                          g_window_resized;
 
-extern ivec2                        g_mouse_delta;
-extern ivec2                        g_mouse_pos;
+extern ivec2                         g_mouse_delta;
+extern ivec2                         g_mouse_pos;
 
-extern fs::path                     g_folder;
-extern fs::path                     g_folder_queued;  // will change to this folder start of next frame
-extern std::vector< media_entry_t > g_folder_media_list;
-extern std::vector< h_thumbnail >   g_folder_thumbnail_list;
-extern size_t                       g_gallery_index;
+extern fs::path                      g_folder;
+extern fs::path                      g_folder_queued;  // will change to this folder start of next frame
+extern std::vector< h_thumbnail >    g_folder_thumbnail_list;
+
+extern size_t                        g_gallery_index;
+extern std::vector< gallery_item_t > g_gallery_items;
 
 
 // Main Image
-extern e_zoom_mode                  g_image_zoom_mode;
-extern image_t                      g_image;
-extern image_t                      g_image_scaled;
-extern main_image_data_t            g_image_data;
-extern main_image_data_t            g_image_scaled_data;
-extern size_t                       g_image_scaled_index;
-extern size_t                       g_media_index;
+extern e_zoom_mode                   g_image_zoom_mode;
+extern image_t                       g_image;
+extern image_t                       g_image_scaled;
+extern main_image_data_t             g_image_data;
+extern main_image_data_t             g_image_scaled_data;
+extern size_t                        g_image_scaled_index;
+extern size_t                        g_media_index;
 
 // Previous Image to Free
-extern main_image_data_t            g_image_data_free;
+extern main_image_data_t             g_image_data_free;
 
 
-void                                media_view_init();
-void                                media_view_shutdown();
-void                                media_view_scale_check_timer( float frame_time );
+void                                 media_view_init();
+void                                 media_view_shutdown();
+void                                 media_view_scale_check_timer( float frame_time );
 
-void                                media_view_load();
-void                                media_view_input();
-void                                media_view_draw_imgui();
-void                                media_view_draw();
-void                                media_view_scroll_zoom( float amount );
-void                                media_view_advance( bool prev = false );
-void                                media_view_window_resize();
-void                                media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true );
-void                                media_view_zoom_reset();
+void                                 media_view_load();
+void                                 media_view_input();
+void                                 media_view_draw_imgui();
+void                                 media_view_draw();
+void                                 media_view_scroll_zoom( float amount );
+void                                 media_view_advance( bool prev = false );
+void                                 media_view_window_resize();
+void                                 media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true );
+void                                 media_view_zoom_reset();
 
-void                                gallery_view_scroll_to_selected();
-void                                gallery_view_input();
-void                                gallery_view_draw();
-void                                gallery_view_dir_change();
+std::string                          gallery_item_get_path_string( gallery_item_t& item );
+fs::path                             gallery_item_get_path( gallery_item_t& item );
+fs::path                             gallery_item_get_path( size_t index );
+std::string                          gallery_item_get_path_string( size_t index );
+media_entry_t                        gallery_item_get_media_entry( size_t index );
 
-void                                gallery_view_toggle();
+void                                 gallery_view_scroll_to_selected();
+void                                 gallery_view_input();
+void                                 gallery_view_draw();
+void                                 gallery_view_dir_change();
 
-void                                update_window_title();
-void                                folder_load_media_list();
+void                                 gallery_view_toggle();
 
-bool                                icon_preload();
-void                                icon_free();
-image_t*                            icon_get_image( e_icon icon_type );
-ImTextureRef                        icon_get_imtexture( e_icon icon_type );
+void                                 update_window_title();
+void                                 folder_load_media_list();
 
-GLuint                              gl_upload_texture( image_t* image );
-void                                gl_update_texture( GLuint texture, image_t* image );
-void                                gl_free_texture( GLuint texture );
+bool                                 icon_preload();
+void                                 icon_free();
+image_t*                             icon_get_image( e_icon icon_type );
+ImTextureRef                         icon_get_imtexture( e_icon icon_type );
 
-bool                                mouse_hovering_imgui_window();
+GLuint                               gl_upload_texture( image_t* image );
+void                                 gl_update_texture( GLuint texture, image_t* image );
+void                                 gl_free_texture( GLuint texture );
+
+bool                                 mouse_hovering_imgui_window();
 
 
 // ---------------------------------------------------------

@@ -118,7 +118,7 @@ void update_window_title()
 	else
 	{
 		if ( g_folder_media_list.size() > g_gallery_index )
-			snprintf( buf, 512, "Media Tag System - %s", g_folder_media_list[ g_gallery_index ].path.string().c_str() );
+			snprintf( buf, 512, "Media Tag System [%d / %d] - %s", g_gallery_index, g_gallery_items.size(), gallery_item_get_path_string( g_gallery_index ).c_str() );
 		else
 			snprintf( buf, 512, "Media Tag System" );
 	}
@@ -241,9 +241,9 @@ void on_new_file( char* file )
 
 	folder_load_media_list();
 
-	for ( size_t i = 0; i < g_folder_media_list.size(); i++ )
+	for ( size_t i = 0; i < g_gallery_items.size(); i++ )
 	{
-		if ( g_folder_media_list[ i ].path == file_path )
+		if ( gallery_item_get_path( i ) == file_path )
 		{
 			g_gallery_index = i;
 			g_folder_queued.clear();

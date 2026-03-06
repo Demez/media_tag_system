@@ -2,28 +2,26 @@
 
 #include "imgui_internal.h"
 
-struct gallery_item_t
-{
-	
-};
 
+extern bool                         g_gallery_view;
+extern std::vector< media_entry_t > g_folder_media_list;
 
-extern bool                       g_gallery_view;
-
-std::vector< gallery_item_t >     g_gallery_items;
+e_gallery_sort_mode                 g_gallery_sort_mode        = e_gallery_sort_mode_date_mod_new_to_old;
+bool                                g_gallery_sort_mode_update = false;
+std::vector< gallery_item_t >       g_gallery_items;
 
 // const int                         GALLERY_GRID_X_COUNT    = 12;
 
-int                               g_gallery_row_count         = 0;
-int                               g_gallery_item_size         = 150;
-int                               g_gallery_item_size_min     = 50;
-int                               g_gallery_item_size_max     = 600;
-bool                              g_gallery_item_size_changed = true;
-std::vector< ImVec2 >             g_gallery_item_text_size;
+int                                 g_gallery_row_count         = 0;
+int                                 g_gallery_item_size         = 150;
+int                                 g_gallery_item_size_min     = 50;
+int                                 g_gallery_item_size_max     = 600;
+bool                                g_gallery_item_size_changed = true;
+std::vector< ImVec2 >               g_gallery_item_text_size;
 
-int                               g_gallery_image_size        = g_gallery_item_size;
+int                                 g_gallery_image_size   = g_gallery_item_size;
 
-bool                              g_gallery_sidebar_draw      = true;
+bool                                g_gallery_sidebar_draw = true;
 
 
 void gallery_view_input()
@@ -31,21 +29,21 @@ void gallery_view_input()
 	if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) )
 	{
 		if ( g_gallery_index == 0 )
-			g_gallery_index = g_folder_media_list.size();
+			g_gallery_index = g_gallery_items.size();
 
 		g_gallery_index--;
 		gallery_view_scroll_to_selected();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) )
 	{
-		g_gallery_index = ( g_gallery_index + 1 ) % g_folder_media_list.size();
+		g_gallery_index = ( g_gallery_index + 1 ) % g_gallery_items.size();
 		gallery_view_scroll_to_selected();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_UpArrow ) )
 	{
 		if ( g_gallery_index < g_gallery_row_count )
 		{
-			size_t count_in_row   = g_folder_media_list.size() % g_gallery_row_count;
+			size_t count_in_row   = g_gallery_items.size() % g_gallery_row_count;
 			size_t missing_in_row = g_gallery_row_count - count_in_row;
 			size_t row_diff       = g_gallery_row_count - g_gallery_index;
 
@@ -53,26 +51,26 @@ void gallery_view_input()
 			if ( missing_in_row >= row_diff )
 				row_diff += g_gallery_row_count;
 
-			g_gallery_index = g_folder_media_list.size() - ( row_diff - missing_in_row );
+			g_gallery_index = g_gallery_items.size() - ( row_diff - missing_in_row );
 		}
 		else
 		{
-			g_gallery_index = ( g_gallery_index - g_gallery_row_count ) % g_folder_media_list.size();
+			g_gallery_index = ( g_gallery_index - g_gallery_row_count ) % g_gallery_items.size();
 		}
 
 		gallery_view_scroll_to_selected();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_DownArrow ) )
 	{
-		if ( g_gallery_index + g_gallery_row_count >= g_folder_media_list.size() )
+		if ( g_gallery_index + g_gallery_row_count >= g_gallery_items.size() )
 		{
-			size_t count_in_row = g_folder_media_list.size() % g_gallery_row_count;
+			size_t count_in_row  = g_gallery_items.size() % g_gallery_row_count;
 			size_t row_pos      = g_gallery_index % g_gallery_row_count;
 			g_gallery_index      = row_pos;
 		}
 		else
 		{
-			g_gallery_index = ( g_gallery_index + g_gallery_row_count ) % g_folder_media_list.size();
+			g_gallery_index = ( g_gallery_index + g_gallery_row_count ) % g_gallery_items.size();
 		}
 
 		gallery_view_scroll_to_selected();
@@ -147,6 +145,51 @@ void gallery_view_draw_header()
 
 		thumbnail_clear_cache();
 	}
+	
+	ImGui::SameLine();
+
+	const char* sort_names[] = {
+		"A to Z",
+		"Z to A",
+		"Date Modified - New to Old",
+		"Date Modified - Old to New",
+		"Date Created - New to Old",
+		"Date Created - Old to New",
+		"File Size - Large to Small",
+		"File Size - Small to Large"
+	};
+
+	static_assert( ARR_SIZE( sort_names ) == e_gallery_sort_mode_count );
+
+	const char* combo_preview_value = sort_names[ g_gallery_sort_mode ];
+
+	if ( ImGui::BeginCombo( "Sort Mode", combo_preview_value, 0 ) )
+	{
+		for ( int n = 0; n < e_gallery_sort_mode_count; n++ )
+		{
+			const bool is_selected = ( g_gallery_sort_mode == n );
+
+			if ( ImGui::Selectable( sort_names[ n ], is_selected ) )
+			{
+				g_gallery_sort_mode        = (e_gallery_sort_mode)n;
+				g_gallery_sort_mode_update = true;
+			}
+
+			// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+			if ( is_selected )
+			{
+				ImGui::SetItemDefaultFocus();
+			}
+		}
+
+		ImGui::EndCombo();
+	}
+
+	// if ( ImGui::Combo( "Sort Mode", &item_current, items, IM_ARRAYSIZE( items ) ) )
+	// {
+	// }
+
+	ImGui::SameLine();
 
 	ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 
@@ -156,9 +199,279 @@ void gallery_view_draw_header()
 }
 
 
+std::string gallery_item_get_path_string( gallery_item_t& item )
+{
+	if ( item.file_index >= g_folder_media_list.size() )
+		return {};
+
+	return g_folder_media_list[ item.file_index ].path.string();
+}
+
+
+fs::path gallery_item_get_path( gallery_item_t& item )
+{
+	if ( item.file_index >= g_folder_media_list.size() )
+		return {};
+
+	return g_folder_media_list[ item.file_index ].path;
+}
+
+
+fs::path gallery_item_get_path( size_t index )
+{
+	if ( index >= g_gallery_items.size() )
+		return {};
+
+	return gallery_item_get_path( g_gallery_items[ index ] );
+}
+
+
+std::string gallery_item_get_path_string( size_t index )
+{
+	if ( index >= g_gallery_items.size() )
+		return {};
+
+	return gallery_item_get_path_string( g_gallery_items[ index ] );
+}
+
+
+media_entry_t gallery_item_get_media_entry( size_t index )
+{
+	if ( index >= g_gallery_items.size() )
+		return {};
+
+	return g_folder_media_list[ g_gallery_items[ index ].file_index ];
+}
+
+
+// Date Modified
+int qsort_date_mod_newest( const void* left, const void* right )
+{
+	const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
+	const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+
+	if ( item_left->date_mod > item_right->date_mod )
+		return -1;
+	else if ( item_left->date_mod < item_right->date_mod )
+		return 1;
+
+	return 0;
+}
+
+
+int qsort_date_mod_oldest( const void* left, const void* right )
+{
+	return qsort_date_mod_newest( left, right ) * -1;
+
+	// const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
+	// const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+	// 
+	// if ( x > y )
+	// 	return 1;
+	// else if ( x < y )
+	// 	return -1;
+	// 
+	// return 0;
+}
+
+
+// Date Created
+int qsort_date_created_newest( const void* left, const void* right )
+{
+	const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
+	const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+
+	if ( item_left->date_created > item_right->date_created )
+		return -1;
+	else if ( item_left->date_created < item_right->date_created )
+		return 1;
+
+	return 0;
+}
+
+
+int qsort_date_created_oldest( const void* left, const void* right )
+{
+	const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
+	const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+
+	if ( item_left->date_created > item_right->date_created )
+		return 1;
+	else if ( item_left->date_created < item_right->date_created )
+		return -1;
+
+	return 0;
+}
+
+
+// File Size
+int qsort_size_large_to_small( const void* left, const void* right )
+{
+	const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
+	const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+
+	if ( item_left->file_size > item_right->file_size )
+		return -1;
+	else if ( item_left->file_size < item_right->file_size )
+		return 1;
+
+	return 0;
+}
+
+
+int qsort_size_small_to_large( const void* left, const void* right )
+{
+	return qsort_size_large_to_small( left, right ) * -1;
+
+	// const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
+	// const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+	// 
+	// if ( item_left->file_size > item_right->file_size )
+	// 	return 1;
+	// else if ( item_left->file_size < item_right->file_size )
+	// 	return -1;
+	// 
+	// return 0;
+}
+
+
+void gallery_view_sort_list( std::vector< gallery_item_t >& gallery_list )
+{
+	// Sort data
+	switch ( g_gallery_sort_mode )
+	{
+		default:
+		case e_gallery_sort_mode_name_a_z:
+		{
+			break;
+		}
+
+		case e_gallery_sort_mode_name_z_a:
+		{
+			break;
+		}
+
+		case e_gallery_sort_mode_date_mod_new_to_old:
+		{
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_date_mod_newest );
+			break;
+		}
+
+		case e_gallery_sort_mode_date_mod_old_to_new:
+		{
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_date_mod_oldest );
+			break;
+		}
+
+		case e_gallery_sort_mode_date_created_new_to_old:
+		{
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_date_created_newest );
+			break;
+		}
+
+		case e_gallery_sort_mode_date_created_old_to_new:
+		{
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_date_created_oldest );
+			break;
+		}
+
+		case e_gallery_sort_mode_size_large_to_small:
+		{
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_size_large_to_small );
+			break;
+		}
+
+		case e_gallery_sort_mode_size_small_to_large:
+		{
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_size_small_to_large );
+			break;
+		}
+	}
+}
+
+
+void gallery_view_sort_dir()
+{
+	static std::vector< gallery_item_t > folders;
+	static std::vector< gallery_item_t > files;
+
+	folders.clear();
+	files.clear();
+
+	folders.reserve( g_folder_media_list.size() );
+	files.reserve( g_folder_media_list.size() );
+
+	size_t        selected_item_idx = g_gallery_index;
+	media_entry_t selected_item{};
+	bool          selected_folder = false;
+
+	if ( g_gallery_items.size() )
+	{
+		selected_item   = gallery_item_get_media_entry( selected_item_idx );
+		selected_folder = selected_item.type == e_media_type_directory;
+	}
+
+	// Fill lists with information
+	for ( size_t i = 0; i < g_folder_media_list.size(); i++ )
+	{
+		gallery_item_t gallery_item{};
+		gallery_item.file_index = i;
+
+		fs::path&      path     = g_folder_media_list[ i ].path;
+		std::string    str_path = g_folder_media_list[ i ].path.string();
+
+		if ( g_folder_media_list[ i ].type == e_media_type_directory )
+		{
+			if ( selected_folder && selected_item.path == path )
+				g_gallery_index = i;
+
+			folders.push_back( gallery_item );
+		}
+		else
+		{
+			if ( !selected_folder && selected_item.path == path )
+				g_gallery_index = i;
+
+			if ( !sys_get_file_times( str_path.data(), &gallery_item.date_created, nullptr, &gallery_item.date_mod ) )
+			{
+				printf( "Failed to get file date created and modified: %s\n", str_path.data() );
+			}
+
+			gallery_item.file_size = fs::file_size( path );
+			files.push_back( gallery_item );
+		}
+	}
+
+	// Sort data
+	if ( g_gallery_sort_mode != e_gallery_sort_mode_size_large_to_small && g_gallery_sort_mode != g_gallery_sort_mode )
+		gallery_view_sort_list( folders );
+
+	gallery_view_sort_list( files );
+
+	g_gallery_items.clear();
+	g_gallery_items.resize( g_folder_media_list.size() );
+
+	// Add Folders First
+	std::copy( folders.begin(), folders.end(), g_gallery_items.begin() );
+
+	// Add Files next
+	std::copy( files.begin(), files.end(), g_gallery_items.begin() + folders.size() );
+
+	if ( !selected_folder )
+		g_gallery_index += folders.size();
+
+	printf( "sorted\n" );
+}
+
+
 void gallery_view_dir_change()
 {
 	snprintf( g_folder_buf, 512, "%s", g_folder.string().c_str() );
+
+	g_gallery_items.clear();
+
+	// SORT FILE LIST
+	gallery_view_sort_dir();
 }
 
 
@@ -180,7 +493,7 @@ void gallery_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
 	{
-		sys_browse_to_file( g_folder_media_list[ g_gallery_index ].path.string().c_str() );
+		sys_browse_to_file( gallery_item_get_path_string( g_gallery_index ).c_str() );
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -354,22 +667,23 @@ void gallery_view_draw_content()
 	ImVec2 image_bounds  = { item_size_x - ( style.WindowPadding.x * 2 ), item_size_x - ( style.WindowPadding.x * 2 ) };
 	g_gallery_image_size = image_bounds.x;
 
-	for ( size_t i = 0; i < g_folder_media_list.size(); i++ )
+	for ( size_t i = 0; i < g_gallery_items.size(); i++ )
 	{
-		const media_entry_t& media  = g_folder_media_list[ i ];
+		const gallery_item_t& gallery_item = g_gallery_items[ i ];
+		const media_entry_t&  media        = g_folder_media_list[ gallery_item.file_index ];
 
-		float                scroll = ImGui::GetScrollY();
+		float                 scroll       = ImGui::GetScrollY();
 
-		ImVec2               media_text_size{};
+		ImVec2                media_text_size{};
 
 		if ( g_gallery_item_size_changed )
 		{
 			media_text_size = ImGui::CalcTextSize( media.filename.c_str(), 0, false, item_size_x - ( style.WindowPadding.x * 2 ) );
-			g_gallery_item_text_size[ i ] = media_text_size;
+			g_gallery_item_text_size[ gallery_item.file_index ] = media_text_size;
 		}
 		else
 		{
-			media_text_size = g_gallery_item_text_size[ i ];
+			media_text_size = g_gallery_item_text_size[ gallery_item.file_index ];
 		}
 
 		//ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, { 0.f, 0.f } );
@@ -505,7 +819,7 @@ void gallery_view_draw_content()
 			}
 			else
 			{
-				thumbnail_t* thumbnail = thumbnail_get_data( g_folder_thumbnail_list[ i ] );
+				thumbnail_t* thumbnail = thumbnail_get_data( g_folder_thumbnail_list[ gallery_item.file_index ] );
 
 				if ( thumbnail )
 				{
@@ -524,7 +838,7 @@ void gallery_view_draw_content()
 					else if ( thumbnail->status == e_thumbnail_status_free )
 					{
 						if ( media.type != e_media_type_directory )
-							thumbnail_requests.emplace_back( media.path, i );
+							thumbnail_requests.emplace_back( media.path, gallery_item.file_index );
 
 						ImGui::Dummy( image_bounds );
 					}
@@ -536,7 +850,7 @@ void gallery_view_draw_content()
 				else
 				{
 					if ( !thumbnail && media.type != e_media_type_directory )
-						thumbnail_requests.emplace_back( media.path, i );
+						thumbnail_requests.emplace_back( media.path, gallery_item.file_index );
 					// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 					ImGui::Dummy( image_bounds );
@@ -783,6 +1097,12 @@ void gallery_view_draw_sidebar()
 
 void gallery_view_draw()
 {
+	if ( g_gallery_sort_mode_update )
+	{
+		gallery_view_sort_dir();
+		g_gallery_sort_mode_update = false;
+	}
+
 	gallery_view_input();
 
 	int window_width, window_height;
