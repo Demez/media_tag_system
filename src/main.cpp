@@ -444,6 +444,9 @@ void style_imgui()
 	style.ItemInnerSpacing.x = 6;
 	style.ItemInnerSpacing.y = 6;
 
+	style.FramePadding.x     = 4;
+	style.FramePadding.y     = 4;
+
 	style.ChildRounding      = 3;
 	style.FrameRounding      = 3;
 	style.GrabRounding       = 3;
