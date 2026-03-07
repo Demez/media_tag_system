@@ -8,10 +8,14 @@
 
 #include <chrono>
 
-ImVec4                       g_clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
+// ImVec4                       g_clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
+ImVec4                       g_clear_color = ImVec4( 0.05f, 0.05f, 0.05f, 1.00f );
 
 SDL_Window*                  g_main_window = nullptr;
 SDL_GLContext                g_gl_context;
+
+double                       g_total_time;
+float                        g_frame_time;
 
 bool                         g_running             = true;
 bool                         g_window_focused      = false;
@@ -48,6 +52,19 @@ extern std::vector< ImVec2 > g_gallery_item_text_size;
 ImFont*                      g_default_font        = nullptr;
 ImFont*                      g_default_font_bold   = nullptr;
 ImFont*                      g_default_font_italic = nullptr;
+
+struct notification_t
+{
+	std::string msg;
+	double      time_added;
+	float       time_remain;
+};
+
+constexpr float               NOTIFICATION_DURATION     = 5;
+constexpr float               NOTIFICATION_FADE_IN_TIME = 0.5;
+constexpr size_t              NOTIFICATION_MAX_SHOWN    = 5;
+
+std::vector< notification_t > g_notification_queue;
 
 
 // Check the function FindHoveredWindowEx() in imgui.cpp to see if you need to update this when updating imgui
@@ -199,7 +216,139 @@ void folder_load_media_list()
 }
 
 
-void imgui_draw()
+void push_notification( const char* msg )
+{
+	g_notification_queue.emplace_back( msg, g_total_time, NOTIFICATION_DURATION );
+}
+
+
+void notification_draw( float frame_time )
+{
+	static float time_drawn = 0.f;
+	static bool  fade_in    = true;
+
+	if ( g_notification_queue.empty() )
+	{
+		time_drawn = 0.f;
+		fade_in    = true;
+		return;
+	}
+
+	// find expired ones first
+	for ( size_t i = 0; i < g_notification_queue.size(); )
+	{
+		notification_t& notif = g_notification_queue[ i ];
+
+		notif.time_remain -= frame_time;
+
+		if ( notif.time_remain > 0.f )
+		{
+			i++;
+			continue;
+		}
+
+		g_notification_queue.erase( g_notification_queue.begin() + i );
+	}
+
+	// check if empty again
+	if ( g_notification_queue.empty() )
+	{
+		time_drawn = 0.f;
+		fade_in    = true;
+		return;
+	}
+
+	// draw last few notifications
+
+	int width, height;
+	SDL_GetWindowSize( g_main_window, &width, &height );
+
+	ImVec2 notif_pos{};
+	notif_pos.x = width / 2;
+	notif_pos.y = 40.f;
+
+	// ----------------------------------------
+
+	// pivot aligns it to the center and the bottom of the window
+	// ImGui::SetNextWindowPos( notif_pos, 0, ImVec2( 0.5f, 1.0f ) );
+	ImGui::SetNextWindowPos( notif_pos, 0, ImVec2( 0.5f, 0.0f ) );
+
+	ImGuiStyle& style        = ImGui::GetStyle();
+
+	ImVec4      bg_color     = style.Colors[ ImGuiCol_FrameBg ];
+	ImVec4      border_color = style.Colors[ ImGuiCol_Border ];
+	bg_color.w               = 0.75;
+
+	float  max_notif_time    = -1.f;
+	// get fadeout time
+	size_t count             = std::min( NOTIFICATION_MAX_SHOWN, g_notification_queue.size() );
+
+	//float  fade_in_amount    = std::min( 1.f, time_drawn / NOTIFICATION_FADE_IN_TIME );
+	// float  fade_amount    = std::min( 1.f, time_drawn / NOTIFICATION_FADE_IN_TIME );
+	float  fade_amount    = 1.f;
+
+	for ( size_t j = 0, i = g_notification_queue.size() - 1;; i--, j++ )
+	{
+		notification_t& notif = g_notification_queue[ i ];
+		max_notif_time        = std::max( max_notif_time, notif.time_remain );
+
+		if ( i == 0 || j == count )
+			break;
+	}
+
+	if ( max_notif_time < NOTIFICATION_FADE_IN_TIME )
+	{
+		fade_amount = max_notif_time / NOTIFICATION_FADE_IN_TIME;
+
+		//border_color.w = max_notif_time * border_color.w;
+		//bg_color.w     = max_notif_time;
+	}
+	//else // if ( max_notif_time > NOTIFICATION_DURATION - NOTIFICATION_FADE_IN_TIME )
+	{
+		border_color.w *= fade_amount;
+		bg_color.w *= fade_amount;
+	}
+
+	ImGui::PushStyleColor( ImGuiCol_WindowBg, bg_color );
+	ImGui::PushStyleColor( ImGuiCol_Border, border_color );
+
+	// ImGui::SetNextWindowSizeConstraints( { width - 80.f, -1.f }, { width - 80.f, -1.f } );
+
+	ImGui::SetNextWindowFocus();
+
+	if ( ImGui::Begin( "##notif", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
+	{
+		for ( size_t j = 0, i = g_notification_queue.size() - 1;; i--, j++ )
+		{
+			notification_t& notif = g_notification_queue[ i ];
+			ImVec4          text_color = style.Colors[ ImGuiCol_Text ];
+
+			// nice fade out effect
+			if ( notif.time_remain < NOTIFICATION_FADE_IN_TIME )
+				text_color.w *= notif.time_remain;
+
+			ImGui::PushStyleColor( ImGuiCol_Text, text_color );
+
+			ImGui::TextUnformatted( g_notification_queue[ i ].msg.c_str() );
+			// ImGui::Text( "%.f - %s", g_notification_queue[ i ].time_added, g_notification_queue[ i ].msg.c_str() );
+
+			ImGui::PopStyleColor();
+
+			if ( i == 0 || j == count )
+				break;
+		}
+
+		ImGui::End();
+	}
+
+	ImGui::PopStyleColor();
+	ImGui::PopStyleColor();
+
+	time_drawn += frame_time;
+}
+
+
+void imgui_draw( float frame_time )
 {
 	if ( g_gallery_view )
 	{
@@ -209,6 +358,10 @@ void imgui_draw()
 	{
 		media_view_draw_imgui();
 	}
+
+	notification_draw( frame_time );
+
+	ImGui::Render();
 }
 
 
@@ -309,7 +462,8 @@ void style_imgui()
 #endif
 
 	colors[ ImGuiCol_FrameBg ]              = ImVec4( 0.00f, 0.21f, 0.52f, 0.54f );
-	colors[ ImGuiCol_WindowBg ]             = ImVec4( 0.06f, 0.06f, 0.06f, 1.00f );
+	// colors[ ImGuiCol_WindowBg ]             = ImVec4( 0.06f, 0.06f, 0.06f, 1.00f );
+	colors[ ImGuiCol_WindowBg ]             = ImVec4( 0.08f, 0.08f, 0.08f, 1.00f );
 
 	colors[ ImGuiCol_ScrollbarBg ]          = ImVec4( 0.02f, 0.02f, 0.02f, 1.00f );
 	colors[ ImGuiCol_ScrollbarGrab ]        = ImVec4( 0.00f, 0.28f, 0.65f, 1.00f );
@@ -535,6 +689,9 @@ int main( int argc, char* argv[] )
 			// don't let the time go too crazy, usually happens when in a breakpoint
 			time                 = std::min( time, 0.1f );
 
+			g_frame_time         = time;
+			g_total_time += time;
+
 			// TODO: GET MONITOR REFRESH RATE
 			float fps_limit      = 144.f;
 			float max_fps        = CLAMP( fps_limit, 10.f, 5000.f );
@@ -653,9 +810,7 @@ int main( int argc, char* argv[] )
 		glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
 		glClear( GL_COLOR_BUFFER_BIT );
 
-		imgui_draw();
-
-		ImGui::Render();
+		imgui_draw( time );
 
 		media_view_scale_check_timer( time );
 

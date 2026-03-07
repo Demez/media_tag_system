@@ -515,7 +515,13 @@ void gallery_view_scroll_to_selected()
 
 void gallery_view_context_menu()
 {
-	if ( !ImGui::BeginPopupContextVoid( "gallery ctx menu" ) )
+	static bool ctx_open = false;
+	if ( !ctx_open  && !ImGui::IsMouseClicked( ImGuiMouseButton_Right ) )
+		return;
+
+	ctx_open = true;
+
+	if ( !ImGui::BeginPopup( "##gallery ctx menu" ) )
 		return;
 
 	ImGuiStyle& style        = ImGui::GetStyle();
@@ -524,6 +530,7 @@ void gallery_view_context_menu()
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
 	{
 		sys_browse_to_file( gallery_item_get_path_string( g_gallery_index ).c_str() );
+		ctx_open = false;
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -574,6 +581,7 @@ void gallery_view_context_menu()
 	if ( ImGui::MenuItem( "Reload Folder", nullptr, false ) )
 	{
 		folder_load_media_list();
+		ctx_open = false;
 	}
 
 	ImGui::Separator();
@@ -661,33 +669,33 @@ void gallery_view_draw_content()
 	// ImGui::SetNextWindowSize( { region_avail.x + style.WindowPadding.x, region_avail.y + style.ItemSpacing.y } );
 	ImGui::SetNextWindowSize( { region_avail.x + style.WindowPadding.x, region_avail.y + style.WindowPadding.y } );
 
+	// ImVec4 bg_color = style.Colors[ ImGuiCol_ChildBg ];
+	// bg_color.x      = 0.f;
+	// bg_color.y      = 0.f;
+	// bg_color.z      = 0.f;
+	// bg_color.w      = 0.f;
+
+	ImGui::PushStyleColor( ImGuiCol_ChildBg, g_clear_color );
+
 	// if ( !ImGui::BeginChild( "##gallery_content", { region_avail.x + style.WindowPadding.x, region_avail.y }, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollWithMouse ) )
-	if ( !ImGui::BeginChild( "##gallery_content", {}, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollWithMouse ) )
+	if ( !ImGui::BeginChild( "##gallery_content", {}, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus ) )
 	{
 		ImGui::EndChild();
+		ImGui::PopStyleColor();
 		return;
 	}
 
 	bool   content_area_hovered = false;
 
-	if ( true )
 	{
-		// FindHoveredWindowEx(const ImVec2& pos, bool find_first_and_in_any_viewport, ImGuiWindow** out_hovered_window, ImGuiWindow** out_hovered_window_under_moving_window)
-
 		ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
-		content_area_hovered     = ImGui::IsMouseHoveringRect( cursor_screen_pos, { region_avail.x + style.WindowPadding.x, region_avail.y + style.WindowPadding.y } );
+		content_area_hovered     = ImGui::IsMouseHoveringRect(
+			cursor_screen_pos,
+			{ cursor_screen_pos.x + region_avail.x + style.WindowPadding.x,
+			region_avail.y + style.WindowPadding.y } );
 
 		if ( content_area_hovered && ImGui::IsPopupOpen( "", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel ) )
 		{
-			//ImGuiWindow* hovered_window                     = nullptr;
-			//ImGuiWindow* hovered_window_under_moving_window = nullptr;
-			//
-			//ImGuiWindow* current_window                     = ImGui::GetCurrentWindow();
-
-			// ImGui::FindHoveredWindowEx( mouse_pos, true, &hovered_window, &hovered_window_under_moving_window );
-
-			// ImGuiWindow* popup = ImGui::GetTopMostPopupModal();
-			// ImGuiWindow* popup = ImGui::FindBlockingModal( NULL );
 			bool          hovered_popup = false;
 
 			ImGuiContext& g = *GImGui;
@@ -1034,7 +1042,8 @@ void gallery_view_draw_content()
 			if ( g_window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 			{
 				sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
-				printf( "Copied to Clipboard (SHOW IN IMGUI)\n" );
+				printf( "Copied to Clipboard\n" );
+				push_notification( "Copied" );
 			}
 		}
 
@@ -1067,6 +1076,8 @@ void gallery_view_draw_content()
 
 	g_scroll_to_selected        = false;
 	g_gallery_item_size_changed = false;
+
+	ImGui::PopStyleColor();
 }
 
 
@@ -1181,6 +1192,8 @@ void gallery_view_draw_sidebar()
 				{
 				}
 
+				ImGui::PushItemWidth( -1 );
+
 				if ( ImGui::BeginListBox( "##Bookmarks" ) )
 				{
 					// TODO: format like this?
@@ -1208,6 +1221,7 @@ void gallery_view_draw_sidebar()
 				}
 
 				ImGui::EndListBox();
+				ImGui::PopItemWidth();
 			}
 			else
 			{
@@ -1245,6 +1259,7 @@ void gallery_view_draw_sidebar()
 	//ImGui::PopStyleVar();
 }
 
+extern void notification_draw( float frame_time );
 
 void gallery_view_draw()
 {
@@ -1262,7 +1277,7 @@ void gallery_view_draw()
 	ImGui::SetNextWindowPos( { 0, 0 } );
 	ImGui::SetNextWindowSize( { (float)window_width, (float)window_height } );
 
-	if ( !ImGui::Begin( "##gallery_main", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar ) )
+	if ( !ImGui::Begin( "##gallery_main", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar ) )
 	{
 		ImGui::End();
 		return;
@@ -1283,8 +1298,8 @@ void gallery_view_draw()
 
 	thumbnail_cache_debug_draw();
 
-	ImGui::End();
-
 	gallery_view_context_menu();
+
+	ImGui::End();
 }
 

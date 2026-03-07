@@ -186,6 +186,10 @@ struct main_image_data_t
 
 extern bool                          g_running;
 extern bool                          g_window_focused;
+extern ImVec4                        g_clear_color;
+
+extern double                        g_total_time;
+extern float                         g_frame_time;
 
 // imgui scroll hack lol
 extern bool                          g_mouse_scrolled_up;
@@ -245,6 +249,8 @@ void                                 gallery_view_toggle();
 
 void                                 update_window_title();
 void                                 folder_load_media_list();
+
+void                                 push_notification( const char* msg );
 
 bool                                 icon_preload();
 void                                 icon_free();

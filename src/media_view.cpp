@@ -439,6 +439,7 @@ void media_view_context_menu()
 	if ( ImGui::MenuItem( "Copy File", nullptr, false ) )
 	{
 		sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
+		push_notification( "Copied" );
 	}
 
 	if ( ImGui::MenuItem( "Copy File Data", nullptr, false, false ) )
@@ -574,7 +575,8 @@ void media_view_input()
 	if ( g_window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 	{
 		sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
-		printf( "Copied to Clipboard (SHOW IN IMGUI)\n" );
+		printf( "Copied to Clipboard\n" );
+		push_notification( "Copied" );
 	}
 
 	media_view_context_menu();
