@@ -106,10 +106,6 @@ void gallery_view_draw_header()
 
 	// ImGui::Selectable( "Sidebar", &g_gallery_sidebar_draw );
 	ImGui::SameLine();
-
-	ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-
-	ImGui::SameLine();
 	ImGui::Spacing();
 	ImGui::SameLine();
 
@@ -1248,6 +1244,7 @@ void gallery_view_draw_sidebar()
 
 		if ( ImGui::BeginTabItem( "Settings" ) )
 		{
+			ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
 			ImGui::EndTabItem();
 		}
 	}
