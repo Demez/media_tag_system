@@ -495,10 +495,12 @@ int main( int argc, char* argv[] )
 				if ( fs_is_dir( arg ) )
 				{
 					g_folder_queued = arg;
+					g_gallery_view  = true;
 				}
 				else
 				{
 					on_new_file( arg );
+					g_gallery_view = false;
 				}
 
 				break;
@@ -506,13 +508,13 @@ int main( int argc, char* argv[] )
 		}
 	}
 
-	if ( !g_folder_queued.empty() )
-	{
-		g_folder = g_folder_queued;
-
-		folder_load_media_list();
-		g_folder_queued.clear();
-	}
+//	if ( !g_folder_queued.empty() )
+//	{
+//		g_folder = g_folder_queued;
+//
+//		folder_load_media_list();
+//		g_folder_queued.clear();
+//	}
 
 	bool run_after_first_loop_hack = true;
 
@@ -675,7 +677,10 @@ int main( int argc, char* argv[] )
 		if ( run_after_first_loop_hack )
 		{
 			icon_preload();
-			media_view_load();
+
+			if ( !g_gallery_view )
+				media_view_load();
+
 			run_after_first_loop_hack = false;
 		}
 
