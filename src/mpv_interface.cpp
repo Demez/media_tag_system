@@ -197,7 +197,7 @@ void mpv_draw_frame()
 		return;
 
 	// called so mpv doesn't get flooded with too many events, and becomes unresponsive
-	mpv_event* video_event = p_mpv_wait_event( g_mpv, 0.01f );
+	mpv_handle_wait_event( g_mpv, 0.01f );
 
 	int width, height;
 	SDL_GetWindowSize( g_main_window, &width, &height );
@@ -437,6 +437,10 @@ bool start_mpv()
 		return false;
 	}
 
+	// p_mpv_request_log_messages( g_mpv, "debug" );
+	//p_mpv_request_log_messages( g_mpv, "warn" );
+	p_mpv_request_log_messages( g_mpv, "info" );
+
 	// create render context
 	mpv_opengl_init_params gl_init = {
 		.get_proc_address = mpv_get_proc,  // e.g. SDL_GL_GetProcAddress
@@ -479,6 +483,9 @@ bool start_mpv()
 	p_mpv_set_property_string( g_mpv, "keep-open", "always" );
 	p_mpv_set_property_string( g_mpv, "loop", "inf" );
 
+	// let mpv finish startup
+	mpv_handle_wait_event( g_mpv, 0.1 );
+
 	return true;
 }
 
@@ -497,6 +504,68 @@ void mpv_window_resize()
 char* mpv_get_current_video()
 {
 	return g_current_video;
+}
+
+
+void mpv_handle_wait_event( mpv_handle* mpv, double timeout, const char* prefix )
+{
+	if ( !mpv )
+		return;
+
+	mpv_event* event = p_mpv_wait_event( mpv, timeout );
+
+	if ( !event )
+		return;
+
+	while ( event->event_id != MPV_EVENT_NONE )
+	{
+		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
+		{
+			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
+
+			if ( prefix )
+			{
+				printf( "%s: [%s] %s: %s", prefix, msg->prefix, msg->level, msg->text );
+			}
+			else
+			{
+				printf( "MPV: [%s] %s: %s", msg->prefix, msg->level, msg->text );
+			}
+		}
+
+		event = p_mpv_wait_event( mpv, timeout );
+	}
+}
+
+
+void mpv_handle_wait_event_2( mpv_handle* mpv, double timeout, const char* prefix )
+{
+	if ( !mpv )
+		return;
+
+	mpv_event* event = p_mpv_wait_event( mpv, timeout );
+
+	if ( !event )
+		return;
+
+	while ( event->event_id != MPV_EVENT_NONE )
+	{
+		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
+		{
+			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
+
+			if ( prefix )
+			{
+				printf( "%s: [%s] %s: %s", prefix, msg->prefix, msg->level, msg->text );
+			}
+			else
+			{
+				printf( "MPV: [%s] %s: %s", msg->prefix, msg->level, msg->text );
+			}
+		}
+
+		event = p_mpv_wait_event( mpv, timeout );
+	}
 }
 
 
@@ -541,7 +610,8 @@ void mpv_cmd_loadfile( const char* file )
 	const char* cmd[]   = { "loadfile", file, NULL };
 	int         cmd_ret = p_mpv_command( g_mpv, cmd );
 
-	mpv_event*  event   = p_mpv_wait_event( g_mpv, 0.1f );
+	// mpv_event*  event   = p_mpv_wait_event( g_mpv, 0.1f );
+	mpv_handle_wait_event( g_mpv, 0.1f );
 
 	if ( g_current_video != nullptr )
 		free( g_current_video );
@@ -553,6 +623,16 @@ void mpv_cmd_loadfile( const char* file )
 //	p_mpv_get_property( g_mpv, "height", MPV_FORMAT_INT64, &g_video_height );
 //
 //	p_mpv_get_property( g_mpv, "height", MPV_FORMAT_INT64, &g_video_height );
+}
+
+
+void mpv_cmd_close_video()
+{
+	if ( !g_mpv )
+		return;
+
+	const char* cmd[]   = { "stop", NULL };
+	int         cmd_ret = p_mpv_command_async( g_mpv, NULL, cmd );
 }
 
 

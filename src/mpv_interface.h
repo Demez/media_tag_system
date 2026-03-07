@@ -21,6 +21,8 @@ void                       mpv_window_resize();
 char*                      mpv_get_current_video();
 
 void                       mpv_cmd_loadfile( const char* file );
+void                       mpv_cmd_close_video();
+
 void                       mpv_cmd_toggle_playback();
 void                       mpv_cmd_seek_offset( double seconds );
 
@@ -28,6 +30,7 @@ void                       mpv_cmd_hook_window( void* window );
 void                       mpv_cmd_hook_window_mpv();
 
 void                       mpv_handle_error();
+void                       mpv_handle_wait_event( mpv_handle* mpv, double timeout, const char* prefix = nullptr );
 
 extern mpv_handle*         g_mpv;
 extern mpv_render_context* g_mpv_gl;

@@ -153,6 +153,8 @@ enum e_gallery_sort_mode
 	e_gallery_sort_mode_size_large_to_small,
 	e_gallery_sort_mode_size_small_to_large,
 
+	// TODO: add resolution size, large to small
+
 	e_gallery_sort_mode_count,
 };
 
@@ -290,6 +292,7 @@ struct thumbnail_t
 	char*                             path;      // mainly for debugging
 	image_t*                          image;
 	GLuint                            texture;
+	e_media_type                      type;
 	ImTextureRef                      im_texture;
 };
 
@@ -298,7 +301,7 @@ bool          thumbnail_loader_init();
 void          thumbnail_loader_shutdown();
 void          thumbnail_loader_update();
 
-h_thumbnail   thumbnail_queue_image( const fs::path& path );
+h_thumbnail   thumbnail_queue_image( const fs::path& path, e_media_type type );
 thumbnail_t*  thumbnail_get_data( h_thumbnail handle );
 // void          thumbnail_free( const fs::path& path, h_thumbnail handle );
 

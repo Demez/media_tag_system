@@ -7,17 +7,18 @@
 #include <queue>
 #include <unordered_map>
 
-constexpr int         JOB_QUEUE_SIZE    = 64;
-constexpr int         THUMBNAIL_THREADS = 8;
-constexpr int         MAX_THUMBNAILS    = 256;
+constexpr int       JOB_QUEUE_SIZE    = 64;
+constexpr int       THUMBNAIL_THREADS = 8;
+constexpr int       MAX_THUMBNAILS    = 256;
 
-std::atomic< bool >   g_thumbnails_running;
-std::thread*          g_thumbnail_worker[ THUMBNAIL_THREADS ];
-std::mutex            g_thumbnail_mutex;
+std::atomic< bool > g_thumbnails_running;
+std::thread*        g_thumbnail_worker[ THUMBNAIL_THREADS ];
+std::mutex          g_thumbnail_mutex;
 
-extern int            g_gallery_image_size;
+extern int          g_gallery_image_size;
+extern void*        g_mpv_module;
 
-constexpr bool        THUMBNAIL_DEBUG_PRINT = false;
+constexpr bool      THUMBNAIL_DEBUG_PRINT = false;
 
 enum e_job_state
 {
@@ -103,7 +104,7 @@ void thumbnail_loader_free_data( u32 index )
 }
 
 
-h_thumbnail thumbnail_loader_queue_push( const char* path )
+h_thumbnail thumbnail_loader_queue_push( const char* path, e_media_type type )
 {
 	if ( !path )
 		return {};
@@ -201,6 +202,7 @@ h_thumbnail thumbnail_loader_queue_push( const char* path )
 
 	g_thumbnail_cache.buffer[ cache_pos ].status   = e_thumbnail_status_queued;
 	g_thumbnail_cache.buffer[ cache_pos ].path     = strdup( path );
+	g_thumbnail_cache.buffer[ cache_pos ].type     = type;
 	g_thumbnail_cache.used_this_frame[ cache_pos ] = true;
 
 	// update the write position in the queue, use release to wait for all reads to finish before updating this
@@ -235,6 +237,53 @@ thumbnail_job_t* thumbnail_loader_queue_pop( u32& job_id )
 
 void thumbnail_loader_worker( u32 thread_id )
 {
+	// MPV Init
+	mpv_handle* local_mpv = nullptr;
+
+	if ( g_mpv_module )
+	{
+		local_mpv = p_mpv_create();
+
+		if ( local_mpv == nullptr )
+		{
+			printf( "mpv_create failed on thread %d!\n", thread_id );
+		}
+		else
+		{
+			// Disable Video - So no window pops up when playing back a video
+			p_mpv_set_option_string( local_mpv, "vo", "null" );
+			
+			// Disable Audio
+			p_mpv_set_option_string( local_mpv, "ao", "null" );
+
+			if ( p_mpv_initialize( local_mpv ) < 0 )
+			{
+				printf( "mpv_initialize failed!\n" );
+				p_mpv_destroy( local_mpv );
+				local_mpv = nullptr;
+			}
+			else
+			{
+				// p_mpv_request_log_messages( local_mpv, "debug" );
+				p_mpv_request_log_messages( local_mpv, "warn" );
+			}
+		}
+	}
+
+	char* app_path = sys_get_exe_folder();
+
+	char video_thumbnail_path[ 512 ];
+	snprintf( video_thumbnail_path, 512, "%s/video_thumbnail_thread_%d.png", app_path, thread_id );
+
+	free( app_path );
+
+	char mpv_thread_name[ 64 ];
+	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );
+
+	// let mpv startup
+	mpv_handle_wait_event( local_mpv, 0.1, mpv_thread_name );
+
+	// Enter Loop
 	while ( g_thumbnails_running.load( std::memory_order_acquire ) )
 	{
 		u32              job_id = 0;
@@ -254,21 +303,197 @@ void thumbnail_loader_worker( u32 thread_id )
 		thumbnail_printf( "[THUMBNAIL %d][JOB %d][THREAD %d] STARTING LOAD OF IMAGE: %s\n", job->thumbnail.index, job_id, thread_id, job->path );
 
 		thumbnail->status.store( e_thumbnail_status_loading, std::memory_order_release );
-		thumbnail->image   = ch_calloc< image_t >( 1 );
 
 		image_load_info_t load_info{};
-		load_info.image          = thumbnail->image;
-		load_info.load_quick     = true;
-		load_info.threaded_load  = true;
-		load_info.thumbnail_load = true;
-		load_info.target_size.x  = g_gallery_image_size;
-		load_info.target_size.y  = g_gallery_image_size;
 
-		if ( !image_load( job->path, load_info ) )
+		if ( thumbnail->type == e_media_type_video )
 		{
-			printf( "FAILED TO LOAD IMAGE: %s\n", job->path );
-			thumbnail->status = e_thumbnail_status_failed;
-			continue;
+			// Use the local mpv instance to capture a frame from the video
+			if ( !local_mpv )
+			{
+				thumbnail->status = e_thumbnail_status_failed;
+				continue;
+			}
+
+			bool        failed       = false;
+
+			// mpv_handle_wait_event( local_mpv, 0.1, mpv_thread_name );
+
+			const char* cmd[]        = { "loadfile", job->path, NULL };
+			int         cmd_ret      = p_mpv_command_async( local_mpv, NULL, cmd );
+
+			mpv_event*  event        = p_mpv_wait_event( local_mpv, -1 );
+
+			while ( event->event_id != MPV_EVENT_NONE )
+			{
+				if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
+				{
+					struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
+					printf( "%s: [%s] %s: %s", mpv_thread_name, msg->prefix, msg->level, msg->text );
+				}
+				else if ( event->event_id == MPV_EVENT_COMMAND_REPLY )
+				{
+					if ( event->error != 0 )
+					{
+						printf( "failed to load video for thumbnail - %d\n", event->error );
+						failed = true;
+						break;
+					}
+				}
+				// this stage is loaded enough for seek to happen, a little quicker that playback restart
+				else if ( event->event_id == MPV_EVENT_FILE_LOADED )
+				{
+					break;
+				}
+				else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
+				{
+					//break;
+				}
+
+				event = p_mpv_wait_event( local_mpv, -1 );
+			}
+
+			if ( failed )
+			{
+				thumbnail->status = e_thumbnail_status_failed;
+				continue;
+			}
+
+			s64         percent_pos  = 30;
+			//cmd_ret                  = p_mpv_set_property( local_mpv, "percent-pos", MPV_FORMAT_INT64, &percent_pos );
+			cmd_ret                  = p_mpv_set_property_async( local_mpv, NULL, "percent-pos", MPV_FORMAT_INT64, &percent_pos );
+
+			event                    = p_mpv_wait_event( local_mpv, -1 );
+			
+			while ( event->event_id != MPV_EVENT_NONE )
+			{
+				if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
+				{
+					struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
+					printf( "%s: [%s] %s: %s", mpv_thread_name, msg->prefix, msg->level, msg->text );
+				}
+				else if ( event->event_id == MPV_EVENT_SET_PROPERTY_REPLY )
+				{
+					if ( event->error != 0 )
+					{
+						printf( "failed to seek into video for thumbnail - %d\n", event->error );
+						failed = true;
+						break;
+					}
+				}
+				// wait for the seek to finish
+				else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
+				{
+					if ( event->error != 0 )
+					{
+						printf( "failed to seek into video for thumbnail - %d\n", event->error );
+						failed = true;
+						break;
+					}
+	
+					break;
+				}
+			
+				event = p_mpv_wait_event( local_mpv, -1 );
+			}
+
+			if ( failed )
+			{
+				// Clear Video from MPV
+				const char* cmd_clear[] = { "stop", NULL };
+				cmd_ret                 = p_mpv_command_async( local_mpv, NULL, cmd_clear );
+
+				thumbnail->status       = e_thumbnail_status_failed;
+				continue;
+			}
+
+			// TODO: USE screenshot-raw
+			const char* cmd3[]       = { "screenshot-to-file", video_thumbnail_path, NULL };
+			cmd_ret                  = p_mpv_command_async( local_mpv, NULL, cmd3 );
+
+			event         = p_mpv_wait_event( local_mpv, -1 );
+
+			while ( event->event_id != MPV_EVENT_NONE )
+			{
+				if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
+				{
+					struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
+
+					if ( msg->log_level == MPV_LOG_LEVEL_ERROR )
+					{
+						printf( "ERROR: %s: [%s] %s: %s - %d", mpv_thread_name, msg->prefix, msg->level, msg->text, event->error );
+					}
+					else
+					{
+						printf( "%s: [%s] %s: %s", mpv_thread_name, msg->prefix, msg->level, msg->text );
+					}
+				}
+				else if ( event->event_id == MPV_EVENT_COMMAND_REPLY )
+				{
+					if ( event->error != 0 )
+					{
+						printf( "failed to write screenshot for thumbnail - %d\n", event->error );
+						failed = true;
+						break;
+					}
+
+					break;
+				}
+
+				event = p_mpv_wait_event( local_mpv, -1 );
+			}
+
+			if ( failed )
+			{
+				// Clear Video from MPV
+				const char* cmd_clear[] = { "stop", NULL };
+				cmd_ret                 = p_mpv_command_async( local_mpv, NULL, cmd_clear );
+
+				thumbnail->status       = e_thumbnail_status_failed;
+				continue;
+			}
+
+			// Clear Video from MPV
+			const char* cmd_clear[]  = { "stop", NULL };
+			cmd_ret                  = p_mpv_command_async( local_mpv, NULL, cmd_clear );
+
+			// Load Image Normally
+			thumbnail->image         = ch_calloc< image_t >( 1 );
+
+			load_info.image          = thumbnail->image;
+			load_info.load_quick     = true;
+			load_info.threaded_load  = true;
+			load_info.thumbnail_load = true;
+			load_info.target_size.x  = g_gallery_image_size;
+			load_info.target_size.y  = g_gallery_image_size;
+
+			if ( !image_load( video_thumbnail_path, load_info ) )
+			{
+				printf( "FAILED TO LOAD IMAGE: %s\n", video_thumbnail_path );
+				thumbnail->status = e_thumbnail_status_failed;
+				continue;
+			}
+			
+			// TODO: Delete Image? it might just slow this down a bit, since it always just gets overwritten later
+		}
+		else
+		{
+			// Load Image Normally
+			thumbnail->image   = ch_calloc< image_t >( 1 );
+
+			load_info.image          = thumbnail->image;
+			load_info.load_quick     = true;
+			load_info.threaded_load  = true;
+			load_info.thumbnail_load = true;
+			load_info.target_size.x  = g_gallery_image_size;
+			load_info.target_size.y  = g_gallery_image_size;
+
+			if ( !image_load( job->path, load_info ) )
+			{
+				printf( "FAILED TO LOAD IMAGE: %s\n", job->path );
+				thumbnail->status = e_thumbnail_status_failed;
+				continue;
+			}
 		}
 
 		if ( thumbnail->image->frame.empty() || !thumbnail->image->frame[ 0 ] )
@@ -413,9 +638,9 @@ void thumbnail_loader_update()
 }
 
 
-h_thumbnail thumbnail_queue_image( const fs::path& path )
+h_thumbnail thumbnail_queue_image( const fs::path& path, e_media_type type )
 {
-	return thumbnail_loader_queue_push( path.string().c_str() );
+	return thumbnail_loader_queue_push( path.string().c_str(), type );
 }
 
 

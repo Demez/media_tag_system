@@ -629,7 +629,7 @@ void media_view_load()
 		{
 			// g_image_view.image = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
 			image_load( entry.path, image_load_info );
-			mpv_cmd_loadfile( "" );
+			mpv_cmd_close_video();
 		}
 		else
 		{
@@ -678,7 +678,7 @@ void media_view_advance( bool prev )
 		return;
 
 	if ( get_media_type() == e_media_type_video )
-		mpv_cmd_loadfile( "" );
+		mpv_cmd_close_video();
 	//else
 	//	g_image_data_free = g_image_data;
 

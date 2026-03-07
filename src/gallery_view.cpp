@@ -636,8 +636,9 @@ void gallery_view_draw_content()
 
 	struct delayed_load_t
 	{
-		fs::path path;
-		size_t   index;
+		fs::path     path;
+		size_t       index;
+		e_media_type type;
 	};
 
 	static std::vector< delayed_load_t > thumbnail_requests;
@@ -814,10 +815,10 @@ void gallery_view_draw_content()
 				gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), image_bounds, false );
 			}
 			// videos don't have thumbnail generation yet
-			else if ( media.type == e_media_type_video )
-			{
-				gallery_view_draw_image( icon_get_image( e_icon_video ), icon_get_imtexture( e_icon_video ), image_bounds, false );
-			}
+			// else if ( media.type == e_media_type_video )
+			// {
+			// 	gallery_view_draw_image( icon_get_image( e_icon_video ), icon_get_imtexture( e_icon_video ), image_bounds, false );
+			// }
 			else
 			{
 				thumbnail_t* thumbnail = thumbnail_get_data( g_folder_thumbnail_list[ gallery_item.file_index ] );
@@ -839,7 +840,7 @@ void gallery_view_draw_content()
 					else if ( thumbnail->status == e_thumbnail_status_free )
 					{
 						if ( media.type != e_media_type_directory )
-							thumbnail_requests.emplace_back( media.path, gallery_item.file_index );
+							thumbnail_requests.emplace_back( media.path, gallery_item.file_index, media.type );
 
 						ImGui::Dummy( image_bounds );
 					}
@@ -851,7 +852,7 @@ void gallery_view_draw_content()
 				else
 				{
 					if ( !thumbnail && media.type != e_media_type_directory )
-						thumbnail_requests.emplace_back( media.path, gallery_item.file_index );
+						thumbnail_requests.emplace_back( media.path, gallery_item.file_index, media.type );
 					// g_folder_thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 					ImGui::Dummy( image_bounds );
@@ -923,7 +924,7 @@ void gallery_view_draw_content()
 	// printf( "IMAGE COUNT: %d\n", image_visible_count );
 
 	for ( size_t i = 0; i < thumbnail_requests.size(); i++ )
-		g_folder_thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_queue_image( thumbnail_requests[ i ].path );
+		g_folder_thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_queue_image( thumbnail_requests[ i ].path, thumbnail_requests[ i ].type );
 
 	g_scroll_to_selected        = false;
 	g_gallery_item_size_changed = false;
