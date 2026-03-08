@@ -449,9 +449,15 @@ FILE_LIST = {
             "name": "nativefiledialog",
             "func": compile_nativefiledialog,
         },
+        # {
+        #     "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20251017/mpv-dev-x86_64-v3-20251017-git-233e896.7z",
+        #     "file": "mpv-dev-x86_64-v3-20251017-git-233e896.7z",
+        #     "name": "mpv",
+        #     "user_extract": True,
+        # },
         {
-            "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20251017/mpv-dev-x86_64-v3-20251017-git-233e896.7z",
-            "file": "mpv-dev-x86_64-v3-20251017-git-233e896.7z",
+            "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
+            "file": "mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
             "name": "mpv",
             "user_extract": True,
         },
