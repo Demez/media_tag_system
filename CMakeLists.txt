@@ -8,9 +8,9 @@ set( CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo" )
 set( CMAKE_POSITION_INDEPENDENT_CODE ON )
 set( CMAKE_SHARED_LIBRARY_PREFIX "" )
 
-option( FREETYPE "Use Freetype in ImGui" ON )
+option( MIMALLOC "Use mimalloc" OFF )
 
-project( media_tag_system )
+project( media_tag_system_proj )
 
 set( PROJ_OBJ "obj" )
 set( PROJ_OUT "${CMAKE_CURRENT_LIST_DIR}/out" )
@@ -29,7 +29,7 @@ endforeach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
 set_property( GLOBAL PROPERTY PREFIX "" )
 set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 
-set( CMAKE_CXX_STANDARD 20 )
+set( CMAKE_CXX_STANDARD 23 )
 
 # Compiler/Platform specifc options
 if ( MSVC )
@@ -62,6 +62,8 @@ if ( MSVC )
 		"/GF"               # string pooling: allows compiler to create a single copy of identical strings in the program image and in memory during execution
 		
 		# disable stupid warnings
+		"/wd4100"  # 'X' unreferenced formal paramter
+
 	#	"/wd4244"  # conversion from 'X' to 'Y', possible loss of data
 	#	"/wd4267"  # conversion from 'X' to 'Y', possible loss of data (yes there's 2 idk why)
 	#	"/wd4305"  # truncation from 'double' to 'float'
@@ -69,7 +71,6 @@ if ( MSVC )
 	#	"/wd4668"  # 'X' is not defined as a preprocessor macro, replacing '0' for '#if/#elif' (floods with win32 stuff)
 	#	"/wd4514"  # 'X' unreferenced inline function has been removed
 	#	"/wd4505"  # 'X' unreferenced function with internal linkage has been removed
-	#	"/wd4100"  # 'X' unreferenced formal paramter
 	#	"/wd4201"  # nonstandard extension used: nameless struct/union (used in glm)
 	#	"/wd5045"  # Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified
     #
@@ -145,6 +146,10 @@ if ( MSVC )
 	message( "Copying FreeImage" )
 	configure_file( "thirdparty/FreeImageRe/bin/FreeImage.dll" "${PROJ_OUT}/FreeImage.dll" COPYONLY )
 	configure_file( "thirdparty/FreeImageRe/bin/heif.dll" "${PROJ_OUT}/heif.dll" COPYONLY )
+
+	#message( "Copying mimalloc" )
+	#configure_file( "thirdparty/mimalloc/out/msvc-x64/Release/mimalloc-redirect.dll" "${PROJ_OUT}/mimalloc-redirect.dll" COPYONLY )
+	#configure_file( "thirdparty/mimalloc/out/msvc-x64/Release/mimalloc.dll" "${PROJ_OUT}/mimalloc.dll" COPYONLY )
 	
 else()  # linux
 	link_libraries( GL )
@@ -196,18 +201,14 @@ set(
 
 set( FREETYPE_DIR "thirdparty/freetype" )
 
-if ( FREETYPE )
-	set(
-		FREETYPE_IMGUI_SRC
-		src/imgui/imgui_freetype.cpp
-		src/imgui/imgui_freetype.h
-	)
+set(
+	FREETYPE_IMGUI_SRC
+	src/imgui/imgui_freetype.cpp
+	src/imgui/imgui_freetype.h
+)
 
-	include_directories( "${FREETYPE_DIR}/include" )
-	add_compile_definitions( IMGUI_ENABLE_FREETYPE=1 )
-else()
-	set( FREETYPE_IMGUI_SRC )
-endif()
+include_directories( "${FREETYPE_DIR}/include" )
+add_compile_definitions( IMGUI_ENABLE_FREETYPE=1 )
 
 file(
 	GLOB_RECURSE THIRDPARTY_FILES CONFIGURE_DEPENDS
@@ -230,6 +231,13 @@ include_directories(
 	"thirdparty/stb"
 )
 
+if ( MIMALLOC )
+	add_compile_definitions( USE_MIMALLOC=1 )
+	include_directories( "thirdparty/mimalloc/include" )
+else()
+	add_compile_definitions( USE_MIMALLOC=0 )
+endif()
+
 add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
 
 target_link_libraries(
@@ -241,6 +249,11 @@ target_link_libraries(
 	spng
 	FreeImage
 )
+
+if ( MIMALLOC )
+	target_link_libraries( media_tag_system PRIVATE mimalloc )
+	target_link_directories( media_tag_system PRIVATE "thirdparty/mimalloc/out/msvc-x64/Release" )
+endif()
 
 target_link_directories(
 	media_tag_system PRIVATE

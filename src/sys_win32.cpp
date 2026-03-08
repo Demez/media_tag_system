@@ -15,6 +15,7 @@
 #include <shlobj_core.h> 
 #include <time.h>
 #include <atlbase.h>
+#include <psapi.h>
 
 #include <profileapi.h>
 #include <stdint.h>
@@ -108,6 +109,8 @@ wchar_t* sys_to_wchar( const char* spStr )
 
 	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst, sSize );
 
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( wchar_t ) );
+
 	return spDst;
 }
 
@@ -118,6 +121,8 @@ wchar_t* sys_to_wchar( const char* spStr, int sSize )
 	memset( spDst, 0, ( sSize + 1 ) * sizeof( wchar_t ) );
 
 	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst, sSize );
+
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( wchar_t ) );
 
 	return spDst;
 }
@@ -133,6 +138,8 @@ wchar_t* sys_to_wchar_extended( const char* spStr )
 
 	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst + 4, sSize );
 
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 5 ) * sizeof( wchar_t ) );
+	
 	return spDst;
 }
 
@@ -144,6 +151,8 @@ wchar_t* sys_to_wchar_extended( const char* spStr, int sSize )
 	wcscat( spDst, L"\\\\?\\" );
 
 	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst + 4, sSize );
+
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 5 ) * sizeof( wchar_t ) );
 
 	return spDst;
 }
@@ -198,6 +207,8 @@ char* sys_to_utf8( const wchar_t* spStr )
 
 	int ret = WideCharToMultiByte( CP_UTF8, 0, spStr, -1, spDst, sSize, NULL, NULL );
 
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( char ) );
+
 	return spDst;
 }
 
@@ -208,6 +219,8 @@ char* sys_to_utf8( const wchar_t* spStr, int sSize )
 	memset( spDst, 0, ( sSize + 1 ) * sizeof( char ) );
 
 	WideCharToMultiByte( CP_UTF8, 0, spStr, -1, spDst, sSize, NULL, NULL );
+
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( char ) );
 
 	return spDst;
 }
@@ -283,7 +296,7 @@ bool sys_recycle_file( const char* path )
 
 	int rc = SHFileOperation( &s );
 
-	free( path_w );
+	ch_free( e_mem_category_string, path_w );
 
 	if ( rc != 0 )
 	{
@@ -397,7 +410,7 @@ bool sys_get_file_times( const char* path, u64* creation, u64* access, u64* writ
 		return false;
 	}
 
-	free( path_w );
+	ch_free( e_mem_category_string, path_w );
 
 	if ( creation )
 		*creation = file_time_to_unix( file_create );
@@ -465,7 +478,7 @@ bool sys_set_file_times( const char* path, u64* creation, u64* access, u64* writ
 		return false;
 	}
 
-	free( path_w );
+	ch_free( e_mem_category_string, path_w );
 
 	return true;
 }
@@ -506,7 +519,7 @@ bool sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_c
 
 	BOOL                fSuccess  = CreateProcessW( NULL, command_w, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi );
 
-	free( command_w );
+	ch_free( e_mem_category_string, command_w );
 
 	if ( !fSuccess )
 	{
@@ -584,7 +597,7 @@ bool sys_execute_read( const char* command, str_buf_t& output )
 
 	BOOL                fSuccess  = CreateProcessW( NULL, command_w, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi );
 
-	free( command_w );
+	ch_free( e_mem_category_string, command_w );
 
 	if ( !fSuccess )
 	{
@@ -642,7 +655,7 @@ int sys_execute( const char* command )
 
 	BOOL                success   = CreateProcessW( NULL, command_w, NULL, NULL, TRUE, BELOW_NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi );
 
-	free( command_w );
+	ch_free( e_mem_category_string, command_w );
 
 	if ( !success )
 	{
@@ -673,7 +686,7 @@ void sys_browse_to_file( const char* path )
 		ILFree( pidl );
 	}
 
-	free( path_w );
+	ch_free( e_mem_category_string, path_w );
 }
 
 
@@ -686,7 +699,7 @@ void sys_open_file_properties( const char* file )
 		wprintf( L"Failed to open File Properties for file: %s\n", path_w );
 	}
 
-	free( path_w );
+	ch_free( e_mem_category_string, path_w );
 }
 
 
@@ -736,7 +749,7 @@ bool sys_copy_to_clipboard( const char* path )
 	ret = true;
 
 end:
-	free( path_w );
+	ch_free( e_mem_category_string, path_w );
 	return ret;
 }
 
@@ -801,6 +814,49 @@ std::vector< fs::path > sys_get_drives()
 
 static LARGE_INTEGER g_win_perf_freq;
 
+
+proc_mem_info_t sys_get_mem_info()
+{
+	proc_mem_info_t mem_info{};
+
+	// Get a handle to the current process.
+	HANDLE          hProcess = GetCurrentProcess();
+
+	if ( NULL == hProcess )
+	{
+		printf( "failed to open current process\n" );
+		sys_print_last_error();
+		return mem_info;
+	}
+
+	PROCESS_MEMORY_COUNTERS pmc;
+	// Set the size of the structure
+	pmc.cb = sizeof( pmc );
+
+	// Get the memory usage details
+	if ( GetProcessMemoryInfo( hProcess, &pmc, sizeof( pmc ) ) )
+	{
+		mem_info.working_set = pmc.WorkingSetSize;
+		mem_info.page_file   = pmc.PagefileUsage;
+
+		// WorkingSetSize is the current physical RAM usage (in bytes)
+		//std::cout << "  WorkingSetSize: " << std::dec << pmc.WorkingSetSize / 1024 << " KB" << std::endl;
+		//// PagefileUsage is the current size in the system paging file (in bytes)
+		//std::cout << "  PagefileUsage:  " << std::dec << pmc.PagefileUsage / 1024 << " KB" << std::endl;
+	}
+	else
+	{
+		printf( "failed to get memory usage\n" );
+		sys_print_last_error();
+	}
+
+	// Close the process handle
+	CloseHandle( hProcess );
+
+	return mem_info;
+}
+
+
 int sys_init()
 {
 	QueryPerformanceFrequency( &g_win_perf_freq );
@@ -825,6 +881,11 @@ int sys_init()
 void sys_shutdown()
 {
 	OleUninitialize();
+}
+
+
+void sys_update()
+{
 }
 
 

@@ -1,5 +1,16 @@
 #pragma once
 
+
+#include <unordered_map>
+#include <stacktrace>
+
+#if USE_MIMALLOC
+#include <mimalloc.h>
+#endif
+
+// --------------------------------------------------------------------------------------------------------
+
+
 #include "imgui.h"
 
 #include <cstdio>
@@ -55,6 +66,14 @@ using module_t = void*;
 
 // --------------------------------------------------------------------------------------------------------
 
+#define ARR_SIZE( arr ) ( sizeof( arr ) / sizeof( arr[ 0 ] ) )
+#define MIN( a, b )     ( ( ( a ) < ( b ) ) ? ( a ) : ( b ) )
+#define MAX( a, b )     ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
+
+#define SET_INT2( var, x, y ) \
+	( var )[ 0 ] = x;         \
+	( var )[ 1 ] = y;
+
 
 // struct ivec2
 // {
@@ -85,20 +104,82 @@ struct str_buf_t
 
 
 // --------------------------------------------------------------------------------------------------------
+// Memory Tracking
 
-#define ARR_SIZE( arr ) ( sizeof( arr ) / sizeof( arr[ 0 ] ) )
-#define MIN( a, b )     ( ( ( a ) < ( b ) ) ? ( a ) : ( b ) )
-#define MAX( a, b )     ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
+enum e_mem_category : u8
+{
+	e_mem_category_general,
 
-#define SET_INT2( var, x, y ) \
-	( var )[ 0 ] = x;         \
-	( var )[ 1 ] = y;
+	e_mem_category_image_data,
+	e_mem_category_image,
+	e_mem_category_string,
+	e_mem_category_file_data,
+
+	e_mem_category_imgui,
+	e_mem_category_stbi_resize,
+
+	e_mem_category_count,
+};
+
+
+extern const char* mem_category_str[];
+
+
+struct mem_alloc_info_t
+{
+	void*            ptr;
+	size_t           size;
+	double           app_time;
+	std::stacktrace* stack_trace;
+};
+
+//struct mem_alloc_info_t
+//{
+//	void*            ptr;
+//	size_t           size;
+//	std::stacktrace* stack_trace;
+//};
+
+
+struct mem_category_info_t
+{
+	size_t                                        total;
+	std::unordered_map< void*, mem_alloc_info_t > sizes;
+	//mem_alloc_info_t*                             alloc;
+	//size_t                                        alloc_count;
+};
+
+
+void                 mem_add_item( e_mem_category category, void* memory, size_t bytes );
+void                 mem_free_item( e_mem_category category, void* memory );
+
+void*                imgui_mem_alloc( size_t sz, void* user_data );
+void                 imgui_mem_free( void* ptr, void* user_data );
+
+extern size_t        g_total_memory_allocated;
+
+// extern mem_category_info_t g_mem_categories[ e_mem_category_count ];
+mem_category_info_t* get_mem_categories();
+
+
+
+// --------------------------------------------------------------------------------------------------------
 
 
 template< typename T >
 T CLAMP( T value, T low, T high )
 {
 	return ( value < low ) ? low : ( ( value > high ) ? high : value );
+}
+
+
+inline void ch_free( e_mem_category category, void* memory )
+{
+	if ( memory == nullptr )
+		return;
+
+	mem_free_item( category, memory );
+	free( memory );
 }
 
 
@@ -121,26 +202,45 @@ T* ch_malloc( size_t count )
 
 
 template< typename T >
-T* ch_calloc( size_t count )
+T* ch_calloc( size_t count, e_mem_category category )
 {
-	return (T*)calloc( count, sizeof( T ) );
+	T* ptr = (T*)calloc( count, sizeof( T ) );
+
+	if ( ptr )
+		mem_add_item( category, ptr, count * sizeof( T ) );
+
+	return ptr;
 }
 
 
 template< typename T >
-T* ch_realloc( T* data, size_t count )
+T* ch_realloc( T* data, size_t count, e_mem_category category )
 {
-	return (T*)realloc( data, count * sizeof( T ) );
+	T* ptr = (T*)realloc( data, count * sizeof( T ) );
+
+	if ( ptr )
+	{
+		if ( data )
+			mem_free_item( category, data );
+
+		mem_add_item( category, ptr, count * sizeof( T ) );
+	}
+
+	return ptr;
 }
 
 
 template< typename T >
-T* ch_recalloc( T* data, size_t count, size_t add_count )
+T* ch_recalloc( T* data, size_t count, size_t add_count, e_mem_category category )
 {
 	T* new_data = (T*)realloc( data, (count + add_count) * sizeof( T ) );
 
 	if ( new_data )
+	{
+		mem_free_item( category, data );
+		mem_add_item( category, new_data, ( count + add_count ) * sizeof( T ) );
 		memset( &new_data[ count ], 0, add_count * sizeof( T ) );
+	}
 
 	return new_data;
 }
@@ -168,10 +268,10 @@ void util_array_remove_element( T* data, COUNT_TYPE& count, COUNT_TYPE index )
 
 
 template< typename T >
-bool util_array_append( T*& data, size_t count )
+bool util_array_append( e_mem_category category, T*& data, size_t count )
 {
 #if 1
-	T* new_data = ch_recalloc< T >( data, count, 1 );
+	T* new_data = ch_recalloc< T >( data, count, 1, category );
 
 	if ( !new_data )
 		return true;
@@ -192,10 +292,10 @@ bool util_array_append( T*& data, size_t count )
 
 
 template< typename T >
-bool util_array_append_err( T*& data, u32 count, const char* msg )
+bool util_array_append_err( e_mem_category category, T*& data, u32 count, const char* msg )
 {
 #if 1
-	T* new_data = ch_recalloc< T >( data, count, 1 );
+	T* new_data = ch_recalloc< T >( data, count, 1, category );
 
 	if ( !new_data )
 	{
@@ -220,17 +320,17 @@ bool util_array_append_err( T*& data, u32 count, const char* msg )
 
 // Allocates X amount more space in the array
 template< typename T >
-bool util_array_extend( T*& data, size_t count, size_t extend_amount )
+bool util_array_extend( e_mem_category category, T*& data, size_t count, size_t extend_amount )
 {
 #if 1
-	T* new_data = ch_recalloc< T >( data, count, extend_amount );
+	T* new_data = ch_recalloc< T >( data, count, extend_amount, category );
 
 	if ( !new_data )
 		return true;
 
 	data = new_data;
 #else
-	T* new_data = ch_realloc< T >( data, count + extend_amount );
+	T* new_data = ch_realloc< T >( data, count + extend_amount, category );
 
 	if ( !new_data )
 		return true;
@@ -246,6 +346,21 @@ bool util_array_extend( T*& data, size_t count, size_t extend_amount )
 // system functions
 
 
+struct sys_font_data_t
+{
+	char* font_path;
+	float weight;
+	float height;
+};
+
+
+struct proc_mem_info_t
+{
+	size_t working_set;
+	size_t page_file;
+};
+
+
 // library loading
 module_t       sys_load_library( const wchar_t* path );
 void           sys_close_library( module_t mod );
@@ -256,6 +371,7 @@ void           sys_print_last_error();
 
 int            sys_init();
 void           sys_shutdown();
+void           sys_update();
 
 // also known as "sys_to_utf16"
 wchar_t*       sys_to_wchar( const char* spStr, int sSize );
@@ -310,12 +426,7 @@ int  sys_execute( const char* command );
 // NOTE: path cannot be over MAX_PATH (260 characters), thanks windows shell
 void sys_browse_to_file( const char* path );
 
-struct sys_font_data_t
-{
-	char* font_path;
-	float weight;
-	float height;
-};
+proc_mem_info_t sys_get_mem_info();
 
 // get the default font to use for imgui
 sys_font_data_t sys_get_font();

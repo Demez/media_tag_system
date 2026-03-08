@@ -113,9 +113,9 @@ struct LoaderPNG: public IImageLoader
 		}
 
 		// one frame
-		// load_info.image->frame      = ch_realloc( load_info.image->frame, 1 );
+		// load_info.image->frame      = ch_realloc( load_info.image->frame, 1, e_mem_category_image_data  );
 		load_info.image->frame.resize( 1 );
-		load_info.image->frame[ 0 ] = ch_realloc( load_info.image->frame[ 0 ], size );
+		load_info.image->frame[ 0 ] = ch_realloc( load_info.image->frame[ 0 ], size, e_mem_category_image_data );
 
 		err                         = spng_decode_image( ctx, load_info.image->frame[ 0 ], size, pngFmt, decode_flags );
 		if ( err != 0 )

@@ -7,7 +7,7 @@
 #include <queue>
 #include <unordered_map>
 
-constexpr int       JOB_QUEUE_SIZE    = 64;
+constexpr int       JOB_QUEUE_SIZE    = 64;  // if this is too high, it can cause noticable hitches when uploading thumbnails
 constexpr int       THUMBNAIL_THREADS = 8;
 constexpr int       MAX_THUMBNAILS    = 256;
 
@@ -30,7 +30,6 @@ enum e_job_state
 
 struct thumbnail_job_t
 {
-	char*       path;
 	h_thumbnail thumbnail;
 	e_job_state state;
 };
@@ -45,33 +44,17 @@ struct thumbnail_queue_t
 };
 
 
-// ring buffer for thumbnails
+// buffer for thumbnails
 struct thumbnail_cache_t
 {
 	thumbnail_t buffer[ MAX_THUMBNAILS ];
-	// u32         index[ MAX_THUMBNAILS ];      // index in buffer array
 	u32         generation[ MAX_THUMBNAILS ];
 	bool        used_this_frame[ MAX_THUMBNAILS ];
-	// u32         write_pos;
 };
 
 
-// list of thumbnails to try to load
-struct thumbnail_list_value_t
-{
-	u32 distance;         // determines when the thumbnail is loaded distances get loaded first for other thumbnails
-	u32 thumbnail_index;  // index into thumbnail_cache_t::buffer
-};
-
-
-// std::vector< thumbnail_list_entry_t > g_thumbnail_list;
-// value is distance, lower values determine whent he thumbnail is loaded
-std::unordered_map< fs::path, thumbnail_list_value_t > g_thumbnail_list;
-thumbnail_queue_t                   g_thumbnail_queue;
-thumbnail_cache_t                   g_thumbnail_cache;
-
-// handle_list_32< h_thumbnail, thumbnail_t, MAX_THUMBNAILS > g_thumbnail_cache;
-// u32                                                        g_thumbnail_cache_index = 0;
+thumbnail_queue_t g_thumbnail_queue;
+thumbnail_cache_t g_thumbnail_cache;
 
 
 // debug printing
@@ -91,14 +74,15 @@ void thumbnail_loader_free_data( u32 index )
 {
 	thumbnail_t& thumbnail = g_thumbnail_cache.buffer[ index ];
 
-	thumbnail_printf( "FREED %d - %s\n", index, thumbnail.path );
+	if ( thumbnail.texture )
+	{
+		thumbnail_printf( "FREED %d - %s\n", index, thumbnail.path );
+		gl_free_texture( thumbnail.texture );
+		thumbnail.im_texture = nullptr;
+	}
 
-	thumbnail.im_texture = nullptr;
-
-	gl_free_texture( thumbnail.texture );
-
-	free( thumbnail.image );
-	free( thumbnail.path );
+	ch_free( e_mem_category_image, thumbnail.image );
+	ch_free( e_mem_category_string, thumbnail.path );
 
 	memset( &thumbnail, 0, sizeof( thumbnail_t ) );
 }
@@ -182,26 +166,19 @@ h_thumbnail thumbnail_loader_queue_push( const char* path, e_media_type type )
 		return {};
 	}
 
-	if ( g_thumbnail_cache.buffer[ cache_pos ].texture )
-	{
-		thumbnail_loader_free_data( cache_pos );
-	}
-
-	thumbnail_printf( "THUMBNAIL %d USED\n", cache_pos );
+	thumbnail_loader_free_data( cache_pos );
+	printf( "THUMBNAIL %d USED\n", cache_pos );
+	printf( "ADDED JOB %d\n", current_pos );
 
 	h_thumbnail handle;
 	handle.index         = cache_pos;
 	handle.generation    = ++g_thumbnail_cache.generation[ cache_pos ];
 
-	if ( job.path )
-		free( job.path );
-
-	job.path                                       = strdup( path );
 	job.thumbnail                                  = handle;
 	job.state                                      = e_job_state_working;
 
 	g_thumbnail_cache.buffer[ cache_pos ].status   = e_thumbnail_status_queued;
-	g_thumbnail_cache.buffer[ cache_pos ].path     = strdup( path );
+	g_thumbnail_cache.buffer[ cache_pos ].path     = util_strdup( path );
 	g_thumbnail_cache.buffer[ cache_pos ].type     = type;
 	g_thumbnail_cache.used_this_frame[ cache_pos ] = true;
 
@@ -275,7 +252,7 @@ void thumbnail_loader_worker( u32 thread_id )
 	char video_thumbnail_path[ 512 ];
 	snprintf( video_thumbnail_path, 512, "%s/video_thumbnail_thread_%d.png", app_path, thread_id );
 
-	free( app_path );
+	ch_free( e_mem_category_string, app_path );
 
 	char mpv_thread_name[ 64 ];
 	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );
@@ -300,7 +277,7 @@ void thumbnail_loader_worker( u32 thread_id )
 		if ( !thumbnail )
 			continue;
 
-		thumbnail_printf( "[THUMBNAIL %d][JOB %d][THREAD %d] STARTING LOAD OF IMAGE: %s\n", job->thumbnail.index, job_id, thread_id, job->path );
+		thumbnail_printf( "[THUMBNAIL %d][JOB %d][THREAD %d] STARTING LOAD OF IMAGE: %s\n", job->thumbnail.index, job_id, thread_id, thumbnail->path );
 
 		thumbnail->status.store( e_thumbnail_status_loading, std::memory_order_release );
 
@@ -319,7 +296,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			// mpv_handle_wait_event( local_mpv, 0.1, mpv_thread_name );
 
-			const char* cmd[]        = { "loadfile", job->path, NULL };
+			const char* cmd[]        = { "loadfile", thumbnail->path, NULL };
 			int         cmd_ret      = p_mpv_command_async( local_mpv, NULL, cmd );
 
 			mpv_event*  event        = p_mpv_wait_event( local_mpv, -1 );
@@ -458,7 +435,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			cmd_ret                  = p_mpv_command_async( local_mpv, NULL, cmd_clear );
 
 			// Load Image Normally
-			thumbnail->image         = ch_calloc< image_t >( 1 );
+			thumbnail->image         = ch_calloc< image_t >( 1, e_mem_category_image );
 
 			load_info.image          = thumbnail->image;
 			load_info.load_quick     = true;
@@ -479,7 +456,7 @@ void thumbnail_loader_worker( u32 thread_id )
 		else
 		{
 			// Load Image Normally
-			thumbnail->image   = ch_calloc< image_t >( 1 );
+			thumbnail->image         = ch_calloc< image_t >( 1, e_mem_category_image );
 
 			load_info.image          = thumbnail->image;
 			load_info.load_quick     = true;
@@ -488,9 +465,9 @@ void thumbnail_loader_worker( u32 thread_id )
 			load_info.target_size.x  = g_gallery_image_size;
 			load_info.target_size.y  = g_gallery_image_size;
 
-			if ( !image_load( job->path, load_info ) )
+			if ( !image_load( thumbnail->path, load_info ) )
 			{
-				printf( "FAILED TO LOAD IMAGE: %s\n", job->path );
+				printf( "FAILED TO LOAD IMAGE: %s\n", thumbnail->path );
 				thumbnail->status = e_thumbnail_status_failed;
 				continue;
 			}
@@ -503,7 +480,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			continue;
 		}
 
-		thumbnail_printf( "[THUMBNAIL %d] LOADED IMAGE: %s\n", job->thumbnail.index, job->path );
+		thumbnail_printf( "[THUMBNAIL %d] LOADED IMAGE: %s\n", job->thumbnail.index, thumbnail->path );
 		
 		float min_size = std::min( thumbnail->image->width, thumbnail->image->height );
 
@@ -523,9 +500,11 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			u8*   old_frame        = thumbnail->image->frame[ 0 ];
 
-			image_downscale( thumbnail->image, thumbnail->image, new_width, new_height );
-
-			free( old_frame );
+			if ( image_downscale( thumbnail->image, thumbnail->image, new_width, new_height ) )
+			{
+				thumbnail->scaled = true;
+				ch_free( e_mem_category_image_data, old_frame );
+			}
 		}
 
 		job->state = e_job_state_free;
@@ -542,13 +521,6 @@ bool thumbnail_loader_init()
 {
 	g_thumbnail_queue.write_pos = 0;
 	g_thumbnail_queue.read_pos  = 0;
-
-	// load fail image
-//	FAILED_IMAGE                = ch_calloc< image_t >( 1 );
-//	if ( !g_test_codec->image_load_scaled( FAILED_IMAGE_PATH, FAILED_IMAGE, 512, 512 ) )
-//	{
-//		return false;
-//	}
 
 	g_thumbnails_running.store( true );
 
@@ -620,7 +592,11 @@ void thumbnail_loader_update()
 		thumbnail.im_texture = thumbnail.texture;
 
 		{
-			free( thumbnail.image->frame[ 0 ] );
+			if ( thumbnail.scaled )
+				ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ 0 ] );
+			else
+				ch_free( e_mem_category_image_data, thumbnail.image->frame[ 0 ] );
+
 			thumbnail.image->frame[ 0 ] = nullptr;
 			thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
 		}

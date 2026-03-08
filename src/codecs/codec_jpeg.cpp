@@ -62,7 +62,7 @@ struct CodecJPEG: public IImageLoader
 		int ret = tjDecompressHeader3(
 		  local_tjpg,
 		  (const unsigned char*)data,
-		  data_len,
+		  (unsigned long)data_len,
 		  &image->width,
 		  &image->height,
 		  &subSamp,
@@ -125,10 +125,10 @@ struct CodecJPEG: public IImageLoader
 			best_height = image->height;
 
 		// one frame
-		// image->frame      = ch_realloc( image->frame, 1 );
+		// image->frame      = ch_realloc( image->frame, 1, e_mem_category_image_data );
 		image->frame.resize( 1 );
-		// image->frame[ 0 ] = ch_realloc( image->frame[ 0 ], best_width * best_height * tjPixelSize[ pixelFmt ] );
-		image->frame[ 0 ] = ch_calloc< u8 >( best_width * best_height * tjPixelSize[ pixelFmt ] );
+		// image->frame[ 0 ] = ch_realloc( image->frame[ 0 ], best_width * best_height * tjPixelSize[ pixelFmt ], e_mem_category_image_data );
+		image->frame[ 0 ] = ch_calloc< u8 >( best_width * best_height * tjPixelSize[ pixelFmt ], e_mem_category_image_data );
 
 		if ( !image->frame[ 0 ] )
 		{
@@ -143,7 +143,7 @@ struct CodecJPEG: public IImageLoader
 		ret       = tjDecompress2(
           local_tjpg,
           (const unsigned char*)data,
-          data_len,
+          (unsigned long)data_len,
           (unsigned char*)image->frame[ 0 ],
           0,
           pitch,
@@ -157,7 +157,7 @@ struct CodecJPEG: public IImageLoader
 			fprintf( stderr, "CODEC_JPEG: Failed to decompress image: %s\n%s\n", tjGetErrorStr2( local_tjpg ), path.string().c_str() );
 			if ( load_info.threaded_load )
 				tjDestroy( local_tjpg );
-			free( image->frame[ 0 ] );
+			ch_free( e_mem_category_image_data, image->frame[ 0 ] );
 			return false;
 		}
 
@@ -167,7 +167,7 @@ struct CodecJPEG: public IImageLoader
 		if ( !image->frame[ 0 ] )
 		{
 			printf( "CODEC_JPEG: Decompress returned a nullptr?\n" );
-			free( image->frame[ 0 ] );
+			ch_free( e_mem_category_image_data, image->frame[ 0 ] );
 			return false;
 		}
 

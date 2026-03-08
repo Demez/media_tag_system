@@ -1,5 +1,15 @@
 #include "main.h"
 
+void* malloc_stbi( size_t size )
+{
+	void* mem = malloc( size );
+	mem_add_item( e_mem_category_stbi_resize, mem, size );
+	return mem;
+}
+
+#define STBIR_MALLOC( size, user_data ) ( (void)( user_data ), malloc_stbi( size ) )
+#define STBIR_FREE( ptr, user_data )    ( (void)( user_data ), ch_free( e_mem_category_stbi_resize, ptr ) )
+
 #define STB_IMAGE_RESIZE2_IMPLEMENTATION
 #include "stb_image_resize2.h"
 
@@ -111,7 +121,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info )
 
 	if ( !load_info.image )
 	{
-		load_info.image = ch_calloc< image_t >( 1 );
+		load_info.image = ch_calloc< image_t >( 1, e_mem_category_image );
 
 		if ( !load_info.image )
 		{
@@ -145,11 +155,11 @@ bool image_load( const fs::path& path, image_load_info_t& load_info )
 			break;
 	}
 
-	free( file_data );
+	ch_free( e_mem_category_file_data, file_data );
 
 	if ( !loaded_image && allocated_image )
 	{
-		free( load_info.image );
+		ch_free( e_mem_category_image, load_info.image );
 		load_info.image = nullptr;
 	}
 
@@ -227,6 +237,8 @@ bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int
 	new_image->pitch      = new_width * 4;
 	// new_image->format     = GL_RGBA;
 
+	// mem_add_item( e_mem_category_image_data, resized_frame, );
+
 	return true;
 }
 
@@ -264,7 +276,7 @@ bool icon_preload()
 {
 	char*    exe_dir  = sys_get_exe_folder();
 	fs::path exe_path = exe_dir;
-	free( exe_dir );
+	ch_free( e_mem_category_string, exe_dir );
 
 	for ( u8 i = 0; i < e_icon_count; i++ )
 	{
@@ -285,7 +297,7 @@ bool icon_preload()
 			continue;
 		}
 
-		free( g_icon_image[ i ].frame[ 0 ] );
+		ch_free( e_mem_category_image_data, g_icon_image[ i ].frame[ 0 ] );
 		g_icon_image[ i ].frame.clear();
 
 		printf( "Loaded icon %s\n", g_icon_names[ i ] );

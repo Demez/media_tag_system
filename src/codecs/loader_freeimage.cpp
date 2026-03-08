@@ -41,7 +41,7 @@ struct LoaderFreeImage : public IImageLoader
 	bool image_load( const fs::path& path, image_load_info_t& load_info, char* data, size_t data_len ) override
 	{
 		// attach the binary data to a memory stream
-		FIMEMORY* memory = FreeImage_OpenMemory( (u8*)data, data_len );
+		FIMEMORY* memory = FreeImage_OpenMemory( (u8*)data, (u32)data_len );
 
 		if ( memory == nullptr )
 		{
@@ -160,7 +160,7 @@ struct LoaderFreeImage : public IImageLoader
 
 			case FIC_PALETTE:
 			{
-				u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
+				//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
 				FIRGBA8*  palette     = FreeImage_GetPalette( bitmap );
 
 				FIBOOL    trans       = FreeImage_IsTransparent( bitmap );
@@ -248,7 +248,7 @@ struct LoaderFreeImage : public IImageLoader
 		size_t image_size           = (size_t)load_info.image->pitch * (size_t)load_info.image->height;
 		// size_t image_size           = load_info.image->width * load_info.image->height * load_info.image->bytes_per_pixel;
 
-		load_info.image->frame[ 0 ] = ch_realloc< u8 >( load_info.image->frame[ 0 ], image_size );
+		load_info.image->frame[ 0 ] = ch_realloc< u8 >( load_info.image->frame[ 0 ], image_size, e_mem_category_image_data );
 		memset( load_info.image->frame[ 0 ], 0, image_size * sizeof( u8 ) );
 
 		memcpy( load_info.image->frame[ 0 ], image_bits, image_size );

@@ -1,8 +1,9 @@
 #pragma once
 
+#include "util.h"
+
 #include "mpv_interface.h"
 #include "args.h"
-#include "util.h"
 #include "handles.h"
 
 #include "imgui.h"
@@ -300,6 +301,7 @@ struct thumbnail_t
 	GLuint                            texture;
 	e_media_type                      type;
 	ImTextureRef                      im_texture;
+	bool                              scaled;
 };
 
 
@@ -321,22 +323,6 @@ void          thumbnail_update_distance( h_thumbnail handle, u32 distance );
 // void          thumbnail_update_region( ImVec2 scroll_area_size, float scroll_amount );
 
 void          thumbnail_cache_debug_draw();
-
-
-// ---------------------------------------------------------
-// Memory Tracking
-
-
-enum e_memory_category
-{
-	e_memory_category_general,
-	e_memory_category_imgui,
-	e_memory_category_image,
-};
-
-
-void*         imgui_mem_alloc( size_t sz, void* user_data );
-void          imgui_mem_free( void* ptr, void* user_data );
 
 
 // ---------------------------------------------------------

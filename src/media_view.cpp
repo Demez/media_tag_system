@@ -60,7 +60,7 @@ void media_view_filter_image()
 	g_scale_lock.lock();
 
 	if ( g_image_scaled.frame.size() )
-		free( g_image_scaled.frame[ 0 ] );
+		ch_free( e_mem_category_stbi_resize, g_image_scaled.frame[ 0 ] );
 
 	g_image_scaled = g_scale_src;
 
@@ -121,7 +121,7 @@ void media_view_scale_check_timer( float frame_time )
 		g_scale_lock.lock();
 
 		if ( g_scale_src.frame.size() )
-			free( g_scale_src.frame[ 0 ] );
+			ch_free( e_mem_category_image_data, g_scale_src.frame[ 0 ] );
 
 		g_scale_src = g_image;
 
@@ -129,7 +129,7 @@ void media_view_scale_check_timer( float frame_time )
 		g_scale_src.frame.resize( g_image.frame.size() );
 
 		size_t image_size      = (size_t)g_image.width * (size_t)g_image.height * (size_t)g_image.bytes_per_pixel;
-		g_scale_src.frame[ 0 ] = ch_calloc< u8 >( image_size );
+		g_scale_src.frame[ 0 ] = ch_calloc< u8 >( image_size, e_mem_category_image_data );
 		memcpy( g_scale_src.frame[ 0 ], g_image.frame[ 0 ], image_size * sizeof( u8 ) );
 
 		g_image_scaled_index = g_gallery_index;

@@ -90,7 +90,7 @@ char* util_strdup_r( char* data, const char* string )
 	if ( len == 0 )
 		return nullptr;
 
-	char* new_data = ch_realloc( data, len + 1 );
+	char* new_data = ch_realloc( data, len + 1, e_mem_category_string );
 
 	if ( !new_data )
 		return nullptr;
@@ -109,7 +109,7 @@ char* util_strndup_r( char* data, const char* string, size_t len )
 	if ( len == 0 )
 		return nullptr;
 
-	char* new_data = ch_realloc( data, len + 1 );
+	char* new_data = ch_realloc( data, len + 1, e_mem_category_string );
 
 	if ( !new_data )
 		return nullptr;
@@ -150,7 +150,7 @@ void util_append_str( str_buf_t& buffer, const char* str, size_t len, size_t buf
 	if ( ( len + buffer.size ) > buffer.capacity )
 	{
 		size_t increase = MAX( len, buffer_size );
-		char*  new_data = ch_realloc( buffer.data, buffer.capacity + increase );
+		char*  new_data = ch_realloc( buffer.data, buffer.capacity + increase, e_mem_category_string );
 
 		if ( !new_data )
 		{
@@ -213,7 +213,7 @@ char* fs_replace_path_seps_unix( const char* path )
 		return nullptr;
 
 	size_t path_len = strlen( path );
-	char*  out      = ch_calloc< char >( path_len + 1 );
+	char*  out      = ch_calloc< char >( path_len + 1, e_mem_category_general );
 
 	if ( !out )
 		return nullptr;
@@ -272,7 +272,7 @@ char* fs_get_filename_no_ext( const char* path, size_t path_len )
 		return name;
 
 	char* output = util_strndup( name, dot - name );
-	free( name );
+	ch_free( e_mem_category_string, name );
 	return output;
 }
 
@@ -380,6 +380,8 @@ char* fs_read_file( const char* path, size_t* len )
 	{
 		return nullptr;
 	}
+
+	mem_add_item( e_mem_category_file_data, output, ( size + 1 ) * sizeof( char ) );
 
 	memset( output, 0, ( size + 1 ) * sizeof( char ) );
 	fread( output, size, 1, fp );

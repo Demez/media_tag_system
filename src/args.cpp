@@ -88,7 +88,7 @@ void args_print_help()
 
 arg_t* args_add_registered_arg()
 {
-	arg_t* new_data = ch_realloc( g_registered_args, g_registered_args_count + 1 );
+	arg_t* new_data = ch_realloc( g_registered_args, g_registered_args_count + 1, e_mem_category_general );
 
 	if ( !new_data )
 		return nullptr;
@@ -107,8 +107,6 @@ const char* args_register_str( const char* default_val, const char* desc, const 
 	arg->type            = e_arg_type_string;
 	arg->default_val_str = default_val;
 	arg->val_str         = default_val;
-
-	size_t switch_len = strlen( cmd_switch );
 
 	for ( int i = 0; i < g_argc; i++ )
 	{
@@ -133,8 +131,6 @@ bool args_register_bool( const char* desc, const char* cmd_switch )
 	arg->cmd_switch   = cmd_switch;
 	arg->type         = e_arg_type_bool;
 	arg->val_bool     = false;
-
-	size_t switch_len = strlen( cmd_switch );
 
 	for ( int i = 0; i < g_argc; i++ )
 	{

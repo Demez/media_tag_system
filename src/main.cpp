@@ -505,7 +505,8 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 	// Symbols/Emoji's
 	if ( load_symbols )
 	{
-		font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor | ImGuiFreeTypeLoaderFlags_Bitmap;
+		// font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor | ImGuiFreeTypeLoaderFlags_Bitmap;
+		font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
 
 		// Segoe UI Symbol
 		dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguisym.ttf", font_data.height, &font_cfg );
@@ -521,6 +522,8 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 
 int main( int argc, char* argv[] )
 {
+	// printf( "Using mimalloc version %d\n", mi_version() );
+
 	args_init( argc, argv );
 	sys_init();
 
@@ -582,7 +585,7 @@ int main( int argc, char* argv[] )
 
 		{
 			ImFontConfig font_cfg{};
-			load_default_font( font_data, g_default_font, font_cfg, true );
+			load_default_font( font_data, g_default_font, font_cfg, false );
 		}
 
 		{
@@ -591,14 +594,14 @@ int main( int argc, char* argv[] )
 			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bold;
 			load_default_font( font_data, g_default_font_bold, font_cfg, false );
 		}
-
+	
 		{
 			ImFontConfig font_cfg{};
 			snprintf( font_cfg.Name, 40, "Default - Oblique" );
 			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Oblique;
 			load_default_font( font_data, g_default_font_italic, font_cfg, false );
 		}
-	
+
 		ImGui_ImplOpenGL3_CreateDeviceObjects();
 
 		//free( exe_path );
@@ -684,6 +687,8 @@ int main( int argc, char* argv[] )
 
 	while ( g_running )
 	{
+		sys_update();
+
 		// Update Frame Time
 		{
 			current_time         = std::chrono::high_resolution_clock::now();

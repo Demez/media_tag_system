@@ -73,19 +73,19 @@ struct handle_list_32
 
 	bool allocate()
 	{
-		if ( util_array_extend( generation, capacity, STEP_SIZE ) )
+		if ( util_array_extend( e_mem_category_general, generation, capacity, STEP_SIZE ) )
 		{
 			::free( generation );
 			return false;
 		}
 
-		if ( util_array_extend( data, capacity, STEP_SIZE ) )
+		if ( util_array_extend( e_mem_category_general, data, capacity, STEP_SIZE ) )
 		{
 			::free( data );
 			return false;
 		}
 
-		if ( util_array_extend( use_list, capacity, STEP_SIZE ) )
+		if ( util_array_extend( e_mem_category_general, use_list, capacity, STEP_SIZE ) )
 		{
 			::free( use_list );
 			return false;
@@ -178,8 +178,8 @@ struct handle_list_simple_32
   private:
 	bool allocate()
 	{
-		u32*  new_generation = util_array_extend( generation, capacity, STEP_SIZE );
-		bool* new_use        = util_array_extend( use_list, capacity, STEP_SIZE );
+		u32*  new_generation = util_array_extend( e_mem_category_general, generation, capacity, STEP_SIZE );
+		bool* new_use        = util_array_extend( e_mem_category_general, use_list, capacity, STEP_SIZE );
 
 		if ( !new_generation || !new_use )
 		{
