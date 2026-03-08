@@ -163,13 +163,13 @@ set(
     src/main.cpp
     src/main.h
     src/thumbnail_loader.cpp
-    src/gallery_view.cpp
-    src/media_view.cpp
     src/mpv_interface.cpp
     src/mpv_interface.h
-    src/render.cpp
     src/image_loader.cpp
     src/memory.cpp
+
+    src/view_gallery.cpp
+    src/view_media.cpp
 	
     src/util.cpp
     src/util.h
