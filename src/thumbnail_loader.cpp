@@ -9,7 +9,7 @@
 
 constexpr int       JOB_QUEUE_SIZE    = 64;  // if this is too high, it can cause noticable hitches when uploading thumbnails
 constexpr int       THUMBNAIL_THREADS = 8;
-constexpr int       MAX_THUMBNAILS    = 256;
+constexpr int       MAX_THUMBNAILS    = 512;
 
 std::atomic< bool > g_thumbnails_running;
 std::thread*        g_thumbnail_worker[ THUMBNAIL_THREADS ];
@@ -167,8 +167,8 @@ h_thumbnail thumbnail_loader_queue_push( const char* path, e_media_type type )
 	}
 
 	thumbnail_loader_free_data( cache_pos );
-	printf( "THUMBNAIL %d USED\n", cache_pos );
-	printf( "ADDED JOB %d\n", current_pos );
+	//printf( "THUMBNAIL %d USED\n", cache_pos );
+	//printf( "ADDED JOB %d\n", current_pos );
 
 	h_thumbnail handle;
 	handle.index         = cache_pos;
@@ -227,11 +227,41 @@ void thumbnail_loader_worker( u32 thread_id )
 		}
 		else
 		{
+			int ret = 0;
+
 			// Disable Video - So no window pops up when playing back a video
 			p_mpv_set_option_string( local_mpv, "vo", "null" );
 			
 			// Disable Audio
-			p_mpv_set_option_string( local_mpv, "ao", "null" );
+			ret = p_mpv_set_option_string( local_mpv, "ao", "null" );
+
+			// Low Latency Mode
+			ret     = p_mpv_set_option_string( local_mpv, "profile", "low-latency" );
+
+			ret     = p_mpv_set_option_string( local_mpv, "demuxer-max-bytes", "6M" );
+			// ret     = p_mpv_set_option_string( local_mpv, "demuxer-max-bytes", "0" );
+			ret     = p_mpv_set_option_string( local_mpv, "demuxer-max-back-bytes", "0" );
+			ret     = p_mpv_set_option_string( local_mpv, "demuxer-donate-buffer", "no" );
+
+			// hopefully helps? since it's just for a single screenshot
+			ret     = p_mpv_set_option_string( local_mpv, "demuxer-thread", "no" );
+
+			ret     = p_mpv_set_option_string( local_mpv, "video-reversal-buffer", "0" );
+			ret     = p_mpv_set_option_string( local_mpv, "audio-reversal-buffer", "0" );
+			ret     = p_mpv_set_option_string( local_mpv, "cache", "no" );
+			ret     = p_mpv_set_option_string( local_mpv, "cache-secs", "0" );
+
+			ret     = p_mpv_set_option_string( local_mpv, "aid", "no" );
+			ret     = p_mpv_set_option_string( local_mpv, "sid", "no" );
+
+			// Only allow 1 frame used
+			ret     = p_mpv_set_option_string( local_mpv, "frames", "1" );
+
+			// Start Paused
+			ret     = p_mpv_set_option_string( local_mpv, "pause", "" );
+
+			// Always start at 30% of the way in the video
+			ret     = p_mpv_set_option_string( local_mpv, "start", "30%" );
 
 			if ( p_mpv_initialize( local_mpv ) < 0 )
 			{
@@ -242,7 +272,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			else
 			{
 				// p_mpv_request_log_messages( local_mpv, "debug" );
-				p_mpv_request_log_messages( local_mpv, "warn" );
+				// p_mpv_request_log_messages( local_mpv, "warn" );
 			}
 		}
 	}
@@ -317,14 +347,9 @@ void thumbnail_loader_worker( u32 thread_id )
 						break;
 					}
 				}
-				// this stage is loaded enough for seek to happen, a little quicker that playback restart
-				else if ( event->event_id == MPV_EVENT_FILE_LOADED )
-				{
-					break;
-				}
 				else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
 				{
-					//break;
+					break;
 				}
 
 				event = p_mpv_wait_event( local_mpv, -1 );
@@ -333,54 +358,6 @@ void thumbnail_loader_worker( u32 thread_id )
 			if ( failed )
 			{
 				thumbnail->status = e_thumbnail_status_failed;
-				continue;
-			}
-
-			s64         percent_pos  = 30;
-			//cmd_ret                  = p_mpv_set_property( local_mpv, "percent-pos", MPV_FORMAT_INT64, &percent_pos );
-			cmd_ret                  = p_mpv_set_property_async( local_mpv, NULL, "percent-pos", MPV_FORMAT_INT64, &percent_pos );
-
-			event                    = p_mpv_wait_event( local_mpv, -1 );
-			
-			while ( event->event_id != MPV_EVENT_NONE )
-			{
-				if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
-				{
-					struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
-					printf( "%s: [%s] %s: %s", mpv_thread_name, msg->prefix, msg->level, msg->text );
-				}
-				else if ( event->event_id == MPV_EVENT_SET_PROPERTY_REPLY )
-				{
-					if ( event->error != 0 )
-					{
-						printf( "failed to seek into video for thumbnail - %d\n", event->error );
-						failed = true;
-						break;
-					}
-				}
-				// wait for the seek to finish
-				else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
-				{
-					if ( event->error != 0 )
-					{
-						printf( "failed to seek into video for thumbnail - %d\n", event->error );
-						failed = true;
-						break;
-					}
-	
-					break;
-				}
-			
-				event = p_mpv_wait_event( local_mpv, -1 );
-			}
-
-			if ( failed )
-			{
-				// Clear Video from MPV
-				const char* cmd_clear[] = { "stop", NULL };
-				cmd_ret                 = p_mpv_command_async( local_mpv, NULL, cmd_clear );
-
-				thumbnail->status       = e_thumbnail_status_failed;
 				continue;
 			}
 

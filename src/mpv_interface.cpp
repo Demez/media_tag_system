@@ -96,7 +96,8 @@ FUNC_PTR( mpv_render_context_free );
 
 bool load_mpv_dll()
 {
-	// return false;
+	if ( args_register_bool( "Disable Video Player", "--no-video" ) )
+		return false;
 
 	g_mpv_module = sys_load_library( L"libmpv-2.dll" );
 
@@ -428,8 +429,10 @@ bool start_mpv()
 	}
 
 	// Disable VO
-	p_mpv_set_option_string( g_mpv, "vo", "libmpv" );
+	int ret = p_mpv_set_option_string( g_mpv, "vo", "libmpv" );
 	//p_mpv_set_option_string( g_mpv, "vo", "null" );
+
+	ret     = p_mpv_set_option_string( g_mpv, "demuxer-max-bytes", "10M" );
 
 	if ( p_mpv_initialize( g_mpv ) < 0 )
 	{
