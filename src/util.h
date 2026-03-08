@@ -156,6 +156,8 @@ void                 mem_free_item( e_mem_category category, void* memory );
 void*                imgui_mem_alloc( size_t sz, void* user_data );
 void                 imgui_mem_free( void* ptr, void* user_data );
 
+void                 mem_draw_debug_ui();
+
 extern size_t        g_total_memory_allocated;
 
 // extern mem_category_info_t g_mem_categories[ e_mem_category_count ];

@@ -618,6 +618,10 @@ void thumbnail_loader_update()
 				ch_free( e_mem_category_image_data, thumbnail.image->frame[ 0 ] );
 
 			thumbnail.image->frame[ 0 ] = nullptr;
+			thumbnail.image->frame.clear();
+
+			image_free_alloc( *thumbnail.image );
+
 			thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
 		}
 

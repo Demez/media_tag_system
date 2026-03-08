@@ -10,7 +10,7 @@ struct LoaderPNG: public IImageLoader
 
 	LoaderPNG()
 	{
-		image_register_codec( this );
+		image_register_codec( this, false );
 	}
 
 	~LoaderPNG()
@@ -93,7 +93,8 @@ struct LoaderPNG: public IImageLoader
 
 		// look into RGBA16?
         //spng_format pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGB8;
-        spng_format pngFmt = SPNG_FMT_RGB8;
+        // spng_format pngFmt = SPNG_FMT_RGB8;
+		spng_format pngFmt = SPNG_FMT_RGBA8;
 		int decode_flags{};
 
         if ( ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR_ALPHA || ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE_ALPHA )
@@ -148,6 +149,9 @@ struct LoaderPNG: public IImageLoader
 		// load_info.image->format    = GL_RGBA;
 		load_info.image->bit_depth       = ihdr.bit_depth;
 		load_info.image->pitch           = load_info.image->width * load_info.image->bytes_per_pixel;
+		
+		// the strdup is stupid lol
+		load_info.image->image_format    = util_strdup( "PNG" );
 
         spng_ctx_free( ctx );
 
@@ -156,6 +160,6 @@ struct LoaderPNG: public IImageLoader
 };
 
 
-// static LoaderPNG gPNG;
+static LoaderPNG g_loader_png;
 
 #endif

@@ -14,6 +14,7 @@ void* malloc_stbi( size_t size )
 #include "stb_image_resize2.h"
 
 std::vector< IImageLoader* > g_codecs;
+std::vector< IImageLoader* > g_codecs_backup;
 
 
 // =================================================================
@@ -98,9 +99,14 @@ void gl_free_texture( GLuint texture )
 // Image Loading
 
 
-void image_register_codec( IImageLoader* codec )
+void image_register_codec( IImageLoader* codec, bool fallback )
 {
-	if ( codec )
+	if ( !codec )
+		return;
+
+	if ( fallback )
+		g_codecs_backup.push_back( codec );
+	else
 		g_codecs.push_back( codec );
 }
 
@@ -155,6 +161,22 @@ bool image_load( const fs::path& path, image_load_info_t& load_info )
 			break;
 	}
 
+	// Check Fallback codecs
+	if ( !loaded_image )
+	{
+		for ( IImageLoader* codec : g_codecs_backup )
+		{
+			// if ( !codec->check_extension( ext_str ) )
+			if ( !codec->check_extension( path_str ) )
+				continue;
+
+			loaded_image = codec->image_load( path, load_info, file_data, file_len );
+
+			if ( loaded_image )
+				break;
+		}
+	}
+
 	ch_free( e_mem_category_file_data, file_data );
 
 	if ( !loaded_image && allocated_image )
@@ -167,9 +189,56 @@ bool image_load( const fs::path& path, image_load_info_t& load_info )
 }
 
 
+// Free all image data
+void image_free( image_t& image )
+{
+	image_free_alloc( image );
+	// memset( &image, 0, sizeof( image_t ) );
+	
+	image.width           = 0;
+	image.height          = 0;
+	image.bit_depth       = 0;
+	image.pitch           = 0;
+	image.bytes_per_pixel = 0;
+	image.format          = 0;
+	image.loop_count      = 0;
+}
+
+
+// Free only frames
+void image_free_frames( image_t& image )
+{
+	if ( image.frame.empty() )
+		return;
+
+	for ( u8* frame : image.frame )
+		ch_free( e_mem_category_image_data, frame );
+
+	image.frame.clear();
+}
+
+
+// Free only frames and allocations
+void image_free_alloc( image_t& image )
+{
+	image_free_frames( image );
+
+	if ( image.image_format )
+		ch_free( e_mem_category_string, image.image_format );
+
+	image.image_format = nullptr;
+}
+
+
 bool image_check_extension( std::string_view ext )
 {
 	for ( IImageLoader* codec : g_codecs )
+	{
+		if ( codec->check_extension( ext ) )
+			return true;
+	}
+
+	for ( IImageLoader* codec : g_codecs_backup )
 	{
 		if ( codec->check_extension( ext ) )
 			return true;
@@ -237,8 +306,6 @@ bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int
 	new_image->pitch      = new_width * 4;
 	// new_image->format     = GL_RGBA;
 
-	// mem_add_item( e_mem_category_image_data, resized_frame, );
-
 	return true;
 }
 
@@ -297,8 +364,7 @@ bool icon_preload()
 			continue;
 		}
 
-		ch_free( e_mem_category_image_data, g_icon_image[ i ].frame[ 0 ] );
-		g_icon_image[ i ].frame.clear();
+		image_free_alloc( g_icon_image[ i ] );
 
 		printf( "Loaded icon %s\n", g_icon_names[ i ] );
 	}

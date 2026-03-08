@@ -26,6 +26,7 @@ bool                     g_image_pan               = false;
 // Draw Information
 bool                     g_draw_media_info         = false;
 bool                     g_draw_imgui_demo         = false;
+bool                     g_draw_mem_stats          = false;
 bool                     g_draw_zoom_level         = true;
 
 extern main_image_data_t g_image_data;
@@ -120,13 +121,15 @@ void media_view_scale_check_timer( float frame_time )
 	{
 		g_scale_lock.lock();
 
-		if ( g_scale_src.frame.size() )
-			ch_free( e_mem_category_image_data, g_scale_src.frame[ 0 ] );
+		image_free( g_scale_src );
 
 		g_scale_src = g_image;
 
 		g_scale_src.frame.clear();
 		g_scale_src.frame.resize( g_image.frame.size() );
+
+		// don't hold onto this
+		g_scale_src.image_format = nullptr;
 
 		size_t image_size      = (size_t)g_image.width * (size_t)g_image.height * (size_t)g_image.bytes_per_pixel;
 		g_scale_src.frame[ 0 ] = ch_calloc< u8 >( image_size, e_mem_category_image_data );
@@ -534,6 +537,7 @@ void media_view_context_menu()
 	ImGui::Separator();
 
 	ImGui::MenuItem( "Demo Window", nullptr, &g_draw_imgui_demo, true );
+	ImGui::MenuItem( "Memory Stats", nullptr, &g_draw_mem_stats, true );
 
 	// 	if ( ImGui::MenuItem( "Show ImGui Demo", nullptr, gShowImGuiDemo ) )
 	// 	{
@@ -911,6 +915,15 @@ void media_view_draw_imgui()
 
 	if ( g_draw_imgui_demo )
 		ImGui::ShowDemoWindow();
+
+	if ( g_draw_mem_stats )
+	{
+		if ( ImGui::Begin( "Memory Stats" ) )
+		{
+			mem_draw_debug_ui();
+			ImGui::End();
+		}
+	}
 
 	if ( get_media_type() == e_media_type_video )
 	{

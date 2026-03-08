@@ -20,7 +20,7 @@ struct CodecJPEG: public IImageLoader
 			return;
 		}
 
-		image_register_codec( this );
+		image_register_codec( this, false );
 	}
 
 	~CodecJPEG()
@@ -77,7 +77,7 @@ struct CodecJPEG: public IImageLoader
 			return false;
 		}
 
-		int              pixelFmt = TJPF_RGB;
+		int              pixelFmt = TJPF_RGBX;
 
 		int              scaling_factor_count;
 		tjscalingfactor* scaling_factor = tjGetScalingFactors( &scaling_factor_count );
@@ -175,8 +175,8 @@ struct CodecJPEG: public IImageLoader
 		image->width           = best_width;
 		image->height          = best_height;
 
-		image->format          = GL_RGB;
-		image->bit_depth       = 24;  // uhhhh
+		image->format          = GL_RGBA;
+		image->bit_depth       = 32;  // uhhhh
 		image->pitch           = pitch;
 
 		return true;
@@ -184,5 +184,6 @@ struct CodecJPEG: public IImageLoader
 };
 
 
+// slower than FreeImage for some reason?
 // static CodecJPEG gCodecJPEG;
 

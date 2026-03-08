@@ -93,8 +93,18 @@ struct IImageLoader
 };
 
 
-void image_register_codec( IImageLoader* codec );
+void image_register_codec( IImageLoader* codec, bool fallback );
 bool image_load( const fs::path& path, image_load_info_t& load_info );
+
+// Free all image data
+void image_free( image_t& image );
+
+// Free only frames
+void image_free_frames( image_t& image );
+
+// Free only frames and allocations
+void image_free_alloc( image_t& image );
+
 bool image_check_extension( std::string_view ext );
 bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int new_height );
 
