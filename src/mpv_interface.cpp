@@ -86,11 +86,13 @@ FUNC_PTR( mpv_render_context_free );
 
 
 #define LOAD_FUNC( func )                                            \
-	p_##func = (func##_t)sys_load_func( g_mpv_module, #func );       \
-	if ( p_##func == nullptr )                                       \
-	{                                                                \
-		wprintf( L"sys_load_func failed: %s\n", sys_get_error_w() ); \
-		return false;                                                \
+	p_##func = (func##_t)sys_load_func( g_mpv_module, #func ); \
+	if ( p_##func == nullptr )                                 \
+	{                                                          \
+		char* sys_error = sys_get_error();                     \
+		printf( "sys_load_func failed: %s\n", sys_error );     \
+		ch_free_str( sys_error );                              \
+		return false;                                          \
 	}
 
 
@@ -103,7 +105,9 @@ bool load_mpv_dll()
 
 	if ( g_mpv_module == nullptr )
 	{
-		wprintf( L"sys_load_library failed: %s\n", sys_get_error_w() );
+		char* sys_error = sys_get_error(); 
+		printf( "sys_load_library failed: %s\n", sys_error );
+		ch_free_str( sys_error );
 		return false;
 	}
 

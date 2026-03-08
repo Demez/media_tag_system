@@ -183,6 +183,13 @@ inline void ch_free( e_mem_category category, void* memory )
 }
 
 
+// shortcut function
+inline void ch_free_str( void* memory )
+{
+	ch_free( e_mem_category_string, memory );
+}
+
+
 template< typename T >
 T* ch_malloc( size_t count )
 {
@@ -370,8 +377,6 @@ void        util_append_str( str_buf_t& buffer, const char* str, size_t len, siz
 // kinda lame lol
 void        util_format_time( char* buffer, double time );  // expects at least TIME_BUFFER characters in buffer
 void        util_format_time( char* buffer, size_t buffer_size, double time );
-
-u64         util_get_time_ms();
 
 
 // --------------------------------------------------------------------------------------------------------

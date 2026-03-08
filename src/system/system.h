@@ -1,8 +1,10 @@
+#pragma once
+
 #include "util.h"
 
 
 // --------------------------------------------------------------------------------------------------------
-// system functions
+// System Interface
 
 
 using module_t = void*;
@@ -16,6 +18,7 @@ struct sys_font_data_t
 };
 
 
+// Process Memory Info
 struct proc_mem_info_t
 {
 	size_t working_set;
@@ -25,11 +28,9 @@ struct proc_mem_info_t
 
 using f_exec_callback = void( char* buf, size_t len );
 
-
 // --------------------------------------------------------------------------------------------------------
 
-
-int                     sys_init();
+bool                    sys_init();
 void                    sys_shutdown();
 void                    sys_update();
 
@@ -38,63 +39,33 @@ module_t                sys_load_library( const wchar_t* path );
 void                    sys_close_library( module_t mod );
 void*                   sys_load_func( module_t mod, const char* path );
 
-// system error
-const char*             sys_get_error();
-const wchar_t*          sys_get_error_w();
+// system error, make sure to free this string!
+char*                   sys_get_error();
 void                    sys_print_last_error();
-
-// --------------------------------------------------------------------------------------------------------
-// string conversion functions, for windows primarily
-// also known as "sys_to_utf16"
-wchar_t*                sys_to_wchar( const char* spStr, int sSize );
-wchar_t*                sys_to_wchar( const char* spStr );
-
-// prepends "\\?\" on the string for windows
-// https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
-wchar_t*                sys_to_wchar_extended( const char* spStr, int sSize );
-wchar_t*                sys_to_wchar_extended( const char* spStr );
-
-wchar_t*                sys_to_wchar_short( const char* spStr, int sSize );
-wchar_t*                sys_to_wchar_short( const char* spStr );
-
-char*                   sys_to_utf8( const wchar_t* spStr, int sSize );
-char*                   sys_to_utf8( const wchar_t* spStr );
 
 // --------------------------------------------------------------------------------------------------------
 // Filesystem
 
 // get folder exe is stored in
+// pass in a ref to a size_t to get the length of the folder
+// FREE THIS AFTER USE
 char*                   sys_get_exe_folder( size_t* len = nullptr );
 
 // get the full path of the exe
+// pass in a ref to a size_t to get the length of the path
+// FREE THIS AFTER USE
 char*                   sys_get_exe_path( size_t* len = nullptr );
 
 // get current working directory
 char*                   sys_get_cwd();
 
-// File Times
+// File Times - In Unix Time
 bool                    sys_get_file_times( const char* path, u64* creation, u64* access, u64* write );
 bool                    sys_set_file_times( const char* path, u64* creation, u64* access, u64* write );
-bool                    sys_copy_file_times( const char* src_path, const char* out_path, bool creation, bool access, bool write );
 
 // Get list of drives mounted on this device
 // Windows returns drive letters
 std::vector< fs::path > sys_get_drives();
-
-
-// --------------------------------------------------------------------------------------------------------
-// Terminal
-
-
-// execute a command and read it's output
-bool                    sys_execute_read( const char* command, str_buf_t& output );
-
-// execute a command and read it's output, with a callback function everytime more output is read from the file
-bool                    sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_callback* p_exec_callback );
-
-// execute a command and return the commands return value
-int                     sys_execute( const char* command );
-
 
 // --------------------------------------------------------------------------------------------------------
 // Shell Functions
@@ -108,22 +79,31 @@ void                    sys_open_file_properties( const char* path );
 
 bool                    sys_copy_to_clipboard( const char* path );
 
-// hack for above
-// void                    sys_set_main_hwnd( void* hwnd );
-
 // NOTE: path cannot be over MAX_PATH (260 characters), thanks windows shell
 void                    sys_browse_to_file( const char* path );
 
 // print color with \aFFF escape codes for color values
 //void        sys_print_color( const char* string );
 
+// --------------------------------------------------------------------------------------------------------
+// Terminal
+
+// execute a command and read it's output
+bool                    sys_execute_read( const char* command, str_buf_t& output );
+
+// execute a command and read it's output, with a callback function everytime more output is read from the file
+bool                    sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_callback* p_exec_callback );
+
+// execute a command and return the commands return value
+int                     sys_execute( const char* command );
 
 // --------------------------------------------------------------------------------------------------------
 // Other
 
-
 proc_mem_info_t         sys_get_mem_info();
 
 // get the default font to use for imgui
+// FREE THIS AFTER USE
 sys_font_data_t         sys_get_font();
 
+u64                     sys_get_time_ms();

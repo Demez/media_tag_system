@@ -183,7 +183,6 @@ set(
     src/codecs/loader_freeimage.cpp
 
     src/system/system.h
-    src/system/win32/sys_win32.cpp
 
     src/imgui/imconfig.h
     src/imgui/imgui.cpp
@@ -199,6 +198,21 @@ set(
 	src/glad/glad.h
 	src/glad/khrplatform.h
 )
+
+
+if ( MSVC )
+	set(
+		SYSTEM_FILES
+		src/system/win32/sys_win32.h
+		src/system/win32/sys_win32.cpp
+		src/system/win32/sys_win32_internal.cpp
+		src/system/win32/sys_win32_dragdrop.cpp
+	)
+else()
+	set(
+		SYSTEM_FILES
+	)
+endif()
 
 set( FREETYPE_DIR "thirdparty/freetype" )
 
@@ -239,7 +253,7 @@ else()
 	add_compile_definitions( USE_MIMALLOC=0 )
 endif()
 
-add_executable( media_tag_system ${SRC_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
+add_executable( media_tag_system ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
 
 target_link_libraries(
 	media_tag_system PRIVATE

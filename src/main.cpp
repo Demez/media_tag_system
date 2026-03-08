@@ -525,7 +525,12 @@ int main( int argc, char* argv[] )
 	// printf( "Using mimalloc version %d\n", mi_version() );
 
 	args_init( argc, argv );
-	sys_init();
+
+	if ( !sys_init() )
+	{
+		printf( "Failed to init system backend!\n" );
+		return 1;
+	}
 
 	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
 	{
