@@ -212,7 +212,7 @@ thumbnail_job_t* thumbnail_loader_queue_pop( u32& job_id )
 }
 
 
-void thumbnail_loader_worker( u32 thread_id )
+mpv_handle* thumbnail_mpv_ctx_create( u32 thread_id )
 {
 	// MPV Init
 	mpv_handle* local_mpv = nullptr;
@@ -231,37 +231,37 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			// Disable Video - So no window pops up when playing back a video
 			p_mpv_set_option_string( local_mpv, "vo", "null" );
-			
+
 			// Disable Audio
 			ret = p_mpv_set_option_string( local_mpv, "ao", "null" );
 
 			// Low Latency Mode
-			ret     = p_mpv_set_option_string( local_mpv, "profile", "low-latency" );
+			ret = p_mpv_set_option_string( local_mpv, "profile", "low-latency" );
 
-			ret     = p_mpv_set_option_string( local_mpv, "demuxer-max-bytes", "6M" );
+			ret = p_mpv_set_option_string( local_mpv, "demuxer-max-bytes", "6M" );
 			// ret     = p_mpv_set_option_string( local_mpv, "demuxer-max-bytes", "0" );
-			ret     = p_mpv_set_option_string( local_mpv, "demuxer-max-back-bytes", "0" );
-			ret     = p_mpv_set_option_string( local_mpv, "demuxer-donate-buffer", "no" );
+			ret = p_mpv_set_option_string( local_mpv, "demuxer-max-back-bytes", "0" );
+			ret = p_mpv_set_option_string( local_mpv, "demuxer-donate-buffer", "no" );
 
 			// hopefully helps? since it's just for a single screenshot
-			ret     = p_mpv_set_option_string( local_mpv, "demuxer-thread", "no" );
+			ret = p_mpv_set_option_string( local_mpv, "demuxer-thread", "no" );
 
-			ret     = p_mpv_set_option_string( local_mpv, "video-reversal-buffer", "0" );
-			ret     = p_mpv_set_option_string( local_mpv, "audio-reversal-buffer", "0" );
-			ret     = p_mpv_set_option_string( local_mpv, "cache", "no" );
-			ret     = p_mpv_set_option_string( local_mpv, "cache-secs", "0" );
+			ret = p_mpv_set_option_string( local_mpv, "video-reversal-buffer", "0" );
+			ret = p_mpv_set_option_string( local_mpv, "audio-reversal-buffer", "0" );
+			ret = p_mpv_set_option_string( local_mpv, "cache", "no" );
+			ret = p_mpv_set_option_string( local_mpv, "cache-secs", "0" );
 
-			ret     = p_mpv_set_option_string( local_mpv, "aid", "no" );
-			ret     = p_mpv_set_option_string( local_mpv, "sid", "no" );
+			ret = p_mpv_set_option_string( local_mpv, "aid", "no" );
+			ret = p_mpv_set_option_string( local_mpv, "sid", "no" );
 
 			// Only allow 1 frame used
-			ret     = p_mpv_set_option_string( local_mpv, "frames", "1" );
+			ret = p_mpv_set_option_string( local_mpv, "frames", "1" );
 
 			// Start Paused
-			ret     = p_mpv_set_option_string( local_mpv, "pause", "" );
+			ret = p_mpv_set_option_string( local_mpv, "pause", "" );
 
 			// Always start at 30% of the way in the video
-			ret     = p_mpv_set_option_string( local_mpv, "start", "30%" );
+			ret = p_mpv_set_option_string( local_mpv, "start", "30%" );
 
 			if ( p_mpv_initialize( local_mpv ) < 0 )
 			{
@@ -277,9 +277,45 @@ void thumbnail_loader_worker( u32 thread_id )
 		}
 	}
 
+	// let mpv startup
+	// mpv_handle_wait_event( local_mpv, 0.1, mpv_thread_name );
+
+	char mpv_thread_name[ 64 ];
+	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );
+
+	mpv_event* event = p_mpv_wait_event( local_mpv, -1 );
+
+	while ( event->event_id != MPV_EVENT_NONE )
+	{
+		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
+		{
+			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
+			printf( "%s: [%s] %s: %s", mpv_thread_name, msg->prefix, msg->level, msg->text );
+		}
+		else if ( event->event_id == MPV_EVENT_IDLE )
+		{
+			break;
+		}
+
+		event = p_mpv_wait_event( local_mpv, -1 );
+	}
+
+	return local_mpv;
+}
+
+
+void thumbnail_mpv_ctx_free( mpv_handle*& ctx )
+{
+	p_mpv_destroy( ctx );
+	ctx = nullptr;
+}
+
+
+void thumbnail_loader_worker( u32 thread_id )
+{
 	char* app_path = sys_get_exe_folder();
 
-	char video_thumbnail_path[ 512 ];
+	char  video_thumbnail_path[ 512 ];
 	snprintf( video_thumbnail_path, 512, "%s/video_thumbnail_thread_%d.png", app_path, thread_id );
 
 	ch_free( e_mem_category_string, app_path );
@@ -287,8 +323,7 @@ void thumbnail_loader_worker( u32 thread_id )
 	char mpv_thread_name[ 64 ];
 	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );
 
-	// let mpv startup
-	mpv_handle_wait_event( local_mpv, 0.1, mpv_thread_name );
+	mpv_handle* local_mpv = nullptr;
 
 	// Enter Loop
 	while ( g_thumbnails_running.load( std::memory_order_acquire ) )
@@ -298,6 +333,9 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		if ( !job )
 		{
+			if ( local_mpv )
+				thumbnail_mpv_ctx_free( local_mpv );
+
 			SDL_Delay( 250 );
 			continue;
 		}
@@ -315,6 +353,11 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		if ( thumbnail->type == e_media_type_video )
 		{
+			if ( !local_mpv )
+			{
+				local_mpv = thumbnail_mpv_ctx_create( thread_id );
+			}
+
 			// Use the local mpv instance to capture a frame from the video
 			if ( !local_mpv )
 			{
