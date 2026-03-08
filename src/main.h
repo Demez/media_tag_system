@@ -5,6 +5,7 @@
 #include "mpv_interface.h"
 #include "args.h"
 #include "handles.h"
+#include "system/system.h"
 
 #include "imgui.h"
 #include "glad/glad.h"

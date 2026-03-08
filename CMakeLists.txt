@@ -182,6 +182,7 @@ set(
     # src/codecs/format_gif.cpp
     src/codecs/loader_freeimage.cpp
 
+    src/system/system.h
     src/system/win32/sys_win32.cpp
 
     src/imgui/imconfig.h
