@@ -566,13 +566,17 @@ void media_view_input()
 		g_scale_state  = e_scale_state_idle;
 	}
 
-	if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
+	// for video view
+	if ( !ImGui::IsKeyDown( ImGuiKey_RightCtrl ) )
 	{
-		media_view_advance();
-	}
-	else if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
-	{
-		media_view_advance( true );
+		if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
+		{
+			media_view_advance();
+		}
+		else if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
+		{
+			media_view_advance( true );
+		}
 	}
 
 	// TODO: Test ImGui::Shortcut()
@@ -720,6 +724,21 @@ void media_view_draw_video_controls()
 	{
 		const char* cmd[]   = { "cycle", "pause", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+
+	// Seeking
+	if ( !mouse_hovering_imgui_window() )
+	{
+		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
+		{
+			const char* cmd[]   = { "seek", "-5", NULL };
+			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+		}
+		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
+		{
+			const char* cmd[]   = { "seek", "5", NULL };
+			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+		}
 	}
 
 	int width, height;
