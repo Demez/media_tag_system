@@ -572,6 +572,48 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 }
 
 
+bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
+{
+	switch ( event->type )
+	{
+		// Redraw window - Window is being resized
+		case SDL_EVENT_WINDOW_EXPOSED:
+		{
+			thumbnail_loader_update();
+
+			ImGui::NewFrame();
+			ImGui_ImplSDL3_NewFrame();
+			ImGui_ImplOpenGL3_NewFrame();
+
+			bool show_frame_time = false;
+
+			int width, height;
+			SDL_GetWindowSize( g_main_window, &width, &height );
+
+			glViewport( 0, 0, width, height );
+			glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
+			glClear( GL_COLOR_BUFFER_BIT );
+
+			imgui_draw( g_frame_time );
+			media_view_scale_reset_timer();
+
+			if ( !g_gallery_view )
+			{
+				media_view_draw();
+			}
+
+			ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
+
+			SDL_GL_SwapWindow( g_main_window );
+
+			break;
+		}
+	}
+
+	return true;
+}
+
+
 int main( int argc, char* argv[] )
 {
 	// printf( "Using mimalloc version %d\n", mi_version() );
@@ -752,6 +794,11 @@ int main( int argc, char* argv[] )
 	auto   current_time              = start_time;
 	float  time                      = 0.f;
 
+	if ( !SDL_AddEventWatch( sdl_window_resize_watcher, nullptr ) )
+	{
+		printf( "Failed to add SDL Event Watch\n" );
+	}
+
 	while ( g_running )
 	{
 		// Update Frame Time
@@ -898,6 +945,13 @@ int main( int argc, char* argv[] )
 		{
 			SDL_Delay( 8 );
 		}
+
+		// never called?
+		// if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_OCCLUDED )
+		// {
+		// 	printf( "OCCLUDED\n" );
+		// 	SDL_Delay( 8 );
+		// }
 
 		ImGui::NewFrame();
 		ImGui_ImplSDL3_NewFrame();

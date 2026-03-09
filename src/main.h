@@ -246,6 +246,7 @@ void                                 media_view_advance( bool prev = false );
 void                                 media_view_window_resize();
 void                                 media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true );
 void                                 media_view_zoom_reset();
+void                                 media_view_scale_reset_timer();
 
 std::string                          gallery_item_get_path_string( gallery_item_t& item );
 fs::path                             gallery_item_get_path( gallery_item_t& item );
