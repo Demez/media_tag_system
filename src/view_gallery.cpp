@@ -938,7 +938,7 @@ void gallery_view_draw_content()
 			}
 		}
 
-		if ( !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
+		if ( selected_item && !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
 		{
 			gallery_selected_item_action( media );
 		}
