@@ -173,8 +173,10 @@ set(
 
     src/view_media.cpp
 	
-    src/util.cpp
     src/util.h
+    src/util.cpp
+    src/util_filesystem.cpp
+
     src/args.cpp
     src/args.h
     src/handles.h

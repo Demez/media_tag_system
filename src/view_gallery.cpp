@@ -405,6 +405,10 @@ void gallery_view_dir_change()
 
 	// SORT FILE LIST
 	gallery_view_sort_dir();
+
+	// Invalidate These
+	g_image_data.index        = SIZE_MAX;
+	g_image_scaled_data.index = SIZE_MAX;
 }
 
 

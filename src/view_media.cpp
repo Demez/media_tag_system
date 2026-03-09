@@ -43,14 +43,28 @@ enum e_scale_state
 	e_scale_state_start,     // main thread sets state to this when it wants to scale the current image
 	e_scale_state_working,   // main thread looks at this state when running, uses full image while waiting
 	e_scale_state_upload,    // main thread needs to upload to gpu, after this, it's set back to idle
+	e_scale_state_finished,  // main thread can use scaled image
+
+	e_scale_state_count
 };
+
+const char* g_scale_state_str[] = 
+{
+	"scale_state_idle",
+	"scale_state_start",
+	"scale_state_working",
+	"scale_state_upload",
+	"scale_state_finished",
+};
+
+static_assert( ARR_SIZE( g_scale_state_str ) == e_scale_state_count );
+
 
 constexpr float      SCALE_WAIT_TIME = 0.1f;
 
 static std::thread*  g_scale_thread;
 static e_scale_state g_scale_state  = e_scale_state_idle;
 static float         g_scale_timer  = -1.f;
-static bool          g_scale_use    = false;  // use scaled down image
 static image_t       g_scale_src{};
 
 std::mutex           g_scale_lock;
@@ -71,18 +85,11 @@ void media_view_filter_image()
 	// Downscale image if size is larger than target size
 	if ( image_draw::size.x < g_scale_src.width )
 	{
-		//u8*   result_image_data      = stbir_resize_uint8_linear(
-		//  old_frame, thumbnail->image->width, thumbnail->image->height, 0,
-		//  nullptr, new_width, new_height, 0, STBIR_RGBA );
-
-		int new_width     = image_draw::size.x;
-		int new_height    = image_draw::size.y;
-
-		if ( image_downscale( &g_scale_src, &g_image_scaled_data.image, new_width, new_height ) )
+		if ( image_downscale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
 			g_scale_state = e_scale_state_upload;
 
-		if ( g_scale_src.width != g_image_scaled_data.image.width )
-			printf( "lol knew it, different image being handled\n" );
+		// if ( g_scale_src.width != g_image_data.image.width )
+		// 	printf( "scale source is different from currently displayed image!\n" );
 	}
 	else
 	{
@@ -117,7 +124,7 @@ void media_view_scale_check_timer( float frame_time )
 
 	g_scale_timer -= frame_time;
 
-	if ( g_scale_timer < 0.f && g_image_scaled_data.image.frame.size() && g_scale_state == e_scale_state_idle )
+	if ( g_scale_timer < 0.f && g_image_data.image.frame.size() && g_scale_state == e_scale_state_idle )
 	{
 		g_scale_lock.lock();
 
@@ -146,7 +153,7 @@ void media_view_scale_check_timer( float frame_time )
 void media_view_scale_reset_timer()
 {
 	g_scale_timer = SCALE_WAIT_TIME;
-	g_scale_use   = false;
+	g_scale_state = e_scale_state_idle;
 }
 
 
@@ -191,14 +198,11 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 
 	if ( adjust_zoom )
 	{
-		float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
-
-		image_draw::size.x    = g_image_data.image.width * zoom_level;
-		image_draw::size.y    = g_image_data.image.height * zoom_level;
-
-		image_draw::zoom     = zoom_level;
-
+		image_draw::zoom      = std::min( factor[ 0 ], factor[ 1 ] );
 		image_draw::zoom_mode = e_zoom_mode_fit;
+
+		image_draw::size.x    = g_image_data.image.width * image_draw::zoom;
+		image_draw::size.y    = g_image_data.image.height * image_draw::zoom;
 	}
 
 	// TODO: only adjust this if needed, check image zoom type
@@ -239,7 +243,7 @@ void media_view_scroll_zoom( float scroll )
 	if ( !g_image_data.texture || scroll == 0 )
 		return;
 
-	if ( mouse_hovering_imgui_window() )
+	if ( util_mouse_hovering_imgui_window() )
 		return;
 
 	double factor = 1.0;
@@ -329,17 +333,26 @@ void media_view_draw_media_info()
 	ImGui::Text( "Date Created: %s", date_created );
 	ImGui::Text( "Date Modified: %s", date_mod );
 
-	ImGui::Separator();
-
 	if ( get_media_type() == e_media_type_video )
 	{
+		ImGui::Separator();
 	}
 	else
 	{
+		// Scaling Info
+		ImGui::SeparatorText( "Scaling" );
+
+		ImGui::Text( "Scale Thread State: %d - %s", g_scale_state, g_scale_state_str[ g_scale_state ] );
+		ImGui::Text( "Scale Thread Timer: %.3f", g_scale_timer );
+		ImGui::Text( "Scaled: %.0fx%.0f", image_draw::size.x, image_draw::size.y );
+
+		ImGui::SeparatorText( "Image Info" );
 
 		// Image Type
 		ImGui::Text( "Size: %dx%d", g_image_data.image.width, g_image_data.image.height );
+
 		ImGui::Text( "Type: %s", g_image_data.image.image_format );
+		ImGui::Text( "Frame Count: %d", g_image_data.image.frame.size() );
 
 		switch ( g_image_data.image.format )
 		{
@@ -577,15 +590,14 @@ void media_view_input()
 		if ( g_image_scaled_data.index == gallery::cursor )
 		{
 			gl_update_texture( g_image_scaled_data.texture, &g_image_scaled_data.image );
-			g_scale_use = true;
 			printf( "Scaled Main Image\n" );
+			g_scale_state = e_scale_state_finished;
 		}
 		else
 		{
 			printf( "SCALE MISMATCH\n" );
+			g_scale_state = e_scale_state_idle;
 		}
-
-		g_scale_state  = e_scale_state_idle;
 	}
 
 	// for video view
@@ -611,7 +623,7 @@ void media_view_input()
 
 	media_view_context_menu();
 
-	// if ( !mouse_hovering_imgui_window() )
+	// if ( !util_mouse_hovering_imgui_window() )
 	// 	return;
 
 	auto& io = ImGui::GetIO();
@@ -620,7 +632,7 @@ void media_view_input()
 	if ( io.WantCaptureMouseUnlessPopupClose && !g_image_pan )
 		return;
 
-	g_image_pan = ImGui::IsMouseDown( ImGuiMouseButton_Left ) && !(mouse_hovering_imgui_window() && !g_image_pan);
+	g_image_pan = ImGui::IsMouseDown( ImGuiMouseButton_Left ) && !( util_mouse_hovering_imgui_window() && !g_image_pan );
 
 	if ( g_image_pan )
 	{
@@ -737,14 +749,16 @@ void media_view_draw_video_controls()
 	if ( !g_mpv )
 		return;
 
-	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !mouse_hovering_imgui_window() && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
+	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
+
+	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !mouse_hover_imgui_window && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
 	{
 		const char* cmd[]   = { "cycle", "pause", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 	}
 
 	// Seeking
-	if ( !mouse_hovering_imgui_window() )
+	if ( !mouse_hover_imgui_window )
 	{
 		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
 		{
@@ -1019,7 +1033,7 @@ static void media_view_draw_image()
 
 	glEnable( GL_TEXTURE_2D );
 
-	if ( g_scale_use )
+	if ( g_scale_state == e_scale_state_finished )
 	{
 		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.texture );
 	}

@@ -1,31 +1,74 @@
 #include "main.h"
 #include "util.h"
 
+#include "imgui.h"
+#include "imgui_internal.h"
+
 #include <sys/stat.h>
 #include <time.h>
 #include <math.h>
 #include <ctype.h>
 #include <locale>
 
-#ifdef _WIN32
-  #include <direct.h>
-  #include <io.h>
 
-  // get rid of the dumb windows posix depreciation warnings
-  #define mkdir      _mkdir
-  #define chdir      _chdir
-  #define access     _access
-  #define getcwd     _getcwd
+// Check the function FindHoveredWindowEx() in imgui.cpp to see if you need to update this when updating imgui
+bool util_mouse_hovering_imgui_window()
+{
+	ImGuiContext& g = *ImGui::GetCurrentContext();
 
-  #define stat       _stat
-#else
-  #include <unistd.h>
-  #include <dirent.h>
-  #include <string.h>
+	ImVec2        imMousePos{ (float)app::mouse_pos[ 0 ], (float)app::mouse_pos[ 1 ] };
 
-// windows-specific mkdir() is used
-  #define mkdir( f ) mkdir( f, 666 )
-#endif
+	ImGuiWindow*  hovered_window                     = NULL;
+	ImGuiWindow*  hovered_window_under_moving_window = NULL;
+
+	if ( g.MovingWindow && !( g.MovingWindow->Flags & ImGuiWindowFlags_NoMouseInputs ) )
+		hovered_window = g.MovingWindow;
+
+	ImVec2 padding_regular    = g.Style.TouchExtraPadding;
+	ImVec2 padding_for_resize = ImMax( g.Style.TouchExtraPadding, ImVec2( g.Style.WindowBorderHoverPadding, g.Style.WindowBorderHoverPadding ) );
+	for ( int i = g.Windows.Size - 1; i >= 0; i-- )
+	{
+		ImGuiWindow* window = g.Windows[ i ];
+		IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
+		if ( !window->WasActive || window->Hidden )
+			continue;
+		if ( window->Flags & ImGuiWindowFlags_NoMouseInputs )
+			continue;
+
+		// Using the clipped AABB, a child window will typically be clipped by its parent (not always)
+		ImVec2 hit_padding = ( window->Flags & ( ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize ) ) ? padding_regular : padding_for_resize;
+		if ( !window->OuterRectClipped.ContainsWithPad( imMousePos, hit_padding ) )
+			continue;
+
+		// Support for one rectangular hole in any given window
+		// FIXME: Consider generalizing hit-testing override (with more generic frame, callback, etc.) (#1512)
+		if ( window->HitTestHoleSize.x != 0 )
+		{
+			ImVec2 hole_pos( window->Pos.x + (float)window->HitTestHoleOffset.x, window->Pos.y + (float)window->HitTestHoleOffset.y );
+			ImVec2 hole_size( (float)window->HitTestHoleSize.x, (float)window->HitTestHoleSize.y );
+			if ( ImRect( hole_pos, hole_pos + hole_size ).Contains( imMousePos ) )
+				continue;
+		}
+
+		//if ( find_first_and_in_any_viewport )
+		//{
+		//	hovered_window = window;
+		//	break;
+		//}
+		//else
+		{
+			if ( hovered_window == NULL )
+				hovered_window = window;
+			IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
+			if ( hovered_window_under_moving_window == NULL && ( !g.MovingWindow || window->RootWindow != g.MovingWindow->RootWindow ) )
+				hovered_window_under_moving_window = window;
+			if ( hovered_window && hovered_window_under_moving_window )
+				break;
+		}
+	}
+
+	return hovered_window;
+}
 
 
 bool point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size )
@@ -237,320 +280,4 @@ void util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool app
 	memcpy( buffer + 19, buffer + 20, buffer_size - 20 );
 	buffer[ buffer_size - 1 ] = '0';
 }
-
-
-// ============================================================================================
-
-
-// replace all backslash path separators with forward slashes
-char* fs_replace_path_seps_unix( const char* path )
-{
-	if ( !path )
-		return nullptr;
-
-	size_t path_len = strlen( path );
-	char*  out      = ch_calloc< char >( path_len + 1, e_mem_category_general );
-
-	if ( !out )
-		return nullptr;
-
-	// TODO: maybe use strchr later? not sure if that's faster
-	for ( size_t i = 0; i < path_len; i++ )
-	{
-		if ( path[ i ] == '\\' )
-			out[ i ] = '/';
-		else
-			out[ i ] = path[ i ];
-	}
-
-	return out;
-}
-
-
-char* fs_get_filename( const char* path, size_t path_len )
-{
-	if ( !path || path_len == 0 )
-		return nullptr;
-
-	size_t i = path_len - 1;
-	for ( ; i > 0; i-- )
-	{
-		if ( path[ i ] == '/' || path[ i ] == '\\' )
-			break;
-	}
-
-	// No File Extension Found
-	if ( i == path_len )
-		return {};
-
-	size_t start_index = i + 1;
-
-	if ( start_index == path_len )
-		return {};
-
-	return util_strndup( &path[ start_index ], path_len - start_index );
-}
-
-
-char* fs_get_filename_no_ext( const char* path, size_t path_len )
-{
-	if ( !path || path_len == 0 )
-		return nullptr;
-
-	char* name = fs_get_filename( path, path_len );
-
-	if ( !name )
-		return nullptr;
-
-	char* dot = strrchr( name, '.' );
-
-	if ( !dot || dot == name )
-		return name;
-
-	char* output = util_strndup( name, dot - name );
-	ch_free_str( name );
-	return output;
-}
-
-
-char* fs_get_filename( const char* path )
-{
-	if ( !path )
-		return nullptr;
-
-	return fs_get_filename( path, strlen( path ) );
-}
-
-
-char* fs_get_filename_no_ext( const char* path )
-{
-	if ( !path )
-		return nullptr;
-
-	return fs_get_filename_no_ext( path, strlen( path ) );
-}
-
-
-bool fs_exists( const char* path )
-{
-	return access( path, 0 ) != -1;
-}
-
-
-bool fs_make_dir( const char* path )
-{
-	return mkdir( path ) == 0;
-}
-
-
-bool fs_is_dir( const char* path )
-{
-	struct stat s;
-
-	if ( stat( path, &s ) == 0 )
-		return ( s.st_mode & S_IFDIR );
-
-	return false;
-}
-
-
-bool fs_is_file( const char* path )
-{
-	struct stat s;
-
-	if ( stat( path, &s ) == 0 )
-		return ( s.st_mode & S_IFREG );
-
-	return false;
-}
-
-
-bool fs_make_dir_check( const char* path )
-{
-	if ( fs_exists( path ) )
-	{
-		if ( fs_is_file( path ) )
-		{
-			printf( "Error: Directory already exists as a file: \"%s\"\n", path );
-			return false;
-		}
-	}
-	else if ( !fs_make_dir( path ) )
-	{
-		printf( "Error: Failed to create directory: \"%s\"\n", path );
-		return false;
-	}
-
-	return true;
-}
-
-
-u64 fs_file_size( const char* path )
-{
-	struct stat s;
-
-	if ( stat( path, &s ) == 0 )
-		return s.st_size;
-
-	return 0;
-}
-
-
-// returns the file length in the len argument
-char* fs_read_file( const char* path, size_t* len )
-{
-	FILE* fp = fopen( path, "rb" );
-
-	if ( !fp )
-	{
-		return nullptr;
-	}
-
-	fseek( fp, 0, SEEK_END );
-	long size = ftell( fp );
-	fseek( fp, 0, SEEK_SET );
-
-	char* output = (char*)malloc( ( size + 1 ) * sizeof( char ) );
-
-	if ( !output )
-	{
-		return nullptr;
-	}
-
-	mem_add_item( e_mem_category_file_data, output, ( size + 1 ) * sizeof( char ) );
-
-	memset( output, 0, ( size + 1 ) * sizeof( char ) );
-	fread( output, size, 1, fp );
-	fclose( fp );
-
-	output[ size ] = 0;
-
-	if ( len )
-		*len = size;
-
-	return output;
-}
-
-
-static bool handle_rename( const char* path, const char* new_path )
-{
-	int code = rename( path, new_path );
-
-	if ( code == 0 )
-		return true;
-
-	printf( "failed to rename old saved file \"%s\" - ", path );
-
-	switch ( code )
-	{
-		case EACCES:
-			printf( "Permission denied\n" );
-			break;
-		case ENOENT:
-			printf( "Source file does not exist\n" );
-			break;
-		case EEXIST:
-			printf( "A file with the new filename already exists\n" );
-			break;
-		case EINVAL:
-			printf( "The names specified are invalid\n" );
-			break;
-	}
-
-	return false;
-}
-
-
-// TODO: THIS CURRENTLY IGNORES THE READ ONLY ATTRIBUTE, FIX THAT !!!!!!
-bool fs_save_file( const char* path, const char* data, size_t size )
-{
-	// write to a temp file,
-	// then rename to old saved file to name.bak,
-	// then remove .temp from new file, and remove .bak file (or keep it until next save)
-	// also check if a .temp file already exists just in case if a crash happened midway through this
-	// basically this is all so if there is a crashe at any point during this, we dont lose any data
-
-	char temp_path[ 4096 ] = { 0 };
-	strcat( temp_path, path );
-	strcat( temp_path, ".temp" );
-
-	char bak_path[ 4096 ] = { 0 };
-	strcat( bak_path, path );
-	strcat( bak_path, ".bak" );
-
-	// check if a .temp file exists already
-	if ( access( temp_path, 0 ) != -1 )
-	{
-		if ( !sys_recycle_file( temp_path ) )
-		{
-			printf( "failed to delete old temp file for saving! - \"%s\"\n", temp_path );
-			return false;
-		}
-	}
-
-	FILE* fp = fopen( temp_path, "wb" );
-
-	if ( fp == nullptr )
-	{
-		printf( "failed to open file handle to write file to\n - \"%s\"", temp_path );
-		return false;
-	}
-
-	size_t amount_wrote = fwrite( data, size, 1, fp );
-
-	fclose( fp );
-
-	// check if a saved file exists already
-	bool old_save_exists = access( path, 0 ) != -1;
-
-	if ( old_save_exists )
-	{
-		// check if a .bak file exists already
-		if ( access( bak_path, 0 ) != -1 )
-		{
-			if ( !sys_recycle_file( bak_path ) )
-			{
-				printf( "failed to delete old backup file for saving! - \"%s\"\n", bak_path );
-				return false;
-			}
-		}
-
-		if ( !handle_rename( path, bak_path ) )
-			return false;
-	}
-
-	if ( !handle_rename( temp_path, path ) )
-		return false;
-
-	// copy file creation date
-	u64 create_date = 0;
-
-	if ( old_save_exists && sys_get_file_times( bak_path, &create_date, nullptr, nullptr ) )
-	{
-		sys_set_file_times( path, &create_date, nullptr, nullptr );
-	}
-
-	return true;
-}
-
-
-bool fs_write_file( const char* path, const char* data, size_t size )
-{
-	FILE* fp = fopen( path, "wb" );
-
-	if ( fp == nullptr )
-	{
-		printf( "failed to open file handle to write file to\n - \"%s\"", path );
-		return false;
-	}
-
-	size_t amount_wrote = fwrite( data, size, 1, fp );
-
-	fclose( fp );
-
-	return true;
-}
-
-
-
 

@@ -385,6 +385,7 @@ void        util_format_time( char* buffer, size_t buffer_size, double time );
 
 void        util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool apply_time_zone = true );
 
+bool        util_mouse_hovering_imgui_window();
 
 // --------------------------------------------------------------------------------------------------------
 // file system functions

@@ -8,6 +8,7 @@
 
 #include <chrono>
 
+
 // General App Data
 namespace app
 {
@@ -50,8 +51,10 @@ namespace directory
 	std::vector< h_thumbnail >   thumbnail_list;
 }
 
+// =================================================================================
 
-bool                         g_gallery_view        = false;
+bool                         g_gallery_view = false;
+std::vector< fs::path >      g_drag_drop_files;
 
 // Main Image
 main_image_data_t            g_image_data;
@@ -59,10 +62,12 @@ main_image_data_t            g_image_scaled_data;
 
 static SDL_GLContext         g_gl_context;
 
+// =================================================================================
+
 struct notification_t
 {
 	std::string msg;
-	double      time_added;
+	u64         time_added;
 	float       time_remain;
 };
 
@@ -72,65 +77,7 @@ constexpr size_t              NOTIFICATION_MAX_SHOWN    = 5;
 
 std::vector< notification_t > g_notification_queue;
 
-
-// Check the function FindHoveredWindowEx() in imgui.cpp to see if you need to update this when updating imgui
-bool mouse_hovering_imgui_window()
-{
-	ImGuiContext& g = *ImGui::GetCurrentContext();
-
-	ImVec2        imMousePos{ (float)app::mouse_pos[ 0 ], (float)app::mouse_pos[ 1 ] };
-
-	ImGuiWindow*  hovered_window                     = NULL;
-	ImGuiWindow*  hovered_window_under_moving_window = NULL;
-
-	if ( g.MovingWindow && !( g.MovingWindow->Flags & ImGuiWindowFlags_NoMouseInputs ) )
-		hovered_window = g.MovingWindow;
-
-	ImVec2 padding_regular    = g.Style.TouchExtraPadding;
-	ImVec2 padding_for_resize = ImMax( g.Style.TouchExtraPadding, ImVec2( g.Style.WindowBorderHoverPadding, g.Style.WindowBorderHoverPadding ) );
-	for ( int i = g.Windows.Size - 1; i >= 0; i-- )
-	{
-		ImGuiWindow* window = g.Windows[ i ];
-		IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
-		if ( !window->WasActive || window->Hidden )
-			continue;
-		if ( window->Flags & ImGuiWindowFlags_NoMouseInputs )
-			continue;
-
-		// Using the clipped AABB, a child window will typically be clipped by its parent (not always)
-		ImVec2 hit_padding = ( window->Flags & ( ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize ) ) ? padding_regular : padding_for_resize;
-		if ( !window->OuterRectClipped.ContainsWithPad( imMousePos, hit_padding ) )
-			continue;
-
-		// Support for one rectangular hole in any given window
-		// FIXME: Consider generalizing hit-testing override (with more generic frame, callback, etc.) (#1512)
-		if ( window->HitTestHoleSize.x != 0 )
-		{
-			ImVec2 hole_pos( window->Pos.x + (float)window->HitTestHoleOffset.x, window->Pos.y + (float)window->HitTestHoleOffset.y );
-			ImVec2 hole_size( (float)window->HitTestHoleSize.x, (float)window->HitTestHoleSize.y );
-			if ( ImRect( hole_pos, hole_pos + hole_size ).Contains( imMousePos ) )
-				continue;
-		}
-
-		//if ( find_first_and_in_any_viewport )
-		//{
-		//	hovered_window = window;
-		//	break;
-		//}
-		//else
-		{
-			if ( hovered_window == NULL )
-				hovered_window = window;
-			IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
-			if ( hovered_window_under_moving_window == NULL && ( !g.MovingWindow || window->RootWindow != g.MovingWindow->RootWindow ) )
-				hovered_window_under_moving_window = window;
-			if ( hovered_window && hovered_window_under_moving_window )
-				break;
-		}
-	}
-
-	return hovered_window;
-}
+// =================================================================================
 
 
 void update_window_title()
@@ -143,7 +90,7 @@ void update_window_title()
 	}
 	else
 	{
-		if ( directory::media_list.size() > gallery::cursor )
+		if ( directory::media_list.size() >= gallery::cursor )
 			snprintf( buf, 512, "Media Tag System [%d / %d] - %s", gallery::cursor, gallery::items.size(), gallery_item_get_path_string( gallery::cursor ).c_str() );
 		else
 			snprintf( buf, 512, "Media Tag System" );
@@ -437,7 +384,7 @@ void set_view_type_media()
 }
 
 
-void on_new_file( const fs::path& file_path )
+bool on_new_file( const fs::path& file_path )
 {
 	bool is_file = fs_is_file( file_path.string().c_str() );
 
@@ -445,44 +392,18 @@ void on_new_file( const fs::path& file_path )
 	{
 		// can we open this file?
 		if ( !image_check_extension( file_path.string() ) )
-			return;
+			return false;
+
+		directory::queued = file_path;
+		return true;
 	}
-
-	directory::queued = file_path;
-
-#if 0
-	folder_load_media_list();
-
-	for ( size_t i = 0; i < gallery::items.size(); i++ )
+	else if ( fs_is_dir( file_path.string().c_str() ) )
 	{
-		if ( gallery_item_get_path( i ) == file_path )
-		{
-			gallery::cursor = i;
-			directory::queued.clear();
-
-			if ( is_file )
-			{
-				set_view_type_media();
-			}
-			else if ( !is_file && !g_gallery_view )
-			{
-				set_view_type_gallery();
-			}
-
-			return;
-		}
+		directory::queued = file_path;
+		return true;
 	}
 
-	// probably not a supported file
-	gallery::cursor = 0;
-#endif
-}
-
-
-void on_new_file( char* file )
-{
-	fs::path file_path = file;
-	on_new_file( file_path );
+	return false;
 }
 
 
@@ -491,8 +412,7 @@ bool drag_drop_recieve_func( const std::vector< fs::path >& files )
 	if ( files.empty() )
 		return false;
 
-	on_new_file( files[ 0 ] );
-	return true;
+	return on_new_file( files[ 0 ] );
 }
 
 
@@ -584,31 +504,47 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 }
 
 
-// called initially on startup and on window resize
-void window_quick_draw()
+void frame_draw_start()
 {
-	// printf( "QUICK DRAW\n" );
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	ImGui::GetIO().DisplaySize.x = width;
+	ImGui::GetIO().DisplaySize.y = height;
 
 	ImGui::NewFrame();
 	ImGui_ImplSDL3_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
 
-	int  width, height;
-	SDL_GetWindowSize( app::window, &width, &height );
-
 	glViewport( 0, 0, width, height );
 	glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
 	glClear( GL_COLOR_BUFFER_BIT );
+}
 
-	imgui_draw( app::frame_time );
-	media_view_scale_reset_timer();
 
+void frame_draw_end()
+{
 	if ( !g_gallery_view )
 		media_view_draw();
 
 	ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
-
 	SDL_GL_SwapWindow( app::window );
+}
+
+
+// called initially on startup and on window resize
+void window_quick_draw()
+{
+	frame_draw_start();
+
+	imgui_draw( app::frame_time );
+
+	app::window_resized = true;
+	media_view_window_resize();
+	gallery_view_scroll_to_cursor();
+	mpv_window_resize();
+
+	frame_draw_end();
 }
 
 
@@ -618,7 +554,8 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 	{
 		// Redraw window - Window is being resized
 		// NOTE: this is also called when dragging the window around
-		case SDL_EVENT_WINDOW_EXPOSED:
+		// case SDL_EVENT_WINDOW_EXPOSED:
+		case SDL_EVENT_WINDOW_RESIZED:
 		{
 			thumbnail_loader_update();
 			window_quick_draw();
@@ -627,6 +564,250 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 	}
 
 	return true;
+}
+
+
+// return true to exit main loop
+// Handle SDL3 Events
+bool handle_events()
+{
+	app::mouse_scrolled_up   = false;
+	app::mouse_scrolled_down = false;
+	app::window_resized      = false;
+
+	app::mouse_delta[ 0 ]    = 0.f;
+	app::mouse_delta[ 1 ]    = 0.f;
+
+	g_drag_drop_files.clear();
+
+	SDL_Event event;
+	while ( SDL_PollEvent( &event ) )
+	{
+		ImGui_ImplSDL3_ProcessEvent( &event );
+
+		switch ( event.type )
+		{
+			case SDL_EVENT_MOUSE_WHEEL:
+				if ( event.wheel.integer_y > 0 )
+					app::mouse_scrolled_up = true;
+				else
+					app::mouse_scrolled_down = true;
+
+				media_view_scroll_zoom( event.wheel.integer_y );
+				break;
+
+			case SDL_EVENT_MOUSE_MOTION:
+				app::mouse_pos[ 0 ] = event.motion.x;
+				app::mouse_pos[ 1 ] = event.motion.y;
+				app::mouse_delta[ 0 ] += event.motion.xrel;
+				app::mouse_delta[ 1 ] += event.motion.yrel;
+				break;
+
+			case SDL_EVENT_WINDOW_RESIZED:
+				int width, height;
+				SDL_GetWindowSize( app::window, &width, &height );
+				ImGui::GetIO().DisplaySize.x    = width;
+				ImGui::GetIO().DisplaySize.y    = height;
+
+				app::window_resized = true;
+				media_view_window_resize();
+				gallery_view_scroll_to_cursor();
+				mpv_window_resize();
+				break;
+
+			case SDL_EVENT_WINDOW_FOCUS_GAINED:
+				app::window_focused = true;
+				break;
+
+			case SDL_EVENT_WINDOW_FOCUS_LOST:
+				app::window_focused = false;
+				break;
+
+			// The system requests a file open
+			case SDL_EVENT_DROP_FILE:
+			{
+				g_drag_drop_files.push_back( event.drop.data );
+				break;
+			}
+
+			// text/plain drag-and-drop event
+			case SDL_EVENT_DROP_TEXT:
+				break;
+
+			// Current set of drops is now complete (NULL filename)
+			case SDL_EVENT_DROP_COMPLETE:
+			{
+				if ( drag_drop_recieve_func( g_drag_drop_files ) )
+					SDL_RaiseWindow( app::window );
+
+				break;
+			}
+
+			// Position while moving over the window
+			case SDL_EVENT_DROP_POSITION:
+				break;
+
+			case SDL_EVENT_QUIT:
+			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+				app::running = false;
+				return true;
+		}
+	}
+
+	return false;
+}
+
+
+void main_loop()
+{
+	bool  run_after_first_loop_hack = true;
+
+	u64   start_time   = sys_get_time_ms();
+	u64   current_time = start_time;
+	float time         = 0.f;
+
+	while ( app::running )
+	{
+		// -----------------------------------------------------------------------------------
+		// Check MPV Playback
+
+		bool playing_back_video = false;
+
+		if ( !g_gallery_view && gallery::items.size() )
+		{
+			media_entry_t entry = gallery_item_get_media_entry( gallery::cursor );
+
+			if ( entry.type == e_media_type_video )
+			{
+				// check mpv state (SHOULD PROBABLY TRY USING OBSERVE PROPERTY)
+				s32 paused = 0;
+				p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
+
+				if ( !paused )
+					playing_back_video = true;
+			}
+		}
+
+		// -----------------------------------------------------------------------------------
+		// Update Frame Time
+
+		current_time  = sys_get_time_ms();
+		time          = ( current_time / 1000.f ) - ( start_time / 1000.f );
+
+		// don't let the time go too crazy, usually happens when in a breakpoint
+		// time                 = std::min( real_time, 0.1f );
+
+		// TODO: GET MONITOR REFRESH RATE
+		float max_fps = 300.f;
+
+		if ( !playing_back_video )
+		{
+			// check if we still have more than 2ms till next frame and if so, wait for "1ms"
+			float min_frame_time = 1.0f / max_fps;
+			if ( ( min_frame_time - time ) > ( 2.0f / 1000.f ) )
+				SDL_Delay( 1 );
+
+			// framerate is above max
+			if ( time < min_frame_time )
+				continue;
+		}
+
+		app::frame_time = time;
+		app::total_time += ( time * 1000.f );
+
+		sys_update();
+
+		// -----------------------------------------------------------------------------------
+		// Queued Directory/File to Change to/Load
+
+		if ( !directory::queued.empty() )
+		{
+			bool is_file = fs_is_file( directory::queued.string().c_str() );
+
+			if ( is_file )
+			{
+				directory::path = directory::queued.parent_path();
+				folder_load_media_list();
+
+				for ( size_t i = 0; i < gallery::items.size(); i++ )
+				{
+					if ( gallery_item_get_path( i ) == directory::queued )
+					{
+						gallery::cursor = i;
+						directory::queued.clear();
+						//media_view_load();
+						set_view_type_media();
+						break;
+					}
+				}
+			}
+			else
+			{
+				gallery::cursor = 0;
+				directory::path = directory::queued;
+				directory::queued.clear();
+				gallery_view_scroll_to_cursor();
+				folder_load_media_list();
+				set_view_type_gallery();
+			}
+		}
+
+		thumbnail_loader_update();
+
+		// -----------------------------------------------------------------------------------
+		// Window Events
+
+		if ( handle_events() )
+			break;
+
+		if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
+		{
+			app::window_focused = false;
+			SDL_Delay( 15 );
+			start_time = current_time;
+			continue;
+		}
+
+		if ( !app::window_focused && !playing_back_video )
+		{
+			SDL_Delay( 8 );
+		}
+
+		// never called?
+		// if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_OCCLUDED )
+		// {
+		// 	printf( "OCCLUDED\n" );
+		// 	SDL_Delay( 8 );
+		// }
+
+		// -----------------------------------------------------------------------------------
+
+		frame_draw_start();
+
+		if ( ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
+		{
+			view_type_toggle();
+		}
+
+		imgui_draw( time );
+
+		media_view_scale_check_timer( time );
+
+		frame_draw_end();
+
+		// -----------------------------------------------------------------------------------
+
+		// delayed startup, stuff that can be loaded after initial draw
+		// like if we open an image or video from file explorer, we want this program to open and show it near instantly
+		// at least the first frame of it, then we can do this after
+		if ( run_after_first_loop_hack )
+		{
+			icon_preload();
+			run_after_first_loop_hack = false;
+		}
+
+		start_time = current_time;
+	}
 }
 
 
@@ -800,11 +981,7 @@ int main( int argc, char* argv[] )
 //		directory::queued.clear();
 //	}
 
-	bool run_after_first_loop_hack = true;
-
 	// ----------------------------------------------------------------
-
-	std::vector< fs::path > drag_drop_files;
 
 	if ( !SDL_AddEventWatch( sdl_window_resize_watcher, nullptr ) )
 	{
@@ -819,238 +996,11 @@ int main( int argc, char* argv[] )
 
 	printf( "%.3f STARTUP TIME\n", time );
 
-	while ( app::running )
-	{
-		bool playing_back_video = false;
+	// -----------------------------------------------------------------------------------
 
-		if ( !g_gallery_view && gallery::items.size() )
-		{
-			media_entry_t entry = gallery_item_get_media_entry( gallery::cursor );
+	main_loop();
 
-			if ( entry.type == e_media_type_video )
-			{
-				// check mpv state (SHOULD PROBABLY TRY USING OBSERVE PROPERTY)
-				s32 paused = 0;
-				p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
-
-				if ( !paused )
-					playing_back_video = true;
-			}
-		}
-
-		// Update Frame Time
-		{
-			current_time = sys_get_time_ms();
-			time   = ( current_time / 1000.f ) - ( start_time / 1000.f );
-
-			// don't let the time go too crazy, usually happens when in a breakpoint
-			// time                 = std::min( real_time, 0.1f );
-
-			// TODO: GET MONITOR REFRESH RATE
-			float max_fps = 200.f;
-
-			if ( !playing_back_video )
-			{
-				// check if we still have more than 2ms till next frame and if so, wait for "1ms"
-				float min_frame_time = 1.0f / max_fps;
-				if ( ( min_frame_time - time ) > ( 2.0f / 1000.f ) )
-					SDL_Delay( 1 );
-		
-				// framerate is above max
-				if ( time < min_frame_time )
-					continue;
-			}
-
-			app::frame_time = time;
-			app::total_time += ( time * 1000.f );
-		}
-
-		sys_update();
-
-		drag_drop_files.clear();
-
-		if ( !directory::queued.empty() )
-		{
-			bool is_file = fs_is_file( directory::queued.string().c_str() );
-
-			if ( is_file )
-			{
-				directory::path = directory::queued.parent_path();
-				folder_load_media_list();
-				
-				for ( size_t i = 0; i < gallery::items.size(); i++ )
-				{
-					if ( gallery_item_get_path( i ) == directory::queued )
-					{
-						gallery::cursor = i;
-						directory::queued.clear();
-						//media_view_load();
-						set_view_type_media();
-						break;
-					}
-				}
-			}
-			else
-			{
-				gallery::cursor = 0;
-				directory::path = directory::queued;
-				directory::queued.clear();
-				gallery_view_scroll_to_cursor();
-				folder_load_media_list();
-				set_view_type_gallery();
-			}
-		}
-		
-		thumbnail_loader_update();
-
-		app::mouse_scrolled_up   = false;
-		app::mouse_scrolled_down = false;
-		app::window_resized      = false;
-
-		app::mouse_delta[ 0 ]    = 0.f;
-		app::mouse_delta[ 1 ]    = 0.f;
-
-		// Handle Events
-		SDL_Event event;
-		while ( SDL_PollEvent( &event ) )
-		{
-			ImGui_ImplSDL3_ProcessEvent( &event );
-
-			switch ( event.type )
-			{
-				case SDL_EVENT_MOUSE_WHEEL:
-					if ( event.wheel.integer_y > 0 )
-						app::mouse_scrolled_up = true;
-					else
-						app::mouse_scrolled_down = true;
-
-					media_view_scroll_zoom( event.wheel.integer_y );
-					break;
-
-				case SDL_EVENT_MOUSE_MOTION:
-					app::mouse_pos[ 0 ] = event.motion.x;
-					app::mouse_pos[ 1 ] = event.motion.y;
-					app::mouse_delta[ 0 ] += event.motion.xrel;
-					app::mouse_delta[ 1 ] += event.motion.yrel;
-					break;
-
-				case SDL_EVENT_WINDOW_RESIZED:
-					int width, height;
-					SDL_GetWindowSize( app::window, &width, &height );
-					io.DisplaySize.x = width;
-					io.DisplaySize.y = height;
-
-					app::window_resized = true;
-					media_view_window_resize();
-					gallery_view_scroll_to_cursor();
-					mpv_window_resize();
-					break;
-
-				case SDL_EVENT_WINDOW_FOCUS_GAINED:
-					app::window_focused = true;
-					break;
-
-				case SDL_EVENT_WINDOW_FOCUS_LOST:
-					app::window_focused = false;
-					break;
-
-				// The system requests a file open
-				case SDL_EVENT_DROP_FILE:
-				{
-					drag_drop_files.push_back( event.drop.data );
-					break;
-				}
-
-				// text/plain drag-and-drop event
-				case SDL_EVENT_DROP_TEXT:
-					break;
-
-				// A new set of drops is beginning (NULL filename)
-				case SDL_EVENT_DROP_BEGIN:
-					break;
-
-				// Current set of drops is now complete (NULL filename)
-				case SDL_EVENT_DROP_COMPLETE:
-				{
-					drag_drop_recieve_func( drag_drop_files );
-					SDL_RaiseWindow( app::window );
-					break;
-				}
-
-				// Position while moving over the window
-				case SDL_EVENT_DROP_POSITION:
-					break;
-
-				case SDL_EVENT_QUIT:
-				case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-					app::running = false;
-					break;
-			}
-		}
-
-		if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
-		{
-			app::window_focused = false;
-			SDL_Delay( 15 );
-			start_time = current_time;
-			continue;
-		}
-
-
-		if ( !app::window_focused && !playing_back_video )
-		{
-			SDL_Delay( 8 );
-		}
-
-		// never called?
-		// if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_OCCLUDED )
-		// {
-		// 	printf( "OCCLUDED\n" );
-		// 	SDL_Delay( 8 );
-		// }
-
-		ImGui::NewFrame();
-		ImGui_ImplSDL3_NewFrame();
-		ImGui_ImplOpenGL3_NewFrame();
-
-		bool show_frame_time = false;
-		
-		if ( ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
-		{
-			view_type_toggle();
-		}
-
-		int width, height;
-		SDL_GetWindowSize( app::window, &width, &height );
-
-		glViewport( 0, 0, width, height );
-		glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
-		glClear( GL_COLOR_BUFFER_BIT );
-
-		imgui_draw( time );
-
-		media_view_scale_check_timer( time );
-
-		if ( !g_gallery_view )
-		{
-			media_view_draw();
-		}
-
-		ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
-
-		SDL_GL_SwapWindow( app::window );
-
-		// delayed startup, stuff that can be loaded after initial draw
-		// like if we open an image or video from file explorer, we want this program to open and show it near instantly
-		// at least the first frame of it, then we can do this after
-		if ( run_after_first_loop_hack )
-		{
-			icon_preload();
-			run_after_first_loop_hack = false;
-		}
-
-		start_time = current_time;
-	}
+	// -----------------------------------------------------------------------------------
 
 	thumbnail_loader_shutdown();
 	media_view_shutdown();
