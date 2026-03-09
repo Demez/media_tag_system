@@ -52,13 +52,17 @@ using f64   = double;
   #define PATH_SEP     '\\'
 
   #define strncasecmp _strnicmp
-  #define strcasecmp  _stricmp
+  #define strcasecmp   _stricmp
+
+constexpr float MEM_SCALE = 1024.f;
 #else
   #define SEP_S        "/"
   #define SEP          '/'
 
   #define PATH_SEP_STR "/"
   #define PATH_SEP     '/'
+
+constexpr float MEM_SCALE = 1000.f;
 #endif
 
 
@@ -91,6 +95,7 @@ using vec2  = float[ 2 ];
 
 constexpr size_t STR_BUF_SIZE = 512;
 constexpr size_t TIME_BUFFER  = 14;
+constexpr size_t DATE_TIME_BUFFER = TIME_BUFFER + 11;
 
 
 struct str_buf_t
@@ -377,6 +382,8 @@ void        util_append_str( str_buf_t& buffer, const char* str, size_t len, siz
 // kinda lame lol
 void        util_format_time( char* buffer, double time );  // expects at least TIME_BUFFER characters in buffer
 void        util_format_time( char* buffer, size_t buffer_size, double time );
+
+void        util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool apply_time_zone = true );
 
 
 // --------------------------------------------------------------------------------------------------------

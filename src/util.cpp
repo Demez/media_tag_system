@@ -5,6 +5,7 @@
 #include <time.h>
 #include <math.h>
 #include <ctype.h>
+#include <locale>
 
 #ifdef _WIN32
   #include <direct.h>
@@ -200,6 +201,41 @@ void util_format_time( char* buffer, size_t buffer_size, double time )
 void util_format_time( char* buffer, double time )
 {
 	return util_format_time( buffer, TIME_BUFFER, time );
+}
+
+
+// TODO: This should use system locale for formatting time
+void util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool apply_time_zone )
+{
+	if ( !buffer )
+		return;
+
+	time_t     time_pos = (time_t)time;
+	struct tm* tm_info{};
+
+	if ( apply_time_zone )
+		tm_info = localtime( &time_pos );
+	else
+		tm_info = gmtime( &time_pos );
+
+	if ( !tm_info )
+	{
+		memset( buffer, '\0', buffer_size );
+		return;
+	}
+
+	// YYYY-MM-DD HH:MM:SS
+	strftime( buffer, buffer_size, "%Y-%m-%d %H:%M:%S", tm_info );
+
+	if ( buffer_size <= 19 )
+		return;
+
+	// add miliseconds
+	snprintf( buffer + 19, buffer_size - 19, "%.8f", fmod( time, 1 ) );
+
+	// move it back to get rid of the 0 lol
+	memcpy( buffer + 19, buffer + 20, buffer_size - 20 );
+	buffer[ buffer_size - 1 ] = '0';
 }
 
 

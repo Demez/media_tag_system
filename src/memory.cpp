@@ -8,8 +8,6 @@
 
 static thread_local bool MEM_TRACK_PAUSE    = false;
 
-constexpr float          MEM_SCALE          = 1024.f;
-
 e_mem_category           g_mem_redirect_src = e_mem_category_general;
 e_mem_category           g_mem_redirect_dst = e_mem_category_general;
 bool                     g_mem_redirect     = false;

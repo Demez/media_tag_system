@@ -302,17 +302,41 @@ void media_view_scroll_zoom( float scroll )
 
 void media_view_draw_media_info()
 {
+	if ( g_gallery_items.empty() )
+		return;
+
 	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar ) )
 	{
 		ImGui::End();
 		return;
 	}
 
+	gallery_item_t& item = g_gallery_items[ g_gallery_index ];
+	media_entry_t entry  = gallery_item_get_media_entry( g_gallery_index );
+
+	ImGui::TextUnformatted( entry.filename.c_str() );
+
+	ImGui::Separator();
+
+	ImGui::Text( "Size: %.3f MB", (float)item.file_size / ( MEM_SCALE * MEM_SCALE ) );
+
+	char date_created[ DATE_TIME_BUFFER ]{};
+	char date_mod[ DATE_TIME_BUFFER ]{};
+
+	util_format_date_time( date_created, DATE_TIME_BUFFER, item.date_created );
+	util_format_date_time( date_mod, DATE_TIME_BUFFER, item.date_mod );
+
+	ImGui::Text( "Date Created: %s", date_created );
+	ImGui::Text( "Date Modified: %s", date_mod );
+
+	ImGui::Separator();
+
 	if ( get_media_type() == e_media_type_video )
 	{
 	}
 	else
 	{
+
 		// Image Type
 		ImGui::Text( "Size: %dx%d", g_image.width, g_image.height );
 		ImGui::Text( "Type: %s", g_image.image_format );
@@ -320,7 +344,7 @@ void media_view_draw_media_info()
 		switch ( g_image.format )
 		{
 			default:
-				ImGui::Text( "Format: GL Format %d", g_image.format );
+				ImGui::Text( "Format: Unhandled GL Format %d", g_image.format );
 				break;
 			case GL_RGB:
 				ImGui::TextUnformatted( "Format: RGB" );
@@ -331,7 +355,6 @@ void media_view_draw_media_info()
 			case GL_RGBA16:
 				ImGui::TextUnformatted( "Format: RGBA16" );
 				break;
-
 		}
 	}
 
@@ -453,10 +476,6 @@ void media_view_context_menu()
 	}
 
 	if ( ImGui::MenuItem( "Set As Desktop Background", nullptr, false, false ) )
-	{
-	}
-
-	if ( ImGui::MenuItem( "File Info", nullptr, false, false ) )
 	{
 	}
 
