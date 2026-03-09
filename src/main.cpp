@@ -856,27 +856,21 @@ int main( int argc, char* argv[] )
 				// The system requests a file open
 				case SDL_EVENT_DROP_FILE:
 				{
-					printf( "DROP FILE\n" );
-					SDL_DropEvent& drop = event.drop;
-					drag_drop_files.push_back( drop.data );
-					// drag_drop_recieve_func( {}});
+					drag_drop_files.push_back( event.drop.data );
 					break;
 				}
 
 				// text/plain drag-and-drop event
 				case SDL_EVENT_DROP_TEXT:
-					printf( "DROP TEXT\n" );
 					break;
 
 				// A new set of drops is beginning (NULL filename)
 				case SDL_EVENT_DROP_BEGIN:
-					printf( "DROP BEGIN\n" );
 					break;
 
 				// Current set of drops is now complete (NULL filename)
 				case SDL_EVENT_DROP_COMPLETE:
 				{
-					printf( "DROP COMPLETE\n" );
 					drag_drop_recieve_func( drag_drop_files );
 					SDL_RaiseWindow( g_main_window );
 					break;
