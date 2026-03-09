@@ -15,7 +15,6 @@ std::atomic< bool > g_thumbnails_running;
 std::thread*        g_thumbnail_worker[ THUMBNAIL_THREADS ];
 std::mutex          g_thumbnail_mutex;
 
-extern int          g_gallery_image_size;
 extern void*        g_mpv_module;
 
 constexpr bool      THUMBNAIL_DEBUG_PRINT = false;
@@ -461,8 +460,8 @@ void thumbnail_loader_worker( u32 thread_id )
 			load_info.load_quick     = true;
 			load_info.threaded_load  = true;
 			load_info.thumbnail_load = true;
-			load_info.target_size.x  = g_gallery_image_size;
-			load_info.target_size.y  = g_gallery_image_size;
+			load_info.target_size.x  = gallery::image_size;
+			load_info.target_size.y  = gallery::image_size;
 
 			if ( !image_load( video_thumbnail_path, load_info ) )
 			{
@@ -482,8 +481,8 @@ void thumbnail_loader_worker( u32 thread_id )
 			load_info.load_quick     = true;
 			load_info.threaded_load  = true;
 			load_info.thumbnail_load = true;
-			load_info.target_size.x  = g_gallery_image_size;
-			load_info.target_size.y  = g_gallery_image_size;
+			load_info.target_size.x  = gallery::image_size;
+			load_info.target_size.y  = gallery::image_size;
 
 			if ( !image_load( thumbnail->path, load_info ) )
 			{

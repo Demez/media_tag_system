@@ -81,7 +81,7 @@ void mem_add_item( e_mem_category category, void* memory, size_t size )
 	stack = new std::stacktrace( std::stacktrace::current() );
 	#endif
 
-	info.sizes[ memory ] = { memory, size, g_total_time, stack };
+	info.sizes[ memory ] = { memory, size, app::total_time, stack };
 
 	info.total += size;
 	g_total_memory_allocated += size;
@@ -153,8 +153,8 @@ void mem_draw_debug_ui()
 {
 	ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
 
-	// ImGui::Text( "App Time: %.3f Sec", g_total_time );
-	ImGui::Text( "App Time: %.3f Sec", g_total_time / 1000.f );
+	// ImGui::Text( "App Time: %.3f Sec", app::total_time );
+	ImGui::Text( "App Time: %.3f Sec", app::total_time / 1000.f );
 
 	ImGui::SeparatorText( "Memory" );
 

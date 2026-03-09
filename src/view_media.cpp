@@ -7,13 +7,16 @@
 #include <mutex>
 
 // Image Draw Data
-e_zoom_mode              g_image_zoom_mode = e_zoom_mode_fit;
-double                   g_image_zoom      = 1.f;
-ImVec2                   g_image_pos{};
-ImVec2                   g_image_size{};
-bool                     g_image_flip_v            = false;
-bool                     g_image_flip_h            = false;
-float                    g_image_rot               = 0.f;
+namespace image_draw
+{
+	e_zoom_mode zoom_mode = e_zoom_mode_fit;
+	double      zoom      = 1.f;
+	ImVec2      pos{};
+	ImVec2      size{};
+	bool        flip_v = false;
+	bool        flip_h = false;
+	float       rot    = 0.f;
+}
 
 // This doesn't let you move the image outside the window
 // if zoomed in, and you move the image down and to the right, the top left corner of the image will be at the top left
@@ -28,9 +31,6 @@ bool                     g_draw_media_info         = false;
 bool                     g_draw_imgui_demo         = false;
 bool                     g_draw_mem_stats          = false;
 bool                     g_draw_zoom_level         = true;
-
-extern main_image_data_t g_image_data;
-extern main_image_data_t g_image_data_free;
 
 constexpr double         ZOOM_AMOUNT = 0.1;
 constexpr double         ZOOM_MIN    = 0.01;
@@ -60,28 +60,28 @@ void media_view_filter_image()
 {
 	g_scale_lock.lock();
 
-	if ( g_image_scaled.frame.size() )
-		ch_free( e_mem_category_stbi_resize, g_image_scaled.frame[ 0 ] );
+	if ( g_image_scaled_data.image.frame.size() )
+		ch_free( e_mem_category_stbi_resize, g_image_scaled_data.image.frame[ 0 ] );
 
-	g_image_scaled = g_scale_src;
+	g_image_scaled_data.image = g_scale_src;
 
-	g_image_scaled.frame.clear();
-	g_image_scaled.frame.resize( g_scale_src.frame.size() );
+	g_image_scaled_data.image.frame.clear();
+	g_image_scaled_data.image.frame.resize( g_scale_src.frame.size() );
 
 	// Downscale image if size is larger than target size
-	if ( g_image_size.x < g_scale_src.width )
+	if ( image_draw::size.x < g_scale_src.width )
 	{
 		//u8*   result_image_data      = stbir_resize_uint8_linear(
 		//  old_frame, thumbnail->image->width, thumbnail->image->height, 0,
 		//  nullptr, new_width, new_height, 0, STBIR_RGBA );
 
-		int new_width     = g_image_size.x;
-		int new_height    = g_image_size.y;
+		int new_width     = image_draw::size.x;
+		int new_height    = image_draw::size.y;
 
-		if ( image_downscale( &g_scale_src, &g_image_scaled, new_width, new_height ) )
+		if ( image_downscale( &g_scale_src, &g_image_scaled_data.image, new_width, new_height ) )
 			g_scale_state = e_scale_state_upload;
 
-		if ( g_scale_src.width != g_image.width )
+		if ( g_scale_src.width != g_image_scaled_data.image.width )
 			printf( "lol knew it, different image being handled\n" );
 	}
 	else
@@ -95,7 +95,7 @@ void media_view_filter_image()
 
 void media_view_scale_thread_run()
 {
-	while ( g_running )
+	while ( app::running )
 	{
 		if ( g_scale_state != e_scale_state_start )
 		{
@@ -117,26 +117,26 @@ void media_view_scale_check_timer( float frame_time )
 
 	g_scale_timer -= frame_time;
 
-	if ( g_scale_timer < 0.f && g_image.frame.size() && g_scale_state == e_scale_state_idle )
+	if ( g_scale_timer < 0.f && g_image_scaled_data.image.frame.size() && g_scale_state == e_scale_state_idle )
 	{
 		g_scale_lock.lock();
 
 		image_free( g_scale_src );
 
-		g_scale_src = g_image;
+		g_scale_src = g_image_data.image;
 
 		g_scale_src.frame.clear();
-		g_scale_src.frame.resize( g_image.frame.size() );
+		g_scale_src.frame.resize( g_image_data.image.frame.size() );
 
 		// don't hold onto this
 		g_scale_src.image_format = nullptr;
 
-		size_t image_size      = (size_t)g_image.width * (size_t)g_image.height * (size_t)g_image.bytes_per_pixel;
+		size_t image_size        = (size_t)g_image_data.image.width * (size_t)g_image_data.image.height * (size_t)g_image_data.image.bytes_per_pixel;
 		g_scale_src.frame[ 0 ] = ch_calloc< u8 >( image_size, e_mem_category_image_data );
-		memcpy( g_scale_src.frame[ 0 ], g_image.frame[ 0 ], image_size * sizeof( u8 ) );
+		memcpy( g_scale_src.frame[ 0 ], g_image_data.image.frame[ 0 ], image_size * sizeof( u8 ) );
 
-		g_image_scaled_index = g_gallery_index;
-		g_scale_state        = e_scale_state_start;
+		g_image_scaled_data.index = gallery::cursor;
+		g_scale_state             = e_scale_state_start;
 
 		g_scale_lock.unlock();
 	}
@@ -167,10 +167,10 @@ void media_view_shutdown()
 
 static e_media_type get_media_type()
 {
-	if ( g_gallery_items.size() <= g_gallery_index )
+	if ( gallery::items.size() <= gallery::cursor )
 		return e_media_type_none;
 
-	return gallery_item_get_media_entry( g_gallery_index ).type;
+	return gallery_item_get_media_entry( gallery::cursor ).type;
 }
 
 
@@ -178,37 +178,37 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 {
 	// new image size
 	int width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	// Fit image in window size
 	float factor[ 2 ] = { 1.f, 1.f };
 
-	if ( g_image.width > width )
-		factor[ 0 ] = (float)width / (float)g_image.width;
+	if ( g_image_data.image.width > width )
+		factor[ 0 ] = (float)width / (float)g_image_data.image.width;
 
-	if ( g_image.height > height )
-		factor[ 1 ] = (float)height / (float)g_image.height;
+	if ( g_image_data.image.height > height )
+		factor[ 1 ] = (float)height / (float)g_image_data.image.height;
 
 	if ( adjust_zoom )
 	{
 		float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
-		g_image_size.x   = g_image.width * zoom_level;
-		g_image_size.y   = g_image.height * zoom_level;
+		image_draw::size.x    = g_image_data.image.width * zoom_level;
+		image_draw::size.y    = g_image_data.image.height * zoom_level;
 
-		g_image_zoom     = zoom_level;
+		image_draw::zoom     = zoom_level;
 
-		g_image_zoom_mode = e_zoom_mode_fit;
+		image_draw::zoom_mode = e_zoom_mode_fit;
 	}
 
 	// TODO: only adjust this if needed, check image zoom type
 	// if image doesn't fit window size, keep locked to center
 
 	//if ( factor[ 0 ] < 1.f )
-		g_image_pos.x = width / 2 - ( g_image_size.x / 2 );
+		image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
 
 	//if ( factor[ 1 ] < 1.f )
-		g_image_pos.y = height / 2 - ( g_image_size.y / 2 );
+		image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
 
 	media_view_scale_reset_timer();
 }
@@ -217,18 +217,18 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 void media_view_zoom_reset()
 {
 	// keep where we are centered on in the image
-	g_image_pos.x = 1 / g_image_zoom * ( g_image_pos.x );
-	g_image_pos.y = 1 / g_image_zoom * ( g_image_pos.y );
+	image_draw::pos.x = 1 / image_draw::zoom * ( image_draw::pos.x );
+	image_draw::pos.y = 1 / image_draw::zoom * ( image_draw::pos.y );
 
-	g_image_zoom  = 1.0;
+	image_draw::zoom  = 1.0;
 
-	g_image_zoom_mode = e_zoom_mode_fixed;
+	image_draw::zoom_mode = e_zoom_mode_fixed;
 
-	if ( !g_image.frame[ 0 ] )
+	if ( !g_image_data.image.frame[ 0 ] )
 		return;
 
-	g_image_size.x = g_image.width;
-	g_image_size.y = g_image.height;
+	image_draw::size.x = g_image_data.image.width;
+	image_draw::size.y = g_image_data.image.height;
 
 	media_view_scale_reset_timer();
 }
@@ -248,7 +248,7 @@ void media_view_scroll_zoom( float scroll )
 	if ( scroll > 0 )
 	{
 		// max zoom level
-		if ( g_image_zoom >= 100.0 )
+		if ( image_draw::zoom >= 100.0 )
 			return;
 
 		factor += ( ZOOM_AMOUNT * scroll );
@@ -256,7 +256,7 @@ void media_view_scroll_zoom( float scroll )
 	else
 	{
 		// min zoom level
-		if ( g_image_zoom <= ZOOM_MIN )
+		if ( image_draw::zoom <= ZOOM_MIN )
 			return;
 
 		factor -= ( ZOOM_AMOUNT * abs( scroll ) );
@@ -265,44 +265,44 @@ void media_view_scroll_zoom( float scroll )
 	// TODO: add zoom levels to snap to here
 	// 100, 200, 400, 500, 50, 25, etc
 
-	// auto rounded_zoom = std::max( 0.01f, roundf( g_image_zoom * factor * 100 ) / 100 );
+	// auto rounded_zoom = std::max( 0.01f, roundf( image_draw::zoom * factor * 100 ) / 100 );
 	// 
 	// if ( fmod( rounded_zoom, 1.0 ) == 0 )
-	// 	factor = rounded_zoom / g_image_zoom;
+	// 	factor = rounded_zoom / image_draw::zoom;
 
-	double old_zoom = g_image_zoom;
+	double old_zoom = image_draw::zoom;
 
-	g_image_zoom = (double)( std::max( 1.f, g_image_size.x ) * factor ) / (double)g_image.width;
+	image_draw::zoom    = (double)( std::max( 1.f, image_draw::size.x ) * factor ) / (double)g_image_data.image.width;
 
 	// round it so we don't get something like 0.9999564598 or whatever instead of 1.0
-	//if ( g_image_zoom < 0.01 )
+	//if ( image_draw::zoom < 0.01 )
 	//{
-	//	g_image_zoom = std::max( ZOOM_MIN, round( g_image_zoom * 10000 ) / 10000 );
+	//	image_draw::zoom = std::max( ZOOM_MIN, round( image_draw::zoom * 10000 ) / 10000 );
 	//}
 	//else
 	{
-		g_image_zoom = std::max( ZOOM_MIN, round( g_image_zoom * 1000 ) / 1000 );
+		image_draw::zoom = std::max( ZOOM_MIN, round( image_draw::zoom * 1000 ) / 1000 );
 	}
 
 	// recalculate draw width and height
-	g_image_size.x = (double)g_image.width * g_image_zoom;
-	g_image_size.y = (double)g_image.height * g_image_zoom;
+	image_draw::size.x = (double)g_image_data.image.width * image_draw::zoom;
+	image_draw::size.y = (double)g_image_data.image.height * image_draw::zoom;
 
 	// recalculate image position to keep image where cursor is
 
 	// New Position = Scale Origin + ( Scale Point - Scale Origin ) * Scale Factor
-	g_image_pos.x  = (double)g_mouse_pos[ 0 ] + ( g_image_pos.x - (double)g_mouse_pos[ 0 ] ) * factor;
-	g_image_pos.y  = (double)g_mouse_pos[ 1 ] + ( g_image_pos.y - (double)g_mouse_pos[ 1 ] ) * factor;
+	image_draw::pos.x  = (double)app::mouse_pos[ 0 ] + ( image_draw::pos.x - (double)app::mouse_pos[ 0 ] ) * factor;
+	image_draw::pos.y  = (double)app::mouse_pos[ 1 ] + ( image_draw::pos.y - (double)app::mouse_pos[ 1 ] ) * factor;
 
 	media_view_scale_reset_timer();
 
-	g_image_zoom_mode = e_zoom_mode_fixed;
+	image_draw::zoom_mode = e_zoom_mode_fixed;
 }
 
 
 void media_view_draw_media_info()
 {
-	if ( g_gallery_items.empty() )
+	if ( gallery::items.empty() )
 		return;
 
 	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar ) )
@@ -311,8 +311,8 @@ void media_view_draw_media_info()
 		return;
 	}
 
-	gallery_item_t& item = g_gallery_items[ g_gallery_index ];
-	media_entry_t entry  = gallery_item_get_media_entry( g_gallery_index );
+	gallery_item_t& item = gallery::items[ gallery::cursor ];
+	media_entry_t entry  = gallery_item_get_media_entry( gallery::cursor );
 
 	ImGui::TextUnformatted( entry.filename.c_str() );
 
@@ -338,22 +338,22 @@ void media_view_draw_media_info()
 	{
 
 		// Image Type
-		ImGui::Text( "Size: %dx%d", g_image.width, g_image.height );
-		ImGui::Text( "Type: %s", g_image.image_format );
+		ImGui::Text( "Size: %dx%d", g_image_data.image.width, g_image_data.image.height );
+		ImGui::Text( "Type: %s", g_image_data.image.image_format );
 
-		switch ( g_image.format )
+		switch ( g_image_data.image.format )
 		{
 			default:
-				ImGui::Text( "Format: Unhandled GL Format %d", g_image.format );
+				ImGui::Text( "Format: Unhandled GL Format %d", g_image_data.image.format );
 				break;
 			case GL_RGB:
-				ImGui::TextUnformatted( "Format: RGB" );
+				ImGui::TextUnformatted( "GL Format: RGB" );
 				break;
 			case GL_RGBA:
-				ImGui::TextUnformatted( "Format: RGBA" );
+				ImGui::TextUnformatted( "GL Format: RGBA" );
 				break;
 			case GL_RGBA16:
-				ImGui::TextUnformatted( "Format: RGBA16" );
+				ImGui::TextUnformatted( "GL Format: RGBA16" );
 				break;
 		}
 	}
@@ -383,31 +383,31 @@ void media_view_context_menu()
 	ImGui::Separator();
 
 	if ( ImGui::Button( "RL" ) )
-		g_image_rot -= 90;
+		image_draw::rot -= 90;
 
 	ImGui::SameLine();
 
 	if ( ImGui::Button( "RR" ) )
-		g_image_rot += 90;
+		image_draw::rot += 90;
 
 	ImGui::SameLine();
 
 	if ( ImGui::Button( "R" ) )
-		g_image_rot = 0;
+		image_draw::rot = 0;
 
 	ImGui::SameLine();
 
 	if ( ImGui::Button( "H" ) )
-		g_image_flip_h = !g_image_flip_h;
+		image_draw::flip_h = !image_draw::flip_h;
 
 	ImGui::SameLine();
 
 	if ( ImGui::Button( "V" ) )
-		g_image_flip_v = !g_image_flip_v;
+		image_draw::flip_v = !image_draw::flip_v;
 
 	ImGui::Separator();
 
-	ImGui::SliderFloat( "rotate", &g_image_rot, 0, 360 );
+	ImGui::SliderFloat( "rotate", &image_draw::rot, 0, 360 );
 
 	ImGui::Separator();
 
@@ -424,29 +424,29 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Rotate Left", nullptr, false, g_image_data.texture ) )
 	{
-		g_image_rot -= 90;
+		image_draw::rot -= 90;
 	}
 
 	if ( ImGui::MenuItem( "Rotate Right", nullptr, false, g_image_data.texture ) )
 	{
-		g_image_rot += 90;
+		image_draw::rot += 90;
 	}
 
-	// ImGui::SliderFloat( "Rotate Slider", &g_image_rot, 0, 360 );
+	// ImGui::SliderFloat( "Rotate Slider", &image_draw::rot, 0, 360 );
 
 	if ( ImGui::MenuItem( "Reset Rotation", nullptr, false, g_image_data.texture ) )
 	{
-		g_image_rot = 0;
+		image_draw::rot = 0;
 	}
 
-	if ( ImGui::MenuItem( "Flip Horizontally", nullptr, g_image_flip_h, g_image_data.texture) )
+	if ( ImGui::MenuItem( "Flip Horizontally", nullptr, image_draw::flip_h, g_image_data.texture) )
 	{
-		g_image_flip_h = !g_image_flip_h;
+		image_draw::flip_h = !image_draw::flip_h;
 	}
 
-	if ( ImGui::MenuItem( "Flip Vertically", nullptr, g_image_flip_v, g_image_data.texture ) )
+	if ( ImGui::MenuItem( "Flip Vertically", nullptr, image_draw::flip_v, g_image_data.texture ) )
 	{
-		g_image_flip_v = !g_image_flip_v;
+		image_draw::flip_v = !image_draw::flip_v;
 	}
 
 	ImGui::Separator();
@@ -454,7 +454,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
 	{
-		sys_browse_to_file( gallery_item_get_path_string( g_gallery_index ).c_str() );
+		sys_browse_to_file( gallery_item_get_path_string( gallery::cursor ).c_str() );
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -467,7 +467,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Copy File", nullptr, false ) )
 	{
-		sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
+		sys_copy_to_clipboard( gallery_item_get_path_string( gallery::cursor ).data() );
 		push_notification( "Copied" );
 	}
 
@@ -484,7 +484,7 @@ void media_view_context_menu()
 		// TODO: create our own imgui file properties for more info
 		// Plat_OpenFileProperties( ImageView_GetImagePath() );
 
-		sys_open_file_properties( gallery_item_get_path_string( g_gallery_index ).c_str() );
+		sys_open_file_properties( gallery_item_get_path_string( gallery::cursor ).c_str() );
 	}
 
 	// TODO: side menu to show information on the image or video overlayed next to the image in a window
@@ -574,9 +574,9 @@ void media_view_input()
 {
 	if ( g_scale_state == e_scale_state_upload )
 	{
-		if ( g_image_scaled_index == g_gallery_index )
+		if ( g_image_scaled_data.index == gallery::cursor )
 		{
-			gl_update_texture( g_image_scaled_data.texture, &g_image_scaled );
+			gl_update_texture( g_image_scaled_data.texture, &g_image_scaled_data.image );
 			g_scale_use = true;
 			printf( "Scaled Main Image\n" );
 		}
@@ -602,9 +602,9 @@ void media_view_input()
 	}
 
 	// TODO: Test ImGui::Shortcut()
-	if ( g_window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
+	if ( app::window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 	{
-		sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
+		sys_copy_to_clipboard( gallery_item_get_path_string( gallery::cursor ).data() );
 		printf( "Copied to Clipboard\n" );
 		push_notification( "Copied" );
 	}
@@ -624,15 +624,15 @@ void media_view_input()
 
 	if ( g_image_pan )
 	{
-		g_image_pos.x += g_mouse_delta[ 0 ];
-		g_image_pos.y += g_mouse_delta[ 1 ];
+		image_draw::pos.x += app::mouse_delta[ 0 ];
+		image_draw::pos.y += app::mouse_delta[ 1 ];
 	}
 }
 
 
 void media_view_window_resize()
 {
-	if ( g_image_zoom_mode == e_zoom_mode_fit || g_image_zoom_mode == e_zoom_mode_fit_width )
+	if ( image_draw::zoom_mode == e_zoom_mode_fit || image_draw::zoom_mode == e_zoom_mode_fit_width )
 	{
 		media_view_fit_in_view();
 	}
@@ -641,25 +641,25 @@ void media_view_window_resize()
 
 void media_view_load()
 {
-	if ( g_gallery_items.empty() )
+	if ( gallery::items.empty() )
 		return;
 
-	if ( g_gallery_index >= g_gallery_items.size() )
+	if ( gallery::cursor >= gallery::items.size() )
 		return;
 
 	float             load_time    = 0.f;
-	// gallery_item_t&   gallery_item = g_gallery_items[ g_gallery_index ];
-	media_entry_t     entry        = gallery_item_get_media_entry( g_gallery_index );
+	// gallery_item_t&   gallery_item = gallery::items[ gallery::cursor ];
+	media_entry_t     entry        = gallery_item_get_media_entry( gallery::cursor );
 
 	image_load_info_t image_load_info{};
-	image_load_info.image = &g_image;
+	image_load_info.image = &g_image_data.image;
 
 	{
 		auto startTime = std::chrono::high_resolution_clock::now();
 
 		if ( entry.type == e_media_type_image )
 		{
-			// g_image_view.image = g_test_codec->image_load( g_folder_media_list[ g_folder_index ] );
+			// g_image_view.image = g_test_codec->image_load( directory::media_list[ g_folder_index ] );
 			image_load( entry.path, image_load_info );
 			mpv_cmd_close_video();
 		}
@@ -678,7 +678,7 @@ void media_view_load()
 		{
 			if ( image_load_info.image->frame.size() > 0 && image_load_info.image->bytes_per_pixel > 0 )
 			{
-				gl_update_texture( g_image_data.texture, &g_image );
+				gl_update_texture( g_image_data.texture, &g_image_data.image );
 				media_view_fit_in_view();
 			}
 			else
@@ -687,16 +687,13 @@ void media_view_load()
 			}
 		}
 
-	//	g_image_data.surface = SDL_CreateSurfaceFrom( g_image.width, g_image.height, g_image.format, g_image.frame, g_image.pitch );
-	//	g_image_data.texture = SDL_CreateTextureFromSurface( g_main_renderer, g_image_data.surface );
-
 		// auto  currentTime    = std::chrono::high_resolution_clock::now();
 		// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-		//printf( "%f Load - %f Up - %s\n", load_time, up_time, g_folder_media_list[ g_folder_index ].string().c_str() );
+		//printf( "%f Load - %f Up - %s\n", load_time, up_time, directory::media_list[ g_folder_index ].string().c_str() );
 		printf( "%f Load - %s\n", load_time, entry.path.string().c_str() );
 	}
 
-	g_media_index = g_gallery_index;
+	g_image_data.index = gallery::cursor;
 
 	update_window_title();
 
@@ -706,31 +703,29 @@ void media_view_load()
 
 void media_view_advance( bool prev )
 {
-	if ( g_gallery_items.size() <= 1 )
+	if ( gallery::items.size() <= 1 )
 		return;
 
 	if ( get_media_type() == e_media_type_video )
 		mpv_cmd_close_video();
-	//else
-	//	g_image_data_free = g_image_data;
 
 advance:
 	if ( prev )
 	{
-		if ( g_gallery_index == 0 )
-			g_gallery_index = g_gallery_items.size();
+		if ( gallery::cursor == 0 )
+			gallery::cursor = gallery::items.size();
 
-		g_gallery_index--;
+		gallery::cursor--;
 	}
 	else
 	{
-		g_gallery_index++;
+		gallery::cursor++;
 
-		if ( g_gallery_index == g_gallery_items.size() )
-			g_gallery_index = 0;
+		if ( gallery::cursor == gallery::items.size() )
+			gallery::cursor = 0;
 	}
 
-	if ( gallery_item_get_media_entry( g_gallery_index ).type == e_media_type_directory )
+	if ( gallery_item_get_media_entry( gallery::cursor ).type == e_media_type_directory )
 		goto advance;
 
 	media_view_load();
@@ -764,7 +759,7 @@ void media_view_draw_video_controls()
 	}
 
 	int width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	ImVec2 playback_control_pos{};
 	playback_control_pos.x = width / 2;
@@ -980,7 +975,7 @@ void media_view_draw_imgui()
 		if ( g_draw_zoom_level )
 		{
 			ImGui::Begin( "##zoom_level", 0, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration );
-			ImGui::Text( "%.1f%%", (float)( g_image_zoom * 100 ) );
+			ImGui::Text( "%.1f%%", (float)( image_draw::zoom * 100 ) );
 			ImGui::End();
 		}
 	}
@@ -999,25 +994,25 @@ float vertices[] = {
 static void media_view_draw_image()
 {
 	SDL_FRect dst_rect{};
-	dst_rect.w = g_image_size.x;
-	dst_rect.h = g_image_size.y;
-	dst_rect.x = g_image_pos.x;
-	dst_rect.y = g_image_pos.y;
+	dst_rect.w = image_draw::size.x;
+	dst_rect.h = image_draw::size.y;
+	dst_rect.x = image_draw::pos.x;
+	dst_rect.y = image_draw::pos.y;
 
-	if ( g_image_flip_h )
+	if ( image_draw::flip_h )
 	{
-		dst_rect.w = -g_image_size.x;
-		dst_rect.x += g_image_size.x;
+		dst_rect.w = -image_draw::size.x;
+		dst_rect.x += image_draw::size.x;
 	}
 
-	if ( g_image_flip_v )
+	if ( image_draw::flip_v )
 	{
-		dst_rect.h = -g_image_size.y;
-		dst_rect.y += g_image_size.y;
+		dst_rect.h = -image_draw::size.y;
+		dst_rect.y += image_draw::size.y;
 	}
 
 	int width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	glEnable( GL_BLEND );
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
@@ -1046,7 +1041,7 @@ static void media_view_draw_image()
 	float image_center_y = dst_rect.y + dst_rect.h * 0.5f;
 
 	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
-	glRotatef( g_image_rot, 0, 0, 1 );                       // rotate around the image
+	glRotatef( image_draw::rot, 0, 0, 1 );                       // rotate around the image
 	glTranslatef( -image_center_x, -image_center_y, 0.0f );  // move back
  
  	glBegin( GL_QUADS );

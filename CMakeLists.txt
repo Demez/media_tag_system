@@ -169,6 +169,8 @@ set(
     src/memory.cpp
 
     src/view_gallery.cpp
+    src/view_gallery_sidebar.cpp
+
     src/view_media.cpp
 	
     src/util.cpp

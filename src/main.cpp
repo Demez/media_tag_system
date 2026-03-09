@@ -8,51 +8,56 @@
 
 #include <chrono>
 
-// ImVec4                       g_clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
-ImVec4                       g_clear_color = ImVec4( 0.05f, 0.05f, 0.05f, 1.00f );
+// General App Data
+namespace app
+{
+	bool        running        = true;
 
-SDL_Window*                  g_main_window = nullptr;
-SDL_GLContext                g_gl_context;
+	SDL_Window* window         = nullptr;
+	bool        window_focused = false;
+	bool        window_resized = false;
 
-// double                       g_total_time;
-u64                          g_total_time;
-float                        g_frame_time;
+	// ImVec4                       clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
+	ImVec4      clear_color    = ImVec4( 0.05f, 0.05f, 0.05f, 1.00f );
 
-bool                         g_running             = true;
-bool                         g_window_focused      = false;
+	u64         total_time     = 0;
+	float       frame_time     = 0.f;
+
+	ivec2       mouse_delta;
+	ivec2       mouse_pos;
+
+	// imgui scroll hack lol
+	bool        mouse_scrolled_up;
+	bool        mouse_scrolled_down;
+}
+
+
+// ImGui Fonts
+namespace font
+{
+	ImFont* normal        = nullptr;
+	ImFont* normal_bold   = nullptr;
+	ImFont* normal_italic = nullptr;
+}
+
+
+// Current Working Directory Information
+namespace directory
+{
+	fs::path                     path;
+	fs::path                     queued;  // will change to this folder start of next frame
+	std::vector< media_entry_t > media_list;
+	std::vector< h_thumbnail >   thumbnail_list;
+}
+
+
 bool                         g_gallery_view        = false;
-bool                         g_mpv_ready           = false;
-
-bool                         g_mouse_scrolled_up   = false;
-bool                         g_mouse_scrolled_down = false;
-bool                         g_window_resized      = false;
-
-ivec2                        g_mouse_delta{};
-ivec2                        g_mouse_pos{};
 
 // Main Image
-image_t                      g_image;
-image_t                      g_image_scaled;
 main_image_data_t            g_image_data;
 main_image_data_t            g_image_scaled_data;
-size_t                       g_image_scaled_index = 0;
-size_t                       g_media_index = 0;
 
-// Previous Image to Free
-main_image_data_t            g_image_data_free;
-
-fs::path                     g_folder;
-fs::path                     g_folder_queued;
-std::vector< media_entry_t > g_folder_media_list;
-std::vector< h_thumbnail >   g_folder_thumbnail_list;
-size_t                       g_gallery_index = 0;
-
-extern bool                  g_gallery_item_size_changed;
-extern std::vector< ImVec2 > g_gallery_item_text_size;
-
-ImFont*                      g_default_font        = nullptr;
-ImFont*                      g_default_font_bold   = nullptr;
-ImFont*                      g_default_font_italic = nullptr;
+static SDL_GLContext         g_gl_context;
 
 struct notification_t
 {
@@ -73,7 +78,7 @@ bool mouse_hovering_imgui_window()
 {
 	ImGuiContext& g = *ImGui::GetCurrentContext();
 
-	ImVec2        imMousePos{ (float)g_mouse_pos[ 0 ], (float)g_mouse_pos[ 1 ] };
+	ImVec2        imMousePos{ (float)app::mouse_pos[ 0 ], (float)app::mouse_pos[ 1 ] };
 
 	ImGuiWindow*  hovered_window                     = NULL;
 	ImGuiWindow*  hovered_window_under_moving_window = NULL;
@@ -134,17 +139,17 @@ void update_window_title()
 
 	if ( g_gallery_view )
 	{
-		snprintf( buf, 512, "Media Tag System - %s", g_folder.string().c_str() );
+		snprintf( buf, 512, "Media Tag System - %s", directory::path.string().c_str() );
 	}
 	else
 	{
-		if ( g_folder_media_list.size() > g_gallery_index )
-			snprintf( buf, 512, "Media Tag System [%d / %d] - %s", g_gallery_index, g_gallery_items.size(), gallery_item_get_path_string( g_gallery_index ).c_str() );
+		if ( directory::media_list.size() > gallery::cursor )
+			snprintf( buf, 512, "Media Tag System [%d / %d] - %s", gallery::cursor, gallery::items.size(), gallery_item_get_path_string( gallery::cursor ).c_str() );
 		else
 			snprintf( buf, 512, "Media Tag System" );
 	}
 
-	SDL_SetWindowTitle( g_main_window, buf );
+	SDL_SetWindowTitle( app::window, buf );
 }
 
 
@@ -152,22 +157,22 @@ void folder_load_media_list()
 {
 	thumbnail_clear_cache();
 
-	g_folder_media_list.clear();
-	g_folder_thumbnail_list.clear();
+	directory::media_list.clear();
+	directory::thumbnail_list.clear();
 
-	g_folder_media_list.reserve( 5000 );
-	g_folder_thumbnail_list.reserve( 5000 );
+	directory::media_list.reserve( 5000 );
+	directory::thumbnail_list.reserve( 5000 );
 
-	g_gallery_item_size_changed = true;
-	g_gallery_item_text_size.clear();
+	gallery::item_size_changed = true;
+	gallery::item_text_size.clear();
 
-	for ( const auto& entry : fs::directory_iterator( g_folder ) )
+	for ( const auto& entry : fs::directory_iterator( directory::path ) )
 	{
 		const fs::path& path = entry.path();
 
 		if ( entry.is_directory() )
 		{
-			g_folder_media_list.emplace_back( path, path.filename().string(), e_media_type_directory );
+			directory::media_list.emplace_back( path, path.filename().string(), e_media_type_directory );
 			continue;
 		}
 
@@ -205,21 +210,21 @@ void folder_load_media_list()
 		if ( !valid_ext )
 			continue;
 
-		g_folder_media_list.emplace_back( path, path.filename().string(), type );
-		// g_folder_thumbnail_list.push_back( UINT32_MAX );
+		directory::media_list.emplace_back( path, path.filename().string(), type );
+		// directory::thumbnail_list.push_back( UINT32_MAX );
 	}
 
-	g_folder_thumbnail_list.resize( g_folder_media_list.size() );
+	directory::thumbnail_list.resize( directory::media_list.size() );
 
 	gallery_view_dir_change();
 	
-	g_gallery_item_text_size.resize( g_folder_media_list.size() );
+	gallery::item_text_size.resize( directory::media_list.size() );
 }
 
 
 void push_notification( const char* msg )
 {
-	g_notification_queue.emplace_back( msg, g_total_time, NOTIFICATION_DURATION );
+	g_notification_queue.emplace_back( msg, app::total_time, NOTIFICATION_DURATION );
 }
 
 
@@ -262,7 +267,7 @@ void notification_draw( float frame_time )
 	// draw last few notifications
 
 	int width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	ImVec2 notif_pos{};
 	notif_pos.x = width / 2;
@@ -387,7 +392,7 @@ void set_view_type_gallery()
 	if ( g_gallery_view )
 		return;
 
-	media_entry_t entry = gallery_item_get_media_entry( g_gallery_index );
+	media_entry_t entry = gallery_item_get_media_entry( gallery::cursor );
 
 	// clear mpv
 	// mpv_cmd_loadfile( "" );
@@ -402,7 +407,7 @@ void set_view_type_gallery()
 		int         cmd_ret   = p_mpv_command_async( g_mpv, 0, cmd );
 	}
 
-	gallery_view_scroll_to_selected();
+	gallery_view_scroll_to_cursor();
 
 	g_gallery_view = true;
 
@@ -415,7 +420,7 @@ void set_view_type_media()
 	//if ( !g_gallery_view )
 	//	return;
 
-	if ( g_media_index != g_gallery_index )
+	if ( g_image_data.index != gallery::cursor )
 		media_view_load();
 
 	if ( g_mpv_resume_on_focus )
@@ -443,17 +448,17 @@ void on_new_file( const fs::path& file_path )
 			return;
 	}
 
-	g_folder_queued = file_path;
+	directory::queued = file_path;
 
 #if 0
 	folder_load_media_list();
 
-	for ( size_t i = 0; i < g_gallery_items.size(); i++ )
+	for ( size_t i = 0; i < gallery::items.size(); i++ )
 	{
 		if ( gallery_item_get_path( i ) == file_path )
 		{
-			g_gallery_index = i;
-			g_folder_queued.clear();
+			gallery::cursor = i;
+			directory::queued.clear();
 
 			if ( is_file )
 			{
@@ -469,7 +474,7 @@ void on_new_file( const fs::path& file_path )
 	}
 
 	// probably not a supported file
-	g_gallery_index = 0;
+	gallery::cursor = 0;
 #endif
 }
 
@@ -589,13 +594,13 @@ void window_quick_draw()
 	ImGui_ImplOpenGL3_NewFrame();
 
 	int  width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	glViewport( 0, 0, width, height );
-	glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
+	glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
 	glClear( GL_COLOR_BUFFER_BIT );
 
-	imgui_draw( g_frame_time );
+	imgui_draw( app::frame_time );
 	media_view_scale_reset_timer();
 
 	if ( !g_gallery_view )
@@ -603,7 +608,7 @@ void window_quick_draw()
 
 	ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 
-	SDL_GL_SwapWindow( g_main_window );
+	SDL_GL_SwapWindow( app::window );
 }
 
 
@@ -645,15 +650,15 @@ int main( int argc, char* argv[] )
 		return 1;
 	}
 
-	g_main_window = SDL_CreateWindow( "Media Tag System", 1600, 900, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL );
+	app::window = SDL_CreateWindow( "Media Tag System", 1600, 900, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL );
 
-	if ( !g_main_window )
+	if ( !app::window )
 	{
 		printf( "Failed to create SDL window\n" );
 		return 1;
 	}
 
-	SDL_SetWindowMinimumSize( g_main_window, 640, 480 );
+	SDL_SetWindowMinimumSize( app::window, 640, 480 );
 
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_FILE, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_TEXT, false );
@@ -661,10 +666,10 @@ int main( int argc, char* argv[] )
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_COMPLETE, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_POSITION, false );
 
-	sys_set_window( g_main_window );
+	sys_set_window( app::window );
 	sys_set_receive_drag_drop_func( drag_drop_recieve_func );
 
-	g_gl_context = SDL_GL_CreateContext( g_main_window );
+	g_gl_context = SDL_GL_CreateContext( app::window );
 	
 	if ( !g_gl_context )
 	{
@@ -672,7 +677,7 @@ int main( int argc, char* argv[] )
 		return 1;
 	}
 	
-	SDL_GL_MakeCurrent( g_main_window, g_gl_context );
+	SDL_GL_MakeCurrent( app::window, g_gl_context );
 
 	if ( !gladLoadGL() )
 	{
@@ -686,7 +691,7 @@ int main( int argc, char* argv[] )
 
 	ImGui::CreateContext();
 
-	if ( !ImGui_ImplSDL3_InitForOpenGL( g_main_window, g_gl_context ) )
+	if ( !ImGui_ImplSDL3_InitForOpenGL( app::window, g_gl_context ) )
 	{
 		printf( "Failed to init imgui for sdl3\n" );
 		return 1;
@@ -706,21 +711,21 @@ int main( int argc, char* argv[] )
 
 		{
 			ImFontConfig font_cfg{};
-			load_default_font( font_data, g_default_font, font_cfg, false );
+			load_default_font( font_data, font::normal, font_cfg, false );
 		}
 
 		{
 			ImFontConfig font_cfg{};
 			snprintf( font_cfg.Name, 40, "Default - Bold" );
 			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bold;
-			load_default_font( font_data, g_default_font_bold, font_cfg, false );
+			load_default_font( font_data, font::normal_bold, font_cfg, false );
 		}
 	
 		{
 			ImFontConfig font_cfg{};
 			snprintf( font_cfg.Name, 40, "Default - Oblique" );
 			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Oblique;
-			load_default_font( font_data, g_default_font_italic, font_cfg, false );
+			load_default_font( font_data, font::normal_italic, font_cfg, false );
 		}
 
 		ImGui_ImplOpenGL3_CreateDeviceObjects();
@@ -731,7 +736,7 @@ int main( int argc, char* argv[] )
 	ImGuiIO& io = ImGui::GetIO();
 
 	int      width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 	io.DisplaySize.x   = width;
 	io.DisplaySize.y   = height;
 
@@ -745,8 +750,6 @@ int main( int argc, char* argv[] )
 	{
 		if ( !start_mpv() )
 			printf( "Failed to start MPV\n" );
-		else
-			g_mpv_ready = true;
 	}
 
 	if ( !thumbnail_loader_init() )
@@ -762,7 +765,7 @@ int main( int argc, char* argv[] )
 
 	// ----------------------------------------------------------------
 
-	g_folder_queued = sys_get_cwd();
+	directory::queued = sys_get_cwd();
 
 	if ( argc > 1 )
 	{
@@ -775,7 +778,7 @@ int main( int argc, char* argv[] )
 			{
 				if ( fs_is_dir( arg ) )
 				{
-					g_folder_queued = arg;
+					directory::queued = arg;
 					g_gallery_view  = true;
 				}
 				else
@@ -789,12 +792,12 @@ int main( int argc, char* argv[] )
 		}
 	}
 
-//	if ( !g_folder_queued.empty() )
+//	if ( !directory::queued.empty() )
 //	{
-//		g_folder = g_folder_queued;
+//		directory::path = directory::queued;
 //
 //		folder_load_media_list();
-//		g_folder_queued.clear();
+//		directory::queued.clear();
 //	}
 
 	bool run_after_first_loop_hack = true;
@@ -816,13 +819,13 @@ int main( int argc, char* argv[] )
 
 	printf( "%.3f STARTUP TIME\n", time );
 
-	while ( g_running )
+	while ( app::running )
 	{
 		bool playing_back_video = false;
 
-		if ( !g_gallery_view && g_gallery_items.size() )
+		if ( !g_gallery_view && gallery::items.size() )
 		{
-			media_entry_t entry = gallery_item_get_media_entry( g_gallery_index );
+			media_entry_t entry = gallery_item_get_media_entry( gallery::cursor );
 
 			if ( entry.type == e_media_type_video )
 			{
@@ -858,29 +861,29 @@ int main( int argc, char* argv[] )
 					continue;
 			}
 
-			g_frame_time = time;
-			g_total_time += ( time * 1000.f );
+			app::frame_time = time;
+			app::total_time += ( time * 1000.f );
 		}
 
 		sys_update();
 
 		drag_drop_files.clear();
 
-		if ( !g_folder_queued.empty() )
+		if ( !directory::queued.empty() )
 		{
-			bool is_file = fs_is_file( g_folder_queued.string().c_str() );
+			bool is_file = fs_is_file( directory::queued.string().c_str() );
 
 			if ( is_file )
 			{
-				g_folder = g_folder_queued.parent_path();
+				directory::path = directory::queued.parent_path();
 				folder_load_media_list();
 				
-				for ( size_t i = 0; i < g_gallery_items.size(); i++ )
+				for ( size_t i = 0; i < gallery::items.size(); i++ )
 				{
-					if ( gallery_item_get_path( i ) == g_folder_queued )
+					if ( gallery_item_get_path( i ) == directory::queued )
 					{
-						g_gallery_index = i;
-						g_folder_queued.clear();
+						gallery::cursor = i;
+						directory::queued.clear();
 						//media_view_load();
 						set_view_type_media();
 						break;
@@ -889,8 +892,10 @@ int main( int argc, char* argv[] )
 			}
 			else
 			{
-				g_folder = g_folder_queued;
-				g_folder_queued.clear();
+				gallery::cursor = 0;
+				directory::path = directory::queued;
+				directory::queued.clear();
+				gallery_view_scroll_to_cursor();
 				folder_load_media_list();
 				set_view_type_gallery();
 			}
@@ -898,12 +903,12 @@ int main( int argc, char* argv[] )
 		
 		thumbnail_loader_update();
 
-		g_mouse_scrolled_up   = false;
-		g_mouse_scrolled_down = false;
-		g_window_resized      = false;
+		app::mouse_scrolled_up   = false;
+		app::mouse_scrolled_down = false;
+		app::window_resized      = false;
 
-		g_mouse_delta[ 0 ]    = 0.f;
-		g_mouse_delta[ 1 ]    = 0.f;
+		app::mouse_delta[ 0 ]    = 0.f;
+		app::mouse_delta[ 1 ]    = 0.f;
 
 		// Handle Events
 		SDL_Event event;
@@ -915,38 +920,38 @@ int main( int argc, char* argv[] )
 			{
 				case SDL_EVENT_MOUSE_WHEEL:
 					if ( event.wheel.integer_y > 0 )
-						g_mouse_scrolled_up = true;
+						app::mouse_scrolled_up = true;
 					else
-						g_mouse_scrolled_down = true;
+						app::mouse_scrolled_down = true;
 
 					media_view_scroll_zoom( event.wheel.integer_y );
 					break;
 
 				case SDL_EVENT_MOUSE_MOTION:
-					g_mouse_pos[ 0 ] = event.motion.x;
-					g_mouse_pos[ 1 ] = event.motion.y;
-					g_mouse_delta[ 0 ] += event.motion.xrel;
-					g_mouse_delta[ 1 ] += event.motion.yrel;
+					app::mouse_pos[ 0 ] = event.motion.x;
+					app::mouse_pos[ 1 ] = event.motion.y;
+					app::mouse_delta[ 0 ] += event.motion.xrel;
+					app::mouse_delta[ 1 ] += event.motion.yrel;
 					break;
 
 				case SDL_EVENT_WINDOW_RESIZED:
 					int width, height;
-					SDL_GetWindowSize( g_main_window, &width, &height );
+					SDL_GetWindowSize( app::window, &width, &height );
 					io.DisplaySize.x = width;
 					io.DisplaySize.y = height;
 
-					g_window_resized = true;
+					app::window_resized = true;
 					media_view_window_resize();
-					gallery_view_scroll_to_selected();
+					gallery_view_scroll_to_cursor();
 					mpv_window_resize();
 					break;
 
 				case SDL_EVENT_WINDOW_FOCUS_GAINED:
-					g_window_focused = true;
+					app::window_focused = true;
 					break;
 
 				case SDL_EVENT_WINDOW_FOCUS_LOST:
-					g_window_focused = false;
+					app::window_focused = false;
 					break;
 
 				// The system requests a file open
@@ -968,7 +973,7 @@ int main( int argc, char* argv[] )
 				case SDL_EVENT_DROP_COMPLETE:
 				{
 					drag_drop_recieve_func( drag_drop_files );
-					SDL_RaiseWindow( g_main_window );
+					SDL_RaiseWindow( app::window );
 					break;
 				}
 
@@ -978,27 +983,27 @@ int main( int argc, char* argv[] )
 
 				case SDL_EVENT_QUIT:
 				case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-					g_running = false;
+					app::running = false;
 					break;
 			}
 		}
 
-		if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_MINIMIZED )
+		if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
 		{
-			g_window_focused = false;
+			app::window_focused = false;
 			SDL_Delay( 15 );
 			start_time = current_time;
 			continue;
 		}
 
 
-		if ( !g_window_focused && !playing_back_video )
+		if ( !app::window_focused && !playing_back_video )
 		{
 			SDL_Delay( 8 );
 		}
 
 		// never called?
-		// if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_OCCLUDED )
+		// if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_OCCLUDED )
 		// {
 		// 	printf( "OCCLUDED\n" );
 		// 	SDL_Delay( 8 );
@@ -1016,10 +1021,10 @@ int main( int argc, char* argv[] )
 		}
 
 		int width, height;
-		SDL_GetWindowSize( g_main_window, &width, &height );
+		SDL_GetWindowSize( app::window, &width, &height );
 
 		glViewport( 0, 0, width, height );
-		glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
+		glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
 		glClear( GL_COLOR_BUFFER_BIT );
 
 		imgui_draw( time );
@@ -1033,7 +1038,7 @@ int main( int argc, char* argv[] )
 
 		ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 
-		SDL_GL_SwapWindow( g_main_window );
+		SDL_GL_SwapWindow( app::window );
 
 		// delayed startup, stuff that can be loaded after initial draw
 		// like if we open an image or video from file explorer, we want this program to open and show it near instantly

@@ -18,11 +18,13 @@ s64                 g_video_width = 0, g_video_height = 0;
 
 bool                g_scale_up_video = true;
 
-extern ImVec4       g_clear_color;
 
-extern bool         g_image_flip_v;
-extern bool         g_image_flip_h;
-extern float        g_image_rot;
+namespace image_draw
+{
+	extern bool  flip_v;
+	extern bool  flip_h;
+	extern float rot;
+}
 
 #define FUNC_PTR( func ) func##_t p_##func = nullptr
 
@@ -205,7 +207,7 @@ void mpv_draw_frame()
 	mpv_handle_wait_event( g_mpv, 0.01f );
 
 	int width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	p_mpv_get_property( g_mpv, "dwidth", MPV_FORMAT_INT64, &g_video_width );
 	p_mpv_get_property( g_mpv, "dheight", MPV_FORMAT_INT64, &g_video_height );
@@ -271,13 +273,13 @@ void mpv_draw_frame()
 	dst_rect.x = 0;
 	dst_rect.y = 0;
 	
-	if ( g_image_flip_h )
+	if ( image_draw::flip_h )
 	{
 		dst_rect.w = -1;
 		dst_rect.x = 1;
 	}
 
-	if ( g_image_flip_v )
+	if ( image_draw::flip_v )
 	{
 		dst_rect.h = -1;
 		dst_rect.y = 1;
@@ -286,17 +288,17 @@ void mpv_draw_frame()
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 	//glBindRenderbuffer( GL_RENDERBUFFER, 0 );
 
-	//if ( g_image_flip_h )
+	//if ( image_draw::flip_h )
 	//	glViewport( pos_x + width, pos_y, -width, height );
 	//else
 	//	glViewport( pos_x, pos_y, width, height );
 
-	//if ( g_image_flip_h )
+	//if ( image_draw::flip_h )
 	//	glViewport( pos_x - offset_x, pos_y, width, height );
 	//else
 	//	glViewport( pos_x, pos_y, width, height );
 
-	if ( g_image_flip_h )
+	if ( image_draw::flip_h )
 		glViewport( -offset_x, 0, width, height );
 	else
 		glViewport( 0, 0, width, height );
@@ -304,7 +306,7 @@ void mpv_draw_frame()
 	glEnable( GL_SCISSOR_TEST );
 	glScissor( pos_x, pos_y, new_width, new_height );
 
-	glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
+	glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
 	glClear( GL_COLOR_BUFFER_BIT );
 
 	glEnable( GL_TEXTURE_2D );
@@ -327,7 +329,7 @@ void mpv_draw_frame()
 //	float image_center_y = ( pos_y + new_height ) * 0.5f;
 //
 //	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
-//	glRotatef( g_image_rot, 0, 0, 1 );                       // rotate around the image
+//	glRotatef( image_draw::rot, 0, 0, 1 );                       // rotate around the image
 //	glTranslatef( -image_center_x, -image_center_y, 0.0f );  // move back
 
 	glBegin( GL_QUADS );
@@ -354,7 +356,7 @@ void mpv_update_texture()
 		return;
 
 	int width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
@@ -380,7 +382,7 @@ void mpv_create_texture()
 	//g_mpv_fbo_tex = 0;
 
 	int width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	//glGenRenderbuffers( 1, &g_mpv_rbo );
 	glGenTextures( 1, &g_mpv_fbo_tex );
@@ -479,7 +481,7 @@ bool start_mpv()
 	//p_mpv_set_property( g_mpv, "keep-open", MPV_FORMAT_FLAG, &yes );
 
 	int width, height;
-	SDL_GetWindowSize( g_main_window, &width, &height );
+	SDL_GetWindowSize( app::window, &width, &height );
 
 	// Create Framebuffer to draw on
 	glGenFramebuffers( 1, &g_mpv_fbo );

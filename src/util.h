@@ -419,5 +419,3 @@ bool        fs_save_file( const char* path, const char* data, size_t size );
 // overrwites any existing file
 bool        fs_write_file( const char* path, const char* data, size_t size );
 
-
-

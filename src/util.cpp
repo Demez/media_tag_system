@@ -36,7 +36,7 @@ bool point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size )
 
 bool mouse_in_rect( ImVec2 min_size, ImVec2 max_size )
 {
-	return point_in_rect( ImVec2( g_mouse_pos[ 0 ], g_mouse_pos[ 1 ] ), min_size, max_size );
+	return point_in_rect( ImVec2( app::mouse_pos[ 0 ], app::mouse_pos[ 1 ] ), min_size, max_size );
 }
 
 

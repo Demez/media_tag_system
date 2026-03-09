@@ -16,14 +16,6 @@
 #include <atomic>
 
 
-extern SDL_Window* g_main_window;
-// extern SDL_Renderer* g_main_renderer;
-
-extern ImFont*     g_default_font;
-extern ImFont*     g_default_font_bold;
-extern ImFont*     g_default_font_italic;
-
-
 HANDLE_GEN_32( h_thumbnail );
 
 
@@ -192,45 +184,98 @@ struct gallery_item_t
 
 struct main_image_data_t
 {
+	// source image
+	image_t image{};
+
+	// index in sorted file list
+	size_t  index   = 0;
+
 	// TODO: add multiple frames here
-	GLuint texture;
+	GLuint  texture = 0;
 };
 
-extern bool                          g_running;
-extern bool                          g_window_focused;
-extern ImVec4                        g_clear_color;
 
-// extern double                        g_total_time;
-extern u64                           g_total_time;
-extern float                         g_frame_time;
+// General App Data
+namespace app
+{
+	extern bool        running;
 
-// imgui scroll hack lol
-extern bool                          g_mouse_scrolled_up;
-extern bool                          g_mouse_scrolled_down;
-extern bool                          g_window_resized;
+	extern SDL_Window* window;
+	extern bool        window_focused;
+	extern bool        window_resized;
 
-extern ivec2                         g_mouse_delta;
-extern ivec2                         g_mouse_pos;
+	extern u64         total_time;
+	extern float       frame_time;
 
-extern fs::path                      g_folder;
-extern fs::path                      g_folder_queued;  // will change to this folder start of next frame
-extern std::vector< h_thumbnail >    g_folder_thumbnail_list;
+	extern ivec2       mouse_delta;
+	extern ivec2       mouse_pos;
 
-extern size_t                        g_gallery_index;
-extern std::vector< gallery_item_t > g_gallery_items;
+	// imgui scroll hack lol
+	extern bool        mouse_scrolled_up;
+	extern bool        mouse_scrolled_down;
+
+	extern ImVec4      clear_color;
+}
+
+
+// ImGui Fonts
+namespace font
+{
+	extern ImFont* normal;
+	extern ImFont* normal_bold;
+	extern ImFont* normal_italic;
+}
+
+
+// Current Working Directory Information
+namespace directory
+{
+	extern fs::path                      path;
+	extern fs::path                      queued;  // will change to this folder start of next frame
+	extern std::vector< media_entry_t >  media_list;
+	extern std::vector< h_thumbnail >    thumbnail_list;
+}
+
+
+// Gallery View
+namespace gallery
+{
+	// a sorted list of items
+	extern std::vector< gallery_item_t > items;
+
+	// cursor position/index in items
+	extern size_t                        cursor;
+
+	extern e_gallery_sort_mode           sort_mode;
+	extern bool                          sort_mode_update;
+
+	extern int                           row_count;
+	extern int                           item_size;
+	extern int                           item_size_min;
+	extern int                           item_size_max;
+	extern bool                          item_size_changed;
+	extern std::vector< ImVec2 >         item_text_size;
+
+	extern int                           image_size;
+
+	extern bool                          sidebar_draw;
+
+	extern bool                          scroll_to_cursor;
+
+	// Files selected in the gallery view
+	extern std::vector< u32 >            selection;
+}
+
+
+// Media View
+namespace media
+{
+}
 
 
 // Main Image
-extern e_zoom_mode                   g_image_zoom_mode;
-extern image_t                       g_image;
-extern image_t                       g_image_scaled;
 extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
-extern size_t                        g_image_scaled_index;
-extern size_t                        g_media_index;
-
-// Previous Image to Free
-extern main_image_data_t             g_image_data_free;
 
 
 void                                 media_view_init();
@@ -255,7 +300,7 @@ fs::path                             gallery_item_get_path( size_t index );
 std::string                          gallery_item_get_path_string( size_t index );
 media_entry_t                        gallery_item_get_media_entry( size_t index );
 
-void                                 gallery_view_scroll_to_selected();
+void                                 gallery_view_scroll_to_cursor();
 void                                 gallery_view_input();
 void                                 gallery_view_draw();
 void                                 gallery_view_dir_change();
