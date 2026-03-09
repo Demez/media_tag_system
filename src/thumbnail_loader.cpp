@@ -566,16 +566,6 @@ void thumbnail_loader_shutdown()
 }
 
 
-void thumbnail_loader_free( h_thumbnail handle )
-{
-}
-
-
-void thumbnail_loader_free_oldest( h_thumbnail handle )
-{
-}
-
-
 void thumbnail_loader_update()
 {
 	// int max = g_thumbnail_cache.write_pos;
@@ -675,16 +665,6 @@ void thumbnail_update_distance( h_thumbnail handle, u32 distance )
 }
 
 
-void thumbnail_free( const fs::path& path, u32 index )
-{
-}
-
-
-void thumbnail_cache_debug_draw()
-{
-}
-
-
 void thumbnail_clear_cache()
 {
 	g_thumbnail_mutex.lock();
@@ -702,4 +682,10 @@ void thumbnail_clear_cache()
 
 	g_thumbnail_mutex.unlock();
 }
+
+
+void thumbnail_cache_debug_draw()
+{
+}
+
 

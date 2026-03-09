@@ -200,7 +200,8 @@ extern bool                          g_running;
 extern bool                          g_window_focused;
 extern ImVec4                        g_clear_color;
 
-extern double                        g_total_time;
+// extern double                        g_total_time;
+extern u64                           g_total_time;
 extern float                         g_frame_time;
 
 // imgui scroll hack lol

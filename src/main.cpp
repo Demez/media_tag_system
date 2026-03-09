@@ -14,7 +14,8 @@ ImVec4                       g_clear_color = ImVec4( 0.05f, 0.05f, 0.05f, 1.00f 
 SDL_Window*                  g_main_window = nullptr;
 SDL_GLContext                g_gl_context;
 
-double                       g_total_time;
+// double                       g_total_time;
+u64                          g_total_time;
 float                        g_frame_time;
 
 bool                         g_running             = true;
@@ -383,6 +384,9 @@ void view_type_toggle()
 
 void set_view_type_gallery()
 {
+	if ( g_gallery_view )
+		return;
+
 	media_entry_t entry = gallery_item_get_media_entry( g_gallery_index );
 
 	// clear mpv
@@ -408,6 +412,9 @@ void set_view_type_gallery()
 
 void set_view_type_media()
 {
+	//if ( !g_gallery_view )
+	//	return;
+
 	if ( g_media_index != g_gallery_index )
 		media_view_load();
 
@@ -434,14 +441,11 @@ void on_new_file( const fs::path& file_path )
 		// can we open this file?
 		if ( !image_check_extension( file_path.string() ) )
 			return;
-
-		g_folder = file_path.parent_path();
-	}
-	else
-	{
-		g_folder = file_path;
 	}
 
+	g_folder_queued = file_path;
+
+#if 0
 	folder_load_media_list();
 
 	for ( size_t i = 0; i < g_gallery_items.size(); i++ )
@@ -466,6 +470,7 @@ void on_new_file( const fs::path& file_path )
 
 	// probably not a supported file
 	g_gallery_index = 0;
+#endif
 }
 
 
@@ -478,7 +483,9 @@ void on_new_file( char* file )
 
 bool drag_drop_recieve_func( const std::vector< fs::path >& files )
 {
-	// files is never empty
+	if ( files.empty() )
+		return false;
+
 	on_new_file( files[ 0 ] );
 	return true;
 }
@@ -572,40 +579,44 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 }
 
 
+// called initially on startup and on window resize
+void window_quick_draw()
+{
+	// printf( "QUICK DRAW\n" );
+
+	ImGui::NewFrame();
+	ImGui_ImplSDL3_NewFrame();
+	ImGui_ImplOpenGL3_NewFrame();
+
+	int  width, height;
+	SDL_GetWindowSize( g_main_window, &width, &height );
+
+	glViewport( 0, 0, width, height );
+	glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
+	glClear( GL_COLOR_BUFFER_BIT );
+
+	imgui_draw( g_frame_time );
+	media_view_scale_reset_timer();
+
+	if ( !g_gallery_view )
+		media_view_draw();
+
+	ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
+
+	SDL_GL_SwapWindow( g_main_window );
+}
+
+
 bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 {
 	switch ( event->type )
 	{
 		// Redraw window - Window is being resized
+		// NOTE: this is also called when dragging the window around
 		case SDL_EVENT_WINDOW_EXPOSED:
 		{
 			thumbnail_loader_update();
-
-			ImGui::NewFrame();
-			ImGui_ImplSDL3_NewFrame();
-			ImGui_ImplOpenGL3_NewFrame();
-
-			bool show_frame_time = false;
-
-			int width, height;
-			SDL_GetWindowSize( g_main_window, &width, &height );
-
-			glViewport( 0, 0, width, height );
-			glClearColor( g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w );
-			glClear( GL_COLOR_BUFFER_BIT );
-
-			imgui_draw( g_frame_time );
-			media_view_scale_reset_timer();
-
-			if ( !g_gallery_view )
-			{
-				media_view_draw();
-			}
-
-			ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
-
-			SDL_GL_SwapWindow( g_main_window );
-
+			window_quick_draw();
 			break;
 		}
 	}
@@ -616,8 +627,6 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 
 int main( int argc, char* argv[] )
 {
-	// printf( "Using mimalloc version %d\n", mi_version() );
-
 	args_init( argc, argv );
 
 	if ( !sys_init() )
@@ -625,6 +634,10 @@ int main( int argc, char* argv[] )
 		printf( "Failed to init system backend!\n" );
 		return 1;
 	}
+
+	u64   start_time   = sys_get_time_ms();
+	u64   current_time = start_time;
+	float time         = 0.f;
 
 	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
 	{
@@ -790,40 +803,63 @@ int main( int argc, char* argv[] )
 
 	std::vector< fs::path > drag_drop_files;
 
-	auto   start_time                = std::chrono::high_resolution_clock::now();
-	auto   current_time              = start_time;
-	float  time                      = 0.f;
-
 	if ( !SDL_AddEventWatch( sdl_window_resize_watcher, nullptr ) )
 	{
 		printf( "Failed to add SDL Event Watch\n" );
 	}
 
+	window_quick_draw();
+
+	current_time = sys_get_time_ms();
+	time         = (current_time / 1000.f) - (start_time / 1000.f);
+	start_time   = current_time;
+
+	printf( "%.3f STARTUP TIME\n", time );
+
 	while ( g_running )
 	{
+		bool playing_back_video = false;
+
+		if ( !g_gallery_view && g_gallery_items.size() )
+		{
+			media_entry_t entry = gallery_item_get_media_entry( g_gallery_index );
+
+			if ( entry.type == e_media_type_video )
+			{
+				// check mpv state (SHOULD PROBABLY TRY USING OBSERVE PROPERTY)
+				s32 paused = 0;
+				p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
+
+				if ( !paused )
+					playing_back_video = true;
+			}
+		}
+
 		// Update Frame Time
 		{
-			current_time         = std::chrono::high_resolution_clock::now();
-			time                 = std::chrono::duration< float, std::chrono::seconds::period >( current_time - start_time ).count();
+			current_time = sys_get_time_ms();
+			time   = ( current_time / 1000.f ) - ( start_time / 1000.f );
 
 			// don't let the time go too crazy, usually happens when in a breakpoint
-			time                 = std::min( time, 0.1f );
-
-			g_frame_time         = time;
-			g_total_time += time;
+			// time                 = std::min( real_time, 0.1f );
 
 			// TODO: GET MONITOR REFRESH RATE
-			float fps_limit      = 144.f;
-			float max_fps        = CLAMP( fps_limit, 10.f, 5000.f );
+			float max_fps = 200.f;
 
-			// check if we still have more than 2ms till next frame and if so, wait for "1ms"
-			float min_frame_time = 1.0f / max_fps;
-			if ( ( min_frame_time - time ) > ( 2.0f / 1000.f ) )
-				SDL_Delay( 1 );
+			if ( !playing_back_video )
+			{
+				// check if we still have more than 2ms till next frame and if so, wait for "1ms"
+				float min_frame_time = 1.0f / max_fps;
+				if ( ( min_frame_time - time ) > ( 2.0f / 1000.f ) )
+					SDL_Delay( 1 );
+		
+				// framerate is above max
+				if ( time < min_frame_time )
+					continue;
+			}
 
-			// framerate is above max
-			if ( time < min_frame_time )
-				continue;
+			g_frame_time = time;
+			g_total_time += ( time * 1000.f );
 		}
 
 		sys_update();
@@ -832,17 +868,32 @@ int main( int argc, char* argv[] )
 
 		if ( !g_folder_queued.empty() )
 		{
-			if ( fs_is_dir( g_folder_queued.string().c_str() ) )
+			bool is_file = fs_is_file( g_folder_queued.string().c_str() );
+
+			if ( is_file )
 			{
-				g_folder = g_folder_queued;
+				g_folder = g_folder_queued.parent_path();
 				folder_load_media_list();
+				
+				for ( size_t i = 0; i < g_gallery_items.size(); i++ )
+				{
+					if ( gallery_item_get_path( i ) == g_folder_queued )
+					{
+						g_gallery_index = i;
+						g_folder_queued.clear();
+						//media_view_load();
+						set_view_type_media();
+						break;
+					}
+				}
 			}
 			else
 			{
-				gallery_view_dir_change();
+				g_folder = g_folder_queued;
+				g_folder_queued.clear();
+				folder_load_media_list();
+				set_view_type_gallery();
 			}
-
-			g_folder_queued.clear();
 		}
 		
 		thumbnail_loader_update();
@@ -850,8 +901,6 @@ int main( int argc, char* argv[] )
 		g_mouse_scrolled_up   = false;
 		g_mouse_scrolled_down = false;
 		g_window_resized      = false;
-
-		//auto      startTime = std::chrono::high_resolution_clock::now();
 
 		g_mouse_delta[ 0 ]    = 0.f;
 		g_mouse_delta[ 1 ]    = 0.f;
@@ -938,10 +987,12 @@ int main( int argc, char* argv[] )
 		{
 			g_window_focused = false;
 			SDL_Delay( 15 );
+			start_time = current_time;
 			continue;
 		}
 
-		if ( !g_window_focused )
+
+		if ( !g_window_focused && !playing_back_video )
 		{
 			SDL_Delay( 8 );
 		}
@@ -984,19 +1035,12 @@ int main( int argc, char* argv[] )
 
 		SDL_GL_SwapWindow( g_main_window );
 
-		//auto  currentTime = std::chrono::high_resolution_clock::now();
-		//float time     = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-		//if ( show_frame_time )
-		// printf( "%f FRAMETIME\n", time );
-
-		// startup hack
+		// delayed startup, stuff that can be loaded after initial draw
+		// like if we open an image or video from file explorer, we want this program to open and show it near instantly
+		// at least the first frame of it, then we can do this after
 		if ( run_after_first_loop_hack )
 		{
 			icon_preload();
-
-			if ( !g_gallery_view )
-				media_view_load();
-
 			run_after_first_loop_hack = false;
 		}
 

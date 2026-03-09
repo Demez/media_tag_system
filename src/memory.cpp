@@ -155,8 +155,8 @@ void mem_draw_debug_ui()
 {
 	ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
 
-	// this oh so wrong lol
-	ImGui::Text( "App Time: %.3f Sec", g_total_time / ( 20.f * 1000.f ) );
+	// ImGui::Text( "App Time: %.3f Sec", g_total_time );
+	ImGui::Text( "App Time: %.3f Sec", g_total_time / 1000.f );
 
 	ImGui::SeparatorText( "Memory" );
 
@@ -227,7 +227,7 @@ void mem_draw_debug_ui()
 				{
 					const mem_alloc_info_t& ptr_info = sorted_mem_infos[ i ][ mem_i ];
 
-					ImGui::Text( "%.3f Sec - Ptr: %p - %.3f KB", ptr_info.app_time / ( 20.f * 1000.f ), ptr_info.ptr, (float)ptr_info.size / MEM_SCALE );
+					ImGui::Text( "%.3f Sec - Ptr: %p - %.3f KB", ptr_info.app_time / ( 1000.f ), ptr_info.ptr, (float)ptr_info.size / MEM_SCALE );
 
 					if ( ptr_info.stack_trace )
 					{

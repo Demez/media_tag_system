@@ -127,7 +127,7 @@ struct mem_alloc_info_t
 {
 	void*            ptr;
 	size_t           size;
-	double           app_time;
+	u64              app_time;
 	std::stacktrace* stack_trace;
 };
 

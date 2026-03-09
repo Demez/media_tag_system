@@ -522,11 +522,6 @@ void gallery_view_sort_dir()
 			break;
 		}
 	}
-
-	//if ( !selected_folder )
-	//	g_gallery_index += folders.size();
-
-	printf( "sorted\n" );
 }
 
 
