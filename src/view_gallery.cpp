@@ -137,7 +137,7 @@ void gallery_view_draw_header()
 		return;
 	}
 
-	if ( ImGui::Button( "Sidebar" ) )
+	if ( ImGui::Button( "Toggle Sidebar" ) )
 	{
 		g_gallery_sidebar_draw = !g_gallery_sidebar_draw;
 	}
@@ -1190,29 +1190,11 @@ void gallery_view_draw_sidebar()
 
 	if ( ImGui::BeginTabBar( "##sidebar_tabs" ) )
 	{
-		if ( ImGui::BeginTabItem( "Tags" ) )
-		{
-			ImGui::PushFont( g_default_font_bold, style.FontSizeBase + 2.f );
-
-			ImGui::TextUnformatted( "Tag Databases" );
-			ImGui::Separator();
-
-			ImGui::PopFont();
-
-			if ( ImGui::BeginListBox( "##TagDatabases" ) )
-			{
-			}
-
-			ImGui::EndListBox();
-
-			ImGui::EndTabItem();
-		}
-
 		if ( ImGui::BeginTabItem( "Filesystem" ) )
 		{
 			ImGui::PushFont( g_default_font_bold, style.FontSizeBase + 2.f );
 
-			if ( ImGui::CollapsingHeader( "Bookmarks" ) )
+			if ( ImGui::CollapsingHeader( "Bookmarks", ImGuiTreeNodeFlags_DefaultOpen ) )
 			{
 				ImGui::PopFont();
 
@@ -1264,6 +1246,24 @@ void gallery_view_draw_sidebar()
 			ImGui::PopFont();
 
 			sidebar_draw_filesystem();
+
+			ImGui::EndTabItem();
+		}
+
+		if ( ImGui::BeginTabItem( "Tags" ) )
+		{
+			ImGui::PushFont( g_default_font_bold, style.FontSizeBase + 2.f );
+
+			ImGui::TextUnformatted( "Tag Databases" );
+			ImGui::Separator();
+
+			ImGui::PopFont();
+
+			if ( ImGui::BeginListBox( "##TagDatabases" ) )
+			{
+			}
+
+			ImGui::EndListBox();
 
 			ImGui::EndTabItem();
 		}
