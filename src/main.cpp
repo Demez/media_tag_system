@@ -784,11 +784,6 @@ void main_loop()
 
 		frame_draw_start();
 
-		if ( ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
-		{
-			view_type_toggle();
-		}
-
 		imgui_draw( time );
 
 		media_view_scale_check_timer( time );

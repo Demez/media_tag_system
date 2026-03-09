@@ -42,7 +42,7 @@ void gallery_view_draw_header()
 
 	if ( ImGui::InputText( "##directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 	{
-		// directory::queued = g_folder_buf;
+		directory::queued = g_folder_buf;
 	}
 
 	ImGui::SameLine();

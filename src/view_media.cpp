@@ -632,6 +632,12 @@ void media_view_input()
 	if ( io.WantCaptureMouseUnlessPopupClose && !g_image_pan )
 		return;
 
+	if ( !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
+	{
+		if ( !g_gallery_view )
+			set_view_type_gallery();
+	}
+
 	g_image_pan = ImGui::IsMouseDown( ImGuiMouseButton_Left ) && !( util_mouse_hovering_imgui_window() && !g_image_pan );
 
 	if ( g_image_pan )

@@ -528,6 +528,20 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 im
 }
 
 
+// called when file is double clicked or enter is pressed on it
+void gallery_selected_item_action( const media_entry_t& media )
+{
+	if ( media.type == e_media_type_directory )
+	{
+		directory::queued = media.path;
+	}
+	else
+	{
+		set_view_type_media();
+	}
+}
+
+
 void gallery_view_draw_content()
 {
 	int window_width, window_height;
@@ -920,15 +934,13 @@ void gallery_view_draw_content()
 
 			if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
 			{
-				if ( media.type == e_media_type_directory )
-				{
-					directory::queued = media.path;
-				}
-				else
-				{
-					set_view_type_media();
-				}
+				gallery_selected_item_action( media );
 			}
+		}
+
+		if ( !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
+		{
+			gallery_selected_item_action( media );
 		}
 
 		grid_pos_x++;

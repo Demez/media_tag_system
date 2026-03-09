@@ -273,6 +273,8 @@ namespace media
 }
 
 
+extern bool                          g_gallery_view;
+
 // Main Image
 extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
