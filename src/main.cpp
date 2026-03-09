@@ -1003,6 +1003,7 @@ int main( int argc, char* argv[] )
 		start_time = current_time;
 	}
 
+	thumbnail_loader_shutdown();
 	media_view_shutdown();
 	icon_free();
 

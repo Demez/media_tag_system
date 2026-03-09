@@ -65,7 +65,7 @@ bool sys_init()
 void sys_shutdown()
 {
 	OleUninitialize();
-	drag_drop_remove( g_main_hwnd );
+	// drag_drop_remove( g_main_hwnd );
 }
 
 

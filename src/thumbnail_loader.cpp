@@ -555,6 +555,14 @@ bool thumbnail_loader_init()
 
 void thumbnail_loader_shutdown()
 {
+	g_thumbnails_running.store( false );
+
+	// wait for threads to shutdown
+	for ( int i = 0; i < THUMBNAIL_THREADS; i++ )
+	{
+		g_thumbnail_worker[ i ]->join();
+		delete g_thumbnail_worker[ i ];
+	}
 }
 
 

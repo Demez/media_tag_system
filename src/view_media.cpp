@@ -97,7 +97,7 @@ void media_view_scale_thread_run()
 {
 	while ( g_running )
 	{
-		while ( g_scale_state != e_scale_state_start )
+		if ( g_scale_state != e_scale_state_start )
 		{
 			SDL_Delay( 250 );
 			continue;
@@ -158,6 +158,9 @@ void media_view_init()
 
 void media_view_shutdown()
 {
+	// wait for scale thread to shutdown
+	g_scale_thread->join();
+
 	delete g_scale_thread;
 }
 
