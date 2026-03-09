@@ -25,21 +25,54 @@ bool                                g_gallery_sidebar_draw = true;
 
 bool                                g_scroll_to_selected   = false;
 
+std::vector< u32 >                  g_gallery_selected_items;
+
+
+void gallery_view_input_check_clear_multi_select()
+{
+	if ( !ImGui::IsKeyDown( ImGuiKey_LeftShift ) && !ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) )
+	{
+		if ( g_gallery_selected_items.size() )
+		{
+			g_gallery_selected_items.clear();
+		}
+	}
+}
+
+
+void gallery_view_input_update_multi_select()
+{
+	if ( ImGui::IsKeyDown( ImGuiKey_LeftShift ) )
+	{
+		g_gallery_selected_items.push_back( g_gallery_index );
+	}
+}
+
 
 void gallery_view_input()
 {
+	// ctrl moves the cursor position, but not what is currently selected
+
+	if ( ImGui::IsKeyDown( ImGuiKey_LeftShift ) )
+	{
+	}
+
 	if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) )
 	{
+		gallery_view_input_check_clear_multi_select();
+
 		if ( g_gallery_index == 0 )
 			g_gallery_index = g_gallery_items.size();
 
 		g_gallery_index--;
 		gallery_view_scroll_to_selected();
+		gallery_view_input_update_multi_select();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) )
 	{
 		g_gallery_index = ( g_gallery_index + 1 ) % g_gallery_items.size();
 		gallery_view_scroll_to_selected();
+		gallery_view_input_update_multi_select();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_UpArrow ) )
 	{
@@ -76,6 +109,11 @@ void gallery_view_input()
 		}
 
 		gallery_view_scroll_to_selected();
+	}
+
+	// shift adds to the selecction amount
+	if ( ImGui::IsKeyDown( ImGuiKey_LeftShift ) )
+	{
 	}
 }
 
@@ -895,7 +933,9 @@ void gallery_view_draw_content()
 		if ( content_area_hovered )
 			item_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + current_item_size_y } );
 
-		if ( g_gallery_index == i )
+		bool selected_item = g_gallery_index == i;
+
+		if ( selected_item )
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBg ] );
 		else if ( item_hovered )
 			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBgHovered ] );
@@ -1029,19 +1069,8 @@ void gallery_view_draw_content()
 
 		//ImGui::PopStyleVar();
 
-		if ( g_gallery_index == i || item_hovered )
+		if ( selected_item || item_hovered )
 			ImGui::PopStyleColor();
-
-		if ( g_gallery_index == i )
-		{
-			// TODO: Test ImGui::Shortcut()
-			if ( g_window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
-			{
-				sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
-				printf( "Copied to Clipboard\n" );
-				push_notification( "Copied" );
-			}
-		}
 
 		if ( item_hovered && ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
 		{
@@ -1055,7 +1084,7 @@ void gallery_view_draw_content()
 				}
 				else
 				{
-					gallery_view_toggle();
+					set_view_type_media();
 				}
 			}
 		}
@@ -1074,6 +1103,14 @@ void gallery_view_draw_content()
 	g_gallery_item_size_changed = false;
 
 	ImGui::PopStyleColor();
+
+	// TODO: Test ImGui::Shortcut()
+	if ( g_window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
+	{
+		sys_copy_to_clipboard( gallery_item_get_path_string( g_gallery_index ).data() );
+		printf( "Copied to Clipboard\n" );
+		push_notification( "Copied" );
+	}
 }
 
 

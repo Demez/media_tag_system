@@ -365,55 +365,82 @@ void imgui_draw( float frame_time )
 }
 
 
-void gallery_view_toggle()
-{
-	static bool   mpv_resume_on_focus = false;
-	media_entry_t entry      = gallery_item_get_media_entry( g_gallery_index );
+static bool g_mpv_resume_on_focus = false;
 
+
+void view_type_toggle()
+{
 	if ( g_gallery_view )
 	{
-		if ( g_media_index != g_gallery_index )
-			media_view_load();
-
-		if ( mpv_resume_on_focus )
-		{
-			const char* cmd[]   = { "set", "pause", "no", NULL };
-			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-		}
-
-		media_view_fit_in_view();
+		set_view_type_media();
 	}
 	else
 	{
-		// clear mpv
-		// mpv_cmd_loadfile( "" );
+		set_view_type_gallery();
+	}
+}
 
-		if ( entry.type == e_media_type_video )
-		{
-			s32 paused = 0;
-			p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
-			mpv_resume_on_focus = !paused;
 
-			const char* cmd[]   = { "set", "pause", "yes", NULL };
-			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-		}
+void set_view_type_gallery()
+{
+	media_entry_t entry = gallery_item_get_media_entry( g_gallery_index );
 
-		gallery_view_scroll_to_selected();
+	// clear mpv
+	// mpv_cmd_loadfile( "" );
+
+	if ( entry.type == e_media_type_video )
+	{
+		s32 paused = 0;
+		p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
+		g_mpv_resume_on_focus = !paused;
+
+		const char* cmd[]     = { "set", "pause", "yes", NULL };
+		int         cmd_ret   = p_mpv_command_async( g_mpv, 0, cmd );
 	}
 
-	g_gallery_view = !g_gallery_view;
+	gallery_view_scroll_to_selected();
+
+	g_gallery_view = true;
 
 	update_window_title();
 }
 
 
-void on_new_file( char* file )
+void set_view_type_media()
 {
-	fs::path file_path = file;
+	if ( g_media_index != g_gallery_index )
+		media_view_load();
 
-	// TODO: CHECK IF WE CAN OPEN THIS FILE FIRST
+	if ( g_mpv_resume_on_focus )
+	{
+		const char* cmd[]   = { "set", "pause", "no", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
 
-	g_folder           = file_path.parent_path();
+	media_view_fit_in_view();
+
+	g_gallery_view = false;
+
+	update_window_title();
+}
+
+
+void on_new_file( const fs::path& file_path )
+{
+	bool is_file = fs_is_file( file_path.string().c_str() );
+
+	if ( is_file )
+	{
+		// can we open this file?
+		if ( !image_check_extension( file_path.string() ) )
+			return;
+
+		g_folder = file_path.parent_path();
+	}
+	else
+	{
+		g_folder = file_path;
+	}
 
 	folder_load_media_list();
 
@@ -423,12 +450,37 @@ void on_new_file( char* file )
 		{
 			g_gallery_index = i;
 			g_folder_queued.clear();
+
+			if ( is_file )
+			{
+				set_view_type_media();
+			}
+			else if ( !is_file && !g_gallery_view )
+			{
+				set_view_type_gallery();
+			}
+
 			return;
 		}
 	}
 
 	// probably not a supported file
 	g_gallery_index = 0;
+}
+
+
+void on_new_file( char* file )
+{
+	fs::path file_path = file;
+	on_new_file( file_path );
+}
+
+
+bool drag_drop_recieve_func( const std::vector< fs::path >& files )
+{
+	// files is never empty
+	on_new_file( files[ 0 ] );
+	return true;
 }
 
 
@@ -547,6 +599,15 @@ int main( int argc, char* argv[] )
 	}
 
 	SDL_SetWindowMinimumSize( g_main_window, 640, 480 );
+
+	// SDL_SetEventEnabled( SDL_EVENT_DROP_FILE, false );
+	// SDL_SetEventEnabled( SDL_EVENT_DROP_TEXT, false );
+	// SDL_SetEventEnabled( SDL_EVENT_DROP_BEGIN, false );
+	// SDL_SetEventEnabled( SDL_EVENT_DROP_COMPLETE, false );
+	// SDL_SetEventEnabled( SDL_EVENT_DROP_POSITION, false );
+
+	sys_set_window( g_main_window );
+	sys_set_receive_drag_drop_func( drag_drop_recieve_func );
 
 	g_gl_context = SDL_GL_CreateContext( g_main_window );
 	
@@ -685,6 +746,7 @@ int main( int argc, char* argv[] )
 
 	// ----------------------------------------------------------------
 
+	std::vector< fs::path > drag_drop_files;
 
 	auto   start_time                = std::chrono::high_resolution_clock::now();
 	auto   current_time              = start_time;
@@ -692,8 +754,6 @@ int main( int argc, char* argv[] )
 
 	while ( g_running )
 	{
-		sys_update();
-
 		// Update Frame Time
 		{
 			current_time         = std::chrono::high_resolution_clock::now();
@@ -718,6 +778,10 @@ int main( int argc, char* argv[] )
 			if ( time < min_frame_time )
 				continue;
 		}
+
+		sys_update();
+
+		drag_drop_files.clear();
 
 		if ( !g_folder_queued.empty() )
 		{
@@ -781,6 +845,47 @@ int main( int argc, char* argv[] )
 					mpv_window_resize();
 					break;
 
+				case SDL_EVENT_WINDOW_FOCUS_GAINED:
+					g_window_focused = true;
+					break;
+
+				case SDL_EVENT_WINDOW_FOCUS_LOST:
+					g_window_focused = false;
+					break;
+
+				// The system requests a file open
+				case SDL_EVENT_DROP_FILE:
+				{
+					printf( "DROP FILE\n" );
+					SDL_DropEvent& drop = event.drop;
+					drag_drop_files.push_back( drop.data );
+					// drag_drop_recieve_func( {}});
+					break;
+				}
+
+				// text/plain drag-and-drop event
+				case SDL_EVENT_DROP_TEXT:
+					printf( "DROP TEXT\n" );
+					break;
+
+				// A new set of drops is beginning (NULL filename)
+				case SDL_EVENT_DROP_BEGIN:
+					printf( "DROP BEGIN\n" );
+					break;
+
+				// Current set of drops is now complete (NULL filename)
+				case SDL_EVENT_DROP_COMPLETE:
+				{
+					printf( "DROP COMPLETE\n" );
+					drag_drop_recieve_func( drag_drop_files );
+					SDL_RaiseWindow( g_main_window );
+					break;
+				}
+
+				// Position while moving over the window
+				case SDL_EVENT_DROP_POSITION:
+					break;
+
 				case SDL_EVENT_QUIT:
 				case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 					g_running = false;
@@ -791,18 +896,13 @@ int main( int argc, char* argv[] )
 		if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_MINIMIZED )
 		{
 			g_window_focused = false;
-			SDL_Delay( 10 );
+			SDL_Delay( 15 );
 			continue;
 		}
 
-		if ( SDL_GetWindowFlags( g_main_window ) & SDL_WINDOW_INPUT_FOCUS )
+		if ( !g_window_focused )
 		{
-			g_window_focused = true;
-		}
-		else
-		{
-			g_window_focused = false;
-			SDL_Delay( 5 );
+			SDL_Delay( 8 );
 		}
 
 		ImGui::NewFrame();
@@ -813,7 +913,7 @@ int main( int argc, char* argv[] )
 		
 		if ( ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
 		{
-			gallery_view_toggle();
+			view_type_toggle();
 		}
 
 		int width, height;

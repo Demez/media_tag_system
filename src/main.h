@@ -236,6 +236,7 @@ void                                 media_view_init();
 void                                 media_view_shutdown();
 void                                 media_view_scale_check_timer( float frame_time );
 
+// Load currently selected file, does not change view type though
 void                                 media_view_load();
 void                                 media_view_input();
 void                                 media_view_draw_imgui();
@@ -257,7 +258,9 @@ void                                 gallery_view_input();
 void                                 gallery_view_draw();
 void                                 gallery_view_dir_change();
 
-void                                 gallery_view_toggle();
+void                                 set_view_type_gallery();
+void                                 set_view_type_media();
+void                                 view_type_toggle();
 
 void                                 update_window_title();
 void                                 folder_load_media_list();

@@ -21,11 +21,15 @@
 #include <profileapi.h>
 #include <stdint.h>
 
+#include <SDL3/SDL_system.h>
+#include <SDL3/SDL_video.h>
+
 
 // ----------------------------------------------------------------------------------------
 
 
-HANDLE               g_con_out = INVALID_HANDLE_VALUE;
+HANDLE               g_con_out   = INVALID_HANDLE_VALUE;
+HWND                 g_main_hwnd = 0;
 static LARGE_INTEGER g_win_perf_freq;
 
 
@@ -52,6 +56,8 @@ bool sys_init()
 		return false;
 	}
 
+	
+
 	return true;
 }
 
@@ -59,11 +65,29 @@ bool sys_init()
 void sys_shutdown()
 {
 	OleUninitialize();
+	drag_drop_remove( g_main_hwnd );
 }
 
 
 void sys_update()
 {
+}
+
+
+void sys_set_window( SDL_Window* window )
+{
+	SDL_PropertiesID props = SDL_GetWindowProperties( window );
+	void*            hwnd  = SDL_GetPointerProperty( props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr );
+
+	if ( hwnd )
+	{
+		g_main_hwnd = (HWND)hwnd;
+		// drag_drop_register( g_main_hwnd );
+	}
+	else
+	{
+		printf( "Failed to get HWND from Window: %s\n", SDL_GetError() );
+	}
 }
 
 

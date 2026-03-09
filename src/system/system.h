@@ -2,6 +2,7 @@
 
 #include "util.h"
 
+#include "SDL3/SDL.h"
 
 // --------------------------------------------------------------------------------------------------------
 // System Interface
@@ -27,12 +28,15 @@ struct proc_mem_info_t
 
 
 using f_exec_callback = void( char* buf, size_t len );
+using f_drag_drop_receive = bool( const std::vector< fs::path >& files );
 
 // --------------------------------------------------------------------------------------------------------
 
 bool                    sys_init();
 void                    sys_shutdown();
 void                    sys_update();
+
+void                    sys_set_window( SDL_Window* window );
 
 // library loading
 module_t                sys_load_library( const wchar_t* path );
@@ -96,6 +100,15 @@ bool                    sys_execute_read_callback( const char* command, str_buf_
 
 // execute a command and return the commands return value
 int                     sys_execute( const char* command );
+
+// --------------------------------------------------------------------------------------------------------
+// Drag and Drop Interface
+
+// Start drag and drop of multiple files in the system shell, like dragging to another folder to copy, into discord, etc.
+void                    sys_begin_drag_drop( const std::vector< fs::path >& files );
+
+// files have been dragged into this program, the drag and drop system will call this function when it recieves it
+void                    sys_set_receive_drag_drop_func( f_drag_drop_receive* callback );
 
 // --------------------------------------------------------------------------------------------------------
 // Other

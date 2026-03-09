@@ -26,3 +26,10 @@ wchar_t*       sys_to_wchar_extended( const char* spStr );
 char*          sys_to_utf8( const wchar_t* spStr, int sSize );
 char*          sys_to_utf8( const wchar_t* spStr );
 
+
+// --------------------------------------------------------------------------------------------------------
+// Internal Drag and Drop functions
+
+bool           drag_drop_register( HWND hwnd );
+void           drag_drop_remove( HWND hwnd );
+
