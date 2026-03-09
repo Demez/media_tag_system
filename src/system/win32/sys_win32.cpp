@@ -311,7 +311,7 @@ bool sys_get_file_times( const char* path, u64* creation, u64* access, u64* writ
 		return false;
 	}
 
-	ch_free( e_mem_category_string, path_w );
+	ch_free_str( path_w );
 
 	if ( creation )
 		*creation = file_time_to_unix( file_create );
@@ -379,7 +379,7 @@ bool sys_set_file_times( const char* path, u64* creation, u64* access, u64* writ
 		return false;
 	}
 
-	ch_free( e_mem_category_string, path_w );
+	ch_free_str( path_w );
 
 	return true;
 }
@@ -447,7 +447,7 @@ bool sys_recycle_file( const char* path )
 
 	int rc = SHFileOperation( &s );
 
-	ch_free( e_mem_category_string, path_w );
+	ch_free_str( path_w );
 
 	if ( rc != 0 )
 	{
@@ -469,7 +469,7 @@ void sys_open_file_properties( const char* file )
 		wprintf( L"Failed to open File Properties for file: %s\n", path_w );
 	}
 
-	ch_free( e_mem_category_string, path_w );
+	ch_free_str( path_w );
 }
 
 
@@ -519,7 +519,7 @@ bool sys_copy_to_clipboard( const char* path )
 	ret = true;
 
 end:
-	ch_free( e_mem_category_string, path_w );
+	ch_free_str( path_w );
 	return ret;
 }
 
@@ -535,7 +535,7 @@ void sys_browse_to_file( const char* path )
 		ILFree( pidl );
 	}
 
-	ch_free( e_mem_category_string, path_w );
+	ch_free_str( path_w );
 }
 
 
@@ -569,7 +569,7 @@ bool sys_execute_read( const char* command, str_buf_t& output )
 
 	BOOL                fSuccess  = CreateProcessW( NULL, command_w, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi );
 
-	ch_free( e_mem_category_string, command_w );
+	ch_free_str( command_w );
 
 	if ( !fSuccess )
 	{
@@ -648,7 +648,7 @@ bool sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_c
 
 	BOOL                fSuccess  = CreateProcessW( NULL, command_w, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi );
 
-	ch_free( e_mem_category_string, command_w );
+	ch_free_str( command_w );
 
 	if ( !fSuccess )
 	{
@@ -708,7 +708,7 @@ int sys_execute( const char* command )
 
 	BOOL                success   = CreateProcessW( NULL, command_w, NULL, NULL, TRUE, BELOW_NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi );
 
-	ch_free( e_mem_category_string, command_w );
+	ch_free_str( command_w );
 
 	if ( !success )
 	{

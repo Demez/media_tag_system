@@ -621,7 +621,7 @@ void mpv_cmd_loadfile( const char* file )
 	mpv_handle_wait_event( g_mpv, 0.1f );
 
 	if ( g_current_video != nullptr )
-		ch_free( e_mem_category_string, g_current_video );
+		ch_free_str( g_current_video );
 
 	g_current_video = util_strdup( file );
 

@@ -272,7 +272,7 @@ char* fs_get_filename_no_ext( const char* path, size_t path_len )
 		return name;
 
 	char* output = util_strndup( name, dot - name );
-	ch_free( e_mem_category_string, name );
+	ch_free_str( name );
 	return output;
 }
 

@@ -82,7 +82,7 @@ void thumbnail_loader_free_data( u32 index )
 	}
 
 	ch_free( e_mem_category_image, thumbnail.image );
-	ch_free( e_mem_category_string, thumbnail.path );
+	ch_free_str( thumbnail.path );
 
 	memset( &thumbnail, 0, sizeof( thumbnail_t ) );
 }
@@ -318,7 +318,7 @@ void thumbnail_loader_worker( u32 thread_id )
 	char  video_thumbnail_path[ 512 ];
 	snprintf( video_thumbnail_path, 512, "%s/video_thumbnail_thread_%d.png", app_path, thread_id );
 
-	ch_free( e_mem_category_string, app_path );
+	ch_free_str( app_path );
 
 	char mpv_thread_name[ 64 ];
 	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );

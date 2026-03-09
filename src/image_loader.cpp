@@ -224,7 +224,7 @@ void image_free_alloc( image_t& image )
 	image_free_frames( image );
 
 	if ( image.image_format )
-		ch_free( e_mem_category_string, image.image_format );
+		ch_free_str( image.image_format );
 
 	image.image_format = nullptr;
 }
@@ -343,7 +343,7 @@ bool icon_preload()
 {
 	char*    exe_dir  = sys_get_exe_folder();
 	fs::path exe_path = exe_dir;
-	ch_free( e_mem_category_string, exe_dir );
+	ch_free_str( exe_dir );
 
 	for ( u8 i = 0; i < e_icon_count; i++ )
 	{
