@@ -4,6 +4,10 @@
 #include "libfyaml.h"
 
 
+constexpr const char* DEFAULT_THUMBNAIL_CACHE = "$app_path$/thumbnail_cache";
+constexpr const char* DEFAULT_VIDEO_THUMBNAIL_CACHE = "$app_path$/thumbnail_video_cache";
+
+
 static fy_document* config_open( char* app_dir )
 {
 	std::string config_path = app_dir;
@@ -41,7 +45,7 @@ void config_reset()
 }
 
 
-bool config_check_path( char* app_dir, char* user_path, std::string& result, const char* fail_str )
+bool config_check_path( char* app_dir, const char* user_path, std::string& result, const char* fail_str )
 {
 	std::string output{};
 
@@ -188,17 +192,29 @@ bool config_load()
 		printf( "Can't have 0 thumbnail uploads per frame!\n" );
 		app::config.thumbnail_uploads_per_frame = 1;
 	}
-	else if ( app::config.thumbnail_uploads_per_frame > 8 )
+	else if ( app::config.thumbnail_uploads_per_frame > 64 )
 	{
-		printf( "Not allowing over 8 thumbnail uploads per frame, it can really lock up the program a lot!\n" );
-		app::config.thumbnail_threads = 8;
+		printf( "Not allowing over 64 thumbnail uploads per frame, it can really lock up the program a lot!\n" );
+		app::config.thumbnail_threads = 64;
 	}
 
 	app::config.vsync = std::clamp( app::config.vsync, -1, 1 );
 
 	if ( cache_dir[ 0 ] )
 	{
-		if ( !config_check_path( app_dir, cache_dir, app::config.thumbnail_cache_path, "Invalid thumbnail-cache-path!\n" ) )
+		config_check_path( app_dir, cache_dir, app::config.thumbnail_cache_path, "Invalid thumbnail-cache-path!\n" );
+	}
+
+	if ( cache_video_dir[ 0 ] )
+	{
+		config_check_path( app_dir, cache_video_dir, app::config.thumbnail_video_cache_path, "Invalid thumbnail-video-cache-path!\n" );
+	}
+
+	// Defaults
+
+	if ( app::config.thumbnail_cache_path.empty() )
+	{
+		if ( !config_check_path( app_dir, DEFAULT_THUMBNAIL_CACHE, app::config.thumbnail_cache_path, "Can't use fallback thumbnail-cache-path!\n" ) )
 		{
 			free( app_dir );
 			fy_document_destroy( fyd );
@@ -206,9 +222,9 @@ bool config_load()
 		}
 	}
 
-	if ( cache_video_dir[ 0 ] )
+	if ( app::config.thumbnail_video_cache_path.empty() )
 	{
-		if ( !config_check_path( app_dir, cache_video_dir, app::config.thumbnail_video_cache_path, "Invalid thumbnail-video-cache-path!\n" ) )
+		if ( !config_check_path( app_dir, DEFAULT_VIDEO_THUMBNAIL_CACHE, app::config.thumbnail_video_cache_path, "Can't use fallback thumbnail-video-cache-path!\n" ) )
 		{
 			free( app_dir );
 			fy_document_destroy( fyd );
