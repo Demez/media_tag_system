@@ -28,10 +28,10 @@ thumbnail-size: 500
 # if 1, use the size above for thumbnails
 # if 0, remake them on the fly whenever the zoom size changes
 # also is enabled if jxl thumbnails are on
-thumbnail-use-fixed-size: 1
+thumbnail-use-fixed-size: 0
 
 # basic JPEG XL thumbnail quality and speed control
-thumbnail-jxl-enable: 1
+thumbnail-jxl-enable: 0
 
 thumbnail-jxl-distance: 4
 thumbnail-jxl-effort: 1
