@@ -9,6 +9,7 @@ mpv_render_context* g_mpv_gl      = nullptr;
 GLuint              g_mpv_fbo     = 0;
 GLuint              g_mpv_fbo_tex = 0;
 GLuint              g_mpv_rbo     = 0;
+static ivec2        g_mpv_framebuffer_size{};
 
 bool                g_wakeup_on_mpv_render_update, g_wakeup_on_mpv_events;
 
@@ -17,6 +18,7 @@ static char*        g_current_video = nullptr;
 s64                 g_video_width = 0, g_video_height = 0;
 
 bool                g_scale_up_video = true;
+
 
 
 namespace image_draw
@@ -209,6 +211,15 @@ void mpv_draw_frame()
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
+	//if ( width < g_mpv_framebuffer_size[ 0 ] / 2 )
+	//	printf( "lol\n" );
+
+	// width /= 2;
+	// height /= 2;
+
+	// width  = g_mpv_framebuffer_size[ 0 ];
+	// height = g_mpv_framebuffer_size[ 1 ];
+
 	p_mpv_get_property( g_mpv, "dwidth", MPV_FORMAT_INT64, &g_video_width );
 	p_mpv_get_property( g_mpv, "dheight", MPV_FORMAT_INT64, &g_video_height );
 
@@ -218,32 +229,31 @@ void mpv_draw_frame()
 	// Fit image in window size
 	float factor[ 2 ] = { 1.f, 1.f };
 
-	if ( g_scale_up_video || g_video_width > width )
-		factor[ 0 ] = (float)width / (float)g_video_width;
+	if ( g_scale_up_video || g_video_width > g_mpv_framebuffer_size[ 0 ] )
+		factor[ 0 ] = (float)g_mpv_framebuffer_size[ 0 ] / (float)g_video_width;
 
-	if ( g_scale_up_video || g_video_height > height )
-		factor[ 1 ] = (float)height / (float)g_video_height;
+	if ( g_scale_up_video || g_video_height > g_mpv_framebuffer_size[ 1 ] )
+		factor[ 1 ] = (float)g_mpv_framebuffer_size[ 1 ] / (float)g_video_height;
 
 	float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
 	int   new_width  = g_video_width * zoom_level;
 	int   new_height = g_video_height * zoom_level;
 
-	int   pos_x      = width / 2 - ( new_width / 2 );
-	int   pos_y      = height / 2 - ( new_height / 2 );
+	int   pos_x      = g_mpv_framebuffer_size[ 0 ] / 2 - ( new_width / 2 );
+	int   pos_y      = g_mpv_framebuffer_size[ 1 ] / 2 - ( new_height / 2 );
 
-	int   offset_x   = width - new_width;
-	int   offset_y   = height - new_height;
+	// pos_x *= 2;
+
+	int   offset_x   = g_mpv_framebuffer_size[ 0 ] - new_width;
+	int   offset_y   = g_mpv_framebuffer_size[ 1 ] - new_height;
+
+	//if ( app::window_resized )
+	//	printf( "MPV RESIZE\n" );
 
 	glBindFramebuffer( GL_FRAMEBUFFER, g_mpv_fbo );
-	////glBindRenderbuffer( GL_RENDERBUFFER, g_mpv_rbo );
-	//
-	glViewport( 0, 0, width, height );
-	// glClearColor( 0.15, 0.15, 0.15, 1.0 );
-	// glClear( GL_COLOR_BUFFER_BIT );
 
-	// mpv_opengl_fbo   fbo{ g_mpv_fbo, new_width, new_height, GL_RGB };
-	mpv_opengl_fbo   fbo{ g_mpv_fbo, width, height, GL_RGB };
+	mpv_opengl_fbo   fbo{ g_mpv_fbo, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGB };
 	int              yes  = 1;
 
 	mpv_render_param rp[] = {
@@ -252,6 +262,7 @@ void mpv_draw_frame()
 		{ MPV_RENDER_PARAM_INVALID, NULL },
 	};
 
+	// TODO: use MPV_RENDER_PARAM_ADVANCED_CONTROL
 	p_mpv_render_context_render( g_mpv_gl, rp );
 
 	// glFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, g_mpv_rbo );
@@ -260,6 +271,20 @@ void mpv_draw_frame()
 	//glBindFramebuffer( GL_READ_BUFFER, g_mpv_fbo );
 	//
 	//glBlitFramebuffer( 0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_LINEAR );
+
+	// int       viewport_offset_x = ( g_mpv_framebuffer_size[ 0 ] - width ) / 1;
+	// int       viewport_offset_y = ( g_mpv_framebuffer_size[ 1 ] - height ) / 1;
+
+	int viewport_offset_x = ( g_mpv_framebuffer_size[ 0 ] - width ) / 2;
+	int viewport_offset_y = ( g_mpv_framebuffer_size[ 1 ] - height ) / 2;
+
+	int clamped_width     = g_mpv_framebuffer_size[ 0 ];
+	int clamped_height    = g_mpv_framebuffer_size[ 1 ];
+
+	// TODO: keep the full video in frame when live resizing the window
+	// scale it up or down when needed
+	//if ( width < new_width )
+	//	printf( "TEST\n" );
 	
 	SDL_FRect dst_area{};
 	dst_area.w = 1;
@@ -299,12 +324,14 @@ void mpv_draw_frame()
 	//	glViewport( pos_x, pos_y, width, height );
 
 	if ( image_draw::flip_h )
-		glViewport( -offset_x, 0, width, height );
+		glViewport( -offset_x + viewport_offset_x, viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
 	else
-		glViewport( 0, 0, width, height );
+		// glViewport( 0, 0, width, height );
+		// glViewport( -viewport_offset_x, 0, clamped_width, clamped_height );
+		glViewport( -viewport_offset_x, -viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
 
 	glEnable( GL_SCISSOR_TEST );
-	glScissor( pos_x, pos_y, new_width, new_height );
+	glScissor( pos_x - viewport_offset_x, pos_y - viewport_offset_y, new_width, new_height );
 
 	glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
 	glClear( GL_COLOR_BUFFER_BIT );
@@ -370,6 +397,9 @@ void mpv_update_texture()
 
 	glBindTexture( GL_TEXTURE_2D, 0 );
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+
+	g_mpv_framebuffer_size[ 0 ] = width;
+	g_mpv_framebuffer_size[ 1 ] = height;
 }
 
 
@@ -402,6 +432,9 @@ void mpv_create_texture()
 
 	glBindTexture( GL_TEXTURE_2D, 0 );
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+
+	g_mpv_framebuffer_size[ 0 ] = width;
+	g_mpv_framebuffer_size[ 1 ] = height;
 }
 
 
