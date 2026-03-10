@@ -221,7 +221,7 @@ struct LoaderFreeImage : public IImageLoader
 		load_info.image->pitch           = FreeImage_GetPitch( bitmap );
 
 		load_info.image->bit_depth       = FreeImage_GetBPP( bitmap );
-		load_info.image->image_format    = util_strdup( FreeImage_GetFormatFromFIF( format ) );
+		load_info.image->image_format    = util_strdup_r( load_info.image->image_format, FreeImage_GetFormatFromFIF( format ) );
 		u32 channel_num                  = FreeImage_GetChannelsNumber( bitmap );
 
 		//load_info.image->pitch           = load_info.image->width * channel_num;

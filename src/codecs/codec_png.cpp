@@ -151,7 +151,7 @@ struct LoaderPNG: public IImageLoader
 		load_info.image->pitch           = load_info.image->width * load_info.image->bytes_per_pixel;
 		
 		// the strdup is stupid lol
-		load_info.image->image_format    = util_strdup( "PNG" );
+		load_info.image->image_format    = util_strndup_r( load_info.image->image_format, "PNG", 3 );
 
         spng_ctx_free( ctx );
 
