@@ -278,6 +278,11 @@ mpv_handle* thumbnail_mpv_ctx_create( u32 thread_id )
 			// Always start at 30% of the way in the video
 			ret = p_mpv_set_option_string( local_mpv, "start", "30%" );
 
+			// Fast PNG files
+			ret = p_mpv_set_option_string( local_mpv, "screenshot-high-bit-depth", "no" );
+			ret = p_mpv_set_option_string( local_mpv, "screenshot-png-compression", "1" );
+			ret = p_mpv_set_option_string( local_mpv, "screenshot-png-filter", "0" );
+
 			if ( p_mpv_initialize( local_mpv ) < 0 )
 			{
 				printf( "mpv_initialize failed!\n" );
