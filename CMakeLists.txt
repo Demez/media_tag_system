@@ -88,10 +88,10 @@ if ( MSVC )
     #
 	#	# MSVC doesn't care about this one, but this errors on gcc and can help catch a mistake i made unknowingly
 	#	"/we4002"  # Too many arguments for function-like macro invocation
-    #
-	#	# I accidently get this a lot with printing std::string, so I want this to error so I know i made a mistake
-	#	"/we4840"  # non-portable use of class 'type' as an argument to a variadic function
-    #
+	
+		# I accidently get this a lot with printing std::string, so I want this to error so I know i made a mistake
+		"/we4840"  # non-portable use of class 'type' as an argument to a variadic function
+		
 	#	# This is self-explanitory
 	#	"/we4129"  # 'X' unrecognized character escape sequence
 	)
@@ -146,6 +146,9 @@ if ( MSVC )
 	message( "Copying FreeImage" )
 	configure_file( "thirdparty/FreeImageRe/bin/FreeImage.dll" "${PROJ_OUT}/FreeImage.dll" COPYONLY )
 	configure_file( "thirdparty/FreeImageRe/bin/heif.dll" "${PROJ_OUT}/heif.dll" COPYONLY )
+	
+	message( "Copying fyaml" )
+	configure_file( "thirdparty/libfyaml/build/Release/fyaml.dll" "${PROJ_OUT}/fyaml.dll" COPYONLY )
 
 	#message( "Copying mimalloc" )
 	#configure_file( "thirdparty/mimalloc/out/msvc-x64/Release/mimalloc-redirect.dll" "${PROJ_OUT}/mimalloc-redirect.dll" COPYONLY )
@@ -167,6 +170,7 @@ set(
     src/mpv_interface.h
     src/image_loader.cpp
     src/memory.cpp
+    src/config.cpp
 
     src/view_gallery.cpp
     src/view_gallery_sidebar.cpp
@@ -248,6 +252,7 @@ include_directories(
 	"thirdparty/gif_load"
 	"thirdparty/FreeImageRe/include"
 	"thirdparty/stb"
+	"thirdparty/libfyaml/include"
 )
 
 if ( MIMALLOC )
@@ -267,6 +272,7 @@ target_link_libraries(
 	turbojpeg-static
 	spng
 	FreeImage
+	fyaml
 )
 
 if ( MIMALLOC )
@@ -280,10 +286,15 @@ target_link_directories(
 	"thirdparty/mozjpeg/build"
 	"thirdparty/libspng/build"
 	"thirdparty/FreeImageRe/lib"
+	"thirdparty/libfyaml/build"
 )
 
 if ( WIN32 )
-	target_link_directories( media_tag_system PRIVATE "thirdparty/libspng/build/Release" )
+	target_link_directories(
+		media_tag_system PRIVATE
+		"thirdparty/libspng/build/Release"
+		"thirdparty/libfyaml/build/Release"
+	)
 endif()
 
 foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
@@ -292,6 +303,7 @@ foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 		"${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static"
 		"thirdparty/nativefiledialog/build/src/${OUTPUT_CONFIG}"
 		"thirdparty/mozjpeg/build/${OUTPUT_CONFIG}"
+		# "thirdparty/libfyaml/build/${OUTPUT_CONFIG}"
 		# "thirdparty/libspng/build/${OUTPUT_CONFIG}"
 	)
 endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )

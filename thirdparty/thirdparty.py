@@ -389,6 +389,29 @@ def compile_nativefiledialog():
 # =================================================================================================
 
 
+def compile_libfyaml():
+    set_project("libfyaml")
+    os.chdir("libfyaml")
+
+    if not syscmd(f"cmake -B build -DENABLE_NETWORK=OFF -DBUILD_TESTING=OFF .", "Failed to run cmake"):
+        return
+
+    print("Building libfyaml - RelWithDebInfo\n")
+    if not syscmd(f"cmake --build ./build --config RelWithDebInfo", "Failed to build in RelWithDebInfo"):
+        return
+
+    print("Building libfyaml - Release\n")
+    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+        return
+
+    print("Building libfyaml - Debug\n")
+    if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
+        return
+
+
+# =================================================================================================
+
+
 '''
 Basic Structure for a file here:
 {
@@ -460,6 +483,13 @@ FILE_LIST = {
             "file": "mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
             "name": "mpv",
             "user_extract": True,
+        },
+        # },
+        {
+            "url":  "https://github.com/pantoniou/libfyaml/releases/download/v0.9.5/libfyaml-0.9.5.tar.gz",
+            "file": "libfyaml-0.9.5.tar.gz",
+            "name": "libfyaml",
+            "func": compile_libfyaml,
         },
     ],
 
@@ -557,6 +587,15 @@ def extract_file(tmp_file: str, file_ext: str, tmp_folder: str, folder: str, use
             with tarfile.open(tmp_file, "r:xz") as tar:
                 tar.extractall(path=folder)
             return_value = True
+        elif file_ext == "gz":
+            # lazy
+            if tmp_file.endswith(".tar.gz"):
+                with tarfile.open(tmp_file, "r:gz") as tar:
+                    tar.extractall(path=folder)
+                # with gzip.open(tmp_file, "rb") as archive:
+                #     with tarfile.open(archive, "r:xz") as tar:
+                #         tar.extractall(path=folder)
+                return_value = True
         elif file_ext == "zip":
             zf = ZipFile(tmp_file)
             zf.extractall(folder)
@@ -588,7 +627,7 @@ def handle_item(item: dict):
     if file:
         # folder, file_ext = os.path.splitext(file)
         folder, file_ext = file.rsplit(".", 1)
-        is_zip = file_ext in ("zip", "7z", "xz")
+        is_zip = file_ext in ("zip", "7z", "xz", "gz")
 
         # HACK
         if folder.endswith(".tar"):

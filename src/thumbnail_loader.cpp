@@ -8,11 +8,10 @@
 #include <unordered_map>
 
 constexpr int       JOB_QUEUE_SIZE    = 64;  // if this is too high, it can cause noticable hitches when uploading thumbnails
-constexpr int       THUMBNAIL_THREADS = 8;
 constexpr int       MAX_THUMBNAILS    = 512;
 
 std::atomic< bool > g_thumbnails_running;
-std::thread*        g_thumbnail_worker[ THUMBNAIL_THREADS ];
+std::thread**       g_thumbnail_worker;
 std::mutex          g_thumbnail_mutex;
 
 extern void*        g_mpv_module;
@@ -69,9 +68,34 @@ void thumbnail_printf( const char* format, ... )
 }
 
 
+void thumbnail_free_host_image_data( size_t thumbnail_slot, thumbnail_t& thumbnail )
+{
+	if ( !thumbnail.image )
+		return;
+
+	if ( thumbnail.image->frame.size() )
+	{
+		if ( thumbnail.scaled )
+			ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ 0 ] );
+		else
+			ch_free( e_mem_category_image_data, thumbnail.image->frame[ 0 ] );
+
+		thumbnail.image->frame[ 0 ] = nullptr;
+	}
+
+	thumbnail.image->frame.clear();
+
+	image_free_alloc( *thumbnail.image );
+
+	thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", thumbnail_slot, thumbnail.path );
+}
+
+
 void thumbnail_loader_free_data( u32 index )
 {
 	thumbnail_t& thumbnail = g_thumbnail_cache.buffer[ index ];
+
+	thumbnail_free_host_image_data( index, thumbnail );
 
 	if ( thumbnail.texture )
 	{
@@ -92,6 +116,10 @@ h_thumbnail thumbnail_loader_queue_push( const char* path, e_media_type type )
 	if ( !path )
 		return {};
 
+	// TODO: some jobs here may be invalidated quickly if the user is scrolling very fast
+	// maybe we could use the same distance value to determine if a queued job could be thrown out,
+	// and instead replaced with an image just requested now?
+
 	// don't care about load order since this is called from the main thread, just get current value
 	u32 current_pos = g_thumbnail_queue.write_pos.load( std::memory_order_relaxed );
 	u32 next_pos    = ( current_pos + 1 ) % JOB_QUEUE_SIZE;
@@ -106,16 +134,6 @@ h_thumbnail thumbnail_loader_queue_push( const char* path, e_media_type type )
 
 	// the queue is not full, so create a new job for it
 	thumbnail_job_t& job = g_thumbnail_queue.buffer[ current_pos ];
-
-	// next job isn't free?
-	// if ( job.state != e_job_state_free )
-	// 	return {};
-
-	// u32 cache_pos               = g_thumbnail_cache.write_pos;
-	// g_thumbnail_cache.write_pos = ( cache_pos + 1 ) % MAX_THUMBNAILS;
-
-	// if ( ++g_thumbnail_cache.write_pos == MAX_THUMBNAILS )
-	// 	g_thumbnail_cache.write_pos = 0;
 	
 	// find a thumbnail not used this frame, it's probably off screen and we can unload it
 	u32  cache_pos         = 0;
@@ -130,15 +148,13 @@ h_thumbnail thumbnail_loader_queue_push( const char* path, e_media_type type )
 			break;
 		}
 
-		// if ( g_thumbnail_cache.buffer[ cache_pos ].status != e_thumbnail_status_free &&
-		//      g_thumbnail_cache.buffer[ cache_pos ].status != e_thumbnail_status_finished &&
-		//      g_thumbnail_cache.buffer[ cache_pos ].status != e_thumbnail_status_failed )
-		// 	break;
-
 		e_thumbnail_status status = g_thumbnail_cache.buffer[ cache_pos ].status.load( std::memory_order_acquire );
 		
 		if ( status == e_thumbnail_status_queued || status == e_thumbnail_status_loading || status == e_thumbnail_status_uploading )
 			continue;
+		
+		// if ( status == e_thumbnail_status_queued || status == e_thumbnail_status_loading )
+		// 	continue;
 
 		if ( g_thumbnail_cache.used_this_frame[ cache_pos ] )
 			continue;
@@ -312,12 +328,8 @@ void thumbnail_mpv_ctx_free( mpv_handle*& ctx )
 
 void thumbnail_loader_worker( u32 thread_id )
 {
-	char* app_path = sys_get_exe_folder();
-
 	char  video_thumbnail_path[ 512 ];
-	snprintf( video_thumbnail_path, 512, "%s/video_thumbnail_thread_%d.png", app_path, thread_id );
-
-	ch_free_str( app_path );
+	snprintf( video_thumbnail_path, 512, "%s" SEP_S "video_thumbnail_thread_%d.png", app::config.thumbnail_video_cache_path.c_str(), thread_id );
 
 	char mpv_thread_name[ 64 ];
 	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );
@@ -542,8 +554,9 @@ bool thumbnail_loader_init()
 	g_thumbnail_queue.read_pos  = 0;
 
 	g_thumbnails_running.store( true );
+	g_thumbnail_worker = ch_calloc< std::thread* >( app::config.thumbnail_threads, e_mem_category_general );
 
-	for ( int i = 0; i < THUMBNAIL_THREADS; i++ )
+	for ( int i = 0; i < app::config.thumbnail_threads; i++ )
 	{
 		g_thumbnail_worker[ i ] = new std::thread( thumbnail_loader_worker, i );
 	}
@@ -557,7 +570,7 @@ void thumbnail_loader_shutdown()
 	g_thumbnails_running.store( false );
 
 	// wait for threads to shutdown
-	for ( int i = 0; i < THUMBNAIL_THREADS; i++ )
+	for ( int i = 0; i < app::config.thumbnail_threads; i++ )
 	{
 		g_thumbnail_worker[ i ]->join();
 		delete g_thumbnail_worker[ i ];
@@ -574,10 +587,9 @@ void thumbnail_loader_update()
 
 	// for ( u32 i = 0; i < max; i++ )
 	u32 upload_count = 0;
-	u32 upload_max   = 4;
 	for ( u32 i = 0; i < MAX_THUMBNAILS; i++ )
 	{
-		if ( upload_count == upload_max )
+		if ( upload_count == app::config.thumbnail_uploads_per_frame )
 			return;
 
 		// reset all of these
@@ -685,6 +697,10 @@ void thumbnail_clear_cache()
 
 void thumbnail_cache_debug_draw()
 {
-}
+	ImGui::SeparatorText( "Thumbnail System" );
+	ImGui::Text( "Thread Count: %d", app::config.thumbnail_threads );
 
+	ImGui::Text( "Job Queue Write Pos: %d", g_thumbnail_queue.write_pos.load() );
+	ImGui::Text( "Job Queue Read Pos: %d", g_thumbnail_queue.read_pos.load() );
+}
 

@@ -181,20 +181,6 @@ void sidebar_draw_filesystem()
 }
 
 
-struct bookmark_t
-{
-	std::string name;
-	std::string path;
-};
-
-
-std::vector< bookmark_t > g_bookmarks = {
-	{ "downloads", "D:\\demez_archive\\media\\downloads" },
-	{ "drawings", "D:\\demez_archive\\media\\demez\\drawings" },
-	{ "sync6", "D:\\demez_archive\\phone\\sync6" },
-};
-
-
 void gallery_view_draw_sidebar()
 {
 	int window_width, window_height;
@@ -232,7 +218,7 @@ void gallery_view_draw_sidebar()
 
 				if ( ImGui::Button( "Add Current Directory" ) )
 				{
-					g_bookmarks.emplace_back( directory::path.filename().string(), directory::path.string() );
+					app::config.bookmark.emplace_back( directory::path.filename().string(), directory::path.string() );
 				}
 
 				ImGui::PushItemWidth( -1 );
@@ -246,12 +232,17 @@ void gallery_view_draw_sidebar()
 					// =================================================
 					//
 
-					for ( const bookmark_t& bookmark : g_bookmarks )
+					u32 id = 1;
+					for ( const bookmark_t& bookmark : app::config.bookmark )
 					{
+						ImGui::PushID( id++ );
+
 						if ( ImGui::Selectable( bookmark.name.data() ) )
 						{
 							directory::queued = bookmark.path;
 						}
+
+						ImGui::PopID();
 					}
 				}
 
@@ -306,6 +297,10 @@ void gallery_view_draw_sidebar()
 
 		if ( ImGui::BeginTabItem( "Stats" ) )
 		{
+			thumbnail_cache_debug_draw();
+
+			ImGui::Separator();
+
 			mem_draw_debug_ui();
 
 			ImGui::EndTabItem();
@@ -318,3 +313,4 @@ void gallery_view_draw_sidebar()
 	ImGui::EndChild();
 	//ImGui::PopStyleVar();
 }
+

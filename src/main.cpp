@@ -12,24 +12,26 @@
 // General App Data
 namespace app
 {
-	bool        running        = true;
+	bool         running        = true;
 
-	SDL_Window* window         = nullptr;
-	bool        window_focused = false;
-	bool        window_resized = false;
+	SDL_Window*  window         = nullptr;
+	bool         window_focused = false;
+	bool         window_resized = false;
 
 	// ImVec4                       clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
-	ImVec4      clear_color    = ImVec4( 0.05f, 0.05f, 0.05f, 1.00f );
+	ImVec4       clear_color    = ImVec4( 0.05f, 0.05f, 0.05f, 1.00f );
 
-	u64         total_time     = 0;
-	float       frame_time     = 0.f;
+	u64          total_time     = 0;
+	float        frame_time     = 0.f;
 
-	ivec2       mouse_delta;
-	ivec2       mouse_pos;
+	ivec2        mouse_delta;
+	ivec2        mouse_pos;
 
 	// imgui scroll hack lol
-	bool        mouse_scrolled_up;
-	bool        mouse_scrolled_down;
+	bool         mouse_scrolled_up;
+	bool         mouse_scrolled_down;
+
+	app_config_t config{};
 }
 
 
@@ -698,19 +700,19 @@ void main_loop()
 		// time                 = std::min( real_time, 0.1f );
 
 		// TODO: GET MONITOR REFRESH RATE
-		float max_fps = 300.f;
-
-		if ( !playing_back_video )
-		{
-			// check if we still have more than 2ms till next frame and if so, wait for "1ms"
-			float min_frame_time = 1.0f / max_fps;
-			if ( ( min_frame_time - time ) > ( 2.0f / 1000.f ) )
-				SDL_Delay( 1 );
-
-			// framerate is above max
-			if ( time < min_frame_time )
-				continue;
-		}
+	//	float max_fps = 300.f;
+	//
+	//	if ( !playing_back_video )
+	//	{
+	//		// check if we still have more than 2ms till next frame and if so, wait for "1ms"
+	//		float min_frame_time = 1.0f / max_fps;
+	//		if ( ( min_frame_time - time ) > ( 2.0f / 1000.f ) )
+	//			SDL_Delay( 1 );
+	//
+	//		// framerate is above max
+	//		if ( time < min_frame_time )
+	//			continue;
+	//	}
 
 		app::frame_time = time;
 		app::total_time += ( time * 1000.f );
@@ -908,6 +910,15 @@ int main( int argc, char* argv[] )
 
 		//free( exe_path );
 	}
+
+	SDL_GL_GetSwapInterval( &app::config.vsync );
+
+	if ( !config_load() )
+	{
+		printf( "Failed to load config, using defaults\n" );
+	}
+
+	SDL_GL_SetSwapInterval( app::config.vsync );
 
 	ImGuiIO& io = ImGui::GetIO();
 

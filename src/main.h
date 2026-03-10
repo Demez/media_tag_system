@@ -163,6 +163,30 @@ enum e_gallery_sort_mode
 };
 
 
+struct bookmark_t
+{
+	std::string name;
+	std::string path;
+};
+
+
+struct app_config_t
+{
+	std::vector< bookmark_t > bookmark{};
+
+	u32                       thumbnail_threads           = 8;
+	u32                       thumbnail_uploads_per_frame = 4;
+
+	// size in kilobytes
+	u32                       thumbnail_mem_cache_size    = 20000;
+
+	std::string               thumbnail_cache_path{};
+	std::string               thumbnail_video_cache_path{};
+
+	int                       vsync;
+};
+
+
 struct media_entry_t
 {
 	fs::path     path;
@@ -198,23 +222,25 @@ struct main_image_data_t
 // General App Data
 namespace app
 {
-	extern bool        running;
+	extern bool         running;
 
-	extern SDL_Window* window;
-	extern bool        window_focused;
-	extern bool        window_resized;
+	extern SDL_Window*  window;
+	extern bool         window_focused;
+	extern bool         window_resized;
 
-	extern u64         total_time;
-	extern float       frame_time;
+	extern u64          total_time;
+	extern float        frame_time;
 
-	extern ivec2       mouse_delta;
-	extern ivec2       mouse_pos;
+	extern ivec2        mouse_delta;
+	extern ivec2        mouse_pos;
 
 	// imgui scroll hack lol
-	extern bool        mouse_scrolled_up;
-	extern bool        mouse_scrolled_down;
+	extern bool         mouse_scrolled_up;
+	extern bool         mouse_scrolled_down;
 
-	extern ImVec4      clear_color;
+	extern ImVec4       clear_color;
+
+	extern app_config_t config;
 }
 
 
@@ -324,6 +350,9 @@ ImTextureRef                         icon_get_imtexture( e_icon icon_type );
 GLuint                               gl_upload_texture( image_t* image );
 void                                 gl_update_texture( GLuint texture, image_t* image );
 void                                 gl_free_texture( GLuint texture );
+
+void                                 config_reset();
+bool                                 config_load();
 
 
 // ---------------------------------------------------------
