@@ -154,6 +154,10 @@ if ( MSVC )
 	configure_file( "thirdparty/libjxl/build/lib/Release/jxl.dll" "${PROJ_OUT}/jxl.dll" COPYONLY )
 	configure_file( "thirdparty/libjxl/build/lib/Release/jxl_cms.dll" "${PROJ_OUT}/jxl_cms.dll" COPYONLY )
 	configure_file( "thirdparty/libjxl/build/lib/Release/jxl_threads.dll" "${PROJ_OUT}/jxl_threads.dll" COPYONLY )
+	
+	configure_file( "thirdparty/libjxl/build/third_party/brotli/Release/brotlicommon.dll" "${PROJ_OUT}/brotlicommon.dll" COPYONLY )
+	configure_file( "thirdparty/libjxl/build/third_party/brotli/Release/brotlidec.dll" "${PROJ_OUT}/brotlidec.dll" COPYONLY )
+	configure_file( "thirdparty/libjxl/build/third_party/brotli/Release/brotlienc.dll" "${PROJ_OUT}/brotlienc.dll" COPYONLY )
 
 	#message( "Copying mimalloc" )
 	#configure_file( "thirdparty/mimalloc/out/msvc-x64/Release/mimalloc-redirect.dll" "${PROJ_OUT}/mimalloc-redirect.dll" COPYONLY )
