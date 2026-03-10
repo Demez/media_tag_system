@@ -202,7 +202,7 @@ struct app_config_t
 
 	u32                       thumbnail_jxl_enable        = 0;
 	float                     thumbnail_jxl_distance      = 4;
-	u32                       thumbnail_jxl_effort        = 1;
+	u32                       thumbnail_jxl_effort        = 6;
 
 	std::string               thumbnail_cache_path{};
 	std::string               thumbnail_video_cache_path{};

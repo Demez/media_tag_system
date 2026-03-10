@@ -34,7 +34,7 @@ thumbnail-use-fixed-size: 0
 thumbnail-jxl-enable: 0
 
 thumbnail-jxl-distance: 4
-thumbnail-jxl-effort: 1
+thumbnail-jxl-effort: 6
 
 # 0 for immediate updates, 1 for vsync, -1 for adaptive vsync
 vsync: 1
