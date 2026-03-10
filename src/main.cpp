@@ -393,7 +393,7 @@ bool on_new_file( const fs::path& file_path )
 	if ( is_file )
 	{
 		// can we open this file?
-		if ( !image_check_extension( file_path.string() ) )
+		if ( !media_check_extension( file_path.string() ) )
 			return false;
 
 		directory::queued = file_path;
@@ -544,7 +544,7 @@ void window_quick_draw()
 	app::window_resized = true;
 	media_view_window_resize();
 	gallery_view_scroll_to_cursor();
-	mpv_window_resize();
+	// mpv_window_resize();
 
 	frame_draw_end();
 }
@@ -556,7 +556,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 	{
 		// Redraw window - Window is being resized
 		// NOTE: this is also called when dragging the window around
-		case SDL_EVENT_WINDOW_EXPOSED:
+		//case SDL_EVENT_WINDOW_EXPOSED:
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
 			thumbnail_loader_update();

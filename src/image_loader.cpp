@@ -248,6 +248,33 @@ bool image_check_extension( std::string_view ext )
 }
 
 
+bool media_check_extension( std::string_view str_path )
+{
+	if ( image_check_extension( str_path ) )
+		return true;
+
+	if ( g_mpv )
+	{
+		fs::path path      = str_path;
+		fs::path ext       = path.extension();
+		bool     valid_ext = false;
+
+		// Video Formats
+		valid_ext |= ext == ".mp4";
+		valid_ext |= ext == ".mkv";
+		valid_ext |= ext == ".webm";
+		valid_ext |= ext == ".mov";
+		valid_ext |= ext == ".3gp";
+		valid_ext |= ext == ".avi";
+
+		if ( valid_ext )
+			return true;
+	}
+
+	return false;
+}
+
+
 bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int new_height )
 {
 	stbir_pixel_layout pixel_layout  = STBIR_RGBA;

@@ -98,6 +98,7 @@ void image_free_frames( image_t& image );
 // Free only frames and allocations
 void image_free_alloc( image_t& image );
 
+bool media_check_extension( std::string_view ext );
 bool image_check_extension( std::string_view ext );
 bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int new_height );
 
