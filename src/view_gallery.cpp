@@ -500,7 +500,7 @@ void gallery_view_context_menu()
 }
 
 
-void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 image_bounds, bool upscale )
+void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 image_bounds, bool upscale, ImVec2& out_image_size )
 {
 	// Fit image in window size, scaling up if needed
 	float factor[ 2 ] = { 1.f, 1.f };
@@ -511,20 +511,23 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 im
 	if ( upscale || image->height > image_bounds.y )
 		factor[ 1 ] = (float)image_bounds.y / (float)image->height;
 
-	float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
+	float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
-	ImVec2 scaled_image_size;
-	scaled_image_size.x = image->width * zoom_level;
-	scaled_image_size.y = image->height * zoom_level;
+	ImVec2 image_size{};
+	image_size.x    = image->width * zoom_level;
+	image_size.y    = image->height * zoom_level;
+
+	if ( upscale )
+		out_image_size = image_size;
 
 	// center the image
 	ImVec2 image_offset = ImGui::GetCursorPos();
-	image_offset.x += ( image_bounds.x - scaled_image_size.x ) / 2;
-	image_offset.y += ( image_bounds.y - scaled_image_size.y ) / 2;
+	image_offset.x += ( image_bounds.x - image_size.x ) / 2;
+	image_offset.y += ( image_bounds.y - image_size.y ) / 2;
 
 	ImGui::SetCursorPos( image_offset );
 
-	ImGui::Image( im_texture, scaled_image_size );
+	ImGui::Image( im_texture, image_size );
 }
 
 
@@ -638,7 +641,9 @@ void gallery_view_draw_content()
 	static std::vector< delayed_load_t > thumbnail_requests;
 	thumbnail_requests.clear();
 
-	// scroll speed hack
+	// ----------------------------------------------------------------------------------------------------------
+	// Do Scrolling
+
 	if ( content_area_hovered )
 	{
 		float scroll = ImGui::GetScrollY();
@@ -661,10 +666,23 @@ void gallery_view_draw_content()
 		ImGui::SetScrollY( scroll );
 	}
 
+	// ----------------------------------------------------------------------------------------------------------
+
 	ImVec2 image_bounds      = { item_size_x - ( style.WindowPadding.x * 2 ), item_size_x - ( style.WindowPadding.x * 2 ) };
 	gallery::image_size     = image_bounds.x;
 
 	ImVec2 image_icon_bounds = { image_bounds.x / 4.f, image_bounds.y / 4.f };
+
+	ImVec2        last_cursor_pos       = ImGui::GetCursorPos();
+	float         last_grid_row_y = ImGui::GetCursorPos().y;
+
+	ImDrawList*   draw_list         = ImGui::GetWindowDrawList();
+
+	float         last_max_item_height = item_size_y;
+
+	ImVec2        controlled_cursor_pos = ImGui::GetCursorPos();
+
+	// ----------------------------------------------------------------------------------------------------------
 
 	for ( size_t i = 0; i < gallery::items.size(); i++ )
 	{
@@ -685,41 +703,35 @@ void gallery_view_draw_content()
 			media_text_size = gallery::item_text_size[ gallery_item.file_index ];
 		}
 
-		//ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, { 0.f, 0.f } );
+		float current_item_size_y = image_bounds.y + media_text_size.y + style.ItemSpacing.y + ( style.WindowPadding.y * 2 );
 
-		// float  image_bounds = item_size_x - ( style.ItemInnerSpacing.y * 4 );
-		// float  image_bounds = item_size_x - ( style.ItemInnerSpacing.x * 2 );
-		// float  image_bounds = item_size_x - ( style.WindowPadding.x * 2 );
+		current_item_size_y       = std::min( current_item_size_y, item_size_y * 1.75f );
 
-		// float                current_item_size_y = std::min( item_size_x + media_text_size.y + style.ItemInnerSpacing.y, item_size_y * 1.75f );
-		float                current_item_size_y = image_bounds.y + media_text_size.y + style.ItemSpacing.y + ( style.WindowPadding.y * 2 );
-
-		current_item_size_y                      = std::min( current_item_size_y, item_size_y * 1.75f );
+		if ( current_item_size_y > last_max_item_height )
+			last_max_item_height = current_item_size_y;
 
 		ImGui::SetNextWindowSize( { item_size_x, current_item_size_y } );
-		// ImGui::SetNextWindowSize( { item_size_x, 0 } );
 		ImGui::SetNextWindowSizeConstraints( { item_size_x, item_size_x }, { -1.f, -1.f } );
 
-		// check if i is 0, for some reason it adds like extra spacing for some reason on the first item
-		if ( grid_pos_x == gallery::row_count || i == 0 )
+		if ( grid_pos_x == gallery::row_count )
 		{
-			grid_pos_x = 0;
-			//float new_pos = std::min( region_avail.x, ImGui::GetCursorPosX() + style.ItemSpacing.x );
-			//ImGui::SetCursorPosX( style.ItemSpacing.x );
-			// ImGui::SetCursorPosX( ImGui::GetCursorPosX() + style.ItemSpacing.x );
-			// ImGui::SetCursorPosX( ImGui::GetCursorPosX() + style.WindowPadding.x );
 			ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
-			// ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
+			ImGui::SetCursorPosY( last_grid_row_y + last_max_item_height + style.ItemSpacing.y );
+
+			grid_pos_x           = 0;
+			last_max_item_height = item_size_y;
 		}
-		else
+		else if ( grid_pos_x > 0 )
 		{
-			// ImGui::SetCursorPos( { cursor_pos.x + item_size_x + grid_item_padding, cursor_pos.y } );
 			ImGui::SameLine();
 		}
 
 		ImVec2 cursor_pos = ImGui::GetCursorPos();
+		last_cursor_pos   = cursor_pos;
+		last_grid_row_y   = cursor_pos.y;
 
-		// Calculate Distance
+		// ----------------------------------------------------------------------------------------------------------
+		// Calculate Distance the Item is from visible scroll area
 		{
 			u32    distance       = 0;
 			float  visible_top    = scroll;
@@ -737,9 +749,7 @@ void gallery_view_draw_content()
 			thumbnail_update_distance( directory::thumbnail_list[ i ], distance );
 		}
 
-		ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
-		bool   item_hovered      = false;
-
+		// ----------------------------------------------------------------------------------------------------------
 		// If we need to scroll to the selected item this frame
 		// adjust the scroll position as needed to keep it on screen
 		if ( gallery::cursor == i && gallery::scroll_to_cursor )
@@ -777,7 +787,11 @@ void gallery_view_draw_content()
 			}
 		}
 
+		// ----------------------------------------------------------------------------------------------------------
 		// is this item even visible?
+
+		ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
+
 		if ( !ImGui::IsRectVisible( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + current_item_size_y } ) )
 		{
 			// use a dummy instead of a full child window, cheaper
@@ -786,147 +800,190 @@ void gallery_view_draw_content()
 			continue;
 		}
 
+		// ----------------------------------------------------------------------------------------------------------
+		// Item is Visible on screen, draw selection/hover background if needed
+
+		ImVec2 window_pos = ImGui::GetWindowPos();
+
+		ImVec2 window_cursor_pos( window_pos.x + cursor_pos.x, ( window_pos.y + cursor_pos.y ) - ImGui::GetScrollY() );
+		ImVec2 global_item_size = ImVec2( window_cursor_pos.x + item_size_x, window_cursor_pos.y + current_item_size_y );
+
+		bool   item_hovered     = false;
+		bool   selected_item    = gallery::cursor == i;
+
 		if ( content_area_hovered )
 			item_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + current_item_size_y } );
 
-		bool selected_item = gallery::cursor == i;
-
-		if ( selected_item )
-			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBg ] );
-		else if ( item_hovered )
-			ImGui::PushStyleColor( ImGuiCol_ChildBg, style.Colors[ ImGuiCol_FrameBgHovered ] );
-
-		// if ( ImGui::BeginChild( i + 1, {}, ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings ) )
-		if ( ImGui::BeginChild( i + 1, {}, ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings ) )
+		// Draw a background if needed
+		if ( selected_item || item_hovered )
 		{
-			ImVec2 current_pos  = ImGui::GetCursorPos();
-#if 1
-			image_visible_count++;
+			// why is this not using Active color?
+			ImColor main_bg_color     = item_hovered ? style.Colors[ ImGuiCol_FrameBgHovered ] : style.Colors[ ImGuiCol_FrameBg ];
+			ImColor main_border_color = style.Colors[ ImGuiCol_Border ];
 
-			//ImGui::SetNextWindowSize( { image_bounds, image_bounds } );
+			draw_list->AddRectFilled( window_cursor_pos, global_item_size, main_bg_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
 
-			ImGui::PushStyleColor( ImGuiCol_ChildBg, { 0.25f, 0.25f, 0.25f, 1.f } );
+			// if ( style.FrameBorderSize )
+				draw_list->AddRect( window_cursor_pos, global_item_size, main_border_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
+		}
 
-			#if 0
-			ImGui::Dummy( image_bounds, image_bounds );
-			#else
+		ImVec2 current_pos = ImGui::GetCursorPos();
+		ImVec2 saved_pos   = ImGui::GetCursorPos();
 
-			if ( media.type == e_media_type_directory )
+		current_pos.x += style.WindowPadding.x;
+		current_pos.y += style.WindowPadding.y;
+		ImGui::SetCursorPos( current_pos );
+
+		image_visible_count++;
+
+		// ----------------------------------------------------------------------------------------------------------
+		// Draw Thumbnail or Icon
+
+		ImVec2 scaled_image_size{};
+
+		if ( media.type == e_media_type_directory )
+		{
+			gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), image_bounds, false, scaled_image_size );
+		}
+		// videos don't have thumbnail generation yet
+		// else if ( media.type == e_media_type_video )
+		// {
+		// 	gallery_view_draw_image( icon_get_image( e_icon_video ), icon_get_imtexture( e_icon_video ), image_bounds, false );
+		// }
+		else
+		{
+			thumbnail_t* thumbnail = thumbnail_get_data( directory::thumbnail_list[ gallery_item.file_index ] );
+
+			if ( thumbnail )
 			{
-				gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), image_bounds, false );
-			}
-			// videos don't have thumbnail generation yet
-			// else if ( media.type == e_media_type_video )
-			// {
-			// 	gallery_view_draw_image( icon_get_image( e_icon_video ), icon_get_imtexture( e_icon_video ), image_bounds, false );
-			// }
-			else
-			{
-				thumbnail_t* thumbnail = thumbnail_get_data( directory::thumbnail_list[ gallery_item.file_index ] );
-
-				if ( thumbnail )
+				if ( thumbnail->status == e_thumbnail_status_finished )
 				{
-					if ( thumbnail->status == e_thumbnail_status_finished )
-					{
-						gallery_view_draw_image( thumbnail->image, thumbnail->im_texture, image_bounds, true );
-					}
-					else if ( thumbnail->status == e_thumbnail_status_failed )
-					{
-						gallery_view_draw_image( icon_get_image( e_icon_invalid ), icon_get_imtexture( e_icon_invalid ), image_bounds, false );
-					}
-					else if ( thumbnail->status == e_thumbnail_status_queued || thumbnail->status == e_thumbnail_status_loading || thumbnail->status == e_thumbnail_status_uploading )
-					{
-						gallery_view_draw_image( icon_get_image( e_icon_loading ), icon_get_imtexture( e_icon_loading ), image_bounds, false );
-					}
-					else if ( thumbnail->status == e_thumbnail_status_free )
-					{
-						if ( media.type != e_media_type_directory )
-							thumbnail_requests.emplace_back( media.path, gallery_item.file_index, media.type );
-
-						ImGui::Dummy( image_bounds );
-					}
-					else // if ( thumbnail->status == e_thumbnail_status_free )
-					{
-						ImGui::Dummy( image_bounds );
-					}
+					gallery_view_draw_image( thumbnail->image, thumbnail->im_texture, image_bounds, true, scaled_image_size );
 				}
-				else
+				else if ( thumbnail->status == e_thumbnail_status_failed )
 				{
-					if ( !thumbnail && media.type != e_media_type_directory )
+					gallery_view_draw_image( icon_get_image( e_icon_invalid ), icon_get_imtexture( e_icon_invalid ), image_bounds, false, scaled_image_size );
+				}
+				else if ( thumbnail->status == e_thumbnail_status_queued || thumbnail->status == e_thumbnail_status_loading || thumbnail->status == e_thumbnail_status_uploading )
+				{
+					gallery_view_draw_image( icon_get_image( e_icon_loading ), icon_get_imtexture( e_icon_loading ), image_bounds, false, scaled_image_size );
+				}
+				else if ( thumbnail->status == e_thumbnail_status_free )
+				{
+					if ( media.type != e_media_type_directory )
 						thumbnail_requests.emplace_back( media.path, gallery_item.file_index, media.type );
-					// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 					ImGui::Dummy( image_bounds );
 				}
+				else  // if ( thumbnail->status == e_thumbnail_status_free )
+				{
+					ImGui::Dummy( image_bounds );
+				}
 			}
-
-			// draw icon on top of it in the corner
-			if ( media.type == e_media_type_video )
+			else
 			{
-				// Fit image in window size, scaling up if needed
-				float factor[ 2 ] = { 1.f, 1.f };
+				if ( !thumbnail && media.type != e_media_type_directory )
+					thumbnail_requests.emplace_back( media.path, gallery_item.file_index, media.type );
+				// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
-				image_t* icon_video = icon_get_image( e_icon_video );
-
-				//if ( image->width > image_bounds.x )
-				factor[ 0 ]          = (float)image_icon_bounds.x / (float)icon_video->width;
-
-				//if ( image->height > image_bounds.y )
-				factor[ 1 ]          = (float)image_icon_bounds.y / (float)icon_video->height;
-
-				float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
-
-				ImVec2 scaled_image_size;
-				scaled_image_size.x = icon_video->width * zoom_level;
-				scaled_image_size.y = icon_video->height * zoom_level;
-
-				// center the image
-				ImVec2 image_offset = ImGui::GetCursorPos();
-				//ImVec2 image_offset = current_pos;
-				//image_offset.x += image_bounds.x;
-				//image_offset.y += image_bounds.y;
-				// image_offset.x += ( image_bounds.x - scaled_image_size.x ) / 2;
-				// image_offset.y += ( image_bounds.y - scaled_image_size.y ) / 2;
-
-				image_offset.x += image_bounds.x - ( scaled_image_size.x / 1.25 );
-				image_offset.y -= ( scaled_image_size.y / 1.25 ) + style.ItemSpacing.y;
-				//image_offset.y += ( image_bounds.y - scaled_image_size.y ) / 2;
-
-				ImGui::SetCursorPos( image_offset );
-
-				ImGui::Image( icon_get_imtexture( e_icon_video ), scaled_image_size );
+				ImGui::Dummy( image_bounds );
 			}
-
-			#endif
-
-			// if ( visible )
-			ImGui::PopStyleColor();
-
-			// center align text
-			ImGui::SetCursorPosX( ImGui::GetCursorPosX() + ( ( gallery::item_size - ( media_text_size.x + style.WindowPadding.x * 2 + style.ItemSpacing.x ) ) * 0.5f ) );
-
-			// ImGui::SetCursorPosY( current_pos.y + image_bounds + style.ItemSpacing.y );
-			ImGui::SetCursorPosY( current_pos.y + image_bounds.x + style.ItemSpacing.y );
-			// ImGui::SetCursorPosY( current_pos.y + item_size_x + style.ItemSpacing.y );
-
-			ImGui::PushTextWrapPos();
-
-			ImGui::TextUnformatted( media.filename.c_str() );
-
-			ImGui::PopTextWrapPos();
-#endif
 		}
 
+		// ----------------------------------------------------------------------------------------------------------
+		// Draw icon on top of it in the bottom right corner
 
-		ImVec2 test_window_size = ImGui::GetWindowSize();
+		if ( media.type == e_media_type_video )
+		{
+			// Fit image in window size, scaling up if needed
+			float    factor[ 2 ] = { 1.f, 1.f };
 
+			image_t* icon_video  = icon_get_image( e_icon_video );
 
-		ImGui::EndChild();
+			//if ( image->width > image_bounds.x )
+			factor[ 0 ]          = (float)image_icon_bounds.x / (float)icon_video->width;
 
-		//ImGui::PopStyleVar();
+			//if ( image->height > image_bounds.y )
+			factor[ 1 ]          = (float)image_icon_bounds.y / (float)icon_video->height;
 
-		if ( selected_item || item_hovered )
-			ImGui::PopStyleColor();
+			float  zoom_level    = std::min( factor[ 0 ], factor[ 1 ] );
+
+			ImVec2 scaled_icon_size;
+			scaled_icon_size.x  = icon_video->width * zoom_level;
+			scaled_icon_size.y  = icon_video->height * zoom_level;
+
+			ImVec2 image_offset = saved_pos;
+			float image_offset_from_side_x = 0.f;
+			float image_offset_from_side_y = 0.f;
+
+			if ( scaled_image_size.x )
+			{
+				image_offset_from_side_x = ( image_bounds.x - scaled_image_size.x ) / 2.f;
+				image_offset_from_side_y = ( image_bounds.y - scaled_image_size.y ) / 2.f;
+			}
+
+#if 0
+			image_offset.x += ( image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 2.f );
+			image_offset.y += ( image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 2.f );
+#else
+			image_offset.x += ( image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 1.25f );
+			image_offset.y += ( image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 1.25f );
+#endif
+
+			// ImVec2 image_offset = ImGui::GetCursorPos();
+			// image_offset.x += image_bounds.x - ( scaled_icon_size.x / 1.25 );
+			// image_offset.y -= ( scaled_icon_size.y / 1.25 ) + style.ItemSpacing.y;
+
+			ImGui::SetCursorPos( image_offset );
+
+			ImGui::Image( icon_get_imtexture( e_icon_video ), scaled_icon_size );
+		}
+
+		// ----------------------------------------------------------------------------------------------------------
+		// Draw Text
+		
+		// center align text
+		ImGui::SetCursorPosX( current_pos.x + ( ( gallery::item_size - ( media_text_size.x + style.WindowPadding.x * 2 + style.ItemSpacing.x ) ) * 0.5f ) );
+		ImGui::SetCursorPosY( current_pos.y + image_bounds.x + style.ItemSpacing.y );
+
+		ImGui::PushTextWrapPos( saved_pos.x + image_bounds.x + style.ItemSpacing.x );
+
+		// Text Clipping
+		{
+			ImVec2  window_pos  = ImGui::GetWindowPos();
+			ImVec2  current_screen_pos = ImGui::GetCursorScreenPos();
+
+			ImVec2  text_clip_min( window_pos.x + cursor_pos.x, ( window_pos.y + cursor_pos.y + image_bounds.x + ( style.ItemSpacing.y * 2 ) ) - ImGui::GetScrollY() );
+			ImVec2  text_clip_max = global_item_size;
+
+			float   text_height   = text_clip_max.y - text_clip_min.y;
+			float   font_height   = ImGui::GetFontSize();
+
+			// float   result        = fmod( text_height, font_height );
+			float   result        = floor( text_height / font_height );
+			text_clip_max.y       = text_clip_min.y + ( result * font_height );
+
+			ImGui::PushClipRect( text_clip_min, text_clip_max, true );
+
+			// draw clipping box for debug if needed
+			//ImColor clip_color = style.Colors[ ImGuiCol_Border ];
+			//draw_list->AddRect( text_clip_min, text_clip_max, clip_color, 0, ImDrawFlags_None );
+		}
+		
+		ImGui::TextUnformatted( media.filename.c_str() );
+		
+		ImGui::PopTextWrapPos();
+		ImGui::PopClipRect();
+
+		// ----------------------------------------------------------------------------------------------------------
+		// Add Dummy Window
+		
+		//ImGui::SetCursorPos( post_dummy_pos );
+		ImGui::SetCursorPos( saved_pos );
+		ImGui::Dummy( { item_size_x, current_item_size_y } );
+		
+		// ----------------------------------------------------------------------------------------------------------
+		// Handle Actions
 
 		if ( item_hovered && ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
 		{
@@ -948,6 +1005,8 @@ void gallery_view_draw_content()
 
 	ImGui::EndChild();
 
+	// ----------------------------------------------------------------------------------------------------------
+	
 	// printf( "IMAGE COUNT: %d\n", image_visible_count );
 
 	for ( size_t i = 0; i < thumbnail_requests.size(); i++ )
