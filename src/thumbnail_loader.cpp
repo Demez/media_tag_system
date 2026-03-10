@@ -557,10 +557,10 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		thumbnail_printf( "[THUMBNAIL %d] LOADED IMAGE: %s\n", job->thumbnail.index, thumbnail->path );
 		
-		float min_size = std::min( thumbnail->image->width, thumbnail->image->height );
+		float max_image_size = std::max( thumbnail->image->width, thumbnail->image->height );
 
 		// Downscale image if size is larger than target size
-		if ( min_size > thumbnail_size )
+		if ( max_image_size > thumbnail_size )
 		// if ( 0 )
 		{
 			float factor[ 2 ]      = { 1.f, 1.f };
