@@ -407,6 +407,31 @@ def compile_libfyaml():
     print("Building libfyaml - Debug\n")
     if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
         return
+        return
+
+
+# =================================================================================================
+
+
+def compile_libjxl():
+    set_project("jxl")
+    os.chdir("jxl")
+
+    # if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=0.", "Failed to run cmake"):
+    if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF", "Failed to run cmake"):
+        return
+
+    #print("Building jxl - RelWithDebInfo\n")
+    #if not syscmd(f"cmake --build ./build --config RelWithDebInfo", "Failed to build in RelWithDebInfo"):
+    #    return
+
+    print("Building jxl - Release\n")
+    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+        return
+
+    #print("Building jxl - Debug\n")
+    #if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
+    #    return
 
 
 # =================================================================================================
@@ -484,12 +509,18 @@ FILE_LIST = {
             "name": "mpv",
             "user_extract": True,
         },
-        # },
         {
             "url":  "https://github.com/pantoniou/libfyaml/releases/download/v0.9.5/libfyaml-0.9.5.tar.gz",
             "file": "libfyaml-0.9.5.tar.gz",
             "name": "libfyaml",
-            "func": compile_libfyaml,
+            #"func": compile_libfyaml,
+        },
+        {
+            "url":  "https://github.com/libjxl/libjxl/archive/refs/tags/v0.11.2.zip",
+            "name": "jxl",
+            "extracted_folder": "libjxl-0.11.2",
+            "file": "libjxl-0.11.2.zip",
+            "func": compile_libjxl,
         },
     ],
 
@@ -509,21 +540,35 @@ FILE_LIST = {
             "file": "SDL3-3.2.24.zip",
         },
         {
-            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/latest/FreeImageRe-v4.0.1-win64.zip",
+            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/v4.1.1/FreeImageRe-v4.1.1-win64.zip",
             "name": "FreeImageRe",
             "extract_folder": "FreeImageRe",
-            "file": "FreeImageRe-v4.0.1-win64.zip",
+            "file": "FreeImageRe-v4.1.1-win64.zip",
         },
+       # {
+       #     "url":  "https://github.com/libjxl/libjxl/releases/download/v0.11.2/jxl-x64-windows.zip",
+       #     "name": "jxl_win",
+       #     "extract_folder": "jxl_win",
+       #     "file": "jxl-x64-windows.zip",
+       # },
     ],
 
     # Linux Only
     OS.Linux: [
         {
-            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/latest/FreeImageRe-linux64.zip",
+            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/v4.1.1/FreeImageRe-v4.1.1-linux64.zip",
             "name": "FreeImageRe",
             "extract_folder": "FreeImageRe",
-            "file": "FreeImageRe-linux64.zip",
+            "file": "FreeImageRe-v4.1.1-linux64.zip",
         },
+
+        # will need to add new behavior here maybe, uh oh
+        # {
+        #     "url":  "https://github.com/libjxl/libjxl/releases/download/v0.11.2/jxl-debs-amd64-ubuntu-24.04.zip",
+        #     "name": "jxl_linux",
+        #     "extract_folder": "jxl_linux",
+        #     "file": "jxl-debs-amd64-ubuntu-24.04.zip",
+        # },
     ],
 }
 

@@ -222,12 +222,12 @@ struct LoaderFreeImage : public IImageLoader
 
 		load_info.image->bit_depth       = FreeImage_GetBPP( bitmap );
 		load_info.image->image_format    = util_strdup_r( load_info.image->image_format, FreeImage_GetFormatFromFIF( format ) );
-		u32 channel_num                  = FreeImage_GetChannelsNumber( bitmap );
+		load_info.image->channels        = FreeImage_GetChannelsNumber( bitmap );
 
 		//load_info.image->pitch           = load_info.image->width * channel_num;
 
 		int bit_depth                    = load_info.image->pitch / load_info.image->width;
-		int bit_depth2                   = bpp / channel_num;
+		int bit_depth2                   = bpp / load_info.image->channels;
 		int bit_depth3                   = load_info.image->pitch / bpp;
 
 		// load_info.image->bytes_per_pixel = bpp / bit_depth2;
@@ -249,6 +249,8 @@ struct LoaderFreeImage : public IImageLoader
 		// size_t image_size           = load_info.image->width * load_info.image->height * load_info.image->bytes_per_pixel;
 
 		load_info.image->frame[ 0 ] = ch_realloc< u8 >( load_info.image->frame[ 0 ], image_size, e_mem_category_image_data );
+		load_info.image->frame_size = image_size;
+
 		memset( load_info.image->frame[ 0 ], 0, image_size * sizeof( u8 ) );
 
 		memcpy( load_info.image->frame[ 0 ], image_bits, image_size );
@@ -261,7 +263,7 @@ struct LoaderFreeImage : public IImageLoader
 
 		if ( image_type == FIT_BITMAP )
 		{
-			switch ( channel_num )
+			switch ( load_info.image->channels )
 			{
 				case 4:
 					if ( load_info.image->bit_depth != 32 )

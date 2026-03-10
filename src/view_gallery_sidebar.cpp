@@ -42,7 +42,10 @@ void gallery_view_draw_header()
 
 	if ( ImGui::InputText( "##directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 	{
-		directory::queued = g_folder_buf;
+		if ( fs_is_dir( g_folder_buf ) )
+			directory::queued = g_folder_buf;
+		else
+			snprintf( g_folder_buf, 512, directory::path.string().c_str() );
 	}
 
 	ImGui::SameLine();
@@ -65,7 +68,8 @@ void gallery_view_draw_header()
 		gallery::item_text_size.clear();
 		gallery::item_text_size.resize( directory::media_list.size() );
 
-		thumbnail_clear_cache();
+		if ( !app::config.thumbnail_use_fixed_size )
+			thumbnail_clear_cache();
 	}
 
 	ImGui::SameLine();

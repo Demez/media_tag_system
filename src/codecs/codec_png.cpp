@@ -95,12 +95,12 @@ struct LoaderPNG: public IImageLoader
         //spng_format pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGB8;
         // spng_format pngFmt = SPNG_FMT_RGB8;
 		spng_format pngFmt = SPNG_FMT_RGBA8;
-		int decode_flags{};
+		int         decode_flags{};
+		decode_flags |= SPNG_DECODE_TRNS;
 
         if ( ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR_ALPHA || ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE_ALPHA )
 		{
 			pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGBA8;
-			decode_flags |= SPNG_DECODE_TRNS;
 			//pngFmt = SPNG_FMT_RGBA8;
 		}
 
@@ -117,6 +117,7 @@ struct LoaderPNG: public IImageLoader
 		// load_info.image->frame      = ch_realloc( load_info.image->frame, 1, e_mem_category_image_data  );
 		load_info.image->frame.resize( 1 );
 		load_info.image->frame[ 0 ] = ch_realloc( load_info.image->frame[ 0 ], size, e_mem_category_image_data );
+		load_info.image->frame_size = size;
 
 		err                         = spng_decode_image( ctx, load_info.image->frame[ 0 ], size, pngFmt, decode_flags );
 		if ( err != 0 )
@@ -131,16 +132,19 @@ struct LoaderPNG: public IImageLoader
 			case SPNG_FMT_RGB8:
 				load_info.image->format          = GL_RGB;
 				load_info.image->bytes_per_pixel = 3;
+				load_info.image->channels        = 3;
 				break;
 
 			case SPNG_FMT_RGBA8:
 				load_info.image->format          = GL_RGBA;
 				load_info.image->bytes_per_pixel = 4;
+				load_info.image->channels        = 4;
 				break;
 
 			case SPNG_FMT_RGBA16:
 				load_info.image->format          = GL_RGBA16;
 				load_info.image->bytes_per_pixel = 8; // ??
+				load_info.image->channels        = 4;
 				break;
 		}
 

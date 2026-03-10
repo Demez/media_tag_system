@@ -149,6 +149,11 @@ if ( MSVC )
 	
 	message( "Copying fyaml" )
 	configure_file( "thirdparty/libfyaml/build/Release/fyaml.dll" "${PROJ_OUT}/fyaml.dll" COPYONLY )
+	
+	message( "Copying jxl" )
+	configure_file( "thirdparty/libjxl/build/lib/Release/jxl.dll" "${PROJ_OUT}/jxl.dll" COPYONLY )
+	configure_file( "thirdparty/libjxl/build/lib/Release/jxl_cms.dll" "${PROJ_OUT}/jxl_cms.dll" COPYONLY )
+	configure_file( "thirdparty/libjxl/build/lib/Release/jxl_threads.dll" "${PROJ_OUT}/jxl_threads.dll" COPYONLY )
 
 	#message( "Copying mimalloc" )
 	#configure_file( "thirdparty/mimalloc/out/msvc-x64/Release/mimalloc-redirect.dll" "${PROJ_OUT}/mimalloc-redirect.dll" COPYONLY )
@@ -166,6 +171,7 @@ set(
     src/main.cpp
     src/main.h
     src/thumbnail_loader.cpp
+    src/thumbnail_jxl.cpp
     src/mpv_interface.cpp
     src/mpv_interface.h
     src/image_loader.cpp
@@ -253,6 +259,8 @@ include_directories(
 	"thirdparty/FreeImageRe/include"
 	"thirdparty/stb"
 	"thirdparty/libfyaml/include"
+	"thirdparty/libjxl/lib/include"
+	"thirdparty/libjxl/build/lib/include"
 )
 
 if ( MIMALLOC )
@@ -271,8 +279,13 @@ target_link_libraries(
 	SDL3
 	turbojpeg-static
 	spng
-	FreeImage
 	fyaml
+	jxl
+	jxl_cms
+	jxl_threads
+
+	# must be below jxl, or my program will link the jxl functions to freeimage instead
+	FreeImage
 )
 
 if ( MIMALLOC )
@@ -294,6 +307,7 @@ if ( WIN32 )
 		media_tag_system PRIVATE
 		"thirdparty/libspng/build/Release"
 		"thirdparty/libfyaml/build/Release"
+		"thirdparty/libjxl/build/lib/Release"
 	)
 endif()
 

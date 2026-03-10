@@ -128,7 +128,9 @@ struct CodecJPEG: public IImageLoader
 		// image->frame      = ch_realloc( image->frame, 1, e_mem_category_image_data );
 		image->frame.resize( 1 );
 		// image->frame[ 0 ] = ch_realloc( image->frame[ 0 ], best_width * best_height * tjPixelSize[ pixelFmt ], e_mem_category_image_data );
-		image->frame[ 0 ] = ch_calloc< u8 >( best_width * best_height * tjPixelSize[ pixelFmt ], e_mem_category_image_data );
+		image->frame[ 0 ]           = ch_calloc< u8 >( best_width * best_height * tjPixelSize[ pixelFmt ], e_mem_category_image_data );
+
+		load_info.image->frame_size = best_width * best_height * tjPixelSize[ pixelFmt ];
 
 		if ( !image->frame[ 0 ] )
 		{
@@ -178,6 +180,7 @@ struct CodecJPEG: public IImageLoader
 		image->format          = GL_RGBA;
 		image->bit_depth       = 32;  // uhhhh
 		image->pitch           = pitch;
+		image->channels        = 4;
 
 		return true;
 	}

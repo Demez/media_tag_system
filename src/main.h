@@ -30,6 +30,9 @@ struct image_frame_t
 
 	// image data
 	unsigned char* data;
+
+	// size
+	size_t         size;
 };
 
 
@@ -41,11 +44,15 @@ struct image_t
 	int                          bit_depth;
 	int                          pitch;
 	int                          bytes_per_pixel;
+	int                          channels;
 	GLint                        format;
 
 	int                          loop_count;
 	// std::vector< image_frame_t > frame;
-	std::vector< u8* > frame;
+	std::vector< u8* >           frame;
+
+	// TEMP until image_frame_t is used
+	size_t                       frame_size;
 
 	char*                        image_format;
 };
@@ -87,7 +94,14 @@ struct IImageLoader
 
 
 void image_register_codec( IImageLoader* codec, bool fallback );
-bool image_load( const fs::path& path, image_load_info_t& load_info );
+
+// Load an image from disk or from memory
+// If nothing is passed in for file_data and data_len, it loads the file internally
+bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_data = nullptr, size_t data_len = 0 );
+
+// not seprate files to check the extension of path still
+// bool image_load_from_memory( image_load_info_t& load_info, char* file_data, size_t file_len );
+// bool image_load( image_load_info_t& load_info, const fs::path& path );
 
 // Free all image data
 void image_free( image_t& image );
@@ -180,6 +194,15 @@ struct app_config_t
 
 	// size in kilobytes
 	u32                       thumbnail_mem_cache_size    = 20000;
+
+	// resoultion of thumbnail
+	u32                       thumbnail_size              = 500;
+	
+	u32                       thumbnail_use_fixed_size    = 0;
+
+	u32                       thumbnail_jxl_enable        = 0;
+	float                     thumbnail_jxl_distance      = 4;
+	u32                       thumbnail_jxl_effort        = 1;
 
 	std::string               thumbnail_cache_path{};
 	std::string               thumbnail_video_cache_path{};

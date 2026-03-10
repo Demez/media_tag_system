@@ -166,6 +166,11 @@ bool config_load()
 	                                        "/thumbnail-threads %u "
 	                                                 "/thumbnail-uploads-per-frame %u "
 	                                                 "/thumbnail-memory-cache-size %u "
+	                                                 "/thumbnail-size %u "
+	                                                 "/thumbnail-use-fixed-size %u "
+	                                                 "/thumbnail-jxl-enable %u "
+	                                                 "/thumbnail-jxl-distance %f "
+	                                                 "/thumbnail-jxl-effort %u "
 	                                                 "/vsync %d "
 	                                                 "/no-focus-sleep-time %u "
 	                                                 "/thumbnail-cache-path %255s "
@@ -173,6 +178,11 @@ bool config_load()
 	                                        &app::config.thumbnail_threads,
 	                                        &app::config.thumbnail_uploads_per_frame,
 	                                        &app::config.thumbnail_mem_cache_size,
+	                                        &app::config.thumbnail_size,
+	                                        &app::config.thumbnail_use_fixed_size,
+	                                        &app::config.thumbnail_jxl_enable,
+	                                        &app::config.thumbnail_jxl_distance,
+	                                        &app::config.thumbnail_jxl_effort,
 	                                        &app::config.vsync,
 	                                        &app::config.no_focus_sleep_time,
 	                                        cache_dir,
@@ -199,6 +209,10 @@ bool config_load()
 		printf( "Not allowing over 64 thumbnail uploads per frame, it can really lock up the program a lot!\n" );
 		app::config.thumbnail_threads = 64;
 	}
+
+	// app::config.thumbnail_jxl_distance = std::clamp( app::config.thumbnail_jxl_distance, -1.f, 25.f );
+	app::config.thumbnail_jxl_effort = std::clamp( app::config.thumbnail_jxl_effort, 0U, 11U );
+	app::config.thumbnail_jxl_enable = std::clamp( app::config.thumbnail_jxl_enable, 0U, 1U );
 
 	app::config.vsync = std::clamp( app::config.vsync, -1, 1 );
 

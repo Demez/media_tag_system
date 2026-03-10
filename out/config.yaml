@@ -23,6 +23,19 @@ thumbnail-cache-path: $app_path$/thumbnail_cache
 thumbnail-video-cache-path: R:\media_tag_system\thumbnail_video_cache
 thumbnail-memory-cache-size: 20000
 
+thumbnail-size: 500
+
+# if 1, use the size above for thumbnails
+# if 0, remake them on the fly whenever the zoom size changes
+# also is enabled if jxl thumbnails are on
+thumbnail-use-fixed-size: 1
+
+# basic JPEG XL thumbnail quality and speed control
+thumbnail-jxl-enable: 1
+
+thumbnail-jxl-distance: 4
+thumbnail-jxl-effort: 1
+
 # 0 for immediate updates, 1 for vsync, -1 for adaptive vsync
 vsync: 1
 no-focus-sleep-time: 5

@@ -55,6 +55,9 @@ thumbnail_queue_t g_thumbnail_queue;
 thumbnail_cache_t g_thumbnail_cache;
 
 
+extern bool       test_save_thumbnail( image_t& image, const std::string& output );
+
+
 // debug printing
 void thumbnail_printf( const char* format, ... )
 {
@@ -366,6 +369,12 @@ void thumbnail_loader_worker( u32 thread_id )
 		thumbnail->status.store( e_thumbnail_status_loading, std::memory_order_release );
 
 		image_load_info_t load_info{};
+		size_t            file_hash = 0;
+
+		u32               thumbnail_size = gallery::image_size;
+
+		if ( app::config.thumbnail_use_fixed_size || app::config.thumbnail_jxl_enable )
+			thumbnail_size = app::config.thumbnail_size;
 
 		if ( thumbnail->type == e_media_type_video )
 		{
@@ -468,7 +477,17 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			// Clear Video from MPV
 			const char* cmd_clear[]  = { "stop", NULL };
-			cmd_ret                  = p_mpv_command_async( local_mpv, NULL, cmd_clear );
+			cmd_ret                 = p_mpv_command_async( local_mpv, NULL, cmd_clear );
+
+			size_t file_len         = 0;
+			char*  file_data         = fs_read_file( video_thumbnail_path, &file_len );
+
+			if ( !file_data )
+			{
+				printf( "Failed to open mpv screenshot: %s\n", video_thumbnail_path );
+				thumbnail->status = e_thumbnail_status_failed;
+				continue;
+			}
 
 			// Load Image Normally
 			thumbnail->image         = ch_calloc< image_t >( 1, e_mem_category_image );
@@ -477,20 +496,35 @@ void thumbnail_loader_worker( u32 thread_id )
 			load_info.load_quick     = true;
 			load_info.threaded_load  = true;
 			load_info.thumbnail_load = true;
-			load_info.target_size.x  = gallery::image_size;
-			load_info.target_size.y  = gallery::image_size;
+			load_info.target_size.x  = thumbnail_size;
+			load_info.target_size.y  = thumbnail_size;
 
-			if ( !image_load( video_thumbnail_path, load_info ) )
+			if ( !image_load( video_thumbnail_path, load_info, file_data, file_len ) )
 			{
 				printf( "FAILED TO LOAD IMAGE: %s\n", video_thumbnail_path );
 				thumbnail->status = e_thumbnail_status_failed;
 				continue;
 			}
+
+			std::string file_data_str( file_data, file_len );
+			file_hash = std::hash< std::string >{}( file_data_str );
+
+			ch_free( e_mem_category_file_data, file_data );
 			
 			// TODO: Delete Image? it might just slow this down a bit, since it always just gets overwritten later
 		}
 		else
 		{
+			size_t file_len          = 0;
+			char*  file_data = fs_read_file( thumbnail->path, &file_len );
+
+			if ( !file_data )
+			{
+				printf( "Failed to open file: %s\n", thumbnail->path );
+				thumbnail->status = e_thumbnail_status_failed;
+				continue;
+			}
+
 			// Load Image Normally
 			thumbnail->image         = ch_calloc< image_t >( 1, e_mem_category_image );
 
@@ -498,15 +532,20 @@ void thumbnail_loader_worker( u32 thread_id )
 			load_info.load_quick     = true;
 			load_info.threaded_load  = true;
 			load_info.thumbnail_load = true;
-			load_info.target_size.x  = gallery::image_size;
-			load_info.target_size.y  = gallery::image_size;
+			load_info.target_size.x  = thumbnail_size;
+			load_info.target_size.y  = thumbnail_size;
 
-			if ( !image_load( thumbnail->path, load_info ) )
+			if ( !image_load( thumbnail->path, load_info, file_data, file_len ) )
 			{
 				printf( "FAILED TO LOAD IMAGE: %s\n", thumbnail->path );
 				thumbnail->status = e_thumbnail_status_failed;
 				continue;
 			}
+
+			std::string file_data_str( file_data, file_len );
+			file_hash = std::hash< std::string >{}( file_data_str );
+
+			ch_free( e_mem_category_file_data, file_data );
 		}
 
 		if ( thumbnail->image->frame.empty() || !thumbnail->image->frame[ 0 ] )
@@ -521,12 +560,13 @@ void thumbnail_loader_worker( u32 thread_id )
 		float min_size = std::min( thumbnail->image->width, thumbnail->image->height );
 
 		// Downscale image if size is larger than target size
-		if ( min_size > load_info.target_size.x )
+		if ( min_size > thumbnail_size )
+		// if ( 0 )
 		{
 			float factor[ 2 ]      = { 1.f, 1.f };
 
-			factor[ 0 ]            = (float)load_info.target_size.x / (float)thumbnail->image->width;
-			factor[ 1 ]            = (float)load_info.target_size.y / (float)thumbnail->image->height;
+			factor[ 0 ]            = (float)thumbnail_size / (float)thumbnail->image->width;
+			factor[ 1 ]            = (float)thumbnail_size / (float)thumbnail->image->height;
 
 			float downscale_amount = std::min( factor[ 0 ], factor[ 1 ] );
 			// float downscale_amount       = 0.5f;
@@ -541,6 +581,16 @@ void thumbnail_loader_worker( u32 thread_id )
 				thumbnail->scaled = true;
 				ch_free( e_mem_category_image_data, old_frame );
 			}
+		}
+
+		if ( app::config.thumbnail_jxl_enable )
+		{
+			std::string thumbnail_path = app::config.thumbnail_cache_path;
+			thumbnail_path += SEP_S;
+			thumbnail_path += std::to_string( file_hash );
+			thumbnail_path += ".jxl";
+
+			test_save_thumbnail( *thumbnail->image, thumbnail_path );
 		}
 
 		job->state = e_job_state_free;

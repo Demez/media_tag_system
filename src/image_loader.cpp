@@ -111,7 +111,7 @@ void image_register_codec( IImageLoader* codec, bool fallback )
 }
 
 
-bool image_load( const fs::path& path, image_load_info_t& load_info )
+bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_data, size_t file_len )
 {
 	std::string path_std_string = path.string();
 	const char* path_str        = path_std_string.c_str();
@@ -138,14 +138,19 @@ bool image_load( const fs::path& path, image_load_info_t& load_info )
 		allocated_image = true;
 	}
 
-	size_t file_len  = 0;
-	char*  file_data = fs_read_file( path.string().c_str(), &file_len );
-
-	if ( !file_data )
-	{
-		printf( "Failed to read file: %s\n", path_str );
+	if ( file_data && !file_len )
 		return false;
-	}
+
+	if ( !file_data && file_len > 0 )
+		return false;
+
+	bool internal_file_ptr = !file_data && !file_len;
+
+	if ( internal_file_ptr )
+		file_data = fs_read_file( path.string().c_str(), &file_len );
+
+	if ( !file_data || file_len == 0 )
+		return false;
 
 	bool loaded_image = false;
 
@@ -177,12 +182,16 @@ bool image_load( const fs::path& path, image_load_info_t& load_info )
 		}
 	}
 
-	ch_free( e_mem_category_file_data, file_data );
-
 	if ( !loaded_image && allocated_image )
 	{
 		ch_free( e_mem_category_image, load_info.image );
 		load_info.image = nullptr;
+		return false;
+	}
+
+	if ( internal_file_ptr )
+	{
+		ch_free( e_mem_category_file_data, file_data );
 	}
 
 	return loaded_image;
@@ -277,8 +286,8 @@ bool media_check_extension( std::string_view str_path )
 
 bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int new_height )
 {
-	stbir_pixel_layout pixel_layout  = STBIR_RGBA;
-	stbir_datatype     datatype      = STBIR_TYPE_UINT8;
+	stbir_pixel_layout pixel_layout = STBIR_RGBA;
+	stbir_datatype     datatype     = STBIR_TYPE_UINT8;
 
 	switch ( old_image->format )
 	{
@@ -319,6 +328,8 @@ bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int
 		return false;
 	}
 
+	// u8* new_frame     = ch_calloc< u8 >( new_width * new_height * old_image->channels, e_mem_category_image_data );
+
 	u8* resized_frame = (u8*)stbir_resize(
 	  old_frame, old_image->width, old_image->height, 0,
 	  nullptr, new_width, new_height, 0,
@@ -331,6 +342,7 @@ bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int
 	new_image->width      = new_width;
 	new_image->height     = new_height;
 	new_image->pitch      = new_width * 4;
+	new_image->frame_size = new_width * new_height * old_image->channels;
 	// new_image->format     = GL_RGBA;
 
 	return true;
