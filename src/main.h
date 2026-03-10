@@ -183,7 +183,8 @@ struct app_config_t
 	std::string               thumbnail_cache_path{};
 	std::string               thumbnail_video_cache_path{};
 
-	int                       vsync;
+	int                       vsync = 1;
+	u32                       no_focus_sleep_time = 8;
 };
 
 

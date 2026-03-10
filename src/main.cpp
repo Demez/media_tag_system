@@ -556,7 +556,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 	{
 		// Redraw window - Window is being resized
 		// NOTE: this is also called when dragging the window around
-		// case SDL_EVENT_WINDOW_EXPOSED:
+		case SDL_EVENT_WINDOW_EXPOSED:
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
 			thumbnail_loader_update();
@@ -772,7 +772,8 @@ void main_loop()
 
 		if ( !app::window_focused && !playing_back_video )
 		{
-			SDL_Delay( 8 );
+			if ( app::config.no_focus_sleep_time > 0 )
+				SDL_Delay( app::config.no_focus_sleep_time );
 		}
 
 		// never called?
@@ -919,6 +920,8 @@ int main( int argc, char* argv[] )
 	}
 
 	SDL_GL_SetSwapInterval( app::config.vsync );
+
+	// bool gl_ret = SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 0 );
 
 	ImGuiIO& io = ImGui::GetIO();
 

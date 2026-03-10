@@ -167,12 +167,14 @@ bool config_load()
 	                                                 "/thumbnail-uploads-per-frame %u "
 	                                                 "/thumbnail-memory-cache-size %u "
 	                                                 "/vsync %d "
+	                                                 "/no-focus-sleep-time %u "
 	                                                 "/thumbnail-cache-path %255s "
 	                                                 "/thumbnail-video-cache-path %255s",
 	                                        &app::config.thumbnail_threads,
 	                                        &app::config.thumbnail_uploads_per_frame,
 	                                        &app::config.thumbnail_mem_cache_size,
 	                                        &app::config.vsync,
+	                                        &app::config.no_focus_sleep_time,
 	                                        cache_dir,
 	                                        cache_video_dir );
 
