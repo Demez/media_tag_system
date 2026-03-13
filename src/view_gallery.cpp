@@ -242,6 +242,8 @@ void gallery_view_sort_list( std::vector< size_t >& gallery_list )
 
 		case e_gallery_sort_mode_name_z_a:
 		{
+			// this only works since fs::directory_iterator is sorted A to Z by default
+			std::reverse( gallery_list.begin(), gallery_list.end() );
 			break;
 		}
 
