@@ -10,11 +10,30 @@
 #include <jxl/types.h>
 
 
-bool test_save_thumbnail( image_t& image, const std::string& output )
+static void* jxl_thumbnail_mem_alloc( void* opaque, size_t sz )
 {
+	void* memory = malloc( sz );
+	mem_add_item( e_mem_category_jxl_thumbnail, memory, sz );
+	return memory;
+}
+
+
+static void jxl_thumbnail_mem_free( void* opaque, void* address )
+{
+	mem_free_item( e_mem_category_jxl_thumbnail, address );
+	free( address );
+}
+
+
+bool thumbnail_save( image_t& image, const std::string& output )
+{
+	JxlMemoryManager jxl_mem{};
+	jxl_mem.alloc = jxl_thumbnail_mem_alloc;
+	jxl_mem.free  = jxl_thumbnail_mem_free;
+
 	std::vector< u8 > jxl_file;
 
-	auto enc    = JxlEncoderMake( /*memory_manager=*/nullptr );
+	auto              enc          = JxlEncoderMake( &jxl_mem );
 
 	// yes, 1 thread, since this is being called from a multithreaded thumbnail system
 	// auto runner = JxlThreadParallelRunnerMake( /*memory_manager=*/nullptr, 1 );

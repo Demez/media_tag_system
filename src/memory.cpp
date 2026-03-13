@@ -36,7 +36,11 @@ const char*                         mem_category_str[] = {
     "mem_category_file_data",
 
     "mem_category_imgui",
-    "mem_category_stbi_resize",
+
+	"mem_category_stbi_resize",
+	"mem_category_jxl",
+	"mem_category_jxl_thumbnail",
+	"mem_category_thumbnail_cache",
 };
 
 

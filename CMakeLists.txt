@@ -195,10 +195,11 @@ set(
     src/args.h
     src/handles.h
 
-    src/codecs/codec_jpeg.cpp
-    src/codecs/codec_png.cpp
+    src/codecs/loader_jpeg.cpp
+    src/codecs/loader_png.cpp
     # src/codecs/format_gif.cpp
     src/codecs/loader_freeimage.cpp
+    src/codecs/loader_jpegxl.cpp
 
     src/system/system.h
 

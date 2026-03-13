@@ -119,7 +119,9 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 	if ( !fs_is_file( path_str ) || fs_file_size( path_str ) == 0 )
 	{
-		printf( "File is Empty or Doesn't exist: %s\n", path_str );
+		if ( !load_info.quiet )
+			printf( "File is Empty or Doesn't exist: %s\n", path_str );
+
 		return false;
 	}
 
@@ -131,7 +133,9 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 		if ( !load_info.image )
 		{
-			printf( "Failed to allocate image data!\n" );
+			if ( !load_info.quiet )
+				printf( "Failed to allocate image data!\n" );
+
 			return false;
 		}
 

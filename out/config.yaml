@@ -12,6 +12,7 @@ bookmarks:
  - D:\demez_archive\media\downloads
  - D:\demez_archive\media\demez\drawings
  - D:\demez_archive\phone\sync6
+ - D:\projects\media_tag_system\out
 
 # Amount of threads to use for generating thumbnails, also uses more memory
 thumbnail-threads: 8
@@ -27,14 +28,13 @@ thumbnail-size: 500
 
 # if 1, use the size above for thumbnails
 # if 0, remake them on the fly whenever the zoom size changes
-# also is enabled if jxl thumbnails are on
 thumbnail-use-fixed-size: 0
 
 # basic JPEG XL thumbnail quality and speed control
-thumbnail-jxl-enable: 0
+thumbnail-jxl-enable: 1
 
 thumbnail-jxl-distance: 4
-thumbnail-jxl-effort: 6
+thumbnail-jxl-effort: 5
 
 # 0 for immediate updates, 1 for vsync, -1 for adaptive vsync
 vsync: 1

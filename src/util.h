@@ -119,7 +119,12 @@ enum e_mem_category : u8
 	e_mem_category_file_data,
 
 	e_mem_category_imgui,
+
+	// image formats
 	e_mem_category_stbi_resize,
+	e_mem_category_jxl,
+	e_mem_category_jxl_thumbnail,
+	e_mem_category_thumbnail_cache,
 
 	e_mem_category_count,
 };

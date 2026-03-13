@@ -77,6 +77,9 @@ struct image_load_info_t
 
 	// Only load the first frame of this image, usually for thumbnails
 	bool     single_frame;
+
+	// No error printing!
+	bool     quiet;
 };
 
 
