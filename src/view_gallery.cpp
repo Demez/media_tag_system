@@ -703,7 +703,7 @@ void gallery_view_draw_content()
 				distance = cursor_pos.y - visible_bottom;
 
 			// if distance is still 0, this item is at least partially on-screen
-			thumbnail_update_distance( directory::thumbnail_list[ i ], distance );
+			thumbnail_update_distance( directory::thumbnail_list[ gallery_index ], distance );
 		}
 
 		// ----------------------------------------------------------------------------------------------------------
