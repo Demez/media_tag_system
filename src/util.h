@@ -395,6 +395,7 @@ bool        util_mouse_hovering_imgui_window();
 // --------------------------------------------------------------------------------------------------------
 // file system functions
 
+std::string fs_path_clean( const char* path, size_t path_len );
 
 char*       fs_get_filename( const char* path );
 char*       fs_get_filename_no_ext( const char* path );
@@ -406,6 +407,9 @@ bool        fs_exists( const char* path );
 bool        fs_make_dir( const char* path );
 bool        fs_is_dir( const char* path );
 bool        fs_is_file( const char* path );
+
+bool        fs_is_absolute( const char* path, size_t path_len );
+bool        fs_is_relative( const char* path, size_t path_len );
 
 // replace all backslash path separators with forward slashes
 char*       fs_replace_path_seps_unix( const char* path );

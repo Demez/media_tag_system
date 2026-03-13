@@ -101,6 +101,8 @@ void config_parse_path( char* app_dir, const char* user_path, std::string& resul
 		last = ++find;
 		find = strchr( last, '$' );
 	}
+
+	result = fs_path_clean( result.data(), result.size() );
 }
 
 

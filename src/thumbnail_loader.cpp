@@ -616,12 +616,18 @@ void thumbnail_loader_worker( u32 thread_id )
 		// If we didn't find the thumbnail on disk, write it!
 		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
 		{
-			std::string thumbnail_path = app::config.thumbnail_cache_path;
-			thumbnail_path += SEP_S;
-			thumbnail_path += std::to_string( file_hash );
-			thumbnail_path += ".jxl";
+			// Make sure it's not in the cache folder
+			std::string cleaned_path = fs_path_clean( thumbnail->path, strlen( thumbnail->path ) );
 
-			thumbnail_save( *thumbnail->image, thumbnail_path );
+			if ( !cleaned_path.starts_with( app::config.thumbnail_cache_path ) )
+			{
+				std::string thumbnail_path = app::config.thumbnail_cache_path;
+				thumbnail_path += SEP_S;
+				thumbnail_path += std::to_string( file_hash );
+				thumbnail_path += ".jxl";
+
+				thumbnail_save( *thumbnail->image, thumbnail_path );
+			}
 		}
 
 		job->state = e_job_state_free;
