@@ -281,9 +281,8 @@ void notification_draw( float frame_time )
 
 	// ImGui::SetNextWindowSizeConstraints( { width - 80.f, -1.f }, { width - 80.f, -1.f } );
 
-	if ( !ImGui::GetIO().WantTextInput )
-
-	ImGui::SetNextWindowFocus();
+	//if ( !ImGui::GetIO().WantTextInput )
+	//	ImGui::SetNextWindowFocus();
 
 	if ( ImGui::Begin( "##notif", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
 	{
@@ -985,12 +984,12 @@ int main( int argc, char* argv[] )
 				if ( fs_is_dir( arg ) )
 				{
 					directory::queued = arg;
-					g_gallery_view  = true;
+					//g_gallery_view  = true;
 				}
 				else
 				{
 					on_new_file( arg );
-					g_gallery_view = false;
+					//g_gallery_view = false;
 				}
 
 				break;

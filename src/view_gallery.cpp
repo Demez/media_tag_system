@@ -1017,6 +1017,9 @@ void gallery_view_draw()
 
 	ImGui::End();
 
+	if ( ImGui::GetIO().WantTextInput )
+		return;
+
 	// TODO: Test ImGui::Shortcut()
 	if ( app::window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 	{
