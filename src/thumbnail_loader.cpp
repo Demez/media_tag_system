@@ -345,6 +345,10 @@ size_t thumbnail_generate_hash( file_t& file )
 	hash ^= std::hash< size_t >{}( file.file_size );
 	hash ^= std::hash< size_t >{}( file.date_mod );
 	hash ^= std::hash< size_t >{}( file.date_created );
+	
+	hash ^= std::hash< size_t >{}( app::config.thumbnail_jxl_effort );
+	hash ^= std::hash< size_t >{}( app::config.thumbnail_jxl_distance );
+	hash ^= std::hash< size_t >{}( app::config.thumbnail_size );
 
 	return hash;
 }
