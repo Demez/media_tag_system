@@ -845,7 +845,7 @@ int main( int argc, char* argv[] )
 		return 1;
 	}
 
-	app::window = SDL_CreateWindow( "Media Tag System", 1600, 900, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL );
+	app::window = SDL_CreateWindow( "Media Tag System", 1000, 600, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL );
 
 	if ( !app::window )
 	{
@@ -853,7 +853,7 @@ int main( int argc, char* argv[] )
 		return 1;
 	}
 
-	SDL_SetWindowMinimumSize( app::window, 640, 480 );
+	SDL_SetWindowMinimumSize( app::window, 400, 400 );
 
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_FILE, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_TEXT, false );
