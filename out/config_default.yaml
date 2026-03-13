@@ -1,0 +1,46 @@
+# bookmarks list
+# thumbnail threads
+# thumbnail cache dir
+# video thumbnail dir
+# default sort mode
+# saved sort mode per folder (store in a different file?)
+# imgui themes
+
+bookmarks:
+ - D:\projects\media_tag_system\out
+
+
+# new layout for thumbnail options
+thumbnail:
+  threads: 8
+
+  # Max amount of thumbnails you can upload at a time,
+  # this blocks the main thread for a second to upload, so don't set this number too high
+  uploads-per-frame: 16
+
+  cache-path: $app_path$/thumbnail_cache
+  cache-path-video: $app_path$/thumbnail_video_cache
+  memory-cache-size: 20000
+
+  size: 500
+
+  # if 1, use the size above for thumbnails
+  # if 0, remake them on the fly whenever the zoom size changes
+  use-fixed-size: 1
+
+  # basic JPEG XL thumbnail quality and speed control
+  jxl-enable: 1
+
+  jxl-distance: 4
+  jxl-effort: 5
+
+
+# 0 for immediate updates, 1 for vsync, -1 for adaptive vsync
+vsync: 1
+
+# When the window isn't focused, add a sleep time every frame, 0 to disable
+no-focus-sleep-time: 5
+
+# Disable video support
+no-video: 0
+

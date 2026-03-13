@@ -240,12 +240,14 @@ void gallery_view_draw_sidebar()
 					for ( const bookmark_t& bookmark : app::config.bookmark )
 					{
 						ImGui::PushID( id++ );
+						ImGui::BeginDisabled( !bookmark.valid );
 
 						if ( ImGui::Selectable( bookmark.name.data() ) )
 						{
 							directory::queued = bookmark.path;
 						}
 
+						ImGui::EndDisabled();
 						ImGui::PopID();
 					}
 				}

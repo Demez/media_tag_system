@@ -102,7 +102,7 @@ FUNC_PTR( mpv_render_context_free );
 
 bool load_mpv_dll()
 {
-	if ( args_register_bool( "Disable Video Player", "--no-video" ) )
+	if ( app::config.no_video )
 		return false;
 
 	g_mpv_module = sys_load_library( L"libmpv-2.dll" );
