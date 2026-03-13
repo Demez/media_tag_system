@@ -5,8 +5,8 @@
 
 namespace gallery
 {
-	// a sorted list of items
-	std::vector< gallery_item_t > items{};
+	// a sorted list of media entries, each item is an index to an entry in directory::media_list
+	std::vector< size_t >         sorted_media{};
 
 	// cursor position/index in items
 	size_t                        cursor            = 0;
@@ -32,11 +32,44 @@ namespace gallery
 }
 
 
-void gallery_view_draw_header();
-void gallery_view_update_header_directory();
+void            gallery_view_draw_header();
+void            gallery_view_update_header_directory();
 
-void gallery_view_draw_sidebar();
-void sidebar_draw_filesystem();
+void            gallery_view_draw_sidebar();
+void            sidebar_draw_filesystem();
+
+
+// =============================================================================================
+
+
+const media_entry_t& gallery_item_get_media_entry( size_t index )
+{
+	if ( index >= gallery::sorted_media.size() )
+		return {};
+
+	return directory::media_list[ gallery::sorted_media[ index ] ];
+}
+
+
+const file_t& gallery_item_get_file( size_t index )
+{
+	return gallery_item_get_media_entry( index ).file;
+}
+
+
+const fs::path& gallery_item_get_path( size_t index )
+{
+	return gallery_item_get_media_entry( index ).file.path;
+}
+
+
+std::string gallery_item_get_path_string( size_t index )
+{
+	return gallery_item_get_media_entry( index ).file.path.string();
+}
+
+
+// =============================================================================================
 
 
 void gallery_view_input_check_clear_multi_select()
@@ -73,7 +106,7 @@ void gallery_view_input()
 		gallery_view_input_check_clear_multi_select();
 
 		if ( gallery::cursor == 0 )
-			gallery::cursor = gallery::items.size();
+			gallery::cursor = gallery::sorted_media.size();
 
 		gallery::cursor--;
 		gallery_view_scroll_to_cursor();
@@ -81,7 +114,7 @@ void gallery_view_input()
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) )
 	{
-		gallery::cursor = ( gallery::cursor + 1 ) % gallery::items.size();
+		gallery::cursor = ( gallery::cursor + 1 ) % gallery::sorted_media.size();
 		gallery_view_scroll_to_cursor();
 		gallery_view_input_update_multi_select();
 	}
@@ -89,7 +122,7 @@ void gallery_view_input()
 	{
 		if ( gallery::cursor < gallery::row_count )
 		{
-			size_t count_in_row   = gallery::items.size() % gallery::row_count;
+			size_t count_in_row   = gallery::sorted_media.size() % gallery::row_count;
 			size_t missing_in_row = gallery::row_count - count_in_row;
 			size_t row_diff       = gallery::row_count - gallery::cursor;
 
@@ -97,26 +130,26 @@ void gallery_view_input()
 			if ( missing_in_row >= row_diff )
 				row_diff += gallery::row_count;
 
-			gallery::cursor = gallery::items.size() - ( row_diff - missing_in_row );
+			gallery::cursor = gallery::sorted_media.size() - ( row_diff - missing_in_row );
 		}
 		else
 		{
-			gallery::cursor = ( gallery::cursor - gallery::row_count ) % gallery::items.size();
+			gallery::cursor = ( gallery::cursor - gallery::row_count ) % gallery::sorted_media.size();
 		}
 
 		gallery_view_scroll_to_cursor();
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_DownArrow ) )
 	{
-		if ( gallery::cursor + gallery::row_count >= gallery::items.size() )
+		if ( gallery::cursor + gallery::row_count >= gallery::sorted_media.size() )
 		{
-			size_t count_in_row  = gallery::items.size() % gallery::row_count;
+			size_t count_in_row  = gallery::sorted_media.size() % gallery::row_count;
 			size_t row_pos      = gallery::cursor % gallery::row_count;
 			gallery::cursor      = row_pos;
 		}
 		else
 		{
-			gallery::cursor = ( gallery::cursor + gallery::row_count ) % gallery::items.size();
+			gallery::cursor = ( gallery::cursor + gallery::row_count ) % gallery::sorted_media.size();
 		}
 
 		gallery_view_scroll_to_cursor();
@@ -129,51 +162,6 @@ void gallery_view_input()
 }
 
 
-std::string gallery_item_get_path_string( gallery_item_t& item )
-{
-	if ( item.file_index >= directory::media_list.size() )
-		return {};
-
-	return directory::media_list[ item.file_index ].path.string();
-}
-
-
-fs::path gallery_item_get_path( gallery_item_t& item )
-{
-	if ( item.file_index >= directory::media_list.size() )
-		return {};
-
-	return directory::media_list[ item.file_index ].path;
-}
-
-
-fs::path gallery_item_get_path( size_t index )
-{
-	if ( index >= gallery::items.size() )
-		return {};
-
-	return gallery_item_get_path( gallery::items[ index ] );
-}
-
-
-std::string gallery_item_get_path_string( size_t index )
-{
-	if ( index >= gallery::items.size() )
-		return {};
-
-	return gallery_item_get_path_string( gallery::items[ index ] );
-}
-
-
-media_entry_t gallery_item_get_media_entry( size_t index )
-{
-	if ( index >= gallery::items.size() )
-		return {};
-
-	return directory::media_list[ gallery::items[ index ].file_index ];
-}
-
-
 // =============================================================================================
 // Sorting
 
@@ -181,12 +169,12 @@ media_entry_t gallery_item_get_media_entry( size_t index )
 // Date Modified
 int qsort_date_mod_newest( const void* left, const void* right )
 {
-	const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
-	const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+	const file_t& file_left  = directory::media_list[ *static_cast< const size_t* >( left ) ].file;
+	const file_t& file_right = directory::media_list[ *static_cast< const size_t* >( right ) ].file;
 
-	if ( item_left->date_mod > item_right->date_mod )
+	if ( file_left.date_mod > file_right.date_mod )
 		return -1;
-	else if ( item_left->date_mod < item_right->date_mod )
+	else if ( file_left.date_mod < file_right.date_mod )
 		return 1;
 
 	return 0;
@@ -202,12 +190,12 @@ int qsort_date_mod_oldest( const void* left, const void* right )
 // Date Created
 int qsort_date_created_newest( const void* left, const void* right )
 {
-	const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
-	const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+	const file_t& file_left  = directory::media_list[ *static_cast< const size_t* >( left ) ].file;
+	const file_t& file_right = directory::media_list[ *static_cast< const size_t* >( right ) ].file;
 
-	if ( item_left->date_created > item_right->date_created )
+	if ( file_left.date_created > file_right.date_created )
 		return -1;
-	else if ( item_left->date_created < item_right->date_created )
+	else if ( file_left.date_created < file_right.date_created )
 		return 1;
 
 	return 0;
@@ -223,12 +211,12 @@ int qsort_date_created_oldest( const void* left, const void* right )
 // File Size
 int qsort_size_large_to_small( const void* left, const void* right )
 {
-	const gallery_item_t* item_left  = static_cast< const gallery_item_t* >( left );
-	const gallery_item_t* item_right = static_cast< const gallery_item_t* >( right );
+	const file_t& file_left  = directory::media_list[ *static_cast< const size_t* >( left ) ].file;
+	const file_t& file_right = directory::media_list[ *static_cast< const size_t* >( right ) ].file;
 
-	if ( item_left->file_size > item_right->file_size )
+	if ( file_left.file_size > file_right.file_size )
 		return -1;
-	else if ( item_left->file_size < item_right->file_size )
+	else if ( file_left.file_size < file_right.file_size )
 		return 1;
 
 	return 0;
@@ -241,7 +229,7 @@ int qsort_size_small_to_large( const void* left, const void* right )
 }
 
 
-void gallery_view_sort_list( std::vector< gallery_item_t >& gallery_list )
+void gallery_view_sort_list( std::vector< size_t >& gallery_list )
 {
 	// Sort data
 	switch ( gallery::sort_mode )
@@ -259,37 +247,37 @@ void gallery_view_sort_list( std::vector< gallery_item_t >& gallery_list )
 
 		case e_gallery_sort_mode_date_mod_new_to_old:
 		{
-			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_date_mod_newest );
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( size_t ), qsort_date_mod_newest );
 			break;
 		}
 
 		case e_gallery_sort_mode_date_mod_old_to_new:
 		{
-			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_date_mod_oldest );
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( size_t ), qsort_date_mod_oldest );
 			break;
 		}
 
 		case e_gallery_sort_mode_date_created_new_to_old:
 		{
-			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_date_created_newest );
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( size_t ), qsort_date_created_newest );
 			break;
 		}
 
 		case e_gallery_sort_mode_date_created_old_to_new:
 		{
-			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_date_created_oldest );
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( size_t ), qsort_date_created_oldest );
 			break;
 		}
 
 		case e_gallery_sort_mode_size_large_to_small:
 		{
-			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_size_large_to_small );
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( size_t ), qsort_size_large_to_small );
 			break;
 		}
 
 		case e_gallery_sort_mode_size_small_to_large:
 		{
-			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( gallery_item_t ), qsort_size_small_to_large );
+			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( size_t ), qsort_size_small_to_large );
 			break;
 		}
 	}
@@ -298,8 +286,8 @@ void gallery_view_sort_list( std::vector< gallery_item_t >& gallery_list )
 
 void gallery_view_sort_dir()
 {
-	static std::vector< gallery_item_t > folders;
-	static std::vector< gallery_item_t > files;
+	static std::vector< size_t > folders;
+	static std::vector< size_t > files;
 
 	folders.clear();
 	files.clear();
@@ -309,45 +297,24 @@ void gallery_view_sort_dir()
 
 	size_t         selected_item_idx = gallery::cursor;
 	media_entry_t  selected_item{};
-	gallery_item_t selected_item_gallery{};
+	size_t         selected_item_gallery{};
 	bool           selected_folder = false;
 
-	if ( gallery::items.size() )
+	if ( gallery::sorted_media.size() )
 	{
-		selected_item_gallery = gallery::items[ selected_item_idx ];
+		selected_item_gallery = gallery::sorted_media[ selected_item_idx ];
 		selected_item         = gallery_item_get_media_entry( selected_item_idx );
 		selected_folder       = selected_item.type == e_media_type_directory;
 	}
 
-	// Fill lists with information
+	// Split up lists
 	for ( size_t i = 0; i < directory::media_list.size(); i++ )
 	{
-		gallery_item_t gallery_item{};
-		gallery_item.file_index = i;
-
-		fs::path&      path     = directory::media_list[ i ].path;
-		std::string    str_path = directory::media_list[ i ].path.string();
-
 		if ( directory::media_list[ i ].type == e_media_type_directory )
-		{
-			//if ( selected_folder && selected_item.path == path )
-			//	gallery::cursor = i;
+			folders.push_back( i );
 
-			folders.push_back( gallery_item );
-		}
 		else
-		{
-			//if ( !selected_folder && selected_item.path == path )
-			//	gallery::cursor = i;
-
-			if ( !sys_get_file_times( str_path.data(), &gallery_item.date_created, nullptr, &gallery_item.date_mod ) )
-			{
-				printf( "Failed to get file date created and modified: %s\n", str_path.data() );
-			}
-
-			gallery_item.file_size = fs::file_size( path );
-			files.push_back( gallery_item );
-		}
+			files.push_back( i );
 	}
 
 	// Sort data
@@ -356,34 +323,23 @@ void gallery_view_sort_dir()
 
 	gallery_view_sort_list( files );
 
-	gallery::items.clear();
-	gallery::items.resize( directory::media_list.size() );
+	gallery::sorted_media.clear();
+	gallery::sorted_media.resize( directory::media_list.size() );
 
 	// Add Folders First
-	std::copy( folders.begin(), folders.end(), gallery::items.begin() );
+	std::copy( folders.begin(), folders.end(), gallery::sorted_media.begin() );
 
 	// Add Files next
-	std::copy( files.begin(), files.end(), gallery::items.begin() + folders.size() );
+	std::copy( files.begin(), files.end(), gallery::sorted_media.begin() + folders.size() );
 
 	// Find Selected File
-	if ( !selected_item.path.empty() )
+	if ( !selected_item.file.path.empty() )
 	{
-		for ( size_t i = 0; i < gallery::items.size(); i++ )
+		for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
 		{
-			gallery_item_t& item = gallery::items[ i ];
+			const file_t& file = gallery_item_get_file( i );
 
-			if ( selected_item_gallery.file_size != item.file_size )
-				continue;
-
-			if ( selected_item_gallery.date_created != item.date_created )
-				continue;
-
-			if ( selected_item_gallery.date_mod != item.date_mod )
-				continue;
-
-			fs::path& path = directory::media_list[ item.file_index ].path;
-
-			if ( path != selected_item.path )
+			if ( selected_item.file != file )
 				continue;
 
 			gallery::cursor = i;
@@ -401,7 +357,7 @@ void gallery_view_dir_change()
 {
 	gallery_view_update_header_directory();
 
-	gallery::items.clear();
+	gallery::sorted_media.clear();
 
 	// SORT FILE LIST
 	gallery_view_sort_dir();
@@ -536,7 +492,7 @@ void gallery_selected_item_action( const media_entry_t& media )
 {
 	if ( media.type == e_media_type_directory )
 	{
-		directory::queued = media.path;
+		directory::queued = media.file.path;
 	}
 	else
 	{
@@ -633,9 +589,8 @@ void gallery_view_draw_content()
 
 	struct delayed_load_t
 	{
-		fs::path     path;
-		size_t       index;
-		e_media_type type;
+		media_entry_t media;
+		size_t        index;
 	};
 
 	static std::vector< delayed_load_t > thumbnail_requests;
@@ -684,23 +639,23 @@ void gallery_view_draw_content()
 
 	// ----------------------------------------------------------------------------------------------------------
 
-	for ( size_t i = 0; i < gallery::items.size(); i++ )
+	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
 	{
-		const gallery_item_t& gallery_item = gallery::items[ i ];
-		const media_entry_t&  media        = directory::media_list[ gallery_item.file_index ];
+		size_t               gallery_index = gallery::sorted_media[ i ];
+		const media_entry_t& media         = directory::media_list[ gallery_index ];
 
-		float                 scroll       = ImGui::GetScrollY();
+		float                scroll        = ImGui::GetScrollY();
 
 		ImVec2                media_text_size{};
 
 		if ( gallery::item_size_changed )
 		{
 			media_text_size = ImGui::CalcTextSize( media.filename.c_str(), 0, false, item_size_x - ( style.WindowPadding.x * 2 ) );
-			gallery::item_text_size[ gallery_item.file_index ] = media_text_size;
+			gallery::item_text_size[ gallery_index ] = media_text_size;
 		}
 		else
 		{
-			media_text_size = gallery::item_text_size[ gallery_item.file_index ];
+			media_text_size = gallery::item_text_size[ gallery_index ];
 		}
 
 		float current_item_size_y = image_bounds.y + media_text_size.y + style.ItemSpacing.y + ( style.WindowPadding.y * 2 );
@@ -852,7 +807,7 @@ void gallery_view_draw_content()
 		// }
 		else
 		{
-			thumbnail_t* thumbnail = thumbnail_get_data( directory::thumbnail_list[ gallery_item.file_index ] );
+			thumbnail_t* thumbnail = thumbnail_get_data( directory::thumbnail_list[ gallery_index ] );
 
 			if ( thumbnail )
 			{
@@ -871,7 +826,7 @@ void gallery_view_draw_content()
 				else if ( thumbnail->status == e_thumbnail_status_free )
 				{
 					if ( media.type != e_media_type_directory )
-						thumbnail_requests.emplace_back( media.path, gallery_item.file_index, media.type );
+						thumbnail_requests.emplace_back( media, gallery_index );
 
 					ImGui::Dummy( image_bounds );
 				}
@@ -883,7 +838,7 @@ void gallery_view_draw_content()
 			else
 			{
 				if ( !thumbnail && media.type != e_media_type_directory )
-					thumbnail_requests.emplace_back( media.path, gallery_item.file_index, media.type );
+					thumbnail_requests.emplace_back( media, gallery_index );
 				// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 				ImGui::Dummy( image_bounds );
@@ -1010,7 +965,7 @@ void gallery_view_draw_content()
 	// printf( "IMAGE COUNT: %d\n", image_visible_count );
 
 	for ( size_t i = 0; i < thumbnail_requests.size(); i++ )
-		directory::thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_queue_image( thumbnail_requests[ i ].path, thumbnail_requests[ i ].type );
+		directory::thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_loader_queue_push( thumbnail_requests[ i ].media );
 
 	gallery::scroll_to_cursor        = false;
 	gallery::item_size_changed = false;

@@ -212,22 +212,42 @@ struct app_config_t
 };
 
 
-struct media_entry_t
+struct file_t
 {
-	fs::path     path;
-	std::string  filename;
-	e_media_type type;
+	fs::path    path{};
+	u64         file_size    = 0;
+	u64         date_mod     = 0;
+	u64         date_created = 0;
+
+	inline bool operator!=( const file_t& other )
+	{
+		if ( file_size != other.file_size )
+			return true;
+
+		if ( date_mod != other.date_mod )
+			return true;
+
+		if ( date_created != other.date_created )
+			return true;
+
+		if ( path != other.path )
+			return true;
+
+		return false;
+	}
+
+	inline bool operator==( const file_t& other )
+	{
+		return !operator!=( other );
+	}
 };
 
 
-// should this just be part of media_entry_t?
-// also rename media_entry_t to something better, like file_t
-struct gallery_item_t
+struct media_entry_t
 {
-	size_t file_index;
-	u64    file_size;
-	u64    date_mod;
-	u64    date_created;
+	file_t       file;
+	std::string  filename;
+	e_media_type type;
 };
 
 
@@ -291,8 +311,8 @@ namespace directory
 // Gallery View
 namespace gallery
 {
-	// a sorted list of items
-	extern std::vector< gallery_item_t > items;
+	// a sorted list of media entries, each item is an index to an entry in directory::media_list
+	extern std::vector< size_t >         sorted_media;
 
 	// cursor position/index in items
 	extern size_t                        cursor;
@@ -347,11 +367,10 @@ void                                 media_view_fit_in_view( bool adjust_zoom = 
 void                                 media_view_zoom_reset();
 void                                 media_view_scale_reset_timer();
 
-std::string                          gallery_item_get_path_string( gallery_item_t& item );
-fs::path                             gallery_item_get_path( gallery_item_t& item );
-fs::path                             gallery_item_get_path( size_t index );
+const media_entry_t&                 gallery_item_get_media_entry( size_t index );
+const file_t&                        gallery_item_get_file( size_t index );
+const fs::path&                      gallery_item_get_path( size_t index );
 std::string                          gallery_item_get_path_string( size_t index );
-media_entry_t                        gallery_item_get_media_entry( size_t index );
 
 void                                 gallery_view_scroll_to_cursor();
 void                                 gallery_view_input();
@@ -424,7 +443,7 @@ bool          thumbnail_loader_init();
 void          thumbnail_loader_shutdown();
 void          thumbnail_loader_update();
 
-h_thumbnail   thumbnail_queue_image( const fs::path& path, e_media_type type );
+h_thumbnail   thumbnail_loader_queue_push( const media_entry_t& media_entry );
 thumbnail_t*  thumbnail_get_data( h_thumbnail handle );
 // void          thumbnail_free( const fs::path& path, h_thumbnail handle );
 

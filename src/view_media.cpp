@@ -174,7 +174,7 @@ void media_view_shutdown()
 
 static e_media_type get_media_type()
 {
-	if ( gallery::items.size() <= gallery::cursor )
+	if ( gallery::sorted_media.size() <= gallery::cursor )
 		return e_media_type_none;
 
 	return gallery_item_get_media_entry( gallery::cursor ).type;
@@ -306,7 +306,7 @@ void media_view_scroll_zoom( float scroll )
 
 void media_view_draw_media_info()
 {
-	if ( gallery::items.empty() )
+	if ( gallery::sorted_media.empty() )
 		return;
 
 	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar ) )
@@ -315,20 +315,19 @@ void media_view_draw_media_info()
 		return;
 	}
 
-	gallery_item_t& item = gallery::items[ gallery::cursor ];
 	media_entry_t entry  = gallery_item_get_media_entry( gallery::cursor );
 
 	ImGui::TextUnformatted( entry.filename.c_str() );
 
 	ImGui::Separator();
 
-	ImGui::Text( "Size: %.3f MB", (float)item.file_size / ( MEM_SCALE * MEM_SCALE ) );
+	ImGui::Text( "Size: %.3f MB", (float)entry.file.file_size / ( MEM_SCALE * MEM_SCALE ) );
 
 	char date_created[ DATE_TIME_BUFFER ]{};
 	char date_mod[ DATE_TIME_BUFFER ]{};
 
-	util_format_date_time( date_created, DATE_TIME_BUFFER, item.date_created );
-	util_format_date_time( date_mod, DATE_TIME_BUFFER, item.date_mod );
+	util_format_date_time( date_created, DATE_TIME_BUFFER, entry.file.date_created );
+	util_format_date_time( date_mod, DATE_TIME_BUFFER, entry.file.date_mod );
 
 	ImGui::Text( "Date Created: %s", date_created );
 	ImGui::Text( "Date Modified: %s", date_mod );
@@ -659,14 +658,14 @@ void media_view_window_resize()
 
 void media_view_load()
 {
-	if ( gallery::items.empty() )
+	if ( gallery::sorted_media.empty() )
 		return;
 
-	if ( gallery::cursor >= gallery::items.size() )
+	if ( gallery::cursor >= gallery::sorted_media.size() )
 		return;
 
 	float             load_time    = 0.f;
-	// gallery_item_t&   gallery_item = gallery::items[ gallery::cursor ];
+	// gallery_item_t&   gallery_item = gallery::sorted_media[ gallery::cursor ];
 	media_entry_t     entry        = gallery_item_get_media_entry( gallery::cursor );
 
 	image_load_info_t image_load_info{};
@@ -678,12 +677,12 @@ void media_view_load()
 		if ( entry.type == e_media_type_image )
 		{
 			// g_image_view.image = g_test_codec->image_load( directory::media_list[ g_folder_index ] );
-			image_load( entry.path, image_load_info );
+			image_load( entry.file.path, image_load_info );
 			mpv_cmd_close_video();
 		}
 		else
 		{
-			mpv_cmd_loadfile( entry.path.string().c_str() );
+			mpv_cmd_loadfile( entry.file.path.string().c_str() );
 		}
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
@@ -701,14 +700,14 @@ void media_view_load()
 			}
 			else
 			{
-				printf( "%f FAILED Load - %s\n", load_time, entry.path.string().c_str() );
+				printf( "%f FAILED Load - %s\n", load_time, entry.file.path.string().c_str() );
 			}
 		}
 
 		// auto  currentTime    = std::chrono::high_resolution_clock::now();
 		// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 		//printf( "%f Load - %f Up - %s\n", load_time, up_time, directory::media_list[ g_folder_index ].string().c_str() );
-		printf( "%f Load - %s\n", load_time, entry.path.string().c_str() );
+		printf( "%f Load - %s\n", load_time, entry.file.path.string().c_str() );
 	}
 
 	g_image_data.index = gallery::cursor;
@@ -721,7 +720,7 @@ void media_view_load()
 
 void media_view_advance( bool prev )
 {
-	if ( gallery::items.size() <= 1 )
+	if ( gallery::sorted_media.size() <= 1 )
 		return;
 
 	if ( get_media_type() == e_media_type_video )
@@ -731,7 +730,7 @@ advance:
 	if ( prev )
 	{
 		if ( gallery::cursor == 0 )
-			gallery::cursor = gallery::items.size();
+			gallery::cursor = gallery::sorted_media.size();
 
 		gallery::cursor--;
 	}
@@ -739,7 +738,7 @@ advance:
 	{
 		gallery::cursor++;
 
-		if ( gallery::cursor == gallery::items.size() )
+		if ( gallery::cursor == gallery::sorted_media.size() )
 			gallery::cursor = 0;
 	}
 

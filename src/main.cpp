@@ -50,6 +50,9 @@ namespace directory
 	fs::path                     path;
 	fs::path                     queued;  // will change to this folder start of next frame
 	std::vector< media_entry_t > media_list;
+
+	// TODO: get rid of these "thumbnail handles", i don't think it's needed anymore, just use the index in media list
+	// and make sure to clear the thumbnail cache when needed
 	std::vector< h_thumbnail >   thumbnail_list;
 }
 
@@ -88,14 +91,14 @@ void update_window_title()
 
 	if ( g_gallery_view )
 	{
-		snprintf( buf, 512, "Media Tag System - %s", directory::path.string().c_str() );
+		snprintf( buf, 512, "Media Tag System [%zd] - %s", directory::media_list.size(), directory::path.string().c_str() );
 	}
 	else
 	{
-		if ( directory::media_list.size() >= gallery::cursor )
-			snprintf( buf, 512, "Media Tag System [%d / %d] - %s", gallery::cursor, gallery::items.size(), gallery_item_get_path_string( gallery::cursor ).c_str() );
+		if ( gallery::sorted_media.size() >= gallery::cursor )
+			snprintf( buf, 512, "Media Tag System [%zd / %zd] - %s", gallery::cursor, gallery::sorted_media.size(), gallery_item_get_path_string( gallery::cursor ).c_str() );
 		else
-			snprintf( buf, 512, "Media Tag System" );
+			snprintf( buf, 512, "Media Tag System [%zd]", gallery::sorted_media.size() );
 	}
 
 	SDL_SetWindowTitle( app::window, buf );
@@ -117,18 +120,19 @@ void folder_load_media_list()
 
 	for ( const auto& entry : fs::directory_iterator( directory::path ) )
 	{
-		const fs::path& path = entry.path();
+		file_t          file{};
+		file.path = entry.path();
 
 		if ( entry.is_directory() )
 		{
-			directory::media_list.emplace_back( path, path.filename().string(), e_media_type_directory );
+			directory::media_list.emplace_back( file, file.path.filename().string(), e_media_type_directory );
 			continue;
 		}
 
-		const fs::path& ext       = path.extension();
+		const fs::path& ext       = file.path.extension();
 		e_media_type    type      = e_media_type_none;
 		// bool            valid_ext = image_check_extension( ext.string() );
-		bool            valid_ext = image_check_extension( path.filename().string() );
+		bool            valid_ext = image_check_extension( file.path.filename().string() );
 
 		// Image Formats
 	//	valid_ext |= ext == ".jpg";
@@ -159,8 +163,16 @@ void folder_load_media_list()
 		if ( !valid_ext )
 			continue;
 
-		directory::media_list.emplace_back( path, path.filename().string(), type );
-		// directory::thumbnail_list.push_back( UINT32_MAX );
+		std::string str_path = file.path.string();
+
+		if ( !sys_get_file_times( str_path.data(), &file.date_created, nullptr, &file.date_mod ) )
+		{
+			printf( "Failed to get file date created and modified: %s\n", str_path.data() );
+		}
+
+		file.file_size = fs::file_size( file.path );
+
+		directory::media_list.emplace_back( file, file.path.filename().string(), type );
 	}
 
 	directory::thumbnail_list.resize( directory::media_list.size() );
@@ -269,9 +281,11 @@ void notification_draw( float frame_time )
 
 	// ImGui::SetNextWindowSizeConstraints( { width - 80.f, -1.f }, { width - 80.f, -1.f } );
 
+	if ( !ImGui::GetIO().WantTextInput )
+
 	ImGui::SetNextWindowFocus();
 
-	if ( ImGui::Begin( "##notif", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
+	if ( ImGui::Begin( "##notif", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
 	{
 		for ( size_t j = 0, i = g_notification_queue.size() - 1;; i--, j++ )
 		{
@@ -675,7 +689,7 @@ void main_loop()
 
 		bool playing_back_video = false;
 
-		if ( !g_gallery_view && gallery::items.size() )
+		if ( !g_gallery_view && gallery::sorted_media.size() )
 		{
 			media_entry_t entry = gallery_item_get_media_entry( gallery::cursor );
 
@@ -731,7 +745,7 @@ void main_loop()
 				directory::path = directory::queued.parent_path();
 				folder_load_media_list();
 
-				for ( size_t i = 0; i < gallery::items.size(); i++ )
+				for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
 				{
 					if ( gallery_item_get_path( i ) == directory::queued )
 					{
@@ -752,6 +766,8 @@ void main_loop()
 				folder_load_media_list();
 				set_view_type_gallery();
 			}
+
+			update_window_title();
 		}
 
 		thumbnail_loader_update();

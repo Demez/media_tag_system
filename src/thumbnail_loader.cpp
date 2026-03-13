@@ -30,6 +30,7 @@ struct thumbnail_job_t
 {
 	h_thumbnail thumbnail;
 	e_job_state state;
+	u32         folder_index;
 };
 
 
@@ -114,9 +115,9 @@ void thumbnail_loader_free_data( u32 index )
 }
 
 
-h_thumbnail thumbnail_loader_queue_push( const char* path, e_media_type type )
+h_thumbnail thumbnail_loader_queue_push( const media_entry_t& media_entry )
 {
-	if ( !path )
+	if ( media_entry.filename.empty() )
 		return {};
 
 	// TODO: some jobs here may be invalidated quickly if the user is scrolling very fast
@@ -196,8 +197,8 @@ h_thumbnail thumbnail_loader_queue_push( const char* path, e_media_type type )
 	job.state                                      = e_job_state_working;
 
 	g_thumbnail_cache.buffer[ cache_pos ].status   = e_thumbnail_status_queued;
-	g_thumbnail_cache.buffer[ cache_pos ].path     = util_strdup( path );
-	g_thumbnail_cache.buffer[ cache_pos ].type     = type;
+	g_thumbnail_cache.buffer[ cache_pos ].path     = util_strdup( media_entry.file.path.string().c_str() );
+	g_thumbnail_cache.buffer[ cache_pos ].type     = media_entry.type;
 	g_thumbnail_cache.used_this_frame[ cache_pos ] = true;
 
 	// update the write position in the queue, use release to wait for all reads to finish before updating this
@@ -334,6 +335,13 @@ void thumbnail_mpv_ctx_free( mpv_handle*& ctx )
 }
 
 
+size_t thumbnail_generate_hash()
+{
+	// take full file path + date modified + file size
+	return 0;
+}
+
+
 void thumbnail_loader_worker( u32 thread_id )
 {
 	char  video_thumbnail_path[ 512 ];
@@ -368,14 +376,14 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		thumbnail->status.store( e_thumbnail_status_loading, std::memory_order_release );
 
-		image_load_info_t load_info{};
-		size_t            file_hash = 0;
+		size_t            file_hash      = thumbnail_generate_hash();
 
 		u32               thumbnail_size = gallery::image_size;
 
 		if ( app::config.thumbnail_use_fixed_size || app::config.thumbnail_jxl_enable )
 			thumbnail_size = app::config.thumbnail_size;
 
+		// ---------------------------------------------------------------------------------------------------------
 		if ( thumbnail->type == e_media_type_video )
 		{
 			if ( !local_mpv )
@@ -492,6 +500,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			// Load Image Normally
 			thumbnail->image         = ch_calloc< image_t >( 1, e_mem_category_image );
 
+			image_load_info_t load_info{};
 			load_info.image          = thumbnail->image;
 			load_info.load_quick     = true;
 			load_info.threaded_load  = true;
@@ -513,6 +522,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			
 			// TODO: Delete Image? it might just slow this down a bit, since it always just gets overwritten later
 		}
+		// ---------------------------------------------------------------------------------------------------------
 		else
 		{
 			size_t file_len          = 0;
@@ -528,6 +538,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			// Load Image Normally
 			thumbnail->image         = ch_calloc< image_t >( 1, e_mem_category_image );
 
+			image_load_info_t load_info{};
 			load_info.image          = thumbnail->image;
 			load_info.load_quick     = true;
 			load_info.threaded_load  = true;
@@ -547,6 +558,8 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			ch_free( e_mem_category_file_data, file_data );
 		}
+
+		// ---------------------------------------------------------------------------------------------------------
 
 		if ( thumbnail->image->frame.empty() || !thumbnail->image->frame[ 0 ] )
 		{
@@ -699,12 +712,6 @@ void thumbnail_loader_update()
 		else
 			thumbnail.status = e_thumbnail_status_failed;
 	}
-}
-
-
-h_thumbnail thumbnail_queue_image( const fs::path& path, e_media_type type )
-{
-	return thumbnail_loader_queue_push( path.string().c_str(), type );
 }
 
 
