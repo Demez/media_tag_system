@@ -17,7 +17,7 @@ namespace gallery
 	int                           row_count         = 0;
 	int                           item_size         = 150;
 	int                           item_size_min     = 70;
-	int                           item_size_max     = 550;
+	int                           item_size_max     = 500;
 	bool                          item_size_changed = true;
 	std::vector< ImVec2 >         item_text_size;
 

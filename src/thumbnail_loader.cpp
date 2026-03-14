@@ -392,8 +392,8 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		u32               thumbnail_size = gallery::image_size;
 
-		if ( app::config.thumbnail_use_fixed_size || app::config.thumbnail_jxl_enable )
-			thumbnail_size = app::config.thumbnail_size;
+		//if ( app::config.thumbnail_use_fixed_size || app::config.thumbnail_jxl_enable )
+		//	thumbnail_size = app::config.thumbnail_size;
 
 		bool              thumbnail_found_on_disk = false;
 		image_load_info_t jxl_thumbnail{};
@@ -541,8 +541,8 @@ void thumbnail_loader_worker( u32 thread_id )
 				load_info.load_quick     = true;
 				load_info.threaded_load  = true;
 				load_info.thumbnail_load = true;
-				load_info.target_size.x  = thumbnail_size;
-				load_info.target_size.y  = thumbnail_size;
+				load_info.target_size.x  = app::config.thumbnail_size;
+				load_info.target_size.y  = app::config.thumbnail_size;
 
 				if ( !image_load( video_thumbnail_path, load_info ) )
 				{
@@ -564,8 +564,8 @@ void thumbnail_loader_worker( u32 thread_id )
 				load_info.load_quick     = true;
 				load_info.threaded_load  = true;
 				load_info.thumbnail_load = true;
-				load_info.target_size.x  = thumbnail_size;
-				load_info.target_size.y  = thumbnail_size;
+				load_info.target_size.x  = app::config.thumbnail_size;
+				load_info.target_size.y  = app::config.thumbnail_size;
 
 				if ( !image_load( thumbnail->path, load_info ) )
 				{
@@ -586,10 +586,63 @@ void thumbnail_loader_worker( u32 thread_id )
 		}
 
 		thumbnail_printf( "[THUMBNAIL %d] LOADED IMAGE: %s\n", job->thumbnail.index, thumbnail->path );
-		
+
 		float max_image_size = std::max( thumbnail->image->width, thumbnail->image->height );
 
-		// Downscale image if size is larger than target size
+		// ---------------------------------------------------------------------------------------------------------
+		// If we didn't find the thumbnail on disk, write it!
+
+		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
+		{
+			// Make sure it's not in the cache folder
+			std::string cleaned_path = fs_path_clean( thumbnail->path, strlen( thumbnail->path ) );
+
+			if ( !cleaned_path.starts_with( app::config.thumbnail_cache_path ) )
+			{
+				// Downscale first
+				if ( max_image_size > app::config.thumbnail_size )
+				{
+					float factor[ 2 ]  = { 1.f, 1.f };
+
+					factor[ 0 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->width;
+					factor[ 1 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->height;
+
+					float   scale      = std::min( factor[ 0 ], factor[ 1 ] );
+
+					float   new_width  = thumbnail->image->width * scale;
+					float   new_height = thumbnail->image->height * scale;
+
+					image_t new_image{};
+
+					if ( image_downscale( thumbnail->image, &new_image, new_width, new_height ) )
+					{
+						std::string thumbnail_path = app::config.thumbnail_cache_path;
+						thumbnail_path += SEP_S;
+						thumbnail_path += std::to_string( file_hash );
+						thumbnail_path += ".jxl";
+
+						thumbnail_save( new_image, thumbnail_path );
+					}
+					else
+					{
+						printf( "Failed to downscale image for thumbnail cache!\n" );
+					}
+				}
+				else
+				{
+					std::string thumbnail_path = app::config.thumbnail_cache_path;
+					thumbnail_path += SEP_S;
+					thumbnail_path += std::to_string( file_hash );
+					thumbnail_path += ".jxl";
+
+					thumbnail_save( *thumbnail->image, thumbnail_path );
+				}
+			}
+		}
+
+		// ---------------------------------------------------------------------------------------------------------
+		// Downscale image if size is larger than target 
+
 		if ( max_image_size > thumbnail_size )
 		// if ( 0 )
 		{
@@ -613,27 +666,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			}
 		}
 
-		// If we didn't find the thumbnail on disk, write it!
-		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
-		{
-			// Make sure it's not in the cache folder
-			std::string cleaned_path = fs_path_clean( thumbnail->path, strlen( thumbnail->path ) );
-
-			if ( !cleaned_path.starts_with( app::config.thumbnail_cache_path ) )
-			{
-				std::string thumbnail_path = app::config.thumbnail_cache_path;
-				thumbnail_path += SEP_S;
-				thumbnail_path += std::to_string( file_hash );
-				thumbnail_path += ".jxl";
-
-				thumbnail_save( *thumbnail->image, thumbnail_path );
-			}
-		}
-
 		job->state = e_job_state_free;
-
-		// hopefully fixes race condition with writes
-		// std::atomic_thread_fence( std::memory_order_seq_cst );
 
 		thumbnail->status.store( e_thumbnail_status_uploading, std::memory_order_release );
 	}

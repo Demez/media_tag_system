@@ -26,7 +26,7 @@ thumbnail:
 
   # if 1, use the size above for thumbnails
   # if 0, remake them on the fly whenever the zoom size changes
-  use-fixed-size: 1
+  use-fixed-size: 0
 
   # basic JPEG XL thumbnail quality and speed control
   jxl-enable: 1

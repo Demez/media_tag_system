@@ -342,12 +342,32 @@ bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int
 	if ( !resized_frame )
 		return false;
 
-	new_image->frame[ 0 ] = resized_frame;
-	new_image->width      = new_width;
-	new_image->height     = new_height;
-	new_image->pitch      = new_width * 4;
-	new_image->frame_size = new_width * new_height * old_image->channels;
-	// new_image->format     = GL_RGBA;
+//	new_image->frame.clear();
+	new_image->frame.resize( 1 );
+	new_image->frame[ 0 ]      = resized_frame;
+	new_image->width           = new_width;
+	new_image->height          = new_height;
+	new_image->pitch           = new_width * 4;
+	new_image->frame_size      = new_width * new_height * old_image->channels;
+	new_image->bit_depth       = 4;
+	new_image->bytes_per_pixel = 4;
+	new_image->channels        = old_image->channels;
+
+	switch ( old_image->channels )
+	{
+		default:
+		case 4:
+			new_image->format = GL_RGBA;
+			break;
+
+		case 3:
+			new_image->format = GL_RGB;
+			break;
+
+		case 1:
+			new_image->format = GL_LUMINANCE;
+			break;
+	}
 
 	return true;
 }
