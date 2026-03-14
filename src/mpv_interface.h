@@ -5,6 +5,8 @@
 #include "mpv/render.h"
 #include "mpv/render_gl.h"
 
+#include <SDL3/SDL.h>
+
 
 // --------------------------------------------------------------------------------------------------------
 // MPV
@@ -31,11 +33,11 @@ void                       mpv_cmd_hook_window_mpv();
 
 void                       mpv_handle_error();
 void                       mpv_handle_wait_event( mpv_handle* mpv, double timeout, const char* prefix = nullptr );
+void                       mpv_sdl_event( SDL_Event& event );
 
 extern mpv_handle*         g_mpv;
 extern mpv_render_context* g_mpv_gl;
-extern bool                g_wakeup_on_mpv_render_update, g_wakeup_on_mpv_events;
-
+extern u32                 g_wakeup_on_mpv_render_update, g_wakeup_on_mpv_events;
 
 // --------------------------------------------------------------------------------------------------------
 // mpv function pointer typedefs, cause im not compiling the mpv source just to link to it

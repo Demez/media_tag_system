@@ -266,19 +266,19 @@ bool config_load()
 
 			if ( string )
 			{
-				if ( fs_is_file( string ) )
+				bookmark_t bookmark{};
+				bookmark.path.assign( string, len );
+
+				if ( fs_is_file( bookmark.path.c_str() ) )
 				{
 					printf( "config: bookmark points to file, not a directory: \"%s\"\n", string );
 					continue;
 				}
 
-				bookmark_t bookmark{};
-				bookmark.valid = fs_is_dir( string );
+				bookmark.valid = fs_is_dir( bookmark.path.c_str() );
 
 				if ( !bookmark.valid )
 					printf( "config: bookmark does not exist! \"%s\"\n", string );
-
-				bookmark.path.assign( string, len );
 
 				char* folder_name = fs_get_filename( string, len );
 				bookmark.name.assign( folder_name );

@@ -1,4 +1,5 @@
 #include "main.h"
+#include "util.h"
 
 // some reference here
 // https://github.com/mpv-player/mpv-examples/blob/master/libmpv/sdl/main.c
@@ -11,7 +12,8 @@ GLuint              g_mpv_fbo_tex = 0;
 GLuint              g_mpv_rbo     = 0;
 static ivec2        g_mpv_framebuffer_size{};
 
-bool                g_wakeup_on_mpv_render_update, g_wakeup_on_mpv_events;
+u32                 g_wakeup_on_mpv_render_update, g_wakeup_on_mpv_events;
+static bool         g_mpv_redraw    = false;
 
 static char*        g_current_video = nullptr;
 
@@ -198,9 +200,33 @@ void unload_mpv_dll()
 }
 
 
-static void on_mpv_events( void* ctx )
+void mpv_update_frame()
 {
-	g_wakeup_on_mpv_events = true;
+	if ( !g_mpv )
+		return;
+
+	u64 start_time = sys_get_time_ms();
+
+	mpv_opengl_fbo fbo{ g_mpv_fbo, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGB };
+	int            yes  = 1;
+
+	mpv_render_param rp[] = {
+		{ MPV_RENDER_PARAM_OPENGL_FBO, &fbo },
+		{ MPV_RENDER_PARAM_FLIP_Y, &yes },
+		{ MPV_RENDER_PARAM_INVALID, NULL },
+	};
+
+	int ret = p_mpv_render_context_render( g_mpv_gl, rp );
+
+	if ( ret != 0 )
+	{
+		printf("MPV Render Context Render Error: %d\n", ret );
+	}
+
+	g_mpv_redraw = false;
+
+	u64 end_time = sys_get_time_ms();
+	//printf( "UPDATE TIME: %.4f\n", (float)(end_time - start_time) / 1000.f );
 }
 
 
@@ -209,8 +235,11 @@ void mpv_draw_frame()
 	if ( !g_mpv )
 		return;
 
+	//if ( g_mpv_redraw )
+	mpv_update_frame();
+
 	// called so mpv doesn't get flooded with too many events, and becomes unresponsive
-	mpv_handle_wait_event( g_mpv, 0.01f );
+//	mpv_handle_wait_event( g_mpv, 0.01f );
 
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
@@ -226,9 +255,6 @@ void mpv_draw_frame()
 
 	p_mpv_get_property( g_mpv, "dwidth", MPV_FORMAT_INT64, &g_video_width );
 	p_mpv_get_property( g_mpv, "dheight", MPV_FORMAT_INT64, &g_video_height );
-
-	s64   window_scale;
-	//	p_mpv_get_property( g_mpv, "current-window-scale", MPV_FORMAT_INT64, &window_scale );
 
 	// Fit image in window size
 	float factor[ 2 ] = { 1.f, 1.f };
@@ -249,25 +275,11 @@ void mpv_draw_frame()
 
 	// pos_x *= 2;
 
-	int   offset_x   = g_mpv_framebuffer_size[ 0 ] - new_width;
-	int   offset_y   = g_mpv_framebuffer_size[ 1 ] - new_height;
+	//int   offset_x   = g_mpv_framebuffer_size[ 0 ] - new_width;
+	//int   offset_y   = g_mpv_framebuffer_size[ 1 ] - new_height;
 
 	//if ( app::window_resized )
 	//	printf( "MPV RESIZE\n" );
-
-	glBindFramebuffer( GL_FRAMEBUFFER, g_mpv_fbo );
-
-	mpv_opengl_fbo   fbo{ g_mpv_fbo, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGB };
-	int              yes  = 1;
-
-	mpv_render_param rp[] = {
-		{ MPV_RENDER_PARAM_OPENGL_FBO, &fbo },
-		{ MPV_RENDER_PARAM_FLIP_Y, &yes },
-		{ MPV_RENDER_PARAM_INVALID, NULL },
-	};
-
-	// TODO: use MPV_RENDER_PARAM_ADVANCED_CONTROL
-	p_mpv_render_context_render( g_mpv_gl, rp );
 
 	// glFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, g_mpv_rbo );
 
@@ -328,7 +340,7 @@ void mpv_draw_frame()
 	//	glViewport( pos_x, pos_y, width, height );
 
 	if ( image_draw::flip_h )
-		glViewport( -offset_x + viewport_offset_x, viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
+		glViewport( -viewport_offset_x, -viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
 	else
 		// glViewport( 0, 0, width, height );
 		// glViewport( -viewport_offset_x, 0, clamped_width, clamped_height );
@@ -444,7 +456,53 @@ void mpv_create_texture()
 
 static void on_mpv_render_update( void* ctx )
 {
-	g_wakeup_on_mpv_render_update = true;
+	SDL_Event event = {.type = g_wakeup_on_mpv_render_update};
+	SDL_PushEvent(&event);
+}
+
+static void on_mpv_events( void* ctx )
+{
+	SDL_Event event = {.type = g_wakeup_on_mpv_events};
+	SDL_PushEvent(&event);
+}
+
+
+void mpv_sdl_event( SDL_Event& event )
+{
+#if 0
+	if ( event.type == g_wakeup_on_mpv_render_update )
+	{
+		u64 flags = p_mpv_render_context_update( g_mpv_gl );
+		if ( flags & MPV_RENDER_UPDATE_FRAME )
+			g_mpv_redraw = true;
+	}
+	else if ( event.type == g_wakeup_on_mpv_events )
+	{
+		// Handle all remaining mpv events.
+		while ( true )
+		{
+			mpv_event *mp_event = p_mpv_wait_event( g_mpv, 0 );
+
+			if (mp_event->event_id == MPV_EVENT_NONE)
+				break;
+
+			if (mp_event->event_id == MPV_EVENT_LOG_MESSAGE)
+			{
+				mpv_event_log_message* msg = (mpv_event_log_message*)mp_event->data;
+				// Print log messages about DR allocations, just to
+				// test whether it works. If there is more than 1 of
+				// these, it works. (The log message can actually change
+				// any time, so it's possible this logging stops working
+				// in the future.)
+				if (strstr(msg->text, "DR image"))
+					printf("MPV: %s", msg->text);
+				continue;
+			}
+
+			printf("MPV EVENT: %s\n", p_mpv_event_name(mp_event->event_id));
+		}
+	}
+#endif
 }
 
 
@@ -475,7 +533,11 @@ bool start_mpv()
 	int ret = p_mpv_set_option_string( g_mpv, "vo", "libmpv" );
 	//p_mpv_set_option_string( g_mpv, "vo", "null" );
 
-	ret     = p_mpv_set_option_string( g_mpv, "demuxer-max-bytes", "10M" );
+	p_mpv_set_option_string( g_mpv, "demuxer-max-bytes", "10M" );
+
+	// Stops the main thread from being blocked somehow
+	// https://github.com/celluloid-player/celluloid/pull/982
+	p_mpv_set_option_string( g_mpv, "video-timing-offset", "0" );
 
 	if ( p_mpv_initialize( g_mpv ) < 0 )
 	{
@@ -492,6 +554,8 @@ bool start_mpv()
 		.get_proc_address = mpv_get_proc,  // e.g. SDL_GL_GetProcAddress
 	};
 
+	int enabled = 1;
+
 	mpv_render_param params[] = {
 		{ MPV_RENDER_PARAM_API_TYPE, (void*)MPV_RENDER_API_TYPE_OPENGL },
 		{ MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl_init },
@@ -499,16 +563,29 @@ bool start_mpv()
 	};
 
 	p_mpv_render_context_create( &g_mpv_gl, g_mpv, params );
-	p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, nullptr );
+
+	// We use events for thread-safe notification of the SDL main loop.
+	// Generally, the wakeup callbacks (set further below) should do as least
+	// work as possible, and merely wake up another thread to do actual work.
+	// On SDL, waking up the mainloop is the ideal course of action. SDL's
+	// SDL_PushEvent() is thread-safe, so we use that.
+	//g_wakeup_on_mpv_render_update = SDL_RegisterEvents(1);
+	//g_wakeup_on_mpv_events = SDL_RegisterEvents(1);
+//
+	//if (g_wakeup_on_mpv_render_update == (u32)-1 || g_wakeup_on_mpv_events == (u32)-1)
+	//{
+	//	printf( "Failed to Regsiter SDL Events for Video Player!\n" );
+	//	return false;
+	//}
 
 	// When normal mpv events are available.
-	p_mpv_set_wakeup_callback( g_mpv, on_mpv_events, NULL );
+	p_mpv_set_wakeup_callback( g_mpv, on_mpv_events, nullptr );
 
 	// When there is a need to call mpv_render_context_update(), which can
 	// request a new frame to be rendered.
 	// (Separate from the normal event handling mechanism for the sake of
 	//  users which run OpenGL on a different thread.)
-	// p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, NULL );
+	//p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, nullptr );
 
 	//int64_t wid = (s64)g_mpv_window;
 	//bool    yes = true;

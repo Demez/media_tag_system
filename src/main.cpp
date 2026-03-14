@@ -554,6 +554,9 @@ void frame_draw_end()
 
 	ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 	SDL_GL_SwapWindow( app::window );
+
+	if ( g_mpv )
+		p_mpv_render_context_report_swap( g_mpv_gl );
 }
 
 
@@ -586,6 +589,9 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 			window_quick_draw();
 			break;
 		}
+
+		default:
+			mpv_sdl_event( *event );
 	}
 
 	return true;
@@ -612,6 +618,10 @@ bool handle_events()
 
 		switch ( event.type )
 		{
+			default:
+				mpv_sdl_event( event );
+				break;
+
 			case SDL_EVENT_MOUSE_WHEEL:
 				if ( event.wheel.integer_y > 0 )
 					app::mouse_scrolled_up = true;
