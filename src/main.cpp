@@ -527,9 +527,9 @@ void frame_draw_start()
 	ImGui::GetIO().DisplaySize.x = width;
 	ImGui::GetIO().DisplaySize.y = height;
 
-	ImGui::NewFrame();
 	ImGui_ImplSDL3_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
+	ImGui::NewFrame();
 
 	glViewport( 0, 0, width, height );
 	glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
