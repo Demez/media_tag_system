@@ -119,6 +119,23 @@ void media_view_scale_thread_run()
 
 void media_view_scale_check_timer( float frame_time )
 {
+	if ( g_scale_state == e_scale_state_finished )
+	{
+		// Are we drawing the image smaller than native size?
+		if ( image_draw::size.x < g_image_data.image.width )
+		{
+			// Does the scaled image size match the size we draw it as?
+			if ( int(image_draw::size.x) != g_image_scaled_data.image.width )
+			{
+				g_scale_state = e_scale_state_idle;
+				g_scale_timer = SCALE_WAIT_TIME;
+			}
+		}
+	}
+
+	if ( g_scale_state != e_scale_state_idle && g_scale_state != e_scale_state_finished )
+		return;
+
 	if ( g_scale_timer < 0.f )
 		return;
 
@@ -126,6 +143,9 @@ void media_view_scale_check_timer( float frame_time )
 
 	if ( g_scale_timer < 0.f && g_image_data.image.frame.size() && g_scale_state == e_scale_state_idle )
 	{
+		if ( image_draw::size.x >= g_image_data.image.width )
+			return;
+
 		g_scale_lock.lock();
 
 		image_free( g_scale_src );
@@ -153,7 +173,9 @@ void media_view_scale_check_timer( float frame_time )
 void media_view_scale_reset_timer()
 {
 	g_scale_timer = SCALE_WAIT_TIME;
-	g_scale_state = e_scale_state_idle;
+
+	if ( g_scale_state == e_scale_state_finished )
+		g_scale_state = e_scale_state_idle;
 }
 
 
@@ -586,6 +608,9 @@ void media_view_input()
 {
 	if ( g_scale_state == e_scale_state_upload )
 	{
+		ch_free( e_mem_category_image_data, g_scale_src.frame[ 0 ] );
+		g_scale_src.frame[ 0 ] = nullptr;
+
 		if ( g_image_scaled_data.index == gallery::cursor )
 		{
 			gl_update_texture( g_image_scaled_data.texture, &g_image_scaled_data.image );
