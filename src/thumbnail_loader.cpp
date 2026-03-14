@@ -405,23 +405,34 @@ void thumbnail_loader_worker( u32 thread_id )
 			thumbnail_path += std::to_string( file_hash );
 			thumbnail_path += ".jxl";
 
-			// Load Image Normally
-			jxl_thumbnail.image          = ch_calloc< image_t >( 1, e_mem_category_image );
-			jxl_thumbnail.target_size.x  = thumbnail_size;
-			jxl_thumbnail.target_size.y  = thumbnail_size;
-			jxl_thumbnail.load_quick     = true;
-			jxl_thumbnail.threaded_load  = true;
-			jxl_thumbnail.thumbnail_load = true;
-			jxl_thumbnail.quiet          = true;
-
-			if ( image_load( thumbnail_path.c_str(), jxl_thumbnail ) )
+			if ( fs_is_file( thumbnail_path.c_str() ) )
 			{
-				thumbnail_found_on_disk = true;
-				thumbnail->image        = jxl_thumbnail.image;
-				jxl_thumbnail.image     = nullptr;
+				// Load Image Normally
+				jxl_thumbnail.image          = ch_calloc< image_t >( 1, e_mem_category_image );
+				jxl_thumbnail.target_size.x  = thumbnail_size;
+				jxl_thumbnail.target_size.y  = thumbnail_size;
+				jxl_thumbnail.load_quick     = true;
+				jxl_thumbnail.threaded_load  = true;
+				jxl_thumbnail.thumbnail_load = true;
+				jxl_thumbnail.quiet          = true;
 
-				//if ( args_register_bool( "spew jxl loads", "--jxl-spew" ) )
-				//	printf( "JXL THUMBNAIL LOADED: %s - %zu\n", thumbnail->path, file_hash );
+				if ( image_load( thumbnail_path.c_str(), jxl_thumbnail ) )
+				{
+					thumbnail_found_on_disk = true;
+
+					if ( thumbnail->image )
+						ch_free( e_mem_category_image, thumbnail->image );
+
+					thumbnail->image        = jxl_thumbnail.image;
+					jxl_thumbnail.image     = nullptr;
+
+					//if ( args_register_bool( "spew jxl loads", "--jxl-spew" ) )
+					//	printf( "JXL THUMBNAIL LOADED: %s - %zu\n", thumbnail->path, file_hash );
+				}
+				else
+				{
+					ch_free( e_mem_category_image, jxl_thumbnail.image );
+				}
 			}
 		}
 
@@ -622,6 +633,8 @@ void thumbnail_loader_worker( u32 thread_id )
 						thumbnail_path += ".jxl";
 
 						thumbnail_save( new_image, thumbnail_path );
+
+						ch_free( e_mem_category_stbi_resize, new_image.frame[ 0 ] );
 					}
 					else
 					{
