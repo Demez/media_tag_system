@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/resource.h>
 
 
 // ----------------------------------------------------------------------------------------
@@ -348,6 +349,13 @@ sys_font_data_t sys_get_font()
 proc_mem_info_t sys_get_mem_info()
 {
 	proc_mem_info_t mem_info{};
+
+	rusage usage{};
+	int ret = getrusage( RUSAGE_SELF, &usage );
+
+	mem_info.working_set = usage.ru_maxrss * 1024;
+	mem_info.page_file   = 0;
+
 	return mem_info;
 }
 

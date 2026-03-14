@@ -54,7 +54,8 @@ using f64   = double;
   #define strncasecmp _strnicmp
   #define strcasecmp   _stricmp
 
-constexpr float MEM_SCALE = 1024.f;
+constexpr float STORAGE_SCALE = 1024.f;
+
 #else
   #define SEP_S        "/"
   #define SEP          '/'
@@ -62,9 +63,11 @@ constexpr float MEM_SCALE = 1024.f;
   #define PATH_SEP_STR "/"
   #define PATH_SEP     '/'
 
-constexpr float MEM_SCALE = 1000.f;
+constexpr float STORAGE_SCALE = 1000.f;
+
 #endif
 
+constexpr float MEM_SCALE = 1000.f;
 
 // --------------------------------------------------------------------------------------------------------
 
