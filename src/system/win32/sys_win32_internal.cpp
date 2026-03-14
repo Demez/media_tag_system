@@ -34,6 +34,7 @@ wchar_t* sys_to_wchar( const char* spStr, int sSize )
 }
 
 
+// Allows you to bypass the MAX_PATH limit in windows
 wchar_t* sys_to_wchar_extended( const char* spStr )
 {
 	int      sSize = MultiByteToWideChar( CP_UTF8, 0, spStr, -1, NULL, 0 );
@@ -50,6 +51,7 @@ wchar_t* sys_to_wchar_extended( const char* spStr )
 }
 
 
+// Allows you to bypass the MAX_PATH limit in windows
 wchar_t* sys_to_wchar_extended( const char* spStr, int sSize )
 {
 	wchar_t* spDst = (wchar_t*)malloc( ( sSize + 5 ) * sizeof( wchar_t ) );

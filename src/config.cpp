@@ -62,6 +62,12 @@ static bool config_write_internal( fy_document* fyd )
 
 void config_parse_path( char* app_dir, const char* user_path, std::string& result )
 {
+	if ( !app_dir )
+	{
+		printf("app_dir is nullptr!\n" );
+		return;
+	}
+
 	result.clear();
 
 	const char* last = user_path;

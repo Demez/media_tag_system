@@ -39,7 +39,12 @@ void                    sys_update();
 void                    sys_set_window( SDL_Window* window );
 
 // library loading
+#ifdef _WIN32
 module_t                sys_load_library( const wchar_t* path );
+#else
+module_t                sys_load_library( const char* path );
+#endif
+
 void                    sys_close_library( module_t mod );
 void*                   sys_load_func( module_t mod, const char* path );
 

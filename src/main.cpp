@@ -24,8 +24,8 @@ namespace app
 	u64          total_time     = 0;
 	float        frame_time     = 0.f;
 
-	ivec2        mouse_delta;
-	ivec2        mouse_pos;
+	ImVec2       mouse_delta;
+	ImVec2       mouse_pos;
 
 	// imgui scroll hack lol
 	bool         mouse_scrolled_up;
@@ -118,61 +118,69 @@ void folder_load_media_list()
 	gallery::item_size_changed = true;
 	gallery::item_text_size.clear();
 
-	for ( const auto& entry : fs::directory_iterator( directory::path ) )
+	// i hate this lol
+	try
 	{
-		file_t          file{};
-		file.path = entry.path();
-
-		if ( entry.is_directory() )
+		for ( const auto& entry : fs::directory_iterator( directory::path ) )
 		{
-			directory::media_list.emplace_back( file, file.path.filename().string(), e_media_type_directory );
-			continue;
-		}
+			file_t          file{};
+			file.path = entry.path();
 
-		const fs::path& ext       = file.path.extension();
-		e_media_type    type      = e_media_type_none;
-		// bool            valid_ext = image_check_extension( ext.string() );
-		bool            valid_ext = image_check_extension( file.path.filename().string() );
+			if ( entry.is_directory() )
+			{
+				directory::media_list.emplace_back( file, file.path.filename().string(), e_media_type_directory );
+				continue;
+			}
 
-		// Image Formats
-	//	valid_ext |= ext == ".jpg";
-	//	valid_ext |= ext == ".jpeg";
-	//	valid_ext |= ext == ".png";
-	//	valid_ext |= ext == ".gif";
+			const fs::path& ext       = file.path.extension();
+			e_media_type    type      = e_media_type_none;
+			// bool            valid_ext = image_check_extension( ext.string() );
+			bool            valid_ext = image_check_extension( file.path.filename().string() );
 
-		if ( valid_ext )
-		{
-			type = e_media_type_image;
-		}
-		else if ( g_mpv )
-		{
-			// Video Formats
-			valid_ext |= ext == ".mp4";
-			valid_ext |= ext == ".mkv";
-			valid_ext |= ext == ".webm";
-			valid_ext |= ext == ".mov";
-			valid_ext |= ext == ".3gp";
-			valid_ext |= ext == ".avi";
-	
+			// Image Formats
+			//	valid_ext |= ext == ".jpg";
+			//	valid_ext |= ext == ".jpeg";
+			//	valid_ext |= ext == ".png";
+			//	valid_ext |= ext == ".gif";
+
 			if ( valid_ext )
 			{
-				type = e_media_type_video;
+				type = e_media_type_image;
 			}
+			else if ( g_mpv )
+			{
+				// Video Formats
+				valid_ext |= ext == ".mp4";
+				valid_ext |= ext == ".mkv";
+				valid_ext |= ext == ".webm";
+				valid_ext |= ext == ".mov";
+				valid_ext |= ext == ".3gp";
+				valid_ext |= ext == ".avi";
+
+				if ( valid_ext )
+				{
+					type = e_media_type_video;
+				}
+			}
+
+			if ( !valid_ext )
+				continue;
+
+			std::string str_path = file.path.string();
+
+			if ( !sys_get_file_times( str_path.data(), &file.date_created, nullptr, &file.date_mod ) )
+			{
+				printf( "Failed to get file date created and modified: %s\n", str_path.data() );
+			}
+
+			file.file_size = fs::file_size( file.path );
+
+			directory::media_list.emplace_back( file, file.path.filename().string(), type );
 		}
-
-		if ( !valid_ext )
-			continue;
-
-		std::string str_path = file.path.string();
-
-		if ( !sys_get_file_times( str_path.data(), &file.date_created, nullptr, &file.date_mod ) )
-		{
-			printf( "Failed to get file date created and modified: %s\n", str_path.data() );
-		}
-
-		file.file_size = fs::file_size( file.path );
-
-		directory::media_list.emplace_back( file, file.path.filename().string(), type );
+	}
+	catch ( fs::filesystem_error& err )
+	{
+		printf("Failed to read directory: \"%s\"\n", directory::path.string().c_str() );
 	}
 
 	directory::thumbnail_list.resize( directory::media_list.size() );
@@ -616,6 +624,7 @@ bool handle_events()
 				app::mouse_pos[ 1 ] = event.motion.y;
 				app::mouse_delta[ 0 ] += event.motion.xrel;
 				app::mouse_delta[ 1 ] += event.motion.yrel;
+				printf("MOUSE MOTION: %f x %f\n", app::mouse_delta[ 0 ], app::mouse_delta[ 1 ] );
 				break;
 
 			case SDL_EVENT_WINDOW_RESIZED:

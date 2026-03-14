@@ -105,7 +105,11 @@ bool load_mpv_dll()
 	if ( app::config.no_video )
 		return false;
 
+#if _WIN32
 	g_mpv_module = sys_load_library( L"libmpv-2.dll" );
+#else
+	g_mpv_module = sys_load_library( "libmpv.so" );
+#endif
 
 	if ( g_mpv_module == nullptr )
 	{
@@ -446,7 +450,7 @@ static void on_mpv_render_update( void* ctx )
 
 static void* mpv_get_proc( void* ctx, const char* name )
 {
-	return SDL_GL_GetProcAddress( name );
+	return ( void* )SDL_GL_GetProcAddress( name );
 }
 
 

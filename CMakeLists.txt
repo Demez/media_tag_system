@@ -30,6 +30,7 @@ set_property( GLOBAL PROPERTY PREFIX "" )
 set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 
 set( CMAKE_CXX_STANDARD 23 )
+set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 # Compiler/Platform specifc options
 if ( MSVC )
@@ -132,7 +133,6 @@ if ( MSVC )
 	)
 
 	link_libraries( opengl32 )
-	link_directories( replay_maker PRIVATE "thirdparty/SDL3/lib/x64" )
 	
 	message( "Copying SDL3" )
 	configure_file( "thirdparty/SDL3/lib/x64/SDL3.dll" "${PROJ_OUT}/SDL3.dll" COPYONLY )
@@ -165,6 +165,25 @@ if ( MSVC )
 	
 else()  # linux
 	link_libraries( GL )
+
+	message( "Copying SPNG" )
+	configure_file( "thirdparty/libspng/build/libspng.so" "${PROJ_OUT}/libspng.so" COPYONLY )
+
+	message( "Copying FreeImage" )
+	configure_file( "thirdparty/FreeImageRe/lib/libFreeImage.so" "${PROJ_OUT}/libFreeImage.so" COPYONLY )
+	configure_file( "thirdparty/FreeImageRe/lib/libheif.so" "${PROJ_OUT}/libheif.so" COPYONLY )
+
+	message( "Copying fyaml" )
+	configure_file( "thirdparty/libfyaml/build/libfyaml.so" "${PROJ_OUT}/libfyaml.so" COPYONLY )
+
+	message( "Copying jxl" )
+	configure_file( "thirdparty/libjxl/build/lib/libjxl.so" "${PROJ_OUT}/libjxl.so" COPYONLY )
+	configure_file( "thirdparty/libjxl/build/lib/libjxl_cms.so" "${PROJ_OUT}/libjxl_cms.so" COPYONLY )
+	configure_file( "thirdparty/libjxl/build/lib/libjxl_threads.so" "${PROJ_OUT}/libjxl_threads.so" COPYONLY )
+
+	configure_file( "thirdparty/libjxl/build/third_party/brotli/libbrotlicommon.so" "${PROJ_OUT}/libbrotlicommon.so" COPYONLY )
+	configure_file( "thirdparty/libjxl/build/third_party/brotli/libbrotlidec.so" "${PROJ_OUT}/libbrotlidec.so" COPYONLY )
+	configure_file( "thirdparty/libjxl/build/third_party/brotli/libbrotlienc.so" "${PROJ_OUT}/libbrotlienc.so" COPYONLY )
 endif()
 
 
@@ -209,7 +228,6 @@ set(
     src/imgui/imgui_draw.cpp
     src/imgui/imgui_impl_opengl3.cpp
     src/imgui/imgui_impl_sdl3.cpp
-    src/imgui/imgui_impl_win32.cpp
     src/imgui/imgui_tables.cpp
     src/imgui/imgui_widgets.cpp
 
@@ -230,6 +248,7 @@ if ( MSVC )
 else()
 	set(
 		SYSTEM_FILES
+		src/system/linux/sys_linux.cpp
 	)
 endif()
 
@@ -268,6 +287,12 @@ include_directories(
 	"thirdparty/libjxl/build/lib/include"
 )
 
+if( LINUX )
+	include_directories(
+		"/usr/include/SDL3"
+	)
+endif()
+
 if ( MIMALLOC )
 	add_compile_definitions( USE_MIMALLOC=1 )
 	include_directories( "thirdparty/mimalloc/include" )
@@ -282,7 +307,6 @@ target_link_libraries(
 	freetype
 	nfd
 	SDL3
-	turbojpeg-static
 	spng
 	fyaml
 	jxl
@@ -313,6 +337,19 @@ if ( WIN32 )
 		"thirdparty/libspng/build/Release"
 		"thirdparty/libfyaml/build/Release"
 		"thirdparty/libjxl/build/lib/Release"
+	)
+	target_link_libraries(
+		media_tag_system PRIVATE
+		turbojpeg-static
+	)
+elseif( LINUX )
+	target_link_directories(
+		media_tag_system PRIVATE
+	)
+	target_link_libraries(
+		media_tag_system PRIVATE
+		turbojpeg
+		stdc++exp
 	)
 endif()
 

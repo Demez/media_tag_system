@@ -1,6 +1,6 @@
 #include "main.h"
 
-#include "Freeimage.h"
+#include "FreeImage.h"
 
 
 struct LoaderFreeImage : public IImageLoader

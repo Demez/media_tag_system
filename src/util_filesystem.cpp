@@ -15,11 +15,16 @@
   #define stat   _stat
 #else
   #include <dirent.h>
-  #include <string.h>
+  #include <cstring>
   #include <unistd.h>
+  #include <sys/stat.h>
 
 // windows-specific mkdir() is used
-  #define mkdir( f ) mkdir( f, 666 )
+  // #define mkdir( f ) mkdir( f, 666 )
+  // owner read, write, exec
+  // group read, exec
+  // others read, exec
+  #define mkdir( f ) mkdir( f, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH )
 #endif
 
 
@@ -237,7 +242,7 @@ bool fs_is_absolute( const char* path, size_t path_len )
 #elif __unix__
 	if ( path_len == 0 )
 		return false;
-	return spPath[ 0 ] == '/';
+	return path[ 0 ] == '/';
 #else
 	return fs::path( path ).is_absolute();
 #endif

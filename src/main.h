@@ -282,8 +282,8 @@ namespace app
 	extern u64          total_time;
 	extern float        frame_time;
 
-	extern ivec2        mouse_delta;
-	extern ivec2        mouse_pos;
+	extern ImVec2       mouse_delta;
+	extern ImVec2       mouse_pos;
 
 	// imgui scroll hack lol
 	extern bool         mouse_scrolled_up;

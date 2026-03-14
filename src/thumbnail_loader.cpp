@@ -67,7 +67,11 @@ void thumbnail_printf( const char* format, ... )
 
 	va_list args;
 	va_start( args, format );
+	#if _WIN32
 	vprintf_s( format, args );
+	#else
+	vprintf( format, args );
+	#endif
 	va_end( args );
 }
 

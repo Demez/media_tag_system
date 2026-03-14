@@ -45,3 +45,4 @@ out/*
 thirdparty/*
 !thirdparty/stb
 __tmp/
+.idea/

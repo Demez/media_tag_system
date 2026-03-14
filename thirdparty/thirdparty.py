@@ -329,6 +329,8 @@ def post_libspng_extract():
 
     if SYS_OS == OS.Windows:
         zlib_build += "/Release/zlibstatic.lib"
+    elif SYS_OS == OS.Linux:
+        zlib_build += "/libz.so"
 
     build_options = f"-DBUILD_EXAMPLES=OFF -DSPNG_SHARED=ON -DZLIB_LIBRARY={zlib_build} -DZLIB_INCLUDE_DIR={zlib_path}"
 
@@ -504,16 +506,10 @@ FILE_LIST = {
         #     "user_extract": True,
         # },
         {
-            "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
-            "file": "mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
-            "name": "mpv",
-            "user_extract": True,
-        },
-        {
             "url":  "https://github.com/pantoniou/libfyaml/releases/download/v0.9.5/libfyaml-0.9.5.tar.gz",
             "file": "libfyaml-0.9.5.tar.gz",
             "name": "libfyaml",
-            #"func": compile_libfyaml,
+            "func": compile_libfyaml,
         },
         {
             "url":  "https://github.com/libjxl/libjxl/archive/refs/tags/v0.11.2.zip",
@@ -544,6 +540,12 @@ FILE_LIST = {
             "name": "FreeImageRe",
             "extract_folder": "FreeImageRe",
             "file": "FreeImageRe-v4.1.1-win64.zip",
+        },
+        {
+            "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
+            "file": "mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
+            "name": "mpv",
+            "user_extract": True,
         },
        # {
        #     "url":  "https://github.com/libjxl/libjxl/releases/download/v0.11.2/jxl-x64-windows.zip",
