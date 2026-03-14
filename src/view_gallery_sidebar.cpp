@@ -15,9 +15,12 @@ void gallery_view_draw_header()
 	// ImGui::SetNextWindowSize( { (float)window_width, 32.f } );
 	// ImGui::SetNextWindowSizeConstraints( { (float)window_width, 0.f }, { (float)window_width, 64.f } );
 
+	ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, { 6, 6 } );
+
 	if ( !ImGui::BeginChild( "##gallery_header", { (float)window_width, 0.f }, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AlwaysUseWindowPadding ) )
 	{
 		ImGui::EndChild();
+		ImGui::PopStyleVar();
 		return;
 	}
 
@@ -120,6 +123,8 @@ void gallery_view_draw_header()
 	ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 
 	ImGui::EndChild();
+
+	ImGui::PopStyleVar();
 
 	ImGui::PopStyleVar();
 }
