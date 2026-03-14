@@ -72,7 +72,7 @@ void gl_update_texture( GLuint texture, image_t* image )
 	auto err = glGetError();
 
 	if ( err != 0 )
-		printf( "FUCK: %d\n", err );
+		printf( "GL Error: %d\n", err );
 
 	glBindTexture( GL_TEXTURE_2D, 0 );
 }
