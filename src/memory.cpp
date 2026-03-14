@@ -18,29 +18,29 @@ bool                     g_mem_redirect     = false;
 
 // ====================================================================================================
 
-size_t                              g_total_memory_allocated = 0;
+size_t               g_total_memory_allocated = 0;
 
-mem_category_info_t*                get_mem_categories()
+mem_category_info_t* get_mem_categories()
 {
 	static mem_category_info_t mem_categories[ e_mem_category_count ];
 	return mem_categories;
 }
 
 
-const char*                         mem_category_str[] = {
-    "mem_category_general",
+const char* mem_category_str[] = {
+    "general",
 
-    "mem_category_image_data",
-    "mem_category_image",
-    "mem_category_string",
-    "mem_category_file_data",
+    "image_data",
+    "image",
+    "string",
+    "file_data",
 
-    "mem_category_imgui",
+    "imgui",
 
-	"mem_category_stbi_resize",
-	"mem_category_jxl",
-	"mem_category_jxl_thumbnail",
-	"mem_category_thumbnail_cache",
+	"stbi_resize",
+	"jxl",
+	"jxl_thumbnail",
+	"thumbnail_cache",
 };
 
 
@@ -196,14 +196,7 @@ void mem_draw_debug_ui()
 		//ImGui::TextUnformatted( mem_category_str[ i ] );
 		//ImGui::Spacing();
 
-		ImGui::Text( "%s: %.3f KB", mem_category_str[ i ], (float)info.total / MEM_SCALE );
-
-
-		ImGui::Text( "Allocations: %zd", info.sizes.size() );
-		// ImGui::Text( "Allocations: %zd", info.alloc_count );
-
-		//char header_name[ 64 ];
-		//snprintf( header_name, 64, "Allocations: %zd", info.sizes.size() );
+		ImGui::Text( "%s - %.3f KB - %zd Allocations", mem_category_str[ i ], (float)info.total / MEM_SCALE, info.sizes.size() );
 
 		if ( ImGui::CollapsingHeader( "Allocations" ) )
 		{
