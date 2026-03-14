@@ -167,7 +167,7 @@ void mem_draw_debug_ui()
 	// ImGui::Text( "Process Memory: %.3f MB", (float)( proc_mem_info.working_set + proc_mem_info.page_file ) / ( 1000.f * 1000.f ) );
 	size_t          untracked_mem = proc_mem_info.working_set - g_total_memory_allocated;
 
-	ImGui::Text( "Process Total: %.3f MB", (float)( proc_mem_info.working_set ) / ( MEM_SCALE * MEM_SCALE ) );
+	ImGui::Text( "Process Total: %.3f MB", float( proc_mem_info.working_set ) / ( MEM_SCALE * MEM_SCALE ) );
 	ImGui::Text( "Tracked: %.3f MB", (float)g_total_memory_allocated / ( MEM_SCALE * MEM_SCALE ) );
 	ImGui::Text( "Untracked: %.3f MB", (float)untracked_mem / ( MEM_SCALE * MEM_SCALE ) );
 	ImGui::Text( "Page File: %.3f MB", (float)( proc_mem_info.page_file ) / ( MEM_SCALE * MEM_SCALE ) );

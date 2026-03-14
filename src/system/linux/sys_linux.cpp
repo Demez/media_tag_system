@@ -353,8 +353,17 @@ proc_mem_info_t sys_get_mem_info()
 	rusage usage{};
 	int ret = getrusage( RUSAGE_SELF, &usage );
 
-	mem_info.working_set = usage.ru_maxrss * 1024;
-	mem_info.page_file   = 0;
+	if ( ret == 0 )
+	{
+		mem_info.working_set = usage.ru_maxrss * (long)MEM_SCALE;
+	}
+	else
+	{
+		printf("Failed to get memory usage - %d!\n", ret );
+		mem_info.working_set = 0;
+	}
+
+	mem_info.page_file = 0;
 
 	return mem_info;
 }
