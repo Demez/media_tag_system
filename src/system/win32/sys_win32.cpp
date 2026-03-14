@@ -544,7 +544,7 @@ void sys_browse_to_file( const char* path )
 
 
 // https://stackoverflow.com/a/35658917
-bool sys_execute_read( const char* command, str_buf_t& output )
+bool sys_execute_read( const char* command, std::string& output )
 {
 	HANDLE              hPipeRead, hPipeWrite;
 
@@ -605,11 +605,9 @@ bool sys_execute_read( const char* command, str_buf_t& output )
 				break;
 
 			buf[ dwRead ] = 0;
-			util_append_str( output, buf, strlen( buf ), 2048 );
+			output.append( buf );
 		}
 	}
-
-	util_append_str( output, "\0", 1, 1 );
 
 	CloseHandle( hPipeWrite );
 	CloseHandle( hPipeRead );
@@ -620,7 +618,7 @@ bool sys_execute_read( const char* command, str_buf_t& output )
 
 
 // https://stackoverflow.com/a/35658917
-bool sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_callback* p_exec_callback )
+bool sys_execute_read_callback( const char* command, std::string& output, f_exec_callback* p_exec_callback )
 {
 	if ( !p_exec_callback )
 		return false;
@@ -686,11 +684,9 @@ bool sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_c
 			buf[ dwRead ]  = 0;
 			size_t buf_len = strlen( buf );
 			p_exec_callback( buf, buf_len );
-			util_append_str( output, buf, buf_len, 2048 );
+			output.append( buf, buf_len );
 		}
 	}
-
-	util_append_str( output, "\0", 1, 1 );
 
 	CloseHandle( hPipeWrite );
 	CloseHandle( hPipeRead );

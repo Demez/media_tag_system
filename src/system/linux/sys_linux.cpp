@@ -1,14 +1,14 @@
-#include "util.h"
+#include "main.h"
 #include "system/system.h"
-
-#include <time.h>
-#include <stdint.h>
-#include <dlfcn.h>
-#include <errno.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#include "util.h"
 
 #include <SDL3/SDL_video.h>
+#include <dlfcn.h>
+#include <errno.h>
+#include <stdint.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
 
 
 // ----------------------------------------------------------------------------------------
@@ -261,15 +261,29 @@ void sys_browse_to_file( const char* path )
 // Terminal
 
 
-// https://stackoverflow.com/a/35658917
-bool sys_execute_read( const char* command, str_buf_t& output )
+// https://stackoverflow.com/a/646254
+bool sys_execute_read( const char* command, std::string& output )
 {
-	return false;
+	FILE* fp = popen( command, "r" );
+
+	if ( fp == nullptr )
+	{
+		printf("Failed to run command: %s\n", command );
+		return false;
+	}
+
+	char buffer[ 4096 ]{};
+	while (fgets( buffer, sizeof( buffer ), fp ) != nullptr )
+	{
+		output.append( buffer );
+	}
+
+	pclose( fp );
+	return true;
 }
 
 
-// https://stackoverflow.com/a/35658917
-bool sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_callback* p_exec_callback )
+bool sys_execute_read_callback( const char* command, std::string& output, f_exec_callback* p_exec_callback )
 {
 	if ( !p_exec_callback )
 		return false;
@@ -291,6 +305,42 @@ int sys_execute( const char* command )
 sys_font_data_t sys_get_font()
 {
 	sys_font_data_t font_data{};
+
+	// TODO: use fontconfig.h instead
+	// Check if we have fc-match
+	int ret = sys_execute( "fc-match" );
+
+	if ( ret != 0 )
+	{
+		printf("Failed to find fc-match for default font!\n" );
+		return font_data;
+	}
+
+	std::string output;
+	sys_execute_read( "fc-match -b", output );
+
+	const char* file      = strstr( output.c_str(), "file: " );
+	//const char* pixelsize = strstr( output.c_str(), "pixelsize: " );
+
+	if ( file )
+	{
+		const char* file_end = strchr( file, '\n' );
+		std::string file_string( file + 7, ( ( file_end - 4 ) - ( file + 7 ) ) );
+		font_data.font_path = util_strndup( file_string.c_str(), file_string.size() );
+	}
+
+	//if ( pixelsize )
+	//{
+	//	const char* line_end = strchr( pixelsize, '\n' );
+	//	std::string pixelsize_str( pixelsize + 11, ( ( line_end - 6 ) - ( pixelsize + 11 ) ) );
+	//	// font_data.font_path = util_strndup( pixelsize.c_str(), pixelsize.size() );
+	//	font_data.height = atof( pixelsize_str.c_str() );
+	//}
+	//else
+	{
+		font_data.height = 17;
+	}
+
 	return font_data;
 }
 

@@ -503,6 +503,7 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 	// Main Font
 	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( font_data.font_path, font_data.height, &font_cfg );
 
+	#ifdef _WIN32
 	// All fonts will be merged into this one above
 	font_cfg.MergeMode = true;
 
@@ -524,6 +525,7 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 		// ImGui::GetIO().Fonts->AddFontFromFileTTF( font_path, font_data.height, &font_cfg );
 		dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguiemj.ttf", font_data.height, &font_cfg );
 	}
+	#endif
 }
 
 
@@ -624,7 +626,6 @@ bool handle_events()
 				app::mouse_pos[ 1 ] = event.motion.y;
 				app::mouse_delta[ 0 ] += event.motion.xrel;
 				app::mouse_delta[ 1 ] += event.motion.yrel;
-				printf("MOUSE MOTION: %f x %f\n", app::mouse_delta[ 0 ], app::mouse_delta[ 1 ] );
 				break;
 
 			case SDL_EVENT_WINDOW_RESIZED:

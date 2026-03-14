@@ -98,10 +98,10 @@ void                    sys_browse_to_file( const char* path );
 // Terminal
 
 // execute a command and read it's output
-bool                    sys_execute_read( const char* command, str_buf_t& output );
+bool                    sys_execute_read( const char* command, std::string& output );
 
 // execute a command and read it's output, with a callback function everytime more output is read from the file
-bool                    sys_execute_read_callback( const char* command, str_buf_t& output, f_exec_callback* p_exec_callback );
+bool                    sys_execute_read_callback( const char* command, std::string& output, f_exec_callback* p_exec_callback );
 
 // execute a command and return the commands return value
 int                     sys_execute( const char* command );
