@@ -345,6 +345,7 @@ bool config_load()
 	config_get_doc_value( fyd, "/vsync %d", app::config.vsync );
 	config_get_doc_value( fyd, "/no-video %u", app::config.no_video );
 	config_get_doc_value( fyd, "/no-focus-sleep-time %u", app::config.no_focus_sleep_time );
+	config_get_doc_value( fyd, "/gallery-show-filenames %u", app::config.gallery_show_filenames );
 
 	app::config.vsync = std::clamp( app::config.vsync, -1, 1 );
 

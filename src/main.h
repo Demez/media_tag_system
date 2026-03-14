@@ -201,7 +201,7 @@ struct app_config_t
 
 	// resoultion of thumbnail
 	u32                       thumbnail_size              = 500;
-	
+
 	bool                      thumbnail_use_fixed_size    = false;
 
 	u32                       thumbnail_jxl_enable        = 0;
@@ -211,9 +211,10 @@ struct app_config_t
 	std::string               thumbnail_cache_path{};
 	std::string               thumbnail_video_cache_path{};
 
-	int                       vsync               = 1;
-	u32                       no_focus_sleep_time = 8;
-	bool                      no_video            = 0;
+	int                       vsync                  = 1;
+	u32                       no_focus_sleep_time    = 8;
+	bool                      no_video               = 0;
+	bool                      gallery_show_filenames = 0;
 };
 
 

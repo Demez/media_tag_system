@@ -3,6 +3,7 @@
 
 static char g_folder_buf[ 512 ]{};
 
+void        gallery_view_reset_text_size();
 
 void gallery_view_draw_header()
 {
@@ -65,11 +66,7 @@ void gallery_view_draw_header()
 
 	if ( ImGui::SliderInt( "Zoom", &gallery::item_size, gallery::item_size_min, gallery::item_size_max ) )
 	{
-		gallery::item_size_changed = true;
-		gallery_view_scroll_to_cursor();
-
-		gallery::item_text_size.clear();
-		gallery::item_text_size.resize( directory::media_list.size() );
+		gallery_view_reset_text_size();
 
 		if ( !app::config.thumbnail_use_fixed_size )
 			thumbnail_clear_cache();
@@ -303,6 +300,11 @@ void gallery_view_draw_sidebar()
 
 		if ( ImGui::BeginTabItem( "Settings" ) )
 		{
+			if ( ImGui::Checkbox( "Gallery - Show Filenames", &app::config.gallery_show_filenames ) )
+			{
+				gallery_view_reset_text_size();
+			}
+
 			ImGui::EndTabItem();
 		}
 

@@ -458,6 +458,16 @@ void gallery_view_context_menu()
 }
 
 
+void gallery_view_reset_text_size()
+{
+	gallery::item_size_changed = true;
+	gallery_view_scroll_to_cursor();
+
+	gallery::item_text_size.clear();
+	gallery::item_text_size.resize( gallery::sorted_media.size() );
+}
+
+
 void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 image_bounds, bool upscale, ImVec2& out_image_size )
 {
 	// Fit image in window size, scaling up if needed
@@ -573,16 +583,15 @@ void gallery_view_draw_content()
 
 	// calc row count
 
-	float  text_height         = ImGui::CalcTextSize( "TEST" ).y;
-
 	// ScrollToBringRectIntoView
 
-	int    grid_item_padding   = style.ItemSpacing.x;
+	gallery::row_count = (int)( region_avail.x - style.ScrollbarSize ) / ( gallery::item_size );
 
-	gallery::row_count        = (int)(region_avail.x - style.ScrollbarSize) / ( gallery::item_size );
+	float item_size_x  = gallery::item_size - style.ItemSpacing.x;
+	float item_size_y  = item_size_x;
 
-	float  item_size_x         = gallery::item_size - ( grid_item_padding );
-	float  item_size_y         = item_size_x + text_height + style.ItemSpacing.y;
+	if ( app::config.gallery_show_filenames )
+		item_size_y += ImGui::GetFontSize() + style.ItemSpacing.y;
 
 	int    grid_pos_x          = 0;
 	size_t i                   = 0;
@@ -650,19 +659,25 @@ void gallery_view_draw_content()
 
 		ImVec2                media_text_size{};
 
-		if ( gallery::item_size_changed )
+		if ( app::config.gallery_show_filenames )
 		{
-			media_text_size = ImGui::CalcTextSize( media.filename.c_str(), 0, false, item_size_x - ( style.WindowPadding.x * 2 ) );
-			gallery::item_text_size[ gallery_index ] = media_text_size;
-		}
-		else
-		{
-			media_text_size = gallery::item_text_size[ gallery_index ];
+			if ( gallery::item_size_changed )
+			{
+				media_text_size = ImGui::CalcTextSize( media.filename.c_str(), 0, false, item_size_x - ( style.WindowPadding.x * 2 ) );
+				gallery::item_text_size[ gallery_index ] = media_text_size;
+			}
+			else
+			{
+				media_text_size = gallery::item_text_size[ gallery_index ];
+			}
 		}
 
-		float current_item_size_y = image_bounds.y + media_text_size.y + style.ItemSpacing.y + ( style.WindowPadding.y * 2 );
+		float current_item_size_y = image_bounds.y + ( style.WindowPadding.y * 2 );
 
-		current_item_size_y       = std::min( current_item_size_y, item_size_y * 1.75f );
+		if ( app::config.gallery_show_filenames )
+			current_item_size_y += media_text_size.y + style.ItemSpacing.y;
+
+		current_item_size_y = std::min( current_item_size_y, item_size_y * 1.75f );
 
 		if ( current_item_size_y > last_max_item_height )
 			last_max_item_height = current_item_size_y;

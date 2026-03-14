@@ -44,3 +44,5 @@ no-focus-sleep-time: 5
 # Disable video support
 no-video: 0
 
+gallery-show-filenames: 1
+
