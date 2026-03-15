@@ -17,6 +17,8 @@ void                       unload_mpv_dll();
 bool                       start_mpv();
 void                       stop_mpv();
 
+bool                       mpv_supports_ext( std::string_view ext );
+
 void                       mpv_draw_frame();
 
 void                       mpv_window_resize();

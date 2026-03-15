@@ -157,13 +157,7 @@ void folder_load_media_list()
 		}
 		else if ( g_mpv )
 		{
-			// Video Formats
-			valid_ext |= ext == ".mp4";
-			valid_ext |= ext == ".mkv";
-			valid_ext |= ext == ".webm";
-			valid_ext |= ext == ".mov";
-			valid_ext |= ext == ".3gp";
-			valid_ext |= ext == ".avi";
+			valid_ext = mpv_supports_ext( ext.string() );
 
 			if ( valid_ext )
 			{
@@ -586,7 +580,9 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 	{
 		// Redraw window - Window is being resized
 		// NOTE: this is also called when dragging the window around
-		//case SDL_EVENT_WINDOW_EXPOSED:
+#ifdef _WIN32
+		case SDL_EVENT_WINDOW_EXPOSED:
+#endif
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
 			thumbnail_loader_update();

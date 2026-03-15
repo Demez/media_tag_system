@@ -4,23 +4,25 @@
 // some reference here
 // https://github.com/mpv-player/mpv-examples/blob/master/libmpv/sdl/main.c
 
-void*               g_mpv_module  = nullptr;
-mpv_handle*         g_mpv         = nullptr;
-mpv_render_context* g_mpv_gl      = nullptr;
-GLuint              g_mpv_fbo     = 0;
-GLuint              g_mpv_fbo_tex = 0;
-GLuint              g_mpv_rbo     = 0;
-static ivec2        g_mpv_framebuffer_size{};
+void*                             g_mpv_module  = nullptr;
+mpv_handle*                       g_mpv         = nullptr;
+mpv_render_context*               g_mpv_gl      = nullptr;
+GLuint                            g_mpv_fbo     = 0;
+GLuint                            g_mpv_fbo_tex = 0;
+GLuint                            g_mpv_rbo     = 0;
+static ivec2                      g_mpv_framebuffer_size{};
 
-u32                 g_wakeup_on_mpv_render_update, g_wakeup_on_mpv_events;
-static bool         g_mpv_redraw    = false;
+u32                               g_wakeup_on_mpv_render_update, g_wakeup_on_mpv_events;
+static bool                       g_mpv_redraw    = false;
 
-static char*        g_current_video = nullptr;
+static char*                      g_current_video = nullptr;
 
-s64                 g_video_width = 0, g_video_height = 0;
+s64                               g_video_width = 0, g_video_height = 0;
 
-bool                g_scale_up_video = true;
+bool                              g_scale_up_video = true;
 
+
+static std::vector< std::string > g_mpv_exts;
 
 
 namespace image_draw
@@ -609,12 +611,44 @@ bool start_mpv()
 	// let mpv finish startup
 	mpv_handle_wait_event( g_mpv, 0.1 );
 
+	// Load supported extensions
+	char* exts = p_mpv_get_property_string( g_mpv, "video-exts" );
+
+	if ( !exts )
+	{
+		printf( "no supported extensions from mpv??\n" );
+		return false;
+	}
+
+	char* ext_cur  = exts; 
+	char* ext_next = strchr( ext_cur, ',' );
+
+	while ( ext_next != nullptr )
+	{
+		std::string ext = ".";
+		ext.append( ext_cur, ext_next - ext_cur );
+		g_mpv_exts.push_back( ext );
+
+		ext_cur  = ext_next + 1;
+		ext_next = strchr( ext_cur, ',' );
+	}
+
 	return true;
 }
 
 
 void stop_mpv()
 {
+}
+
+
+bool mpv_supports_ext( std::string_view ext )
+{
+	for ( const std::string& supported_ext : g_mpv_exts )
+		if ( ext.ends_with( supported_ext ) )
+			return true;
+
+	return false;
 }
 
 
