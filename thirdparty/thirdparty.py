@@ -418,17 +418,48 @@ def compile_libfyaml():
 def libjxl_run():
     set_project("jxl")
 
+    # Stable version of libjxl to use
+    branch = "v0.11.x"
+
+    # TODO: implement a global basic version check system for tasks
+    # check version
+    redownload = False
+    if os.path.isdir("libjxl"):
+        if os.path.isfile("libjxl/IMAGE_VIEW_VERSION"):
+            version = ""
+            with open("libjxl/IMAGE_VIEW_VERSION", "r") as version_io:
+                version = version_io.read()
+
+            if version != branch:
+                print_color(Color.YELLOW, "JXL: Version mismatch: got version {version}, expected {branch}")
+                redownload = True
+        else:
+            print_color(Color.YELLOW, "JXL: Version file not found, redownloading!")
+            redownload = True
+
+    if redownload:
+        shutil.rmtree("libjxl")
+
+    # NOTE: this probably could just be a submodule in this repo, but i want less submodules downloaded so it's a bit faster, and takes less space'
     if not os.path.isdir("libjxl"):
-        # NOTE: should we remove some submodules?
-        if not syscmd(f"git clone https://github.com/libjxl/libjxl.git --recursive --shallow-submodules", "Failed to clone libjxl with git"):
+        # NOTE: should we only clone some submodules?
+        # if not syscmd(f"git clone --branch {branch} https://github.com/libjxl/libjxl.git --recursive --shallow-submodules", "Failed to clone libjxl with git"):
+        if not syscmd(f"git clone --branch {branch} --single-branch https://github.com/libjxl/libjxl.git", "Failed to clone libjxl with git"):
             return
+
+        # init some submodules
+        if not syscmd(f"git -C libjxl/third_party submodule update --init highway brotli skcms libpng zlib", "Failed to init libjxl submodules"):
+            return
+
+        with open("libjxl/IMAGE_VIEW_VERSION", "w") as version_io:
+            version_io.write(branch)
 
         # add spacing
         print()
 
     os.chdir("libjxl")
 
-    defines = "-DBUILD_SHARED_LIBS=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DCXX_FUZZERS_SUPPORTED=OFF -DJPEGXL_ENABLE_DOXYGEN=ON -DJPEGXL_ENABLE_MANPAGES=ON -DJPEGXL_ENABLE_EXAMPLES=ON -DJPEGXL_ENABLE_JNI=OFF -DJPEGXL_ENABLE_OPENEXR=OFF -DJPEGXL_ENABLE_SJPEG=ON -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_JPEGLI=OFF -DJPEGXL_ENABLE_JPEGLI_LIBJPEG=OFF -DJPEGXL_ENABLE_TOOLS=ON"
+    defines = "-DBUILD_SHARED_LIBS=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DCXX_FUZZERS_SUPPORTED=OFF -DJPEGXL_ENABLE_DOXYGEN=ON -DJPEGXL_ENABLE_MANPAGES=ON -DJPEGXL_ENABLE_EXAMPLES=ON -DJPEGXL_ENABLE_JNI=OFF -DJPEGXL_ENABLE_OPENEXR=OFF -DJPEGXL_ENABLE_SJPEG=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_JPEGLI=OFF -DJPEGXL_ENABLE_JPEGLI_LIBJPEG=OFF -DJPEGXL_ENABLE_TOOLS=OFF"
 
     # if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=0.", "Failed to run cmake"):
     # if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF", "Failed to run cmake"):
@@ -665,6 +696,12 @@ def handle_item(item: dict):
         folder, file_ext = file.rsplit(".", 1)
         is_zip = file_ext in ("zip", "7z", "xz", "gz")
 
+        if not url:
+            error = f"Project \"{name}\" Has a download file specified, but no url to download it!"
+            ERROR_LIST.append(error)
+            sys.stderr.write(error)
+            return
+
         # HACK
         if folder.endswith(".tar"):
             folder = folder.rsplit(".", 1)[0]
@@ -699,8 +736,11 @@ def handle_item(item: dict):
             print_color(Color.CYAN, f"Already Downloaded: {name}")
 
     if func:
-        print_color(Color.CYAN, f"Running Post Build Func: \"{name}\"")
-        func()
+        print_color(Color.CYAN, f"Running Task Function: \"{name}\"")
+        try:
+            func()
+        except Exception as e:
+            print(f"Task Function Crashed with error: {e}")
 
 
 def main():
