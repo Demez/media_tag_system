@@ -165,6 +165,11 @@ if ( MSVC )
 	
 else()  # linux
 	link_libraries( GL )
+	
+	add_compile_definitions(
+		_FILE_OFFSET_BITS=64
+		_TIME_BITS=64
+	)
 
 	message( "Copying SPNG" )
 	configure_file( "thirdparty/libspng/build/libspng.so" "${PROJ_OUT}/libspng.so" COPYONLY )

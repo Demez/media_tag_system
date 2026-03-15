@@ -218,37 +218,6 @@ struct app_config_t
 };
 
 
-struct file_t
-{
-	fs::path    path{};
-	u64         file_size    = 0;
-	u64         date_mod     = 0;
-	u64         date_created = 0;
-
-	inline bool operator!=( const file_t& other )
-	{
-		if ( file_size != other.file_size )
-			return true;
-
-		if ( date_mod != other.date_mod )
-			return true;
-
-		if ( date_created != other.date_created )
-			return true;
-
-		if ( path != other.path )
-			return true;
-
-		return false;
-	}
-
-	inline bool operator==( const file_t& other )
-	{
-		return !operator!=( other );
-	}
-};
-
-
 struct media_entry_t
 {
 	file_t       file;

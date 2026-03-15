@@ -214,9 +214,9 @@ int qsort_size_large_to_small( const void* left, const void* right )
 	const file_t& file_left  = directory::media_list[ *static_cast< const size_t* >( left ) ].file;
 	const file_t& file_right = directory::media_list[ *static_cast< const size_t* >( right ) ].file;
 
-	if ( file_left.file_size > file_right.file_size )
+	if ( file_left.size > file_right.size )
 		return -1;
-	else if ( file_left.file_size < file_right.file_size )
+	else if ( file_left.size < file_right.size )
 		return 1;
 
 	return 0;

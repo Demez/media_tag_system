@@ -343,7 +343,7 @@ void media_view_draw_media_info()
 
 	ImGui::Separator();
 
-	ImGui::Text( "Size: %.3f MB", (float)entry.file.file_size / ( STORAGE_SCALE * STORAGE_SCALE ) );
+	ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
 
 	char date_created[ DATE_TIME_BUFFER ]{};
 	char date_mod[ DATE_TIME_BUFFER ]{};

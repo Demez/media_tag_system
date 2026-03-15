@@ -22,6 +22,16 @@ enum e_scandir_flags_ : u8
 using e_scandir_flags = u8;
 
 
+enum e_file_type_ : u8
+{
+	e_file_type_invalid     = 0,
+	e_file_type_file        = 1 << 0,
+	e_file_type_directory   = 1 << 1,
+	e_file_type_system_link = 1 << 2,
+};
+
+using e_file_type = u8;
+
 using module_t = void*;
 
 
@@ -38,6 +48,41 @@ struct proc_mem_info_t
 {
 	size_t working_set;
 	size_t page_file;
+};
+
+
+struct file_t
+{
+	fs::path    path{};
+	u64         size         = 0;
+	u64         date_mod     = 0;
+	u64         date_created = 0;
+	e_file_type type         = e_file_type_invalid;
+
+	bool operator!=( const file_t& other ) const
+	{
+		if ( size != other.size )
+			return true;
+
+		if ( date_mod != other.date_mod )
+			return true;
+
+		if ( date_created != other.date_created )
+			return true;
+
+		if ( type != other.type )
+			return true;
+
+		if ( path != other.path )
+			return true;
+
+		return false;
+	}
+
+	bool operator==( const file_t& other ) const
+	{
+		return !operator!=( other );
+	}
 };
 
 
@@ -108,7 +153,7 @@ void                    sys_browse_to_file( const char* path );
 // print color with \aFFF escape codes for color values
 //void        sys_print_color( const char* string );
 
-bool                    sys_scandir( const char* root, const char* path, std::vector< std::string >& files, e_scandir_flags flags );
+bool                    sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags );
 
 // --------------------------------------------------------------------------------------------------------
 // Terminal

@@ -3,13 +3,15 @@
 #include "util.h"
 
 #include <SDL3/SDL_video.h>
+#include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <stdint.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/resource.h>
+#include <ftw.h>
 
 
 // ----------------------------------------------------------------------------------------
@@ -137,8 +139,11 @@ char* sys_get_cwd()
 
 bool sys_get_file_times_and_size( const char* path, u64* creation, u64* access, u64* write, u64* size )
 {
+	if ( !path )
+		return false;
+
 	struct stat s{};
-	if ( stat( path_w, &s ) != 0 )
+	if ( stat( path, &s ) != 0 )
 		return false;
 
 	if ( creation )
@@ -167,6 +172,174 @@ std::vector< fs::path > sys_get_drives()
 {
 	std::vector< fs::path > drives{};
 	return drives;
+}
+
+
+struct nftw_data_t
+{
+	const char*            root      = nullptr;
+	e_scandir_flags        flags     = e_scandir_none;
+	std::vector< file_t >* files_ptr = nullptr;
+	bool found_root                  = false;
+};
+
+
+static nftw_data_t nftw_data{};
+
+
+int ftw_callback( const char* filename, const struct stat64* status, int __flag, struct FTW* ftwbuf )
+{
+	// hack lol
+	if ( !nftw_data.found_root )
+	{
+		if ( strcmp( filename, nftw_data.root ) == 0 )
+		{
+			nftw_data.found_root = true;
+			return FTW_CONTINUE;
+		}
+	}
+
+	if ( nftw_data.files_ptr )
+	{
+		file_t file{};
+		file.path = filename;
+
+		if ( status->st_mode & S_IFREG )
+		{
+			file.type |= e_file_type_file;
+			file.size = status->st_size;
+		}
+		else if ( status->st_mode & S_IFDIR )
+		{
+			file.type |= e_file_type_directory;
+			file.size = 0;
+		}
+
+		file.date_created = 0;
+		file.date_mod     = status->st_mtime;
+
+		nftw_data.files_ptr->push_back( file );
+	}
+
+	//if ( ftwbuf->level > 1 )
+	//	return FTW_SKIP_SIBLINGS;
+
+	if ( ftwbuf->level > 0 && status->st_mode & S_IFDIR )
+		return FTW_SKIP_SUBTREE;
+
+	return FTW_CONTINUE;
+}
+
+
+// TODO: look at getdents64()?
+bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
+{
+	std::string scan_dir = root;
+
+	if ( path )
+	{
+		scan_dir += SEP_S;
+		scan_dir += path;
+	}
+
+	scan_dir += SEP_S;
+
+	// Failed experiment lol
+#if 0
+
+	nftw_data.root       = root;
+	nftw_data.files_ptr  = &files;
+	nftw_data.flags      = flags;
+	nftw_data.found_root = false;
+
+	if ( nftw64( scan_dir.c_str(), ftw_callback, 100, FTW_ACTIONRETVAL | FTW_PHYS ) != 0)
+	{
+		perror("ftw");
+	}
+
+	nftw_data.root       = nullptr;
+	nftw_data.files_ptr  = nullptr;
+	nftw_data.flags      = e_scandir_none;
+	nftw_data.found_root = false;
+
+#else
+	DIR* dir = opendir( scan_dir.c_str() );
+
+	if ( !dir )
+	{
+		printf( "Failed to open directory: \"%s\"\n", scan_dir.c_str() );
+		return false;
+	}
+
+	dirent64* ent;
+	while ( ( ent = readdir64( dir ) ) != nullptr )
+	{
+		if ( ent->d_type == DT_DIR )
+		{
+			if ( strcmp( ent->d_name, "." ) == 0 || strcmp( ent->d_name, ".." ) == 0 )
+				continue;
+		}
+
+		std::string relative_path;
+
+		if ( path )
+		{
+			relative_path += path;
+			relative_path += SEP_S;
+		}
+
+		relative_path += ent->d_name;
+
+		if ( ent->d_type == DT_DIR )
+		{
+			if ( flags & e_scandir_recursive )
+				sys_scandir( root, relative_path.data(), files, flags );
+
+			if ( flags & e_scandir_no_dirs )
+				continue;
+		}
+
+		if ( ( ent->d_type == DT_REG ) && flags & e_scandir_no_files )
+		{
+			continue;
+		}
+
+		file_t file{};
+
+		std::string abs_path = scan_dir + ent->d_name;
+
+		if ( flags & e_scandir_abs_paths )
+			file.path = abs_path;
+		else
+			file.path = relative_path;
+
+		// TODO: handle system links
+
+		if ( ent->d_type == DT_REG )
+		{
+			file.type |= e_file_type_file;
+			file.size = ent->d_off;
+		}
+		else
+		{
+			file.type |= e_file_type_directory;
+			file.size = 0;
+		}
+
+		struct stat64 s{};
+		if ( stat64( abs_path.c_str(), &s ) == 0 )
+		{
+			// file.size = s.st_size;
+			file.date_created = 0;
+			file.date_mod     = s.st_mtime;
+		}
+
+		files.push_back( file );
+	}
+
+	closedir( dir );
+#endif
+	return true;
 }
 
 

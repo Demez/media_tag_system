@@ -377,13 +377,15 @@ std::vector< fs::path > sys_get_drives()
 }
 
 
-bool sys_scandir( const char* root, const char* path, std::vector< std::string >& files, e_scandir_flags flags )
+bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
 {
-	std::string scan_dir{}, scan_dir_wildcard{};
+	std::string scan_dir = root, scan_dir_wildcard{};
 
-	scan_dir += root;
-	scan_dir += SEP_S;
-	scan_dir += path;
+	if ( path )
+	{
+		scan_dir += SEP_S;
+		scan_dir += path;
+	}
 	
 	scan_dir_wildcard += scan_dir;
 	scan_dir_wildcard += SEP_S;
@@ -402,7 +404,6 @@ bool sys_scandir( const char* root, const char* path, std::vector< std::string >
 		return false;
 	}
 
-	std::string relative_path;
 	while ( FindNextFile( find, &ffd ) != 0 )
 	{
 		bool is_dir = ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
@@ -410,8 +411,13 @@ bool sys_scandir( const char* root, const char* path, std::vector< std::string >
 		if ( is_dir && wcsncmp( ffd.cFileName, L"..", 2 ) == 0 )
 			continue;
 
-		relative_path = path;
-		relative_path += SEP_S;
+		std::string relative_path;
+
+		if ( path )
+		{
+			relative_path += path;
+			relative_path += SEP_S;
+		}
 
 		char* filename = sys_to_utf8( ffd.cFileName );
 		relative_path += filename;
@@ -425,17 +431,34 @@ bool sys_scandir( const char* root, const char* path, std::vector< std::string >
 			continue;
 		}
 
-		if ( ( flags & e_scandir_no_files ) && fs_is_file( relative_path.data() ) )
+		// if ( ( flags & e_scandir_no_files ) && fs_is_file( relative_path.data() ) )
+		if ( ( flags & e_scandir_no_files ) && !is_dir )
 		{
 			ch_free_str( filename );
 			continue;
 		}
 
-		if ( flags & e_scandir_abs_paths )
-			files.push_back( scan_dir + filename );
-		else
-			files.push_back( relative_path );
+		file_t file{};
+		file.date_created = file_time_to_unix( ffd.ftCreationTime );
+		file.date_mod = file_time_to_unix( ffd.ftLastWriteTime );
 
+		if ( flags & e_scandir_abs_paths )
+			file.path = scan_dir + filename;
+		else
+			file.path = relative_path;
+
+		if ( is_dir )
+		{
+			file.type |= e_file_type_directory;
+			file.size = 0;
+		}
+		else
+		{
+			file.type |= e_file_type_file;
+			file.size = (ffd.nFileSizeHigh * (MAXDWORD+1)) + ffd.nFileSizeLow;
+		}
+
+		files.push_back( file );
 		ch_free_str( filename );
 	}
 

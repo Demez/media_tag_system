@@ -346,7 +346,7 @@ size_t thumbnail_generate_hash( file_t& file )
 	size_t hash = 0;
 
 	hash ^= std::hash< fs::path >{}( file.path );
-	hash ^= std::hash< size_t >{}( file.file_size );
+	hash ^= std::hash< size_t >{}( file.size );
 	hash ^= std::hash< size_t >{}( file.date_mod );
 	hash ^= std::hash< size_t >{}( file.date_created );
 
