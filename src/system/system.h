@@ -8,6 +8,20 @@
 // System Interface
 
 
+enum e_scandir_flags_ : u8
+{
+	e_scandir_none          = 0,
+	e_scandir_abs_paths     = 1 << 0,  // All paths must be absolute
+	e_scandir_no_dirs       = 1 << 1,  // Don't include any directories
+	e_scandir_no_files      = 1 << 2,  // Don't include any files
+	e_scandir_recursive     = 1 << 3,  // Recursively scan a directory, works with e_scandir_no_dirs flag
+
+	e_scandir_abs_recursive = e_scandir_abs_paths | e_scandir_recursive,
+};
+
+using e_scandir_flags = u8;
+
+
 using module_t = void*;
 
 
@@ -69,7 +83,7 @@ char*                   sys_get_exe_path( size_t* len = nullptr );
 char*                   sys_get_cwd();
 
 // File Times - In Unix Time
-bool                    sys_get_file_times( const char* path, u64* creation, u64* access, u64* write );
+bool                    sys_get_file_times_and_size( const char* path, u64* creation, u64* access, u64* write, u64* size );
 bool                    sys_set_file_times( const char* path, u64* creation, u64* access, u64* write );
 
 // Get list of drives mounted on this device
@@ -93,6 +107,8 @@ void                    sys_browse_to_file( const char* path );
 
 // print color with \aFFF escape codes for color values
 //void        sys_print_color( const char* string );
+
+bool                    sys_scandir( const char* root, const char* path, std::vector< std::string >& files, e_scandir_flags flags );
 
 // --------------------------------------------------------------------------------------------------------
 // Terminal

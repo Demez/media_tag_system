@@ -415,7 +415,7 @@ bool fs_save_file( const char* path, const char* data, size_t size )
 	// copy file creation date
 	u64 create_date = 0;
 
-	if ( old_save_exists && sys_get_file_times( bak_path, &create_date, nullptr, nullptr ) )
+	if ( old_save_exists && sys_get_file_times_and_size( bak_path, &create_date, nullptr, nullptr, nullptr ) )
 	{
 		sys_set_file_times( path, &create_date, nullptr, nullptr );
 	}

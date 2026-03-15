@@ -337,6 +337,7 @@ if ( WIN32 )
 		"thirdparty/libspng/build/Release"
 		"thirdparty/libfyaml/build/Release"
 		"thirdparty/libjxl/build/lib/Release"
+		"thirdparty/SDL3/lib/x64"
 	)
 	target_link_libraries(
 		media_tag_system PRIVATE

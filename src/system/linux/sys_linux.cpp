@@ -135,11 +135,10 @@ char* sys_get_cwd()
 	return getcwd( nullptr, 0 );
 }
 
-
-bool sys_get_file_times( const char* path, u64* creation, u64* access, u64* write )
+bool sys_get_file_times_and_size( const char* path, u64* creation, u64* access, u64* write, u64* size )
 {
 	struct stat s{};
-	if ( stat( path, &s ) != 0 )
+	if ( stat( path_w, &s ) != 0 )
 		return false;
 
 	if ( creation )
@@ -150,6 +149,9 @@ bool sys_get_file_times( const char* path, u64* creation, u64* access, u64* writ
 
 	if ( access )
 		*access = s.st_atime;
+
+	if ( size )
+		*size = s.st_size;
 
 	return true;
 }

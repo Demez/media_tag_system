@@ -17,6 +17,7 @@
 #include <time.h>
 #include <atlbase.h>
 #include <psapi.h>
+#include <sys/stat.h>
 
 #include <profileapi.h>
 #include <stdint.h>
@@ -261,14 +262,16 @@ static FILETIME file_time_from_unix( u64 time )
 }
 
 
-bool sys_get_file_times( const char* path, u64* creation, u64* access, u64* write )
+bool sys_get_file_times_and_size( const char* path, u64* creation, u64* access, u64* write, u64* size )
 {
-	// wchar_t* path_w = sys_to_wchar_extended( path );
+	wchar_t* path_w = sys_to_wchar( path );
 
-#if 1
-	struct stat s;
-	if ( stat( path, &s ) != 0 )
+	struct _stat s;
+	if ( _wstat( path_w, &s ) != 0 )
+	{
+		ch_free_str( path_w );
 		return false;
+	}
 
 	if ( creation )
 		*creation = s.st_ctime;
@@ -279,49 +282,10 @@ bool sys_get_file_times( const char* path, u64* creation, u64* access, u64* writ
 	if ( access )
 		*access = s.st_atime;
 
-#else
-	HANDLE file     = CreateFile( path_w, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL );
-
-	if ( file == INVALID_HANDLE_VALUE )
-	{
-		printf( "failed to open file handle for \"%s\"\n", path );
-		sys_print_last_error();
-		return false;
-	}
-
-	FILETIME file_create{}, file_access{}, file_write{};
-	BOOL     ret = GetFileTime( file, &file_create, &file_access, &file_write );
-
-	CloseHandle( file );
-
-	if ( ret == FALSE )
-	{
-		sys_print_last_error();
-		printf( "failed to get file time - \"%s\"\n", path );
-
-		if ( creation )
-			*creation = 0;
-
-		if ( access )
-			*access = 0;
-
-		if ( write )
-			*write = 0;
-
-		return false;
-	}
+	if ( size )
+		*size = s.st_size;
 
 	ch_free_str( path_w );
-
-	if ( creation )
-		*creation = file_time_to_unix( file_create );
-
-	if ( access )
-		*access = file_time_to_unix( file_access );
-
-	if ( write )
-		*write = file_time_to_unix( file_write );
-#endif
 
 	return true;
 }
@@ -410,6 +374,73 @@ std::vector< fs::path > sys_get_drives()
 	}
 
 	return drives;
+}
+
+
+bool sys_scandir( const char* root, const char* path, std::vector< std::string >& files, e_scandir_flags flags )
+{
+	std::string scan_dir{}, scan_dir_wildcard{};
+
+	scan_dir += root;
+	scan_dir += SEP_S;
+	scan_dir += path;
+	
+	scan_dir_wildcard += scan_dir;
+	scan_dir_wildcard += SEP_S;
+	scan_dir_wildcard += "*";
+
+	wchar_t*        scan_dir_wildcard_w = sys_to_wchar( scan_dir_wildcard.c_str() );
+
+	WIN32_FIND_DATA ffd;
+	HANDLE          find = FindFirstFile( scan_dir_wildcard_w, &ffd );
+
+	ch_free_str( scan_dir_wildcard_w );
+
+	if ( INVALID_HANDLE_VALUE == find )
+	{
+		printf( "Failed to find first file in directory: \"%s\"\n", path );
+		return false;
+	}
+
+	std::string relative_path;
+	while ( FindNextFile( find, &ffd ) != 0 )
+	{
+		bool is_dir = ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+
+		if ( is_dir && wcsncmp( ffd.cFileName, L"..", 2 ) == 0 )
+			continue;
+
+		relative_path = path;
+		relative_path += SEP_S;
+
+		char* filename = sys_to_utf8( ffd.cFileName );
+		relative_path += filename;
+
+		if ( ( flags & e_scandir_recursive ) && is_dir )
+			sys_scandir( root, relative_path.data(), files, flags );
+
+		if ( ( flags & e_scandir_no_dirs ) && is_dir )
+		{
+			ch_free_str( filename );
+			continue;
+		}
+
+		if ( ( flags & e_scandir_no_files ) && fs_is_file( relative_path.data() ) )
+		{
+			ch_free_str( filename );
+			continue;
+		}
+
+		if ( flags & e_scandir_abs_paths )
+			files.push_back( scan_dir + filename );
+		else
+			files.push_back( relative_path );
+
+		ch_free_str( filename );
+	}
+
+	FindClose( find );
+	return true;
 }
 
 

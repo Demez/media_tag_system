@@ -118,69 +118,73 @@ void folder_load_media_list()
 	gallery::item_size_changed = true;
 	gallery::item_text_size.clear();
 
-	// i hate this lol
-	try
+	std::string root = directory::path.string();
+	std::vector< std::string > files{};
+
+	if ( !sys_scandir( root.c_str(), "", files, e_scandir_abs_paths ) )
 	{
-		for ( const auto& entry : fs::directory_iterator( directory::path ) )
+		printf( "Failed to scan directory\n" );
+		return;
+	}
+
+	directory::media_list.reserve( files.size() );
+
+	for ( const std::string& entry : files )
+	{
+		file_t file{};
+		file.path = entry;
+
+		if ( fs_is_dir( entry.data() ) )
 		{
-			file_t          file{};
-			file.path = entry.path();
+			directory::media_list.emplace_back( file, file.path.filename().string(), e_media_type_directory );
+			continue;
+		}
 
-			if ( entry.is_directory() )
-			{
-				directory::media_list.emplace_back( file, file.path.filename().string(), e_media_type_directory );
-				continue;
-			}
+		const fs::path& ext       = file.path.extension();
+		e_media_type    type      = e_media_type_none;
+		// bool            valid_ext = image_check_extension( ext.string() );
+		bool            valid_ext = image_check_extension( file.path.filename().string() );
 
-			const fs::path& ext       = file.path.extension();
-			e_media_type    type      = e_media_type_none;
-			// bool            valid_ext = image_check_extension( ext.string() );
-			bool            valid_ext = image_check_extension( file.path.filename().string() );
+		// Image Formats
+		//	valid_ext |= ext == ".jpg";
+		//	valid_ext |= ext == ".jpeg";
+		//	valid_ext |= ext == ".png";
+		//	valid_ext |= ext == ".gif";
 
-			// Image Formats
-			//	valid_ext |= ext == ".jpg";
-			//	valid_ext |= ext == ".jpeg";
-			//	valid_ext |= ext == ".png";
-			//	valid_ext |= ext == ".gif";
+		if ( valid_ext )
+		{
+			type = e_media_type_image;
+		}
+		else if ( g_mpv )
+		{
+			// Video Formats
+			valid_ext |= ext == ".mp4";
+			valid_ext |= ext == ".mkv";
+			valid_ext |= ext == ".webm";
+			valid_ext |= ext == ".mov";
+			valid_ext |= ext == ".3gp";
+			valid_ext |= ext == ".avi";
 
 			if ( valid_ext )
 			{
-				type = e_media_type_image;
+				type = e_media_type_video;
 			}
-			else if ( g_mpv )
-			{
-				// Video Formats
-				valid_ext |= ext == ".mp4";
-				valid_ext |= ext == ".mkv";
-				valid_ext |= ext == ".webm";
-				valid_ext |= ext == ".mov";
-				valid_ext |= ext == ".3gp";
-				valid_ext |= ext == ".avi";
-
-				if ( valid_ext )
-				{
-					type = e_media_type_video;
-				}
-			}
-
-			if ( !valid_ext )
-				continue;
-
-			std::string str_path = file.path.string();
-
-			if ( !sys_get_file_times( str_path.data(), &file.date_created, nullptr, &file.date_mod ) )
-			{
-				printf( "Failed to get file date created and modified: %s\n", str_path.data() );
-			}
-
-			file.file_size = fs::file_size( file.path );
-
-			directory::media_list.emplace_back( file, file.path.filename().string(), type );
 		}
-	}
-	catch ( fs::filesystem_error& err )
-	{
-		printf("Failed to read directory: \"%s\"\n", directory::path.string().c_str() );
+
+		if ( !valid_ext )
+			continue;
+
+		if ( !sys_get_file_times_and_size( entry.data(), &file.date_created, nullptr, &file.date_mod, &file.file_size ) )
+		{
+			printf( "Failed to get file date created and modified, and size: %s\n", entry.data() );
+		}
+
+		media_entry_t entry{};
+		entry.file     = file;
+		entry.filename = file.path.filename().string();
+		entry.type     = type;
+
+		directory::media_list.push_back( entry );
 	}
 
 	directory::thumbnail_list.resize( directory::media_list.size() );
