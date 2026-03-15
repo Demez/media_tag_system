@@ -154,7 +154,10 @@ void folder_load_media_list()
 		else if ( g_mpv )
 		{
 			if ( mpv_supports_ext( ext.string() ) )
+			{
+				valid_ext        = true;
 				media_entry.type = e_media_type_video;
+			}
 		}
 
 		if ( !valid_ext )
