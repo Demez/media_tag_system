@@ -452,16 +452,16 @@ def libjxl_run():
 
 
 '''
-Basic Structure for a file here:
+Basic Structure for a task here:
 {
-    # URL for downloading the file
+    # Task Name: Doubles as the folder name and the "package/task" name in this script, so you can skip it or only use it, etc.
+    "name": "ENTRY",
+
+    # OPTIONAL: URL for downloading the file
     "url":  "ENTRY",
     
-    # Filename that gets downloaded, most stuff from github is different from the url filename
+    # OPTIONAL: Filename that gets downloaded, most stuff from github is different from the url filename
     "file": "FILENAME.zip/7z",
-    
-    # Doubles as the folder name and the "package" name in this script, so you can skip it or only use it, etc.
-    "name": "ENTRY",
     
     # OPTIONAL: A compile function to run after extracting it
     "func": function_pointer,
@@ -478,58 +478,45 @@ Basic Structure for a file here:
 '''
 
 
-FILE_LIST = {
+TASK_LIST = {
     # All Platforms
     OS.Any: [
         {
+            "name": "freetype",
             "url":  "https://nongnu.askapache.com/freetype/freetype-2.14.1.tar.xz",
             "file": "freetype-2.14.1.tar.xz",
-            "name": "freetype",
             "func": post_freetype_extract,
         },
         {
+            "name": "mozjpeg",
             "url":  "https://github.com/mozilla/mozjpeg/archive/refs/tags/v4.1.1.zip",
             "file": "mozjpeg-4.1.1.zip",
-            "name": "mozjpeg",
             "func": post_mozjpeg_extract,
         },
         {
+            "name": "zlib-ng",
             "url":  "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/2.2.5.zip",
             "file": "zlib-ng-2.2.5.zip",
-            "name": "zlib-ng",
             "func": post_zlib_extract,
         },
         {
+            "name": "libspng",
             "url":  "https://github.com/randy408/libspng/archive/v0.7.4.zip",
             "file": "libspng-0.7.4.zip",
-            "name": "libspng",
             "func": post_libspng_extract,
         },
         {
+            "name": "nativefiledialog",
             "url":  "https://github.com/btzy/nativefiledialog-extended/archive/refs/tags/v1.2.1.zip",
             "file": "nativefiledialog-extended-1.2.1.zip",
-            "name": "nativefiledialog",
             "func": compile_nativefiledialog,
         },
-        # {
-        #     "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20251017/mpv-dev-x86_64-v3-20251017-git-233e896.7z",
-        #     "file": "mpv-dev-x86_64-v3-20251017-git-233e896.7z",
-        #     "name": "mpv",
-        #     "user_extract": True,
-        # },
         {
+            "name": "libfyaml",
             "url":  "https://github.com/pantoniou/libfyaml/releases/download/v0.9.5/libfyaml-0.9.5.tar.gz",
             "file": "libfyaml-0.9.5.tar.gz",
-            "name": "libfyaml",
             "func": compile_libfyaml,
         },
-#        {
-#            "url":  "https://github.com/libjxl/libjxl/archive/refs/tags/v0.11.2.zip",
-#            "name": "jxl",
-#            "extracted_folder": "libjxl-0.11.2",
-#            "file": "libjxl-0.11.2.zip",
-#            "func": compile_libjxl,
-#        },
         {
             "name": "jxl",
             "func": libjxl_run,
@@ -541,52 +528,38 @@ FILE_LIST = {
 
         # MUST BE FIRST FOR VSWHERE !!!!!
         {
-            "url":  "https://github.com/microsoft/vswhere/releases/download/2.8.4/vswhere.exe",
             "name": "vswhere",
+            "url":  "https://github.com/microsoft/vswhere/releases/download/2.8.4/vswhere.exe",
             "file": "vswhere.exe",
             "func": setup_vs_env,
         },
         {
-            "url":  "https://github.com/libsdl-org/SDL/releases/download/release-3.2.24/SDL3-devel-3.2.24-VC.zip",
             "name": "SDL3",
+            "url":  "https://github.com/libsdl-org/SDL/releases/download/release-3.2.24/SDL3-devel-3.2.24-VC.zip",
             "file": "SDL3-3.2.24.zip",
         },
         {
-            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/v4.1.1/FreeImageRe-v4.1.1-win64.zip",
             "name": "FreeImageRe",
+            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/v4.1.1/FreeImageRe-v4.1.1-win64.zip",
             "extract_folder": "FreeImageRe",
             "file": "FreeImageRe-v4.1.1-win64.zip",
         },
         {
+            "name": "mpv",
             "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
             "file": "mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
-            "name": "mpv",
             "user_extract": True,
         },
-       # {
-       #     "url":  "https://github.com/libjxl/libjxl/releases/download/v0.11.2/jxl-x64-windows.zip",
-       #     "name": "jxl_win",
-       #     "extract_folder": "jxl_win",
-       #     "file": "jxl-x64-windows.zip",
-       # },
     ],
 
     # Linux Only
     OS.Linux: [
         {
-            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/v4.1.1/FreeImageRe-v4.1.1-linux64.zip",
             "name": "FreeImageRe",
+            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/v4.1.1/FreeImageRe-v4.1.1-linux64.zip",
             "extract_folder": "FreeImageRe",
             "file": "FreeImageRe-v4.1.1-linux64.zip",
         },
-
-        # will need to add new behavior here maybe, uh oh
-        # {
-        #     "url":  "https://github.com/libjxl/libjxl/releases/download/v0.11.2/jxl-debs-amd64-ubuntu-24.04.zip",
-        #     "name": "jxl_linux",
-        #     "extract_folder": "jxl_linux",
-        #     "file": "jxl-debs-amd64-ubuntu-24.04.zip",
-        # },
     ],
 }
 
@@ -736,13 +709,13 @@ def main():
         return
 
     # Do your platform first (need to be first on windows for vswhere.exe)
-    for item in FILE_LIST[SYS_OS]:
+    for item in TASK_LIST[SYS_OS]:
         handle_item(item)
 
     print("\n---------------------------------------------------------\n")
 
     # Do all platforms last
-    for item in FILE_LIST[OS.Any]:
+    for item in TASK_LIST[OS.Any]:
         handle_item(item)
         reset_dir()
 
