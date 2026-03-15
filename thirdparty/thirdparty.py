@@ -415,12 +415,24 @@ def compile_libfyaml():
 # =================================================================================================
 
 
-def compile_libjxl():
+def libjxl_run():
     set_project("jxl")
-    os.chdir("jxl")
+
+    if not os.path.isdir("libjxl"):
+        # NOTE: should we remove some submodules?
+        if not syscmd(f"git clone https://github.com/libjxl/libjxl.git --recursive --shallow-submodules", "Failed to clone libjxl with git"):
+            return
+
+        # add spacing
+        print()
+
+    os.chdir("libjxl")
+
+    defines = "-DBUILD_SHARED_LIBS=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DCXX_FUZZERS_SUPPORTED=OFF -DJPEGXL_ENABLE_DOXYGEN=ON -DJPEGXL_ENABLE_MANPAGES=ON -DJPEGXL_ENABLE_EXAMPLES=ON -DJPEGXL_ENABLE_JNI=OFF -DJPEGXL_ENABLE_OPENEXR=OFF -DJPEGXL_ENABLE_SJPEG=ON -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_JPEGLI=OFF -DJPEGXL_ENABLE_JPEGLI_LIBJPEG=OFF -DJPEGXL_ENABLE_TOOLS=ON"
 
     # if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=0.", "Failed to run cmake"):
-    if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF", "Failed to run cmake"):
+    # if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF", "Failed to run cmake"):
+    if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release {defines}", "Failed to run cmake"):
         return
 
     #print("Building jxl - RelWithDebInfo\n")
@@ -511,12 +523,16 @@ FILE_LIST = {
             "name": "libfyaml",
             "func": compile_libfyaml,
         },
+#        {
+#            "url":  "https://github.com/libjxl/libjxl/archive/refs/tags/v0.11.2.zip",
+#            "name": "jxl",
+#            "extracted_folder": "libjxl-0.11.2",
+#            "file": "libjxl-0.11.2.zip",
+#            "func": compile_libjxl,
+#        },
         {
-            "url":  "https://github.com/libjxl/libjxl/archive/refs/tags/v0.11.2.zip",
             "name": "jxl",
-            "extracted_folder": "libjxl-0.11.2",
-            "file": "libjxl-0.11.2.zip",
-            "func": compile_libjxl,
+            "func": libjxl_run,
         },
     ],
 
