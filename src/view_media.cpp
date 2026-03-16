@@ -61,6 +61,7 @@ static_assert( ARR_SIZE( g_scale_state_str ) == e_scale_state_count );
 
 
 constexpr float      SCALE_WAIT_TIME = 0.1f;
+constexpr float      UPSCALE_LIMIT = 2.f;
 
 static std::thread*  g_scale_thread;
 static e_scale_state g_scale_state  = e_scale_state_idle;
@@ -83,7 +84,7 @@ void media_view_filter_image()
 	g_image_scaled_data.image.frame.resize( g_scale_src.frame.size() );
 
 	// Downscale image if size is larger than target size
-	if ( image_draw::size.x < g_scale_src.width )
+	if ( image_draw::size.x < ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 	{
 		if ( image_downscale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
 			g_scale_state = e_scale_state_upload;
@@ -122,7 +123,7 @@ void media_view_scale_check_timer( float frame_time )
 	if ( g_scale_state == e_scale_state_finished )
 	{
 		// Are we drawing the image smaller than native size?
-		if ( image_draw::size.x < g_image_data.image.width )
+		if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 		{
 			// Does the scaled image size match the size we draw it as?
 			if ( int(image_draw::size.x) != g_image_scaled_data.image.width )
@@ -143,7 +144,7 @@ void media_view_scale_check_timer( float frame_time )
 
 	if ( g_scale_timer < 0.f && g_image_data.image.frame.size() && g_scale_state == e_scale_state_idle )
 	{
-		if ( image_draw::size.x >= g_image_data.image.width )
+		if ( image_draw::size.x >= ( g_image_data.image.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 			return;
 
 		g_scale_lock.lock();
