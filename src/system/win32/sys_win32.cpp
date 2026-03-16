@@ -380,6 +380,7 @@ std::vector< fs::path > sys_get_drives()
 bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
 {
 	std::string scan_dir = root, scan_dir_wildcard{};
+	scan_dir += SEP_S;
 
 	if ( path )
 	{
