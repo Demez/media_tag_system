@@ -32,11 +32,15 @@ namespace gallery
 }
 
 
-void            gallery_view_draw_header();
-void            gallery_view_update_header_directory();
+extern char          g_search_buf[ 1024 ];
+extern bool          g_do_search;
 
-void            gallery_view_draw_sidebar();
-void            sidebar_draw_filesystem();
+
+void                 gallery_view_draw_header();
+void                 gallery_view_update_header_directory();
+
+void                 gallery_view_draw_sidebar();
+void                 sidebar_draw_filesystem();
 
 
 // =============================================================================================
@@ -309,9 +313,19 @@ void gallery_view_sort_dir()
 		selected_folder       = selected_item.type == e_media_type_directory;
 	}
 
+	size_t search_len = strlen( g_search_buf );
+
 	// Split up lists
 	for ( size_t i = 0; i < directory::media_list.size(); i++ )
 	{
+		//if ( g_do_search )
+		if ( search_len )
+		{
+			media_entry_t& entry = directory::media_list[ i ];
+			if ( entry.filename.find( g_search_buf, search_len ) == std::string::npos )
+				continue;
+		}
+
 		if ( directory::media_list[ i ].type == e_media_type_directory )
 			folders.push_back( i );
 
@@ -326,7 +340,7 @@ void gallery_view_sort_dir()
 	gallery_view_sort_list( files );
 
 	gallery::sorted_media.clear();
-	gallery::sorted_media.resize( directory::media_list.size() );
+	gallery::sorted_media.resize( folders.size() + files.size() );
 
 	// Add Folders First
 	std::copy( folders.begin(), folders.end(), gallery::sorted_media.begin() );
@@ -349,6 +363,9 @@ void gallery_view_sort_dir()
 			break;
 		}
 	}
+
+	//if ( g_do_search )
+	//	g_do_search = false;
 }
 
 

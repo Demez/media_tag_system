@@ -2,6 +2,8 @@
 
 
 static char g_folder_buf[ 512 ]{};
+char        g_search_buf[ 1024 ]{};
+bool        g_do_search = false;
 
 void        gallery_view_reset_text_size();
 
@@ -114,6 +116,16 @@ void gallery_view_draw_header()
 	// if ( ImGui::Combo( "Sort Mode", &item_current, items, IM_ARRAYSIZE( items ) ) )
 	// {
 	// }
+
+	ImGui::SameLine();
+
+	if ( ImGui::InputText( "Search", g_search_buf, 1024, ImGuiInputTextFlags_EnterReturnsTrue ) )
+	{
+		g_do_search = true;
+		gallery_view_dir_change();
+		gallery_view_reset_text_size();
+		printf( "SEARCH\n" );
+	}
 
 	ImGui::SameLine();
 
