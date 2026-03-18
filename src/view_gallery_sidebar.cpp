@@ -149,20 +149,19 @@ void sidebar_draw_filesystem()
 {
 	// get mounted drives
 	// TODO: MOVE ME TO STARTUP, AND CHECK FOR NEW DRIVES BEING MOUNTED/UNMOUNTED ONCE IN A WHILE
-	static bool                    first_run = true;
-	static std::vector< fs::path > drives;
+	static bool                       first_run = true;
+	static std::vector< std::string > drives;
 
 	if ( first_run )
 	{
-		drives    = sys_get_drives();
+		sys_get_drives( drives );
 		first_run = false;
 	}
 
 	u32 drive_i = 0;
-	for ( const fs::path& drive : drives )
+	for ( const std::string& drive : drives )
 	{
-		std::string drive_str = drive.string();
-		if ( ImGui::CollapsingHeader( drive_str.data() ) )
+		if ( ImGui::CollapsingHeader( drive.c_str() ) )
 		{
 			ImGui::PushID( drive_i + 1 );
 

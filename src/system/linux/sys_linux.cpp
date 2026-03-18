@@ -168,10 +168,9 @@ bool sys_set_file_times( const char* path, u64* creation, u64* access, u64* writ
 }
 
 
-std::vector< fs::path > sys_get_drives()
+bool sys_get_drives( std::vector< std::string >& drives )
 {
-	std::vector< fs::path > drives{};
-	return drives;
+	return true;
 }
 
 

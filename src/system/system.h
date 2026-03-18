@@ -133,7 +133,7 @@ bool                    sys_set_file_times( const char* path, u64* creation, u64
 
 // Get list of drives mounted on this device
 // Windows returns drive letters
-std::vector< fs::path > sys_get_drives();
+bool                    sys_get_drives( std::vector< std::string >& drives );
 
 // --------------------------------------------------------------------------------------------------------
 // Shell Functions

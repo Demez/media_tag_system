@@ -349,10 +349,8 @@ bool sys_set_file_times( const char* path, u64* creation, u64* access, u64* writ
 }
 
 
-std::vector< fs::path > sys_get_drives()
+bool sys_get_drives( std::vector< std::string >& drives )
 {
-	std::vector< fs::path > drives;
-
 	wchar_t                 drive_str[ MAX_PATH ];
 	memset( drive_str, 0, sizeof( drive_str ) );
 
@@ -361,7 +359,7 @@ std::vector< fs::path > sys_get_drives()
 	{
 		sys_print_last_error();
 		printf( "Failed to get logical drives!\n" );
-		return drives;
+		return false;
 	}
 
 	for ( u32 i = 0; i < MAX_PATH; i += 4 )
@@ -369,11 +367,11 @@ std::vector< fs::path > sys_get_drives()
 		if ( drive_str[ i ] == L'\0' )
 			break;
 
-		fs::path drive( &drive_str[ i ], &drive_str[ i + 4 ] );
+		std::string drive( &drive_str[ i ], &drive_str[ i + 4 ] );
 		drives.push_back( drive );
 	}
 
-	return drives;
+	return true;
 }
 
 
