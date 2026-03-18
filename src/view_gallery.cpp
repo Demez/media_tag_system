@@ -681,11 +681,11 @@ void gallery_view_draw_content()
 			if ( gallery::item_size_changed )
 			{
 				media_text_size = ImGui::CalcTextSize( media.filename.c_str(), 0, false, item_size_x - ( style.WindowPadding.x * 2 ) );
-				gallery::item_text_size[ gallery_index ] = media_text_size;
+				gallery::item_text_size[ i ] = media_text_size;
 			}
 			else
 			{
-				media_text_size = gallery::item_text_size[ gallery_index ];
+				media_text_size = gallery::item_text_size[ i ];
 			}
 		}
 
