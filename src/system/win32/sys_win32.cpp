@@ -859,17 +859,3 @@ u64 sys_get_time_ms()
 	return (uint64_t)( counter.QuadPart * 1000 / g_win_perf_freq.QuadPart );
 }
 
-
-// LINUX VERSION
-#if 0
-#include <time.h>
-#include <stdint.h>
-
-u64 sys_get_time_ms()
-{
-	struct timespec ts;
-	clock_gettime( CLOCK_MONOTONIC, &ts );
-	return (uint64_t)( ts.tv_sec * 1000ULL + ts.tv_nsec / 1000000ULL );
-}
-#endif
-
