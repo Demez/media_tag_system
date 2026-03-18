@@ -86,7 +86,7 @@ void media_view_filter_image()
 	// Downscale image if size is larger than target size
 	if ( image_draw::size.x < ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 	{
-		if ( image_downscale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
+		if ( image_scale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
 			g_scale_state = e_scale_state_upload;
 
 		// if ( g_scale_src.width != g_image_data.image.width )

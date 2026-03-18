@@ -629,7 +629,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 					image_t new_image{};
 
-					if ( image_downscale( thumbnail->image, &new_image, new_width, new_height ) )
+					if ( image_scale( thumbnail->image, &new_image, new_width, new_height ) )
 					{
 						std::string thumbnail_path = app::config.thumbnail_cache_path;
 						thumbnail_path += SEP_S;
@@ -676,7 +676,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			u8*   old_frame        = thumbnail->image->frame[ 0 ];
 
-			if ( image_downscale( thumbnail->image, thumbnail->image, new_width, new_height ) )
+			if ( image_scale( thumbnail->image, thumbnail->image, new_width, new_height ) )
 			{
 				thumbnail->scaled = true;
 				ch_free( e_mem_category_image_data, old_frame );

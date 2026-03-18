@@ -74,7 +74,53 @@ enum e_gallery_sort_mode
 };
 
 
-// ---------------------------------------------------------
+struct bookmark_t
+{
+	std::string name{};
+	std::string path{};
+	bool        valid = false;
+};
+
+
+struct app_config_t
+{
+	std::vector< bookmark_t > bookmark{};
+
+	u32                       thumbnail_threads           = 8;
+	u32                       thumbnail_uploads_per_frame = 4;
+
+	// size in kilobytes
+	u32                       thumbnail_mem_cache_size    = 20000;
+
+	// resoultion of thumbnail
+	u32                       thumbnail_size              = 500;
+
+	bool                      thumbnail_use_fixed_size    = false;
+
+	u32                       thumbnail_jxl_enable        = 0;
+	float                     thumbnail_jxl_distance      = 4;
+	u32                       thumbnail_jxl_effort        = 6;
+
+	std::string               thumbnail_cache_path{};
+	std::string               thumbnail_video_cache_path{};
+
+	int                       vsync                  = 1;
+	u32                       no_focus_sleep_time    = 8;
+	bool                      no_video               = 0;
+	bool                      gallery_show_filenames = 0;
+};
+
+
+struct media_entry_t
+{
+	file_t       file;
+	std::string  filename;
+	e_media_type type;
+};
+
+
+// -------------------------------------------------------------------------------------------
+// Image Data
 
 
 struct image_frame_t
@@ -137,64 +183,6 @@ struct image_load_info_t
 };
 
 
-struct IImageLoader
-{
-	virtual bool check_extension( std::string_view ext )                                                       = 0;
-	virtual bool check_header( const fs::path& path )                                                          = 0;
-
-	// Load the smallest version of an image that's larger than the inputted size
-	//virtual bool     image_load_scaled( const fs::path& path, image_t* image_info, int area_width, int area_height ) = 0;
-
-	virtual bool image_load( const fs::path& path, image_load_info_t& load_info, char* data, size_t data_len ) = 0;
-	//virtual image_t* image_load( const fs::path& path )                                                              = 0;
-};
-
-
-struct bookmark_t
-{
-	std::string name{};
-	std::string path{};
-	bool        valid = false;
-};
-
-
-struct app_config_t
-{
-	std::vector< bookmark_t > bookmark{};
-
-	u32                       thumbnail_threads           = 8;
-	u32                       thumbnail_uploads_per_frame = 4;
-
-	// size in kilobytes
-	u32                       thumbnail_mem_cache_size    = 20000;
-
-	// resoultion of thumbnail
-	u32                       thumbnail_size              = 500;
-
-	bool                      thumbnail_use_fixed_size    = false;
-
-	u32                       thumbnail_jxl_enable        = 0;
-	float                     thumbnail_jxl_distance      = 4;
-	u32                       thumbnail_jxl_effort        = 6;
-
-	std::string               thumbnail_cache_path{};
-	std::string               thumbnail_video_cache_path{};
-
-	int                       vsync                  = 1;
-	u32                       no_focus_sleep_time    = 8;
-	bool                      no_video               = 0;
-	bool                      gallery_show_filenames = 0;
-};
-
-
-struct media_entry_t
-{
-	file_t       file;
-	std::string  filename;
-	e_media_type type;
-};
-
-
 struct main_image_data_t
 {
 	// source image
@@ -206,6 +194,49 @@ struct main_image_data_t
 	// TODO: add multiple frames here
 	GLuint  texture = 0;
 };
+
+
+// -------------------------------------------------------------------------------------------
+// Thumbnail Data
+
+
+enum e_thumbnail_status
+{
+	// This is not a valid thumbnail at all, but is a free slot for a thumbnail
+	// The thumbnail can also go to this state if it's automatically freed
+	e_thumbnail_status_free,
+
+	// Waiting for processing
+	e_thumbnail_status_queued,
+
+	// Thumbnail is loading from disk
+	e_thumbnail_status_loading,
+
+	// Thumbnail is uploading to the GPU
+	e_thumbnail_status_uploading,
+
+	// Thumbnail is uploaded and ready for use
+	e_thumbnail_status_finished,
+
+	// Failed to load thumbnail
+	e_thumbnail_status_failed,
+};
+
+
+struct thumbnail_t
+{
+	std::atomic< e_thumbnail_status > status;
+	u32                               distance;  // higher distances get freed first for other thumbnails
+	char*                             path;      // mainly for debugging
+	image_t*                          image;
+	GLuint                            texture;
+	e_media_type                      type;
+	ImTextureRef                      im_texture;
+	bool                              scaled;
+};
+
+
+// -------------------------------------------------------------------------------------------
 
 
 // General App Data
@@ -343,8 +374,21 @@ void                                 config_reset();
 bool                                 config_load();
 
 
-// ---------------------------------------------------------
-// codec handler
+// -------------------------------------------------------------------------------------------
+// image loader
+
+
+struct IImageLoader
+{
+	virtual bool check_extension( std::string_view ext )                                                       = 0;
+	virtual bool check_header( const fs::path& path )                                                          = 0;
+
+	// Load the smallest version of an image that's larger than the inputted size
+	//virtual bool     image_load_scaled( const fs::path& path, image_t* image_info, int area_width, int area_height ) = 0;
+
+	virtual bool image_load( const fs::path& path, image_load_info_t& load_info, char* data, size_t data_len ) = 0;
+	//virtual image_t* image_load( const fs::path& path )                                                              = 0;
+};
 
 
 void image_register_codec( IImageLoader* codec, bool fallback );
@@ -352,10 +396,6 @@ void image_register_codec( IImageLoader* codec, bool fallback );
 // Load an image from disk or from memory
 // If nothing is passed in for file_data and data_len, it loads the file internally
 bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_data = nullptr, size_t data_len = 0 );
-
-// not seprate files to check the extension of path still
-// bool image_load_from_memory( image_load_info_t& load_info, char* file_data, size_t file_len );
-// bool image_load( image_load_info_t& load_info, const fs::path& path );
 
 // Free all image data
 void image_free( image_t& image );
@@ -368,7 +408,7 @@ void image_free_alloc( image_t& image );
 
 bool media_check_extension( std::string_view ext, e_media_type& type );
 bool image_check_extension( std::string_view ext );
-bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int new_height );
+bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new_height );
 
 
 // TODO: add image load functions here
@@ -377,120 +417,21 @@ bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int
 // - split it into reading the file first, passing it into each codec to check the header, if valid, load the rest of the image
 
 
-// ---------------------------------------------------------
+// -------------------------------------------------------------------------------------------
 // Thumbnail System
 
 
-enum e_thumbnail_status
-{
-	// This is not a valid thumbnail at all, but is a free slot for a thumbnail
-	// The thumbnail can also go to this state if it's automatically freed
-	e_thumbnail_status_free,
+bool         thumbnail_loader_init();
+void         thumbnail_loader_shutdown();
+void         thumbnail_loader_update();
 
-	// Waiting for processing
-	e_thumbnail_status_queued,
+h_thumbnail  thumbnail_loader_queue_push( const media_entry_t& media_entry );
+thumbnail_t* thumbnail_get_data( h_thumbnail handle );
 
-	// Thumbnail is loading from disk
-	e_thumbnail_status_loading,
-
-	// Thumbnail is uploading to the GPU
-	e_thumbnail_status_uploading,
-
-	// Thumbnail is uploaded and ready for use
-	e_thumbnail_status_finished,
-
-	// Failed to load thumbnail
-	e_thumbnail_status_failed,
-};
-
-
-struct thumbnail_t
-{
-	std::atomic< e_thumbnail_status > status;
-	u32                               distance;  // higher distances get freed first for other thumbnails
-	char*                             path;      // mainly for debugging
-	image_t*                          image;
-	GLuint                            texture;
-	e_media_type                      type;
-	ImTextureRef                      im_texture;
-	bool                              scaled;
-};
-
-
-bool          thumbnail_loader_init();
-void          thumbnail_loader_shutdown();
-void          thumbnail_loader_update();
-
-h_thumbnail   thumbnail_loader_queue_push( const media_entry_t& media_entry );
-thumbnail_t*  thumbnail_get_data( h_thumbnail handle );
-// void          thumbnail_free( const fs::path& path, h_thumbnail handle );
-
-void          thumbnail_add( const fs::path& path );
-void          thumbnail_remove( const fs::path& path );
-
-void          thumbnail_clear_cache();
+void         thumbnail_clear_cache();
 
 // distance based cache
-void          thumbnail_update_distance( h_thumbnail handle, u32 distance );
-// void          thumbnail_update_region( ImVec2 scroll_area_size, float scroll_amount );
+void         thumbnail_update_distance( h_thumbnail handle, u32 distance );
 
-void          thumbnail_cache_debug_draw();
-
-
-// ---------------------------------------------------------
-
-constexpr u32 DATABASE_VERSION = 1;
-
-using db_handle_t              = u32;
-using media_handle_t           = u32;
-
-// temporary structures, these are horrible for searching through
-// only just for laying out what i want
-
-
-struct tag_descriptor_t
-{
-	// strings encoded in utf-8
-	char*          name;
-	char*          description;
-};
-
-
-struct media_descriptor_t
-{
-	media_handle_t handle;
-
-	// strings encoded in utf-8
-	char*          name;
-	char*          path;
-
-	// description
-	char*          description;
-
-	db_handle_t*   tags;
-	u32            tags_count;
-
-	// authors
-	char*          authors;
-	u32            authors_count;
-
-	// dates
-	// urls
-};
-
-// ---------------------------------------------------------
-
-
-// Media Tag Database System
-
-bool load_database();
-bool save_database();
-void run_database();
-
-
-// testing ideas
-
-// Copies metadata from an array of items to another array of items
-void db_copy_data( db_handle_t db, s32 count, media_handle_t* input, media_handle_t* output );
-
+void         thumbnail_cache_debug_draw();
 
