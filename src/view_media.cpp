@@ -301,6 +301,10 @@ void media_view_scroll_zoom( float scroll )
 
 	image_draw::zoom    = (double)( std::max( 1.f, image_draw::size.x ) * factor ) / (double)g_image_data.image.width;
 
+	// Snap to 100% zoom level
+	if ( old_zoom < 1.0 && image_draw::zoom >= 1.0 || old_zoom > 1.0 && image_draw::zoom <= 1.0 )
+		image_draw::zoom = 1.0;
+
 	// round it so we don't get something like 0.9999564598 or whatever instead of 1.0
 	//if ( image_draw::zoom < 0.01 )
 	//{
@@ -310,6 +314,9 @@ void media_view_scroll_zoom( float scroll )
 	{
 		image_draw::zoom = std::max( ZOOM_MIN, round( image_draw::zoom * 1000 ) / 1000 );
 	}
+
+	// get new factor
+	factor             = image_draw::zoom / old_zoom;
 
 	// recalculate draw width and height
 	image_draw::size.x = (double)g_image_data.image.width * image_draw::zoom;
