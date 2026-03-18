@@ -143,24 +143,7 @@ void folder_load_media_list()
 			continue;
 		}
 
-		const fs::path& ext       = entry.path.extension();
-		// bool            valid_ext = image_check_extension( ext.string() );
-		bool            valid_ext = image_check_extension( media_entry.filename );
-
-		if ( valid_ext )
-		{
-			media_entry.type = e_media_type_image;
-		}
-		else if ( g_mpv )
-		{
-			if ( mpv_supports_ext( ext.string() ) )
-			{
-				valid_ext        = true;
-				media_entry.type = e_media_type_video;
-			}
-		}
-
-		if ( !valid_ext )
+		if ( !media_check_extension( media_entry.filename, media_entry.type ) )
 			continue;
 
 		// if ( !sys_get_file_times_and_size( entry.data(), &file.date_created, nullptr, &file.date_mod, &file.file_size ) )
@@ -402,7 +385,8 @@ bool on_new_file( const fs::path& file_path )
 	if ( is_file )
 	{
 		// can we open this file?
-		if ( !media_check_extension( file_path.string() ) )
+		e_media_type type = e_media_type_none;
+		if ( !media_check_extension( file_path.string(), type ) )
 			return false;
 
 		directory::queued = file_path;

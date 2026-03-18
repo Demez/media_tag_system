@@ -261,29 +261,24 @@ bool image_check_extension( std::string_view ext )
 }
 
 
-bool media_check_extension( std::string_view str_path )
+bool media_check_extension( std::string_view str_path, e_media_type& type )
 {
 	if ( image_check_extension( str_path ) )
+	{
+		type = e_media_type_image;
 		return true;
+	}
 
 	if ( g_mpv )
 	{
-		fs::path path      = str_path;
-		fs::path ext       = path.extension();
-		bool     valid_ext = false;
-
-		// Video Formats
-		valid_ext |= ext == ".mp4";
-		valid_ext |= ext == ".mkv";
-		valid_ext |= ext == ".webm";
-		valid_ext |= ext == ".mov";
-		valid_ext |= ext == ".3gp";
-		valid_ext |= ext == ".avi";
-
-		if ( valid_ext )
+		if ( mpv_supports_ext( str_path ) )
+		{
+			type = e_media_type_video;
 			return true;
+		}
 	}
 
+	type = e_media_type_none;
 	return false;
 }
 

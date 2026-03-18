@@ -20,113 +20,6 @@ HANDLE_GEN_32( h_thumbnail );
 
 
 // ---------------------------------------------------------
-// codec handler
-
-
-struct image_frame_t
-{
-	// time to spend on frame
-	double         time;
-
-	// image data
-	unsigned char* data;
-
-	// size
-	size_t         size;
-};
-
-
-struct image_t
-{
-	int                          width;
-	int                          height;
-
-	int                          bit_depth;
-	int                          pitch;
-	int                          bytes_per_pixel;
-	int                          channels;
-	GLint                        format;
-
-	int                          loop_count;
-	// std::vector< image_frame_t > frame;
-	std::vector< u8* >           frame;
-
-	// TEMP until image_frame_t is used
-	size_t                       frame_size;
-
-	char*                        image_format;
-};
-
-
-struct image_load_info_t
-{
-	// Image frame, this will be reused if valid frame, result is also stored in here
-	image_t* image;
-
-	// When not 0, The codec will load the smallest version of an image that's larger than this resolution
-	ImVec2   target_size;
-
-	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
-	bool     load_quick;
-
-	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
-	bool     thumbnail_load;
-
-	// Is this being loaded from a thread?
-	bool     threaded_load;
-
-	// Only load the first frame of this image, usually for thumbnails
-	bool     single_frame;
-
-	// No error printing!
-	bool     quiet;
-};
-
-
-struct IImageLoader
-{
-	virtual bool     check_extension( std::string_view ext )                                                       = 0;
-	virtual bool     check_header( const fs::path& path )                                                          = 0;
-
-	// Load the smallest version of an image that's larger than the inputted size
-	//virtual bool     image_load_scaled( const fs::path& path, image_t* image_info, int area_width, int area_height ) = 0;
-
-	virtual bool     image_load( const fs::path& path, image_load_info_t& load_info, char* data, size_t data_len ) = 0;
-	//virtual image_t* image_load( const fs::path& path )                                                              = 0;
-};
-
-
-void image_register_codec( IImageLoader* codec, bool fallback );
-
-// Load an image from disk or from memory
-// If nothing is passed in for file_data and data_len, it loads the file internally
-bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_data = nullptr, size_t data_len = 0 );
-
-// not seprate files to check the extension of path still
-// bool image_load_from_memory( image_load_info_t& load_info, char* file_data, size_t file_len );
-// bool image_load( image_load_info_t& load_info, const fs::path& path );
-
-// Free all image data
-void image_free( image_t& image );
-
-// Free only frames
-void image_free_frames( image_t& image );
-
-// Free only frames and allocations
-void image_free_alloc( image_t& image );
-
-bool media_check_extension( std::string_view ext );
-bool image_check_extension( std::string_view ext );
-bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int new_height );
-
-
-// TODO: add image load functions here
-// - add animated image support
-// - add color profile support (PAIN)
-// - split it into reading the file first, passing it into each codec to check the header, if valid, load the rest of the image
-
-
-// ---------------------------------------------------------
 
 
 enum e_media_type
@@ -178,6 +71,82 @@ enum e_gallery_sort_mode
 	// TODO: add resolution size, large to small
 
 	e_gallery_sort_mode_count,
+};
+
+
+// ---------------------------------------------------------
+
+
+struct image_frame_t
+{
+	// time to spend on frame
+	double         time;
+
+	// image data
+	unsigned char* data;
+
+	// size
+	size_t         size;
+};
+
+
+struct image_t
+{
+	int                width;
+	int                height;
+
+	int                bit_depth;
+	int                pitch;
+	int                bytes_per_pixel;
+	int                channels;
+	GLint              format;
+
+	int                loop_count;
+	// std::vector< image_frame_t > frame;
+	std::vector< u8* > frame;
+
+	// TEMP until image_frame_t is used
+	size_t             frame_size;
+
+	char*              image_format;
+};
+
+
+struct image_load_info_t
+{
+	// Image frame, this will be reused if valid frame, result is also stored in here
+	image_t* image;
+
+	// When not 0, The codec will load the smallest version of an image that's larger than this resolution
+	ImVec2   target_size;
+
+	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
+	bool     load_quick;
+
+	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
+	bool     thumbnail_load;
+
+	// Is this being loaded from a thread?
+	bool     threaded_load;
+
+	// Only load the first frame of this image, usually for thumbnails
+	bool     single_frame;
+
+	// No error printing!
+	bool     quiet;
+};
+
+
+struct IImageLoader
+{
+	virtual bool check_extension( std::string_view ext )                                                       = 0;
+	virtual bool check_header( const fs::path& path )                                                          = 0;
+
+	// Load the smallest version of an image that's larger than the inputted size
+	//virtual bool     image_load_scaled( const fs::path& path, image_t* image_info, int area_width, int area_height ) = 0;
+
+	virtual bool image_load( const fs::path& path, image_load_info_t& load_info, char* data, size_t data_len ) = 0;
+	//virtual image_t* image_load( const fs::path& path )                                                              = 0;
 };
 
 
@@ -372,6 +341,40 @@ void                                 gl_free_texture( GLuint texture );
 
 void                                 config_reset();
 bool                                 config_load();
+
+
+// ---------------------------------------------------------
+// codec handler
+
+
+void image_register_codec( IImageLoader* codec, bool fallback );
+
+// Load an image from disk or from memory
+// If nothing is passed in for file_data and data_len, it loads the file internally
+bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_data = nullptr, size_t data_len = 0 );
+
+// not seprate files to check the extension of path still
+// bool image_load_from_memory( image_load_info_t& load_info, char* file_data, size_t file_len );
+// bool image_load( image_load_info_t& load_info, const fs::path& path );
+
+// Free all image data
+void image_free( image_t& image );
+
+// Free only frames
+void image_free_frames( image_t& image );
+
+// Free only frames and allocations
+void image_free_alloc( image_t& image );
+
+bool media_check_extension( std::string_view ext, e_media_type& type );
+bool image_check_extension( std::string_view ext );
+bool image_downscale( image_t* old_image, image_t* new_image, int new_width, int new_height );
+
+
+// TODO: add image load functions here
+// - add animated image support
+// - add color profile support (PAIN)
+// - split it into reading the file first, passing it into each codec to check the header, if valid, load the rest of the image
 
 
 // ---------------------------------------------------------
