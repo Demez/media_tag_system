@@ -10,7 +10,7 @@ set( CMAKE_SHARED_LIBRARY_PREFIX "" )
 
 option( MIMALLOC "Use mimalloc" OFF )
 
-project( media_tag_system_proj )
+project( media_tag_system )
 
 set( PROJ_OBJ "obj" )
 set( PROJ_OUT "${CMAKE_CURRENT_LIST_DIR}/out" )
@@ -34,6 +34,11 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 # Compiler/Platform specifc options
 if ( MSVC )
+	# Sets the subsystem to Windows
+	# set( CMAKE_WIN32_EXECUTABLE ON )
+
+	# sets main function to int main() instead of WinMain()
+	# set( CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup )
 
 	add_compile_definitions(
 		_AMD64_ __x86_64 __amd64
@@ -129,6 +134,8 @@ if ( MSVC )
 	)
 	
 	add_link_options(
+		"/SUBSYSTEM:WINDOWS"
+		"/ENTRY:mainCRTStartup"
 		# "/INCREMENTAL"
 	)
 
@@ -305,10 +312,7 @@ else()
 	add_compile_definitions( USE_MIMALLOC=0 )
 endif()
 
-add_executable( media_tag_system ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
-
-target_link_libraries(
-	media_tag_system PRIVATE
+link_libraries(
 	freetype
 	nfd
 	SDL3
@@ -323,12 +327,11 @@ target_link_libraries(
 )
 
 if ( MIMALLOC )
-	target_link_libraries( media_tag_system PRIVATE mimalloc )
-	target_link_directories( media_tag_system PRIVATE "thirdparty/mimalloc/out/msvc-x64/Release" )
+	link_libraries( mimalloc )
+	link_directories( "thirdparty/mimalloc/out/msvc-x64/Release" )
 endif()
 
-target_link_directories(
-	media_tag_system PRIVATE
+link_directories(
 	"thirdparty/nativefiledialog/build/src"
 	"thirdparty/mozjpeg/build"
 	"thirdparty/libspng/build"
@@ -337,31 +340,26 @@ target_link_directories(
 )
 
 if ( WIN32 )
-	target_link_directories(
-		media_tag_system PRIVATE
+	link_directories(
 		"thirdparty/libspng/build/Release"
 		"thirdparty/libfyaml/build/Release"
 		"thirdparty/libjxl/build/lib/Release"
 		"thirdparty/SDL3/lib/x64"
 	)
-	target_link_libraries(
-		media_tag_system PRIVATE
+	link_libraries(
 		turbojpeg-static
 	)
 elseif( LINUX )
-	target_link_directories(
-		media_tag_system PRIVATE
+	link_directories(
 	)
-	target_link_libraries(
-		media_tag_system PRIVATE
+	link_libraries(
 		turbojpeg
 		stdc++exp
 	)
 endif()
 
 foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
-	target_link_directories(
-		media_tag_system PRIVATE
+	link_directories(
 		"${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static"
 		"thirdparty/nativefiledialog/build/src/${OUTPUT_CONFIG}"
 		"thirdparty/mozjpeg/build/${OUTPUT_CONFIG}"
@@ -370,10 +368,28 @@ foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	)
 endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 
+add_executable( media_tag_system ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
+
+if ( WIN32 )
+	add_executable( media_tag_system_con ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
+
+	target_link_options(
+		media_tag_system_con PRIVATE
+		"/SUBSYSTEM:CONSOLE"
+	)
+
+	set_target_properties(
+		media_tag_system_con PROPERTIES
+		SUFFIX ".com"
+		RUNTIME_OUTPUT_NAME "media_tag_system"
+		PDB_NAME "media_tag_system_con"
+	)
+endif()
+
 source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}/src
 	PREFIX "Source Files"
-	FILES ${SRC_FILES} ${FREETYPE_IMGUI_SRC}
+	FILES ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC}
 )
 
 source_group(
