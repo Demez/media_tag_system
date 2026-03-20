@@ -332,7 +332,7 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 	u8* resized_frame = (u8*)stbir_resize(
 	  old_frame, old_image->width, old_image->height, 0,
 	  nullptr, new_width, new_height, 0,
-      pixel_layout, datatype, STBIR_EDGE_WRAP, STBIR_FILTER_DEFAULT );
+	  pixel_layout, datatype, STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT );
 
 	if ( !resized_frame )
 		return false;
@@ -342,7 +342,7 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 	new_image->frame[ 0 ]      = resized_frame;
 	new_image->width           = new_width;
 	new_image->height          = new_height;
-	new_image->pitch           = new_width * 4;
+	new_image->pitch           = new_width * old_image->channels;
 	new_image->frame_size      = new_width * new_height * old_image->channels;
 	new_image->bit_depth       = 4;
 	new_image->bytes_per_pixel = 4;
