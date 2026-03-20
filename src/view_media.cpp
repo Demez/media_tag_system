@@ -123,7 +123,7 @@ void media_view_scale_check_timer( float frame_time )
 	if ( g_scale_state == e_scale_state_finished )
 	{
 		// Are we drawing the image smaller than native size?
-		if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
+		if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) || round(image_draw::size.x) != g_image_data.image.width )
 		{
 			// Does the scaled image size match the size we draw it as?
 			if ( int(image_draw::size.x) != g_image_scaled_data.image.width )
@@ -373,7 +373,8 @@ void media_view_draw_media_info()
 
 		ImGui::Text( "Scale Thread State: %d - %s", g_scale_state, g_scale_state_str[ g_scale_state ] );
 		ImGui::Text( "Scale Thread Timer: %.3f", g_scale_timer );
-		ImGui::Text( "Scaled: %.0fx%.0f", image_draw::size.x, image_draw::size.y );
+		ImGui::Text( "Scaled: %dx%d", g_image_scaled_data.image.width, g_image_scaled_data.image.height );
+		ImGui::Text( "Render Size: %.0fx%.0f", image_draw::size.x, image_draw::size.y );
 
 		ImGui::SeparatorText( "Image Info" );
 
@@ -382,6 +383,7 @@ void media_view_draw_media_info()
 
 		ImGui::Text( "Type: %s", g_image_data.image.image_format );
 		ImGui::Text( "Frame Count: %d", g_image_data.image.frame.size() );
+		ImGui::Text( "Channels: %d", g_image_data.image.channels );
 
 		switch ( g_image_data.image.format )
 		{
@@ -396,6 +398,9 @@ void media_view_draw_media_info()
 				break;
 			case GL_RGBA16:
 				ImGui::TextUnformatted( "GL Format: RGBA16" );
+				break;
+			case GL_LUMINANCE:
+				ImGui::TextUnformatted( "GL Format: LUMINANCE" );
 				break;
 		}
 	}
@@ -1062,6 +1067,11 @@ static void media_view_draw_image()
 		dst_rect.h = -image_draw::size.y;
 		dst_rect.y += image_draw::size.y;
 	}
+
+	dst_rect.w = round( dst_rect.w );
+	dst_rect.h = round( dst_rect.h );
+	dst_rect.x = round( dst_rect.x );
+	dst_rect.y = round( dst_rect.y );
 
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
