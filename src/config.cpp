@@ -343,7 +343,6 @@ bool config_load()
 
 		app::config.thumbnail_jxl_distance = std::clamp( app::config.thumbnail_jxl_distance, -1.f, 25.f );
 		app::config.thumbnail_jxl_effort   = std::clamp( app::config.thumbnail_jxl_effort, 0U, 11U );
-		app::config.thumbnail_jxl_enable   = std::clamp( app::config.thumbnail_jxl_enable, 0U, 1U );
 	}
 
 	// =====================================================================================================================
@@ -352,6 +351,7 @@ bool config_load()
 	config_get_doc_value( fyd, "/no-video %u", app::config.no_video );
 	config_get_doc_value( fyd, "/no-focus-sleep-time %u", app::config.no_focus_sleep_time );
 	config_get_doc_value( fyd, "/gallery-show-filenames %u", app::config.gallery_show_filenames );
+	config_get_doc_value( fyd, "/always-draw %u", app::config.always_draw );
 
 	app::config.vsync = std::clamp( app::config.vsync, -1, 1 );
 

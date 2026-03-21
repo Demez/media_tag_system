@@ -195,7 +195,7 @@ void media_view_shutdown()
 }
 
 
-static e_media_type get_media_type()
+e_media_type get_media_type()
 {
 	if ( gallery::sorted_media.size() <= gallery::cursor )
 		return e_media_type_none;
@@ -331,6 +331,7 @@ void media_view_scroll_zoom( float scroll )
 	media_view_scale_reset_timer();
 
 	image_draw::zoom_mode = e_zoom_mode_fixed;
+	app::draw_frame       = true;
 }
 
 
@@ -413,6 +414,9 @@ void media_view_context_menu()
 {
 	if ( !ImGui::BeginPopupContextVoid( "main ctx menu" ) )
 		return;
+
+	// hack lol
+	// app::draw_frame          = true;
 
 	ImGuiStyle& style        = ImGui::GetStyle();
 	ImVec2      region_avail = ImGui::GetContentRegionAvail();
@@ -628,12 +632,15 @@ void media_view_input()
 		{
 			gl_update_texture( g_image_scaled_data.texture, &g_image_scaled_data.image );
 			printf( "Scaled Main Image\n" );
-			g_scale_state = e_scale_state_finished;
+			g_scale_state   = e_scale_state_finished;
+			app::draw_frame = true;
+
 		}
 		else
 		{
 			printf( "SCALE MISMATCH\n" );
-			g_scale_state = e_scale_state_idle;
+			g_scale_state   = e_scale_state_idle;
+			app::draw_frame = true;
 		}
 	}
 
@@ -679,6 +686,7 @@ void media_view_input()
 
 	if ( g_image_pan )
 	{
+		app::draw_frame = true;
 		image_draw::pos.x += app::mouse_delta[ 0 ];
 		image_draw::pos.y += app::mouse_delta[ 1 ];
 	}
@@ -753,6 +761,8 @@ void media_view_load()
 	update_window_title();
 
 	media_view_scale_reset_timer();
+
+	app::draw_frame = true;
 }
 
 
@@ -792,6 +802,9 @@ void media_view_draw_video_controls()
 	if ( !g_mpv )
 		return;
 
+	//if ( !g_mpv_video_ready )
+	//	return;
+
 	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
 
 	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !mouse_hover_imgui_window && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
@@ -825,9 +838,22 @@ void media_view_draw_video_controls()
 
 	// check if mouse in rectangle
 
+	static bool  was_drawing_controls = false;
+
 	static float controls_height = 50.f;
-	if ( !mouse_in_rect( { 0.f, height - (80.f + (controls_height * 2)) }, { (float)width, (float)height } ) )
+	if ( !mouse_in_rect( { 0.f, height - ( 80.f + ( controls_height * 2 ) ) }, { (float)width, (float)height } ) )
+	{
+		if ( was_drawing_controls )
+			app::draw_frame = true;
+
+		was_drawing_controls = false;
 		return;
+	}
+
+	if ( !was_drawing_controls )
+		app::draw_frame = true;
+
+	was_drawing_controls = true;
 
 	// ----------------------------------------
 

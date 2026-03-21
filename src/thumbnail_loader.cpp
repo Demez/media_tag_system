@@ -774,6 +774,8 @@ void thumbnail_loader_update()
 			image_free_alloc( *thumbnail.image );
 
 			thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
+
+			app::draw_frame = true;
 		}
 
 		if ( thumbnail.texture )

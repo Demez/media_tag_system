@@ -19,7 +19,8 @@ static char*                      g_current_video = nullptr;
 
 s64                               g_video_width = 0, g_video_height = 0;
 
-bool                              g_scale_up_video = true;
+bool                              g_scale_up_video  = true;
+bool                              g_mpv_video_ready = false;
 
 
 static std::vector< std::string > g_mpv_exts;
@@ -236,6 +237,9 @@ void mpv_draw_frame()
 {
 	if ( !g_mpv )
 		return;
+
+	//if ( !g_mpv_video_ready )
+	//	return;
 
 	//if ( g_mpv_redraw )
 	mpv_update_frame();
@@ -464,8 +468,8 @@ static void on_mpv_render_update( void* ctx )
 
 static void on_mpv_events( void* ctx )
 {
-	SDL_Event event = {.type = g_wakeup_on_mpv_events};
-	SDL_PushEvent(&event);
+	//SDL_Event event = {.type = g_wakeup_on_mpv_events};
+	//SDL_PushEvent(&event);
 }
 
 
@@ -478,19 +482,23 @@ void mpv_sdl_event( SDL_Event& event )
 		if ( flags & MPV_RENDER_UPDATE_FRAME )
 			g_mpv_redraw = true;
 	}
-	else if ( event.type == g_wakeup_on_mpv_events )
+	else
+#endif
+#if 0
+	if ( event.type == g_wakeup_on_mpv_events )
 	{
 		// Handle all remaining mpv events.
-		while ( true )
-		{
-			mpv_event *mp_event = p_mpv_wait_event( g_mpv, 0 );
 
-			if (mp_event->event_id == MPV_EVENT_NONE)
+		mpv_event* event = p_mpv_wait_event( g_mpv, 0 );
+
+		while ( event->event_id != MPV_EVENT_NONE )
+		{
+			if ( event->event_id == MPV_EVENT_NONE )
 				break;
 
-			if (mp_event->event_id == MPV_EVENT_LOG_MESSAGE)
+			if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
 			{
-				mpv_event_log_message* msg = (mpv_event_log_message*)mp_event->data;
+				mpv_event_log_message* msg = (mpv_event_log_message*)event->data;
 				// Print log messages about DR allocations, just to
 				// test whether it works. If there is more than 1 of
 				// these, it works. (The log message can actually change
@@ -501,7 +509,17 @@ void mpv_sdl_event( SDL_Event& event )
 				continue;
 			}
 
-			printf("MPV EVENT: %s\n", p_mpv_event_name(mp_event->event_id));
+			else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
+			{
+				// Video Loaded
+				app::draw_frame = true;
+				g_mpv_video_ready = true;
+				continue;
+			}
+
+			event = p_mpv_wait_event( g_mpv, 0 );
+
+			printf( "MPV EVENT: %s\n", p_mpv_event_name( event->event_id ) );
 		}
 	}
 #endif
@@ -689,6 +707,12 @@ void mpv_handle_wait_event( mpv_handle* mpv, double timeout, const char* prefix 
 				printf( "MPV: [%s] %s: %s", msg->prefix, msg->level, msg->text );
 			}
 		}
+		if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
+		{
+			// Video Loaded
+			app::draw_frame = true;
+			g_mpv_video_ready = true;
+		}
 
 		event = p_mpv_wait_event( mpv, timeout );
 	}
@@ -765,15 +789,49 @@ void mpv_cmd_loadfile( const char* file )
 	printf( "loading file: %s\n", file );
 
 	const char* cmd[]   = { "loadfile", file, NULL };
-	int         cmd_ret = p_mpv_command( g_mpv, cmd );
+	int         cmd_ret = p_mpv_command_async( g_mpv, NULL, cmd );
+
+	g_mpv_video_ready   = false;
 
 	// mpv_event*  event   = p_mpv_wait_event( g_mpv, 0.1f );
-	mpv_handle_wait_event( g_mpv, 0.1f );
+	// mpv_handle_wait_event( g_mpv, 0.1f );
 
-	if ( g_current_video != nullptr )
-		ch_free_str( g_current_video );
+	ch_free_str( g_current_video );
+	g_current_video  = nullptr;
 
+	mpv_event* event = p_mpv_wait_event( g_mpv, -1 );
+
+	while ( event->event_id != MPV_EVENT_NONE )
+	{
+		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
+		{
+			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
+			printf( "[%s] %s: %s", msg->prefix, msg->level, msg->text );
+		}
+		else if ( event->event_id == MPV_EVENT_COMMAND_REPLY )
+		{
+			if ( event->error != 0 )
+			{
+				printf( "failed to load video - %d\n", event->error );
+				return;
+			}
+
+			// Video Loaded
+			//break;
+		}
+		else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
+		{
+			// Video Loaded
+			break;
+		}
+
+		event = p_mpv_wait_event( g_mpv, -1 );
+	}
+
+	// Video Loaded
 	g_current_video = util_strdup( file );
+
+	app::draw_frame = true;
 
 	// or use video-params?
 //	p_mpv_get_property( g_mpv, "width", MPV_FORMAT_INT64, &g_video_width );
@@ -790,6 +848,11 @@ void mpv_cmd_close_video()
 
 	const char* cmd[]   = { "stop", NULL };
 	int         cmd_ret = p_mpv_command_async( g_mpv, NULL, cmd );
+
+	ch_free_str( g_current_video );
+	g_current_video   = nullptr;
+
+	g_mpv_video_ready = false;
 }
 
 
@@ -821,31 +884,5 @@ void mpv_cmd_seek_offset( double seconds )
 
 	const char* cmd[]   = { "seek", time_pos_str, "absolute", NULL };
 	int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-}
-
-
-void mpv_cmd_hook_window( void* window )
-{
-	if ( !g_mpv )
-		return;
-
-	int64_t wid = (s64)window;
-	int ret = p_mpv_set_property( g_mpv, "wid", MPV_FORMAT_INT64, &wid );
-
-	printf( "hooked window idk\n" );
-}
-
-
-void mpv_cmd_hook_window_mpv()
-{
-	//int64_t wid = (s64)g_mpv_window;
-	//int     ret = p_mpv_set_property( g_mpv, "wid", MPV_FORMAT_INT64, &wid );
-	//printf( "hooked mpv window idk\n" );
-}
-
-
-void mpv_handle_error( int )
-{
-	//p_mpv_error_string()
 }
 

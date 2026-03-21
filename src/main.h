@@ -97,7 +97,7 @@ struct app_config_t
 
 	bool                      thumbnail_use_fixed_size    = false;
 
-	u32                       thumbnail_jxl_enable        = 0;
+	bool                      thumbnail_jxl_enable        = true;
 	float                     thumbnail_jxl_distance      = 4;
 	u32                       thumbnail_jxl_effort        = 6;
 
@@ -105,9 +105,11 @@ struct app_config_t
 	std::string               thumbnail_video_cache_path{};
 
 	int                       vsync                  = 1;
-	u32                       no_focus_sleep_time    = 8;
-	bool                      no_video               = 0;
-	bool                      gallery_show_filenames = 0;
+	u32                       no_focus_sleep_time    = 5;
+	u32                       focus_sleep_time       = 1;
+	bool                      no_video               = false;
+	bool                      gallery_show_filenames = false;
+	bool                      always_draw            = false;
 };
 
 
@@ -253,14 +255,14 @@ namespace app
 
 	extern ImVec2       mouse_delta;
 	extern ImVec2       mouse_pos;
-
-	// imgui scroll hack lol
-	extern bool         mouse_scrolled_up;
-	extern bool         mouse_scrolled_down;
+	extern int          mouse_scroll;
 
 	extern ImVec4       clear_color;
 
 	extern app_config_t config;
+
+	extern bool         draw_frame;
+	extern bool         draw_next_frame;
 }
 
 
@@ -321,6 +323,8 @@ namespace media
 
 extern bool                          g_gallery_view;
 
+extern bool                          g_mpv_video_ready;
+
 // Main Image
 extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
@@ -329,6 +333,7 @@ extern main_image_data_t             g_image_scaled_data;
 void                                 media_view_init();
 void                                 media_view_shutdown();
 void                                 media_view_scale_check_timer( float frame_time );
+e_media_type                         get_media_type();
 
 // Load currently selected file, does not change view type though
 void                                 media_view_load();

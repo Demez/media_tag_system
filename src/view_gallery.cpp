@@ -396,14 +396,17 @@ void gallery_view_scroll_to_cursor()
 // doesn't want to work
 void gallery_view_context_menu()
 {
-	static bool ctx_open = false;
-	if ( !ctx_open  && !ImGui::IsMouseClicked( ImGuiMouseButton_Right ) )
-		return;
+	//static bool ctx_open = false;
+	//if ( !ctx_open  && !ImGui::IsMouseClicked( ImGuiMouseButton_Right ) )
+	//	return;
 
-	ctx_open = true;
+	//ctx_open = true;
 
-	if ( !ImGui::BeginPopup( "##gallery ctx menu" ) )
-		return;
+	// if ( !ImGui::BeginPopup( "##gallery ctx menu" ) )
+	// 	return;
+
+	if ( !ImGui::BeginPopupContextVoid( "##gallery ctx menu", ImGuiPopupFlags_AnyPopup ) )
+	 	return;
 
 	ImGuiStyle& style        = ImGui::GetStyle();
 	ImVec2      region_avail = ImGui::GetContentRegionAvail();
@@ -411,7 +414,7 @@ void gallery_view_context_menu()
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
 	{
 		sys_browse_to_file( gallery_item_get_path_string( gallery::cursor ).c_str() );
-		ctx_open = false;
+		//ctx_open = false;
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -462,7 +465,7 @@ void gallery_view_context_menu()
 	if ( ImGui::MenuItem( "Reload Folder", nullptr, false ) )
 	{
 		folder_load_media_list();
-		ctx_open = false;
+		//ctx_open = false;
 	}
 
 	ImGui::Separator();
@@ -632,11 +635,12 @@ void gallery_view_draw_content()
 		float scroll = ImGui::GetScrollY();
 		float scroll_amount = item_size_y + style.ItemSpacing.y;
 		
-		if ( app::mouse_scrolled_up )
-			scroll -= scroll_amount;
-
-		else if ( app::mouse_scrolled_down )
-			scroll += scroll_amount;
+		if ( app::mouse_scroll != 0 )
+		{
+			scroll -= scroll_amount * app::mouse_scroll;
+			app::draw_frame      = true;
+			app::draw_next_frame = true;
+		}
 
 		if ( app::window_resized )
 		{
@@ -651,19 +655,23 @@ void gallery_view_draw_content()
 
 	// ----------------------------------------------------------------------------------------------------------
 
-	ImVec2 image_bounds      = { item_size_x - ( style.WindowPadding.x * 2 ), item_size_x - ( style.WindowPadding.x * 2 ) };
-	gallery::image_size     = image_bounds.x;
+	ImVec2 image_bounds                 = { item_size_x - ( style.WindowPadding.x * 2 ), item_size_x - ( style.WindowPadding.x * 2 ) };
+	gallery::image_size                 = image_bounds.x;
 
-	ImVec2 image_icon_bounds = { image_bounds.x / 4.f, image_bounds.y / 4.f };
+	ImVec2        image_icon_bounds     = { image_bounds.x / 4.f, image_bounds.y / 4.f };
 
 	ImVec2        last_cursor_pos       = ImGui::GetCursorPos();
-	float         last_grid_row_y = ImGui::GetCursorPos().y;
+	float         last_grid_row_y       = ImGui::GetCursorPos().y;
 
-	ImDrawList*   draw_list         = ImGui::GetWindowDrawList();
+	ImDrawList*   draw_list             = ImGui::GetWindowDrawList();
 
-	float         last_max_item_height = item_size_y;
+	float         last_max_item_height  = item_size_y;
 
 	ImVec2        controlled_cursor_pos = ImGui::GetCursorPos();
+
+	static size_t last_hovered          = SIZE_MAX;
+	static size_t last_selected         = SIZE_MAX;
+	bool          any_item_hovered      = false;
 
 	// ----------------------------------------------------------------------------------------------------------
 
@@ -674,7 +682,7 @@ void gallery_view_draw_content()
 
 		float                scroll        = ImGui::GetScrollY();
 
-		ImVec2                media_text_size{};
+		ImVec2               media_text_size{};
 
 		if ( app::config.gallery_show_filenames )
 		{
@@ -698,9 +706,6 @@ void gallery_view_draw_content()
 
 		if ( current_item_size_y > last_max_item_height )
 			last_max_item_height = current_item_size_y;
-
-		ImGui::SetNextWindowSize( { item_size_x, current_item_size_y } );
-		ImGui::SetNextWindowSizeConstraints( { item_size_x, item_size_x }, { -1.f, -1.f } );
 
 		if ( grid_pos_x == gallery::row_count )
 		{
@@ -774,6 +779,9 @@ void gallery_view_draw_content()
 
 				ImGui::SetScrollY( ImGui::GetScrollY() + scroll_offset );
 			}
+
+			app::draw_frame      = true;
+			app::draw_next_frame = true;
 		}
 
 		// ----------------------------------------------------------------------------------------------------------
@@ -802,6 +810,25 @@ void gallery_view_draw_content()
 
 		if ( content_area_hovered )
 			item_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + current_item_size_y } );
+
+		any_item_hovered |= item_hovered;
+
+		if ( selected_item && !item_hovered && i == last_hovered )
+		{
+			app::draw_frame = true;
+		}
+
+		if ( item_hovered && i != last_hovered )
+		{
+			last_hovered = i;
+			app::draw_frame = true;
+		}
+
+		if ( selected_item && i != last_selected )
+		{
+			last_selected   = i;
+			app::draw_frame = true;
+		}
 
 		// Draw a background if needed
 		if ( selected_item || item_hovered )
@@ -993,6 +1020,12 @@ void gallery_view_draw_content()
 	}
 
 	ImGui::EndChild();
+
+	if ( !any_item_hovered && last_hovered != SIZE_MAX )
+	{
+		last_hovered    = SIZE_MAX;
+		app::draw_frame = true;
+	}
 
 	// ----------------------------------------------------------------------------------------------------------
 	

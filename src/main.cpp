@@ -26,10 +26,10 @@ namespace app
 
 	ImVec2       mouse_delta;
 	ImVec2       mouse_pos;
+	int          mouse_scroll    = 0;
 
-	// imgui scroll hack lol
-	bool         mouse_scrolled_up;
-	bool         mouse_scrolled_down;
+	bool         draw_frame      = false;
+	bool         draw_next_frame = false;
 
 	app_config_t config{};
 }
@@ -308,7 +308,10 @@ void imgui_draw( float frame_time )
 
 	notification_draw( frame_time );
 
-	ImGui::Render();
+	if ( app::draw_frame )
+		ImGui::Render();
+	else
+		ImGui::EndFrame();
 }
 
 
@@ -535,6 +538,8 @@ void frame_draw_end()
 // called initially on startup and on window resize
 void window_quick_draw()
 {
+	app::draw_frame = true;
+
 	frame_draw_start();
 
 	imgui_draw( app::frame_time );
@@ -545,6 +550,8 @@ void window_quick_draw()
 	// mpv_window_resize();
 
 	frame_draw_end();
+
+	app::draw_frame = false;
 }
 
 
@@ -576,12 +583,11 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 // Handle SDL3 Events
 bool handle_events()
 {
-	app::mouse_scrolled_up   = false;
-	app::mouse_scrolled_down = false;
-	app::window_resized      = false;
+	app::mouse_scroll     = 0;
+	app::window_resized   = false;
 
-	app::mouse_delta[ 0 ]    = 0.f;
-	app::mouse_delta[ 1 ]    = 0.f;
+	app::mouse_delta[ 0 ] = 0.f;
+	app::mouse_delta[ 1 ] = 0.f;
 
 	g_drag_drop_files.clear();
 
@@ -596,11 +602,18 @@ bool handle_events()
 				mpv_sdl_event( event );
 				break;
 
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			case SDL_EVENT_MOUSE_BUTTON_UP:
+			case SDL_EVENT_KEY_DOWN:
+			case SDL_EVENT_KEY_UP:
+				app::draw_frame      = true;
+				app::draw_next_frame = true;
+				break;
+
 			case SDL_EVENT_MOUSE_WHEEL:
-				if ( event.wheel.integer_y > 0 )
-					app::mouse_scrolled_up = true;
-				else
-					app::mouse_scrolled_down = true;
+				app::draw_frame      = true;
+				app::draw_next_frame = true;
+				app::mouse_scroll += event.wheel.integer_y;
 
 				media_view_scroll_zoom( event.wheel.integer_y );
 				break;
@@ -610,6 +623,7 @@ bool handle_events()
 				app::mouse_pos[ 1 ] = event.motion.y;
 				app::mouse_delta[ 0 ] += event.motion.xrel;
 				app::mouse_delta[ 1 ] += event.motion.yrel;
+				// app::draw_frame = true;
 				break;
 
 			case SDL_EVENT_WINDOW_RESIZED:
@@ -618,7 +632,8 @@ bool handle_events()
 				ImGui::GetIO().DisplaySize.x    = width;
 				ImGui::GetIO().DisplaySize.y    = height;
 
-				app::window_resized = true;
+				app::window_resized             = true;
+				app::draw_frame                 = true;
 				media_view_window_resize();
 				gallery_view_scroll_to_cursor();
 				mpv_window_resize();
@@ -626,6 +641,7 @@ bool handle_events()
 
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
 				app::window_focused = true;
+				app::draw_frame     = true;
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
@@ -646,6 +662,7 @@ bool handle_events()
 			// Current set of drops is now complete (NULL filename)
 			case SDL_EVENT_DROP_COMPLETE:
 			{
+				app::draw_frame = true;
 				if ( drag_drop_recieve_func( g_drag_drop_files ) )
 					SDL_RaiseWindow( app::window );
 
@@ -654,16 +671,71 @@ bool handle_events()
 
 			// Position while moving over the window
 			case SDL_EVENT_DROP_POSITION:
+				app::draw_frame = true;
 				break;
 
 			case SDL_EVENT_QUIT:
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+				app::draw_frame = true;
 				app::running = false;
 				return true;
 		}
 	}
 
 	return false;
+}
+
+
+void check_need_draw( bool playing_back_video )
+{
+	if ( app::config.always_draw )
+	{
+		app::draw_frame = true;
+		return;
+	}
+
+	ImGuiContext* ctx = ImGui::GetCurrentContext();
+	ImGuiIO&      io  = ImGui::GetIO();
+
+	// hack
+	if ( app::draw_next_frame )
+	{
+		app::draw_frame      = true;
+		app::draw_next_frame = false;
+	}
+
+	// Check if a popup was opened or closed
+	static bool popup_open_last = false;
+	bool        popup_open      = ImGui::IsPopupOpen( "", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel );
+
+	app::draw_frame |= ( popup_open_last != popup_open );
+
+	popup_open_last = popup_open;
+
+	if ( ctx->ActiveIdHasBeenEditedThisFrame || ctx->NavActivateFlags != 0 || ctx->NavAnyRequest )
+		app::draw_frame = true;
+
+	if ( ctx->HoveredId != ctx->HoveredIdPreviousFrame )
+		app::draw_frame = true;
+
+	if ( ctx->ActiveId != ctx->ActiveIdPreviousFrame )
+		app::draw_frame = true;
+
+	if ( ctx->WantTextInputNextFrame || ctx->WantCaptureKeyboardNextFrame != -1 )
+		app::draw_frame = true;
+
+	//if ( ctx->WantCaptureMouseNextFrame )
+	//	app::draw_frame = true;
+
+	//if ( io.WantCaptureMouse != ( ctx->WantCaptureMouseNextFrame == -1 ) )
+	//	app::draw_frame = true;
+
+	if ( io.WantTextInput || io.WantCaptureKeyboard /*|| io.WantCaptureMouse || !io.WantCaptureMouseUnlessPopupClose*/ || io.WantSetMousePos )
+		app::draw_frame = true;
+
+	// Always draw on video playback
+	if ( playing_back_video )
+		app::draw_frame = true;
 }
 
 
@@ -686,7 +758,7 @@ void main_loop()
 		{
 			media_entry_t entry = gallery_item_get_media_entry( gallery::cursor );
 
-			if ( entry.type == e_media_type_video )
+			if ( entry.type == e_media_type_video /*&& g_mpv_video_ready*/ )
 			{
 				// check mpv state (SHOULD PROBABLY TRY USING OBSERVE PROPERTY)
 				s32 paused = 0;
@@ -779,6 +851,8 @@ void main_loop()
 			continue;
 		}
 
+		check_need_draw( playing_back_video );
+
 		if ( !app::window_focused && !playing_back_video )
 		{
 			if ( app::config.no_focus_sleep_time > 0 )
@@ -800,7 +874,19 @@ void main_loop()
 
 		media_view_scale_check_timer( time );
 
-		frame_draw_end();
+		if ( app::draw_frame )
+		{
+			frame_draw_end();
+
+			if ( app::config.focus_sleep_time && app::config.always_draw )
+				SDL_Delay( app::config.focus_sleep_time );
+		}
+		else
+		{
+			SDL_Delay( 15 );
+		}
+
+		app::draw_frame = false;
 
 		// -----------------------------------------------------------------------------------
 
@@ -811,6 +897,7 @@ void main_loop()
 		{
 			icon_preload();
 			run_after_first_loop_hack = false;
+			app::draw_frame           = true;
 		}
 
 		start_time = current_time;
@@ -938,6 +1025,18 @@ int main( int argc, char* argv[] )
 	SDL_GetWindowSize( app::window, &width, &height );
 	io.DisplaySize.x   = width;
 	io.DisplaySize.y   = height;
+
+	// Set imgui.ini path to exe directory
+	{
+		char* exe_path     = sys_get_exe_folder();
+
+		char  imgui_path[ 1024 ];
+		snprintf( imgui_path, 1024, "%s" SEP_S "imgui.ini", exe_path );
+
+		io.IniFilename = util_strdup( imgui_path );
+
+		free( exe_path );
+	}
 
 	style_imgui();
 
