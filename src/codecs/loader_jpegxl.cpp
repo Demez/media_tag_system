@@ -81,7 +81,7 @@ struct LoaderJXL: public IImageLoader
 		// if ( JXL_DEC_SUCCESS != JxlDecoderSubscribeEvents( dec.get(), JXL_DEC_BASIC_INFO | JXL_DEC_COLOR_ENCODING | JXL_DEC_FULL_IMAGE ) )
 		if ( JXL_DEC_SUCCESS != JxlDecoderSubscribeEvents( dec.get(), JXL_DEC_BASIC_INFO | JXL_DEC_FULL_IMAGE ) )
 		{
-			fprintf( stderr, "JxlDecoderSubscribeEvents failed\n" );
+			printf( "JxlDecoderSubscribeEvents failed\n" );
 			return false;
 		}
 
@@ -97,7 +97,7 @@ struct LoaderJXL: public IImageLoader
 																 JxlResizableParallelRunner,
 																 runner.get() ) )
 			{
-				fprintf( stderr, "JxlDecoderSetParallelRunner failed\n" );
+				printf( "JxlDecoderSetParallelRunner failed\n" );
 				return false;
 			}
 		//}
@@ -121,23 +121,27 @@ struct LoaderJXL: public IImageLoader
 
 			if ( status == JXL_DEC_ERROR )
 			{
-				fprintf( stderr, "Decoder error\n" );
+				printf( "Decoder error\n" );
 				return false;
 			}
 			else if ( status == JXL_DEC_NEED_MORE_INPUT )
 			{
-				fprintf( stderr, "Error, already provided all input\n" );
+				printf( "Error, already provided all input\n" );
 				return false;
 			}
 			else if ( status == JXL_DEC_BASIC_INFO )
 			{
 				if ( JXL_DEC_SUCCESS != JxlDecoderGetBasicInfo( dec.get(), &info ) )
 				{
-					fprintf( stderr, "JxlDecoderGetBasicInfo failed\n" );
+					printf( "JxlDecoderGetBasicInfo failed\n" );
 					return false;
 				}
+
 				load_info.image->width  = info.xsize;
 				load_info.image->height = info.ysize;
+
+				if ( info.have_animation )
+					printf( "ANIMATED JXL\n" );
 
 				JxlResizableParallelRunnerSetThreads( runner.get(), JxlResizableParallelRunnerSuggestThreads( info.xsize, info.ysize ) );
 			}
@@ -147,7 +151,7 @@ struct LoaderJXL: public IImageLoader
 				size_t icc_size = 0;
 				if ( JXL_DEC_SUCCESS != JxlDecoderGetICCProfileSize( dec.get(), JXL_COLOR_PROFILE_TARGET_DATA, &icc_size ) )
 				{
-					fprintf( stderr, "JxlDecoderGetICCProfileSize failed\n" );
+					printf( "JxlDecoderGetICCProfileSize failed\n" );
 					return false;
 				}
 
@@ -156,7 +160,7 @@ struct LoaderJXL: public IImageLoader
 										  dec.get(), JXL_COLOR_PROFILE_TARGET_DATA,
 										  icc_profile.data(), icc_profile.size() ) )
 				{
-					fprintf( stderr, "JxlDecoderGetColorAsICCProfile failed\n" );
+					printf( "JxlDecoderGetColorAsICCProfile failed\n" );
 					return false;
 				}
 			}
@@ -165,23 +169,23 @@ struct LoaderJXL: public IImageLoader
 				size_t buffer_size = 0;
 				if ( JXL_DEC_SUCCESS != JxlDecoderImageOutBufferSize( dec.get(), &format, &buffer_size ) )
 				{
-					fprintf( stderr, "JxlDecoderImageOutBufferSize failed\n" );
+					printf( "JxlDecoderImageOutBufferSize failed\n" );
 					return false;
 				}
 
 				if ( load_info.image->frame.empty() )
 					load_info.image->frame.resize( 1 );
 
-				load_info.image->frame[ 0 ] = ch_realloc< u8 >( load_info.image->frame[ 0 ], buffer_size, e_mem_category_image_data );
-				load_info.image->frame_size = buffer_size * sizeof( u8 );
+				load_info.image->frame[ 0 ].data = ch_realloc< u8 >( load_info.image->frame[ 0 ].data, buffer_size, e_mem_category_image_data );
+				load_info.image->frame[ 0 ].size = buffer_size * sizeof( u8 );
 
-				memset( load_info.image->frame[ 0 ], 0, buffer_size * sizeof( u8 ) );
+				memset( load_info.image->frame[ 0 ].data, 0, buffer_size * sizeof( u8 ) );
 
-				void*  pixels_buffer = static_cast< void* >( load_info.image->frame[ 0 ] );
+				void* pixels_buffer = static_cast< void* >( load_info.image->frame[ 0 ].data );
 
 				if ( JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer( dec.get(), &format, pixels_buffer, buffer_size ) )
 				{
-					fprintf( stderr, "JxlDecoderSetImageOutBuffer failed\n" );
+					printf( "JxlDecoderSetImageOutBuffer failed\n" );
 					return false;
 				}
 			}
@@ -199,18 +203,21 @@ struct LoaderJXL: public IImageLoader
 			}
 			else
 			{
-				fprintf( stderr, "Unknown decoder status\n" );
+				printf( "Unknown decoder status\n" );
 				return false;
 			}
 		}
 
-		load_info.image->format          = GL_RGBA;
-		load_info.image->bytes_per_pixel = 4;
-		load_info.image->channels        = 4;
+		load_info.image->format            = GL_RGBA;
+		load_info.image->bytes_per_pixel   = 4;
+		load_info.image->channels          = 4;
 
 		// ?
-		load_info.image->bit_depth       = 4;
-		load_info.image->pitch           = load_info.image->width * load_info.image->bytes_per_pixel;
+		load_info.image->bit_depth         = 4;
+		load_info.image->pitch             = load_info.image->width * load_info.image->bytes_per_pixel;
+
+		load_info.image->frame[ 0 ].width  = load_info.image->width;
+		load_info.image->frame[ 0 ].height = load_info.image->height;
 
 		// the strdup is stupid lol
 		load_info.image->image_format = util_strndup_r( load_info.image->image_format, "JPEG XL", 8 );

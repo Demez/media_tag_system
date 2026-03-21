@@ -21,7 +21,7 @@ std::vector< IImageLoader* > g_codecs_backup;
 // Texture Uploading
 
 
-void gl_update_texture( GLuint texture, image_t* image )
+void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 {
 	glBindTexture( GL_TEXTURE_2D, texture );
 
@@ -44,54 +44,77 @@ void gl_update_texture( GLuint texture, image_t* image )
 	//glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
 	//glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 
+	int width  = image->frame[ frame_i ].width;
+	int height = image->frame[ frame_i ].height;
+
+	if ( width == 0 )
+		width = image->width;
+
+	if ( height == 0 )
+		height = image->height;
+
 	if ( image->format == GL_RGBA16 )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, image->width, image->height, 0, GL_RGBA, GL_UNSIGNED_SHORT, (u16*)image->frame[ 0 ] );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0, GL_RGBA, GL_UNSIGNED_SHORT, (u16*)image->frame[ frame_i ].data );
 	}
 	else if ( image->format == GL_R16UI )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, image->width, image->height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, (u16*)image->frame[ 0 ] );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, (u16*)image->frame[ frame_i ].data );
 	}
 	else if ( image->format == GL_R16I )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, image->width, image->height, 0, GL_LUMINANCE, GL_SHORT, (s16*)image->frame[ 0 ] );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, width, height, 0, GL_LUMINANCE, GL_SHORT, (s16*)image->frame[ frame_i ].data );
 	}
 	else if ( image->format == GL_R8 )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, image->width, image->height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ 0 ] );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
 	}
 	else if ( image->format == GL_RGBA32F )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, image->width, image->height, 0, GL_RGBA, GL_FLOAT, image->frame[ 0 ] );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, image->frame[ frame_i ].data );
 	}
 	else
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, image->format, image->width, image->height, 0, image->format, GL_UNSIGNED_BYTE, image->frame[ 0 ] );
+		glTexImage2D( GL_TEXTURE_2D, 0, image->format, width, height, 0, image->format, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
 	}
 
 	auto err = glGetError();
 
 	if ( err != 0 )
 		printf( "GL Error: %d\n", err );
-
-	glBindTexture( GL_TEXTURE_2D, 0 );
 }
 
 
-GLuint gl_upload_texture( image_t* image )
+void gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t frame_count )
 {
-	GLuint image_texture;
-	glGenTextures( 1, &image_texture );
+	if ( textures.count != frame_count )
+	{
+		if ( textures.frame )
+			glDeleteTextures( textures.count, textures.frame );
 
-	gl_update_texture( image_texture, image );
+		textures.frame = ch_realloc< GLuint >( textures.frame, frame_count, e_mem_category_image_data );
+		memset( textures.frame, 0, sizeof( GLuint ) * frame_count );
 
-	return image_texture;
+		glGenTextures( frame_count, textures.frame );
+		textures.count = frame_count;
+	}
+
+	for ( size_t i = 0; i < frame_count; i++ )
+	{
+		gl_update_texture( textures.frame[ i ], image, i );
+	}
 }
 
 
-void gl_free_texture( GLuint texture )
+void gl_free_textures( uploaded_textures_t& textures )
 {
-	glDeleteTextures( 1, &texture );
+	if ( textures.frame )
+		glDeleteTextures( textures.count, textures.frame );
+
+	ch_free( e_mem_category_image_data, textures.frame );
+
+	textures.frame = nullptr;
+	textures.count = 0;
 }
 
 
@@ -224,8 +247,8 @@ void image_free_frames( image_t& image )
 	if ( image.frame.empty() )
 		return;
 
-	for ( u8* frame : image.frame )
-		ch_free( e_mem_category_image_data, frame );
+	for ( image_frame_t& frame : image.frame )
+		ch_free( e_mem_category_image_data, frame.data );
 
 	image.frame.clear();
 }
@@ -319,31 +342,37 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 			break;
 	}
 
-	u8* old_frame = old_image->frame[ 0 ];
+	new_image->frame.resize( old_image->frame.size() );
 
-	if ( old_frame == nullptr )
+	for ( size_t i = 0; i < old_image->frame.size(); i++ )
 	{
-		printf( "nullptr frame?????\n" );
-		return false;
+		u8* old_frame = old_image->frame[ i ].data;
+
+		if ( old_frame == nullptr )
+		{
+			printf( "nullptr frame?????\n" );
+			return false;
+		}
+
+		// u8* new_frame     = ch_calloc< u8 >( new_width * new_height * old_image->channels, e_mem_category_image_data );
+
+		u8* resized_frame = (u8*)stbir_resize(
+		  old_frame, old_image->frame[ i ].width, old_image->frame[ i ].height, 0,
+		  nullptr, new_width, new_height, 0,
+		  pixel_layout, datatype, STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT );
+
+		if ( !resized_frame )
+			return false;
+
+		new_image->frame[ i ].data   = resized_frame;
+		new_image->frame[ i ].size   = new_width * new_height * old_image->channels;
+		new_image->frame[ i ].width  = new_width;
+		new_image->frame[ i ].height = new_height;
 	}
 
-	// u8* new_frame     = ch_calloc< u8 >( new_width * new_height * old_image->channels, e_mem_category_image_data );
-
-	u8* resized_frame = (u8*)stbir_resize(
-	  old_frame, old_image->width, old_image->height, 0,
-	  nullptr, new_width, new_height, 0,
-	  pixel_layout, datatype, STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT );
-
-	if ( !resized_frame )
-		return false;
-
-//	new_image->frame.clear();
-	new_image->frame.resize( 1 );
-	new_image->frame[ 0 ]      = resized_frame;
 	new_image->width           = new_width;
 	new_image->height          = new_height;
 	new_image->pitch           = new_width * old_image->channels;
-	new_image->frame_size      = new_width * new_height * old_image->channels;
 	new_image->bit_depth       = 4;
 	new_image->bytes_per_pixel = 4;
 	new_image->channels        = old_image->channels;
@@ -414,7 +443,8 @@ bool icon_preload()
 			continue;
 		}
 
-		g_icon_texture[ i ] = gl_upload_texture( &g_icon_image[ i ] );
+		glGenTextures( 1, &g_icon_texture[ i ] );
+		gl_update_texture( g_icon_texture[ i ], &g_icon_image[ i ] );
 
 		if ( !g_icon_texture[ i ] )
 		{
@@ -435,7 +465,7 @@ void icon_free()
 {
 	for ( u8 i = 0; i < e_icon_count; i++ )
 	{
-		gl_free_texture( g_icon_texture[ i ] );
+		glDeleteTextures( 1, &g_icon_texture[ i ] );
 	}
 }
 
@@ -456,5 +486,4 @@ ImTextureRef icon_get_imtexture( e_icon icon_type )
 
 	return static_cast< ImTextureRef >( g_icon_texture[ icon_type ] );
 }
-
 

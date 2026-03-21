@@ -657,6 +657,21 @@ bool start_mpv()
 
 void stop_mpv()
 {
+	if ( !g_mpv )
+		return;
+
+	mpv_cmd_close_video();
+
+	mpv_event* event = p_mpv_wait_event( g_mpv, 0 );
+
+	while ( event->event_id != MPV_EVENT_NONE )
+	{
+		event = p_mpv_wait_event( g_mpv, 0 );
+	}
+
+	// causes a crash?
+	//p_mpv_destroy( g_mpv );
+	//g_mpv = nullptr;
 }
 
 

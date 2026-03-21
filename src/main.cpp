@@ -1058,8 +1058,8 @@ int main( int argc, char* argv[] )
 
 	media_view_init();
 	
-	glGenTextures( 1, &g_image_data.texture );
-	glGenTextures( 1, &g_image_scaled_data.texture );
+//	glGenTextures( 1, &g_image_data.texture );
+//	glGenTextures( 1, &g_image_scaled_data.texture );
 
 	// ----------------------------------------------------------------
 
@@ -1119,6 +1119,7 @@ int main( int argc, char* argv[] )
 
 	// -----------------------------------------------------------------------------------
 
+	stop_mpv();
 	thumbnail_loader_shutdown();
 	media_view_shutdown();
 	icon_free();

@@ -127,36 +127,37 @@ struct media_entry_t
 
 struct image_frame_t
 {
-	// time to spend on frame
-	double         time;
-
 	// image data
-	unsigned char* data;
+	u8*    data;
 
 	// size
-	size_t         size;
+	size_t size;
+
+	// time to spend on frame
+	double time;
+
+	// frame width and height
+	int    width;
+	int    height;
 };
 
 
 struct image_t
 {
-	int                width;
-	int                height;
+	int                          width;
+	int                          height;
 
-	int                bit_depth;
-	int                pitch;
-	int                bytes_per_pixel;
-	int                channels;
-	GLint              format;
+	int                          bit_depth;
+	int                          pitch;
+	int                          bytes_per_pixel;
+	int                          channels;
+	GLint                        format;
 
-	int                loop_count;
-	// std::vector< image_frame_t > frame;
-	std::vector< u8* > frame;
+	int                          loop_count;
 
-	// TEMP until image_frame_t is used
-	size_t             frame_size;
+	std::vector< image_frame_t > frame;
 
-	char*              image_format;
+	char*                        image_format;
 };
 
 
@@ -185,16 +186,22 @@ struct image_load_info_t
 };
 
 
+struct uploaded_textures_t
+{
+	GLuint* frame = nullptr;
+	size_t  count = 0;
+};
+
+
 struct main_image_data_t
 {
 	// source image
-	image_t image{};
+	image_t             image{};
 
 	// index in sorted file list
-	size_t  index   = 0;
+	size_t              index = 0;
 
-	// TODO: add multiple frames here
-	GLuint  texture = 0;
+	uploaded_textures_t textures{};
 };
 
 
@@ -231,7 +238,7 @@ struct thumbnail_t
 	u32                               distance;  // higher distances get freed first for other thumbnails
 	char*                             path;      // mainly for debugging
 	image_t*                          image;
-	GLuint                            texture;
+	uploaded_textures_t               textures{};
 	e_media_type                      type;
 	ImTextureRef                      im_texture;
 	bool                              scaled;
@@ -318,6 +325,10 @@ namespace gallery
 // Media View
 namespace media
 {
+	extern double next_frame_timer;
+	extern size_t frame;
+	extern float  playback_speed;
+	extern bool   pause;
 }
 
 
@@ -371,9 +382,10 @@ void                                 icon_free();
 image_t*                             icon_get_image( e_icon icon_type );
 ImTextureRef                         icon_get_imtexture( e_icon icon_type );
 
-GLuint                               gl_upload_texture( image_t* image );
-void                                 gl_update_texture( GLuint texture, image_t* image );
-void                                 gl_free_texture( GLuint texture );
+// GLuint                               gl_upload_texture( image_t* image );
+void                                 gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t frame_count );
+void                                 gl_update_texture( GLuint texture, image_t* image, size_t frame_i = 0 );
+void                                 gl_free_textures( uploaded_textures_t& textures );
 
 void                                 config_reset();
 bool                                 config_load();

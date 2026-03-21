@@ -411,7 +411,7 @@ void gallery_view_context_menu()
 	ImGuiStyle& style        = ImGui::GetStyle();
 	ImVec2      region_avail = ImGui::GetContentRegionAvail();
 
-	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
+	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
 	{
 		sys_browse_to_file( gallery_item_get_path_string( gallery::cursor ).c_str() );
 		//ctx_open = false;

@@ -81,14 +81,14 @@ void thumbnail_free_host_image_data( size_t thumbnail_slot, thumbnail_t& thumbna
 	if ( !thumbnail.image )
 		return;
 
-	if ( thumbnail.image->frame.size() )
+	for ( size_t i = 0; i < thumbnail.image->frame.size(); i++ )
 	{
 		if ( thumbnail.scaled )
-			ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ 0 ] );
+			ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ i ].data );
 		else
-			ch_free( e_mem_category_image_data, thumbnail.image->frame[ 0 ] );
+			ch_free( e_mem_category_image_data, thumbnail.image->frame[ i ].data );
 
-		thumbnail.image->frame[ 0 ] = nullptr;
+		thumbnail.image->frame[ i ].data = nullptr;
 	}
 
 	thumbnail.image->frame.clear();
@@ -105,10 +105,10 @@ void thumbnail_loader_free_data( u32 index )
 
 	thumbnail_free_host_image_data( index, thumbnail );
 
-	if ( thumbnail.texture )
+	if ( thumbnail.textures.count )
 	{
 		thumbnail_printf( "FREED %d - %s\n", index, thumbnail.path );
-		gl_free_texture( thumbnail.texture );
+		gl_free_textures( thumbnail.textures );
 		thumbnail.im_texture = nullptr;
 	}
 
@@ -593,7 +593,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		// ---------------------------------------------------------------------------------------------------------
 
-		if ( thumbnail->image->frame.empty() || !thumbnail->image->frame[ 0 ] )
+		if ( thumbnail->image->frame.empty() || !thumbnail->image->frame[ 0 ].data )
 		{
 			printf( "data is nullptr in worker?\n" );
 			thumbnail->status = e_thumbnail_status_failed;
@@ -638,7 +638,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 						thumbnail_save( new_image, thumbnail_path );
 
-						ch_free( e_mem_category_stbi_resize, new_image.frame[ 0 ] );
+						ch_free( e_mem_category_stbi_resize, new_image.frame[ 0 ].data );
 					}
 					else
 					{
@@ -674,7 +674,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			float new_width        = thumbnail->image->width * downscale_amount;
 			float new_height       = thumbnail->image->height * downscale_amount;
 
-			u8*   old_frame        = thumbnail->image->frame[ 0 ];
+			u8*   old_frame        = thumbnail->image->frame[ 0 ].data;
 
 			if ( image_scale( thumbnail->image, thumbnail->image, new_width, new_height ) )
 			{
@@ -754,31 +754,33 @@ void thumbnail_loader_update()
 
 		// printf( "UPLOADING IMAGE: %s\n", thumbnail.path );
 
-		if ( thumbnail.image->frame.empty() || !thumbnail.image->frame[ 0 ] )
+		if ( thumbnail.image->frame.empty() || !thumbnail.image->frame[ 0 ].data )
 		{
 			printf( "thumbnail data is nullptr\n" );
 		}
 
-		thumbnail.texture    = gl_upload_texture( thumbnail.image );
-		thumbnail.im_texture = thumbnail.texture;
+		gl_update_textures( thumbnail.textures, thumbnail.image, 1 );
+		thumbnail.im_texture = thumbnail.textures.frame[ 0 ];
 
+		for ( size_t i = 0; i < thumbnail.image->frame.size(); i++ )
 		{
 			if ( thumbnail.scaled )
-				ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ 0 ] );
+				ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ i ].data );
 			else
-				ch_free( e_mem_category_image_data, thumbnail.image->frame[ 0 ] );
+				ch_free( e_mem_category_image_data, thumbnail.image->frame[ i ].data );
 
-			thumbnail.image->frame[ 0 ] = nullptr;
-			thumbnail.image->frame.clear();
-
-			image_free_alloc( *thumbnail.image );
-
-			thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
-
-			app::draw_frame = true;
+			thumbnail.image->frame[ i ].data = nullptr;
 		}
 
-		if ( thumbnail.texture )
+		thumbnail.image->frame.clear();
+
+		image_free_alloc( *thumbnail.image );
+
+		thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
+
+		app::draw_frame = true;
+
+		if ( thumbnail.textures.count )
 		{
 			thumbnail.status = e_thumbnail_status_finished;
 			//thumbnail_printf( "IMAGE FINISHED: %s\n", thumbnail.path );
@@ -786,7 +788,9 @@ void thumbnail_loader_update()
 			upload_count++;
 		}
 		else
+		{
 			thumbnail.status = e_thumbnail_status_failed;
+		}
 	}
 }
 

@@ -18,6 +18,14 @@ namespace image_draw
 	float       rot    = 0.f;
 }
 
+namespace media
+{
+	double next_frame_timer = 0.0;
+	size_t frame            = 0;
+	float  playback_speed   = 1.f;
+	bool   pause            = false;
+}
+
 // This doesn't let you move the image outside the window
 // if zoomed in, and you move the image down and to the right, the top left corner of the image will be at the top left
 // or if zoomed out, you can't pan the image, the image is in the middle of the window
@@ -73,6 +81,7 @@ std::mutex           g_scale_lock;
 
 void media_view_filter_image()
 {
+	#if 0
 	g_scale_lock.lock();
 
 	if ( g_image_scaled_data.image.frame.size() )
@@ -98,11 +107,13 @@ void media_view_filter_image()
 	}
 
 	g_scale_lock.unlock();
+	#endif
 }
 
 
 void media_view_scale_thread_run()
 {
+#if 0
 	while ( app::running )
 	{
 		if ( g_scale_state != e_scale_state_start )
@@ -115,11 +126,41 @@ void media_view_scale_thread_run()
 
 		media_view_filter_image();
 	}
+#endif
+}
+
+
+void media_view_frame_advance( bool backwards = false )
+{
+	if ( backwards )
+	{
+		if ( media::frame == 0 )
+			media::frame = g_image_data.image.frame.size();
+
+		media::frame--;
+	}
+	else
+	{
+		media::frame = ( media::frame + 1 ) % g_image_data.image.frame.size();
+	}
+
+	media::next_frame_timer = g_image_data.image.frame[ media::frame ].time;
+}
+
+
+void media_view_frame_set( size_t frame )
+{
+	if ( frame >= g_image_data.image.frame.size() )
+		return;
+
+	media::frame            = frame;
+	media::next_frame_timer = g_image_data.image.frame[ media::frame ].time;
 }
 
 
 void media_view_scale_check_timer( float frame_time )
 {
+#if 0
 	if ( g_scale_state == e_scale_state_finished )
 	{
 		// Are we drawing the image smaller than native size?
@@ -168,6 +209,25 @@ void media_view_scale_check_timer( float frame_time )
 
 		g_scale_lock.unlock();
 	}
+#endif
+
+	// Add frame draw timer here for animated images
+	if ( g_image_data.image.frame.size() > 1 )
+	{
+		if ( !media::pause )
+		{
+			media::next_frame_timer -= frame_time * media::playback_speed;
+
+			if ( media::next_frame_timer < 0.f )
+			{
+				media_view_frame_advance();
+			}
+		}
+	}
+	else
+	{
+		media::next_frame_timer = 0.0;
+	}
 }
 
 
@@ -182,16 +242,16 @@ void media_view_scale_reset_timer()
 
 void media_view_init()
 {
-	g_scale_thread = new std::thread( media_view_scale_thread_run );
+	// g_scale_thread = new std::thread( media_view_scale_thread_run );
 }
 
 
 void media_view_shutdown()
 {
 	// wait for scale thread to shutdown
-	g_scale_thread->join();
+	//g_scale_thread->join();
 
-	delete g_scale_thread;
+	//delete g_scale_thread;
 }
 
 
@@ -251,7 +311,7 @@ void media_view_zoom_reset()
 
 	image_draw::zoom_mode = e_zoom_mode_fixed;
 
-	if ( !g_image_data.image.frame[ 0 ] )
+	if ( !g_image_data.image.frame.size() )
 		return;
 
 	image_draw::size.x = g_image_data.image.width;
@@ -263,7 +323,7 @@ void media_view_zoom_reset()
 
 void media_view_scroll_zoom( float scroll )
 {
-	if ( !g_image_data.texture || scroll == 0 )
+	if ( !g_image_data.textures.count || scroll == 0 )
 		return;
 
 	if ( util_mouse_hovering_imgui_window() )
@@ -503,7 +563,7 @@ void media_view_context_menu()
 	ImGui::Separator();
 #endif
 
-	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.texture ) )
+	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
 	{
 		sys_browse_to_file( gallery_item_get_path_string( gallery::cursor ).c_str() );
 	}
@@ -623,6 +683,7 @@ void media_view_context_menu()
 
 void media_view_input()
 {
+#if 0
 	if ( g_scale_state == e_scale_state_upload )
 	{
 		ch_free( e_mem_category_image_data, g_scale_src.frame[ 0 ] );
@@ -643,6 +704,7 @@ void media_view_input()
 			app::draw_frame = true;
 		}
 	}
+#endif
 
 	// for video view
 	if ( !ImGui::IsKeyDown( ImGuiKey_RightCtrl ) )
@@ -741,8 +803,11 @@ void media_view_load()
 		{
 			if ( image_load_info.image->frame.size() > 0 && image_load_info.image->bytes_per_pixel > 0 )
 			{
-				gl_update_texture( g_image_data.texture, &g_image_data.image );
+				gl_update_textures( g_image_data.textures, &g_image_data.image, g_image_data.image.frame.size() );
 				media_view_fit_in_view();
+
+				media::frame            = 0;
+				media::next_frame_timer = g_image_data.image.frame[ media::frame ].time;
 			}
 			else
 			{
@@ -1025,6 +1090,154 @@ void media_view_draw_video_controls()
 }
 
 
+void media_view_draw_animated_image_controls()
+{
+	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
+
+	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !mouse_hover_imgui_window && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
+	{
+		media::pause = !media::pause;
+	}
+
+	// Seeking
+	if ( !mouse_hover_imgui_window )
+	{
+		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
+		{
+			media_view_frame_advance();
+		}
+		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
+		{
+			media_view_frame_advance( true );
+		}
+	}
+
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	ImVec2 playback_control_pos{};
+	playback_control_pos.x = width / 2;
+	//playback_control_pos.y = ( height - 75.f );
+	playback_control_pos.y = ( height - 40.f );
+
+	// check if mouse in rectangle
+
+	static bool  was_drawing_controls = false;
+
+	static float controls_height = 50.f;
+	if ( !mouse_in_rect( { 0.f, height - ( 80.f + ( controls_height * 2 ) ) }, { (float)width, (float)height } ) )
+	{
+		if ( was_drawing_controls )
+			app::draw_frame = true;
+
+		was_drawing_controls = false;
+		return;
+	}
+
+	if ( !was_drawing_controls )
+		app::draw_frame = true;
+
+	was_drawing_controls = true;
+
+	// ----------------------------------------
+
+	// pivot aligns it to the center and the bottom of the window
+	ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.5f, 1.0f ) );
+
+	ImGui::SetNextWindowSizeConstraints( { width - 80.f, -1.f }, { width - 80.f, -1.f } );
+
+	if ( !ImGui::Begin( "##image_controls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
+	{
+		ImGui::End();
+		return;
+	}
+
+	ImGuiStyle&  style         = ImGui::GetStyle();
+
+	const ImVec2 label_size    = ImGui::CalcTextSize( "Pause", NULL, true );
+	ImVec2       play_btn_size = ImGui::CalcItemSize( { 0, 0 }, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f );
+
+	if ( media::pause )
+	{
+		if ( ImGui::Button( "Play", play_btn_size ) )
+		{
+			media::pause = false;
+		}
+	}
+	else
+	{
+		if ( ImGui::Button( "Pause", play_btn_size ) )
+		{
+			media::pause = true;
+		}
+	}
+
+	ImGui::SameLine();
+	ImGui::Spacing();
+
+	ImGui::SameLine();
+	if ( ImGui::Button( "<|" ) )
+	{
+		media_view_frame_set( 0 );
+	}
+
+	//ImGui::SameLine();
+	//if ( ImGui::Button( "|>" ) )
+	//{
+	//	media_view_frame_set( g_image_data.image.frame.size() - 1 );
+	//}
+
+	ImGui::SameLine();
+	//ImGui::Spacing();
+
+	ImGui::SameLine();
+	if ( ImGui::Button( "<" ) )
+	{
+		media::pause = true;
+		media_view_frame_advance( true );
+	}
+
+	ImGui::SameLine();
+	if ( ImGui::Button( ">" ) )
+	{
+		media::pause = true;
+		media_view_frame_advance();
+	}
+	
+	ImGui::SameLine();
+
+	// https://stackoverflow.com/questions/3673226/how-to-print-time-in-format-2009-08-10-181754-811
+
+	char str_position[ 256 ]{};
+
+	snprintf( str_position, 256, "%zu / %zu", media::frame + 1, g_image_data.image.frame.size() );
+
+	const ImVec2 time_size             = ImGui::CalcTextSize( str_position, NULL, true );
+
+	float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 2 );
+	// float        avaliable_width = 500.f - ( style.ItemSpacing.x * 2 );
+
+	float        seek_bar_width        = avaliable_width;
+	seek_bar_width -= ( time_size.x + ( style.ItemSpacing.x * 1 ) );
+	// seek_bar_width -= ( play_btn_size.x + vol_bar_width + time_size.x + ( style.ItemSpacing.x * 2 ) );
+
+	ImGui::SetNextItemWidth( seek_bar_width );
+
+	int desired_frame = media::frame + 1;
+	if ( ImGui::SliderInt( "##seek", &desired_frame, 1, g_image_data.image.frame.size(), "" ) )
+	{
+		media_view_frame_set( desired_frame - 1 );
+	}
+
+	ImGui::SameLine();
+	ImGui::TextUnformatted( str_position );
+
+	controls_height = ImGui::GetWindowContentRegionMax().y;
+
+	ImGui::End();
+}
+
+
 void media_view_draw_imgui()
 {
 	media_view_input();
@@ -1050,9 +1263,9 @@ void media_view_draw_imgui()
 	}
 	else
 	{
-		if ( get_media_type() == e_media_type_image_animated )
+		if ( get_media_type() == e_media_type_image && g_image_data.image.frame.size() > 1 )
 		{
-			// Draw frame controls
+			media_view_draw_animated_image_controls();
 		}
 
 		if ( g_draw_zoom_level )
@@ -1076,6 +1289,18 @@ float vertices[] = {
 
 static void media_view_draw_image()
 {
+	if ( g_image_data.textures.frame == nullptr )
+	{
+		printf( "NULLPTR IMAGE\n" );
+		return;
+	}
+
+	if ( g_image_data.textures.count > 1 )
+	{
+		app::draw_frame      = true;
+		app::draw_next_frame = true;
+	}
+
 	SDL_FRect dst_rect{};
 	dst_rect.w = image_draw::size.x;
 	dst_rect.h = image_draw::size.y;
@@ -1109,11 +1334,11 @@ static void media_view_draw_image()
 
 	if ( g_scale_state == e_scale_state_finished )
 	{
-		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.texture );
+		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.textures.frame[ media::frame ] );
 	}
 	else
 	{
-		glBindTexture( GL_TEXTURE_2D, g_image_data.texture );
+		glBindTexture( GL_TEXTURE_2D, g_image_data.textures.frame[ media::frame ] );
 	}
 
  	glMatrixMode( GL_PROJECTION );

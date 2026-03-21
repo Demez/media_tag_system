@@ -116,10 +116,10 @@ struct LoaderPNG: public IImageLoader
 		// one frame
 		// load_info.image->frame      = ch_realloc( load_info.image->frame, 1, e_mem_category_image_data  );
 		load_info.image->frame.resize( 1 );
-		load_info.image->frame[ 0 ] = ch_realloc( load_info.image->frame[ 0 ], size, e_mem_category_image_data );
-		load_info.image->frame_size = size;
+		load_info.image->frame[ 0 ].data = ch_realloc( load_info.image->frame[ 0 ].data, size, e_mem_category_image_data );
+		load_info.image->frame[ 0 ].size = size;
 
-		err                         = spng_decode_image( ctx, load_info.image->frame[ 0 ], size, pngFmt, decode_flags );
+		err                              = spng_decode_image( ctx, load_info.image->frame[ 0 ].data, size, pngFmt, decode_flags );
 		if ( err != 0 )
 		{
 			printf( "LOADER_PNG: Failed to decode image: %s\n", spng_strerror( err ) );
@@ -148,14 +148,18 @@ struct LoaderPNG: public IImageLoader
 				break;
 		}
 
-		load_info.image->width           = ihdr.width;
-		load_info.image->height          = ihdr.height;
+		load_info.image->width             = ihdr.width;
+		load_info.image->height            = ihdr.height;
+
+		load_info.image->frame[ 0 ].width  = ihdr.width;
+		load_info.image->frame[ 0 ].height = ihdr.height;
+
 		// load_info.image->format    = GL_RGBA;
-		load_info.image->bit_depth       = ihdr.bit_depth;
-		load_info.image->pitch           = load_info.image->width * load_info.image->bytes_per_pixel;
-		
+		load_info.image->bit_depth         = ihdr.bit_depth;
+		load_info.image->pitch             = load_info.image->width * load_info.image->bytes_per_pixel;
+
 		// the strdup is stupid lol
-		load_info.image->image_format    = util_strndup_r( load_info.image->image_format, "PNG", 3 );
+		load_info.image->image_format      = util_strndup_r( load_info.image->image_format, "PNG", 3 );
 
         spng_ctx_free( ctx );
 

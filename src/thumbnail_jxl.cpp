@@ -105,7 +105,7 @@ bool thumbnail_save( image_t& image, const std::string& output )
 	status = JxlEncoderSetFrameDistance( frame_settings, app::config.thumbnail_jxl_distance );
 	status = JxlEncoderFrameSettingsSetOption( frame_settings, JXL_ENC_FRAME_SETTING_EFFORT, app::config.thumbnail_jxl_effort );
 
-	status = JxlEncoderAddImageFrame( frame_settings, &pixel_format, image.frame[ 0 ], image.frame_size );
+	status = JxlEncoderAddImageFrame( frame_settings, &pixel_format, image.frame[ 0 ].data, image.frame[ 0 ].size );
 
 	if ( status != JXL_ENC_SUCCESS )
 	{
