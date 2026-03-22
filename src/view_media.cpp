@@ -1251,10 +1251,9 @@ void media_view_draw_imgui()
 	if ( g_draw_mem_stats )
 	{
 		if ( ImGui::Begin( "Memory Stats" ) )
-		{
 			mem_draw_debug_ui();
-			ImGui::End();
-		}
+
+		ImGui::End();
 	}
 
 	if ( get_media_type() == e_media_type_video )
