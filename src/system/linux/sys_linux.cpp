@@ -298,7 +298,7 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 				continue;
 		}
 
-		if ( ( ent->d_type == DT_REG ) && flags & e_scandir_no_files )
+		if ( ( ent->d_type != DT_DIR ) && flags & e_scandir_no_files )
 		{
 			continue;
 		}
@@ -312,17 +312,15 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 		else
 			file.path = relative_path;
 
-		// TODO: handle system links
-
-		if ( ent->d_type == DT_REG )
-		{
-			file.type |= e_file_type_file;
-			file.size = ent->d_off;
-		}
-		else
+		if ( ent->d_type == DT_DIR )
 		{
 			file.type |= e_file_type_directory;
 			file.size = 0;
+		}
+		else
+		{
+			file.type |= e_file_type_file;
+			file.size = ent->d_off;
 		}
 
 		struct stat64 s{};
