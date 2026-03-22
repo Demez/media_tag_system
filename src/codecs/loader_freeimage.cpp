@@ -257,7 +257,7 @@ struct LoaderFreeImage : public IImageLoader
 			case FIF_GIF:
 			{
 				// 'Play' the GIF to generate each frame (as 32bpp) instead of returning raw frame data when loading 
-				// load_flags = GIF_PLAYBACK;
+				load_flags = GIF_PLAYBACK;
 				break;
 			}
 			case FIF_JPEG:
@@ -272,7 +272,7 @@ struct LoaderFreeImage : public IImageLoader
 		}
 
 		// FIBITMAP* bitmap = FreeImage_LoadFromMemory( format, memory, load_flags );
-		FIMULTIBITMAP* multi_bitmap  = FreeImage_LoadMultiBitmapFromMemory( format, memory );
+		FIMULTIBITMAP* multi_bitmap  = FreeImage_LoadMultiBitmapFromMemory( format, memory, load_flags );
 		FIBITMAP*      single_bitmap = nullptr;
 
 		if ( multi_bitmap == nullptr )
@@ -324,7 +324,7 @@ struct LoaderFreeImage : public IImageLoader
 			FreeImage_CloseMultiBitmap( multi_bitmap );
 			multi_bitmap  = nullptr;
 
-			single_bitmap = FreeImage_LoadFromMemory( format, memory );
+			single_bitmap = FreeImage_LoadFromMemory( format, memory, load_flags );
 
 			if ( single_bitmap == nullptr )
 			{
