@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <linux/stat.h>
 #include <stdint.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -230,23 +231,23 @@ int ftw_callback( const char* filename, const struct stat64* status, int __flag,
 }
 
 
-static void set_file_attributes( file_t &file, const dirent64 &ent, const struct stat64 &s )
+static void set_file_attributes( file_t &file, const dirent64 &ent, const struct statx &s )
 {
-	if ( S_ISDIR( s.st_mode ) )
+	if ( S_ISDIR( s.stx_mode ) )
 	{
 		file.type |= e_file_type_directory;
 		file.size = 0;
 	}
-	else if ( S_ISREG( s.st_mode ) )
+	else if ( S_ISREG( s.stx_mode ) )
 	{
 		file.type |= e_file_type_file;
-		file.size = s.st_size;
+		file.size = s.stx_size;
 	}
 
 	file.type |= ( ent.d_type == DT_LNK ) ? e_file_type_system_link : 0;
 
-	file.date_created = 0;
-	file.date_mod     = s.st_mtime;
+	file.date_created = s.stx_btime.tv_sec;
+	file.date_mod     = s.stx_mtime.tv_sec;
 }
 
 
@@ -332,10 +333,12 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 		else
 			file.path = relative_path;
 
-		struct stat64 s{};
-		if ( stat64( abs_path.c_str(), &s ) != 0 )
+		struct statx s{};
+
+		const int statx_mask = STATX_TYPE | STATX_BTIME | STATX_MTIME | STATX_SIZE;
+		if ( statx( 0, abs_path.c_str(), 0, statx_mask, &s ) != 0 )
 		{
-			printf( "Call to stat64() failed on %s\n", abs_path.c_str() );
+			printf( "Call to statx() failed on %s\n", abs_path.c_str() );
 			continue;
 		}
 
