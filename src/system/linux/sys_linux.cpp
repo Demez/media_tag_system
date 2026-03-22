@@ -230,6 +230,26 @@ int ftw_callback( const char* filename, const struct stat64* status, int __flag,
 }
 
 
+static void set_file_attributes( file_t &file, const dirent64 &ent, const struct stat64 &s )
+{
+	if ( S_ISDIR( s.st_mode ) )
+	{
+		file.type |= e_file_type_directory;
+		file.size = 0;
+	}
+	else if ( S_ISREG( s.st_mode ) )
+	{
+		file.type |= e_file_type_file;
+		file.size = s.st_size;
+	}
+
+	file.type |= ( ent.d_type == DT_LNK ) ? e_file_type_system_link : 0;
+
+	file.date_created = 0;
+	file.date_mod     = s.st_mtime;
+}
+
+
 // TODO: look at getdents64()?
 bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
 {
@@ -312,24 +332,14 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 		else
 			file.path = relative_path;
 
-		if ( ent->d_type == DT_DIR )
+		struct stat64 s{};
+		if ( stat64( abs_path.c_str(), &s ) != 0 )
 		{
-			file.type |= e_file_type_directory;
-			file.size = 0;
-		}
-		else
-		{
-			file.type |= e_file_type_file;
-			file.size = ent->d_off;
+			printf( "Call to stat64() failed on %s\n", abs_path.c_str() );
+			continue;
 		}
 
-		struct stat64 s{};
-		if ( stat64( abs_path.c_str(), &s ) == 0 )
-		{
-			// file.size = s.st_size;
-			file.date_created = 0;
-			file.date_mod     = s.st_mtime;
-		}
+		set_file_attributes(file, *ent, s);
 
 		files.push_back( file );
 	}
