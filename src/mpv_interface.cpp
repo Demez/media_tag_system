@@ -355,7 +355,7 @@ void mpv_draw_frame()
 	glEnable( GL_SCISSOR_TEST );
 	glScissor( pos_x - viewport_offset_x, pos_y - viewport_offset_y, new_width, new_height );
 
-	glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
+	glClearColor( app::config.media_bg_color.x, app::config.media_bg_color.y, app::config.media_bg_color.z, app::config.media_bg_color.w );
 	glClear( GL_COLOR_BUFFER_BIT );
 
 	glEnable( GL_TEXTURE_2D );

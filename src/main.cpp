@@ -19,7 +19,9 @@ namespace app
 	bool         window_resized = false;
 
 	// ImVec4                       clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
-	ImVec4       clear_color    = ImVec4( 0.05f, 0.05f, 0.05f, 1.00f );
+	// ImVec4       clear_color    = ImVec4( 0.05f, 0.05f, 0.05f, 0.0f );
+	// ImVec4       clear_color    = ImVec4( 0.f, 0.f, 0.f, 0.f );
+	// ImVec4       clear_color    = ImVec4( 1.f, 1.f, 0.f, 0.f );
 
 	u64          total_time     = 0;
 	float        frame_time     = 0.f;
@@ -516,7 +518,12 @@ void frame_draw_start()
 	ImGui::NewFrame();
 
 	glViewport( 0, 0, width, height );
-	glClearColor( app::clear_color.x, app::clear_color.y, app::clear_color.z, app::clear_color.w );
+
+	if ( g_gallery_view )
+		glClearColor( app::config.header_bg_color.x, app::config.header_bg_color.y, app::config.header_bg_color.z, app::config.header_bg_color.w );
+	else	
+		glClearColor( app::config.media_bg_color.x, app::config.media_bg_color.y, app::config.media_bg_color.z, app::config.media_bg_color.w );
+
 	glClear( GL_COLOR_BUFFER_BIT );
 }
 
@@ -812,6 +819,8 @@ void main_loop()
 		{
 			bool is_file = fs_is_file( directory::queued.string().c_str() );
 
+			memset( gallery::search, 0, 512 * sizeof( char ) );
+
 			if ( is_file )
 			{
 				directory::path = directory::queued.parent_path();
@@ -917,6 +926,11 @@ int main( int argc, char* argv[] )
 {
 	args_init( argc, argv );
 
+	if ( !config_load() )
+	{
+		printf( "Failed to load config, using defaults\n" );
+	}
+
 	if ( !sys_init() )
 	{
 		printf( "Failed to init system backend!\n" );
@@ -1017,12 +1031,7 @@ int main( int argc, char* argv[] )
 		//free( exe_path );
 	}
 
-	SDL_GL_GetSwapInterval( &app::config.vsync );
-
-	if ( !config_load() )
-	{
-		printf( "Failed to load config, using defaults\n" );
-	}
+	// SDL_GL_GetSwapInterval( &app::config.vsync );
 
 	SDL_GL_SetSwapInterval( app::config.vsync );
 

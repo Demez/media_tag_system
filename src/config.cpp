@@ -194,6 +194,64 @@ static bool config_get_node_string( fy_node* node, const char* fmt, char* buffer
 }
 
 
+static bool config_get_color( fy_node* node, const char* path, ImVec4& output )
+{
+	fy_node* color_node = fy_node_by_path( node, path, FY_NT, FYNWF_PTR_DEFAULT );
+
+	if ( !color_node )
+	{
+		printf( "config: Failed to find \"%s\"\n", path );
+		return false;
+	}
+
+	fy_node_type color_node_type = fy_node_get_type( color_node );
+
+	if ( color_node_type != FYNT_SEQUENCE )
+	{
+		printf( "config: Expected Sequence like [0.1, 0.2, 0.5, 1.0] or 0 to 255 values in \"%s\"\n", path );
+		return false;
+	}
+
+	int item_count = fy_node_sequence_item_count( color_node );
+
+	for ( int item_i = 0; item_i < item_count; item_i++ )
+	{
+		fy_node*     node_entry = fy_node_sequence_get_by_index( color_node, item_i );
+		fy_node_type node_type  = fy_node_get_type( node_entry );
+
+		if ( node_type != FYNT_SCALAR )
+			continue;
+
+		const char* string = fy_node_get_scalar0( node_entry );
+
+		if ( strchr( string, '.' ) )
+		{
+			// Float
+			char*  end    = nullptr;
+			double result = strtod( string, &end );
+
+			if ( end )
+			{
+				*( &output.x + item_i ) = result;
+			}
+		}
+		else
+		{
+			// RGB 0 to 255
+			char* end    = nullptr;
+			long  result = strtol( string, &end, 10 );
+
+			if ( end )
+			{
+				*( &output.x + item_i ) = result / 255.f;
+			}
+		}
+	}
+
+	return true;
+}
+
+
 //static void config_get_node_path( fy_node* node, char* app_dir, const char* fmt, std::string& value )
 //{
 //	char buffer[ 256 ]{};
@@ -351,6 +409,8 @@ bool config_load()
 	config_get_doc_value( fyd, "/no-video %u", app::config.no_video );
 	config_get_doc_value( fyd, "/gallery-show-filenames %u", app::config.gallery_show_filenames );
 	config_get_doc_value( fyd, "/always-draw %u", app::config.always_draw );
+	config_get_doc_value( fyd, "/dwm-extend %u", app::config.dwm_extend );
+	config_get_doc_value( fyd, "/use-custom-colors %u", app::config.use_custom_colors );
 
 	config_get_doc_value( fyd, "/sleep-time-no-focus %u", app::config.sleep_time_no_focus );
 	config_get_doc_value( fyd, "/sleep-time-focus %u", app::config.sleep_time_focus );
@@ -359,7 +419,18 @@ bool config_load()
 	config_get_doc_value( fyd, "/font-size %u", app::config.font_size );
 
 	config_get_doc_value( fyd, "/gallery-zoom-default %u", app::config.gallery_zoom_default );
-	config_get_doc_value( fyd, "/media-zoom-scale %.3f", app::config.media_zoom_scale );
+	config_get_doc_value( fyd, "/media-zoom-scale %f", app::config.media_zoom_scale );
+
+	config_get_doc_value( fyd, "/gallery-header-padding-x %f", app::config.gallery_header_padding[ 0 ] );
+	config_get_doc_value( fyd, "/gallery-header-padding-y %f", app::config.gallery_header_padding[ 1 ] );
+
+	//int media_bg_color[ 4 ]{};
+	//int color_count = fy_document_scanf( fyd, "/media-background-color %d %d %d %d", &media_bg_color[ 0 ], &media_bg_color[ 1 ], &media_bg_color[ 2 ], &media_bg_color[ 3 ] );
+	
+	config_get_color( fy_document_root( fyd ), "/media-background-color", app::config.media_bg_color );
+	config_get_color( fy_document_root( fyd ), "/gallery-header-background-color", app::config.header_bg_color );
+	config_get_color( fy_document_root( fyd ), "/gallery-sidebar-bg-color", app::config.sidebar_bg_color );
+	config_get_color( fy_document_root( fyd ), "/gallery-content-bg-color", app::config.content_bg_color );
 
 	app::config.vsync = std::clamp( app::config.vsync, -1, 1 );
 

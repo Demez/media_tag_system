@@ -1,6 +1,7 @@
 #include "util.h"
 #include "system/system.h"
 #include "sys_win32.h"
+#include "main.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -17,6 +18,7 @@
 #include <time.h>
 #include <atlbase.h>
 #include <psapi.h>
+#include <dwmapi.h>
 #include <sys/stat.h>
 
 #include <profileapi.h>
@@ -84,6 +86,23 @@ void sys_set_window( SDL_Window* window )
 	{
 		g_main_hwnd = (HWND)hwnd;
 		// drag_drop_register( g_main_hwnd );
+
+		if ( app::config.dwm_extend )
+		{
+			MARGINS margins{ -1 };
+			// margins.cxLeftWidth = 0;
+			// margins.cxRightWidth = 800;
+			// margins.cyBottomHeight = 400;
+			// margins.cyTopHeight = 0;
+
+			HRESULT res = DwmExtendFrameIntoClientArea( g_main_hwnd, &margins );
+
+			if ( res != S_OK )
+			{
+				printf( "Failed to extend frame into client area\n" );
+				sys_print_last_error();
+			}
+		}
 	}
 	else
 	{

@@ -8,6 +8,8 @@ namespace gallery
 	// a sorted list of media entries, each item is an index to an entry in directory::media_list
 	std::vector< size_t >         sorted_media{};
 
+	char                          search[ 512 ];
+
 	// cursor position/index in items
 	size_t                        cursor            = 0;
 
@@ -32,11 +34,10 @@ namespace gallery
 }
 
 
-extern char          g_search_buf[ 1024 ];
 extern bool          g_do_search;
 
 
-void                 gallery_view_draw_header();
+int                  gallery_view_draw_header();
 void                 gallery_view_update_header_directory();
 
 void                 gallery_view_draw_sidebar();
@@ -313,7 +314,7 @@ void gallery_view_sort_dir()
 		selected_folder       = selected_item.type == e_media_type_directory;
 	}
 
-	size_t search_len = strlen( g_search_buf );
+	size_t search_len = strlen( gallery::search );
 
 	// Split up lists
 	for ( size_t i = 0; i < directory::media_list.size(); i++ )
@@ -322,7 +323,7 @@ void gallery_view_sort_dir()
 		if ( search_len )
 		{
 			media_entry_t& entry = directory::media_list[ i ];
-			if ( entry.filename.find( g_search_buf, search_len ) == std::string::npos )
+			if ( entry.filename.find( gallery::search, search_len ) == std::string::npos )
 				continue;
 		}
 
@@ -558,13 +559,13 @@ void gallery_view_draw_content()
 	// bg_color.z      = 0.f;
 	// bg_color.w      = 0.f;
 
-	ImGui::PushStyleColor( ImGuiCol_ChildBg, app::clear_color );
+	// ImGui::PushStyleColor( ImGuiCol_ChildBg, app::config.media_bg_color );
 
 	// if ( !ImGui::BeginChild( "##gallery_content", { region_avail.x + style.WindowPadding.x, region_avail.y }, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollWithMouse ) )
 	if ( !ImGui::BeginChild( "##gallery_content", {}, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus ) )
 	{
 		ImGui::EndChild();
-		ImGui::PopStyleColor();
+		// ImGui::PopStyleColor();
 		return;
 	}
 
@@ -1037,7 +1038,7 @@ void gallery_view_draw_content()
 	gallery::scroll_to_cursor        = false;
 	gallery::item_size_changed = false;
 
-	ImGui::PopStyleColor();
+	// ImGui::PopStyleColor();
 }
 
 
@@ -1054,8 +1055,24 @@ void gallery_view_draw()
 	int window_width, window_height;
 	SDL_GetWindowSize( app::window, &window_width, &window_height );
 
-	ImGui::SetNextWindowPos( { 0, 0 } );
-	ImGui::SetNextWindowSize( { (float)window_width, (float)window_height } );
+	//ImGui::SetNextWindowPos( { 0, 0 } );
+	// ImGui::SetCursorPos( { 0, 0 } );
+
+	// Header
+	float header_height = gallery_view_draw_header();
+
+	// ImVec2 region_avail = ImGui::GetWindowContentRegionMax();
+
+	//ImGui::SetNextWindowPos( { 0, 0 } );
+
+	// ImVec2 cursor_pos = ImGui::GetCursorPos();
+
+	//ImGui::SetCursorPosX( 0.f );
+	ImGui::SetNextWindowPos( { 0, header_height } );
+	ImGui::SetNextWindowSize( { (float)window_width, (float)window_height - header_height } );
+
+	if ( app::config.use_custom_colors )
+		ImGui::SetNextWindowBgAlpha( app::config.header_bg_color.w );
 
 	if ( !ImGui::Begin( "##gallery_main", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar ) )
 	{
@@ -1063,22 +1080,35 @@ void gallery_view_draw()
 		return;
 	}
 
-	// Header
-	gallery_view_draw_header();
-
 	// Sidebar
 	if ( gallery::sidebar_draw )
 	{
+		ImGui::SetCursorPosX( 0 );
+		ImGui::SetCursorPosY( 0 );
+
+		if ( app::config.use_custom_colors )
+			ImGui::PushStyleColor( ImGuiCol_ChildBg, app::config.sidebar_bg_color );
+
 		gallery_view_draw_sidebar();
+
+		if ( app::config.use_custom_colors )
+			ImGui::PopStyleColor();
+
 		ImGui::SameLine();
 	}
 
 	// Gallery View
+	ImGui::SetCursorPosY( 0 );
+
+	if ( app::config.use_custom_colors )
+		ImGui::PushStyleColor( ImGuiCol_ChildBg, app::config.content_bg_color );
+
 	gallery_view_draw_content();
 
-	thumbnail_cache_debug_draw();
+	if ( app::config.use_custom_colors )
+		ImGui::PopStyleColor();
 
-	gallery_view_context_menu();
+	// gallery_view_context_menu();
 
 	ImGui::End();
 

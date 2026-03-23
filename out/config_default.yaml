@@ -63,3 +63,15 @@ gallery-zoom-default: 200
 # Scale to zoom in/out by with scroll wheel
 media-zoom-scale: 0.1
 
+# WINDOWS ONLY - Allows titlebar color to extend into the window, useful for DWMBlurGlass
+dwm-extend: 0
+use-custom-colors: 0
+
+# gallery-header-background-color: [0.1, .1, .1, 0]
+gallery-header-background-color: [0, 0, 0, 0]
+gallery-sidebar-bg-color: [0, 0, 0, 0.5]
+gallery-content-bg-color: [12, 12, 12, 1.0]
+
+gallery-header-padding-x: 6
+gallery-header-padding-y: 6
+

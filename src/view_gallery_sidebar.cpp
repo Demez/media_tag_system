@@ -4,7 +4,6 @@
 
 
 static char g_folder_buf[ 512 ]{};
-char        g_search_buf[ 1024 ]{};
 bool        g_do_search = false;
 
 void        gallery_view_reset_text_size();
@@ -102,47 +101,67 @@ bool        SliderStepInt( const char* label, int* value, const int step_size, c
 
 static void draw_vertical_separator( ImDrawList* draw_list, ImGuiStyle& style )
 {
+	ImVec2 cursor_pos = ImGui::GetCursorPos();
+
 	if ( style.WindowBorderSize > 0 )
 	{
 		ImColor border_col   = style.Colors[ ImGuiCol_Border ];
-		ImVec2  cursor_pos   = ImGui::GetCursorPos();
 		ImVec2  region_avail = ImGui::GetContentRegionAvail();
+		float  window_height = ImGui::GetWindowHeight();
 
-		ImVec2  line_start   = cursor_pos;
+		ImVec2  line_start   = { cursor_pos.x, 0 };
 		ImVec2  line_end     = cursor_pos;
 
-		line_start.y -= style.FramePadding.y;
-		line_end.y += region_avail.y + style.FramePadding.y;
+		// line_start.y -= style.FramePadding.y;
+		line_end.y += window_height + style.FramePadding.y;
 
 		draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
 
 		// ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
 		ImGui::SetCursorPosX( cursor_pos.x + style.WindowBorderSize + style.ItemSpacing.x );
 	}
+	else
+	{
+		ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
+	}
 }
 
 
-void gallery_view_draw_header()
+int gallery_view_draw_header()
 {
 	int window_width, window_height;
 	SDL_GetWindowSize( app::window, &window_width, &window_height );
 
 	ImGuiStyle& style = ImGui::GetStyle();
 
-	ImDrawList* draw_list = ImGui::GetWindowDrawList();
-
 	ImGui::SetNextWindowPos( { 0, 0 } );
-	// ImGui::SetNextWindowSize( { (float)window_width, 32.f } );
-	// ImGui::SetNextWindowSizeConstraints( { (float)window_width, 0.f }, { (float)window_width, 64.f } );
+	//ImGui::SetCursorPos( { 0, 0 } );
+	//ImGui::SetNextWindowSize( { (float)window_width, 0.f } );
+	ImGui::SetNextWindowSizeConstraints( { (float)window_width, 0.f }, { (float)window_width, -1.f } );
 
-	ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, { 6, 6 } );
+	ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, app::config.gallery_header_padding );
+	ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0 );
 
-	if ( !ImGui::BeginChild( "##gallery_header", { (float)window_width, 0.f }, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AlwaysUseWindowPadding ) )
+	if ( app::config.use_custom_colors )
 	{
-		ImGui::EndChild();
-		ImGui::PopStyleVar();
-		return;
+		ImGui::PushStyleColor( ImGuiCol_FrameBg, style.Colors[ ImGuiCol_WindowBg ] );
+		ImGui::PushStyleColor( ImGuiCol_FrameBgHovered, style.Colors[ ImGuiCol_WindowBg ] );
+		ImGui::PushStyleColor( ImGuiCol_FrameBgActive, style.Colors[ ImGuiCol_WindowBg ] );
+
+		ImGui::PushStyleColor( ImGuiCol_WindowBg, app::config.header_bg_color );
 	}
+
+	// if ( !ImGui::Begin( "##gallery_header", { (float)window_width, 0.f }, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AlwaysUseWindowPadding ) )
+	if ( !ImGui::Begin( "##gallery_header", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav ) )
+	{
+		ImGui::End();
+		if ( app::config.use_custom_colors )
+			ImGui::PopStyleColor( 4 );
+		ImGui::PopStyleVar( 2 );
+		return 0;
+	}
+
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
 	if ( ImGui::Button( "Toggle Sidebar" ) )
 	{
@@ -204,7 +223,7 @@ void gallery_view_draw_header()
 
 	ImGui::SameLine();
 
-	if ( ImGui::InputText( "##search", g_search_buf, 1024, ImGuiInputTextFlags_EnterReturnsTrue ) )
+	if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 	{
 		g_do_search = true;
 		gallery_view_dir_change();
@@ -331,15 +350,20 @@ void gallery_view_draw_header()
 	// {
 	// }
 
-	ImGui::SameLine();
+	// ImGui::SameLine();
 
-	ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
+	//ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 
-	ImGui::EndChild();
+	int im_window_height = ImGui::GetWindowHeight();
 
-	ImGui::PopStyleVar();
+	ImGui::End();
 
-	ImGui::PopStyleVar();
+	if ( app::config.use_custom_colors )
+		ImGui::PopStyleColor( 4 );
+
+	ImGui::PopStyleVar( 2 );
+
+	return im_window_height;
 }
 
 
@@ -411,7 +435,7 @@ void gallery_view_draw_sidebar()
 	ImGuiStyle& style        = ImGui::GetStyle();
 
 	ImVec2      cursor_pos   = ImGui::GetCursorPos();
-	ImGui::SetCursorPosX( 0.f );
+	// ImGui::SetCursorPosX( 0.f );
 
 	// weirdly sized still
 	// ImGui::SetNextWindowPos( { 0, 32.f } );

@@ -118,6 +118,15 @@ struct app_config_t
 	bool                      no_video               = false;
 	bool                      gallery_show_filenames = false;
 	bool                      always_draw            = false;
+	bool                      dwm_extend             = true;
+	bool                      use_custom_colors      = true;
+
+	ImVec2                    gallery_header_padding{};
+	ImVec4                    header_bg_color{};
+	ImVec4                    sidebar_bg_color{};
+	ImVec4                    content_bg_color{};
+
+	ImVec4                    media_bg_color{};
 };
 
 
@@ -324,7 +333,7 @@ namespace app
 	extern ImVec2       mouse_pos;
 	extern int          mouse_scroll;
 
-	extern ImVec4       clear_color;
+	// extern ImVec4       clear_color;
 
 	extern app_config_t config;
 
@@ -357,6 +366,8 @@ namespace gallery
 {
 	// a sorted list of media entries, each item is an index to an entry in directory::media_list
 	extern std::vector< size_t >         sorted_media;
+
+	extern char                          search[ 512 ];
 
 	// cursor position/index in items
 	extern size_t                        cursor;
