@@ -535,7 +535,7 @@ void frame_draw_end()
 
 
 // called initially on startup and on window resize
-void window_quick_draw()
+void window_quick_draw( bool resize = false )
 {
 	app::draw_frame = true;
 
@@ -543,10 +543,13 @@ void window_quick_draw()
 
 	imgui_draw( app::frame_time );
 
-	app::window_resized = true;
-	media_view_window_resize();
-	gallery_view_scroll_to_cursor();
-	// mpv_window_resize();
+	if ( resize )
+	{
+		app::window_resized = true;
+		media_view_window_resize();
+		gallery_view_scroll_to_cursor();
+		// mpv_window_resize();
+	}
 
 	frame_draw_end();
 
@@ -562,11 +565,16 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 		// NOTE: this is also called when dragging the window around
 #ifdef _WIN32
 		case SDL_EVENT_WINDOW_EXPOSED:
+		{
+			thumbnail_loader_update();
+			window_quick_draw( false );
+			break;
+		}
 #endif
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
 			thumbnail_loader_update();
-			window_quick_draw();
+			window_quick_draw( true );
 			break;
 		}
 
