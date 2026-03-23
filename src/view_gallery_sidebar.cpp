@@ -100,12 +100,36 @@ bool        SliderStepInt( const char* label, int* value, const int step_size, c
 #endif
 
 
+static void draw_vertical_separator( ImDrawList* draw_list, ImGuiStyle& style )
+{
+	if ( style.WindowBorderSize > 0 )
+	{
+		ImColor border_col   = style.Colors[ ImGuiCol_Border ];
+		ImVec2  cursor_pos   = ImGui::GetCursorPos();
+		ImVec2  region_avail = ImGui::GetContentRegionAvail();
+
+		ImVec2  line_start   = cursor_pos;
+		ImVec2  line_end     = cursor_pos;
+
+		line_start.y -= style.FramePadding.y;
+		line_end.y += region_avail.y + style.FramePadding.y;
+
+		draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
+
+		// ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
+		ImGui::SetCursorPosX( cursor_pos.x + style.WindowBorderSize + style.ItemSpacing.x );
+	}
+}
+
+
 void gallery_view_draw_header()
 {
 	int window_width, window_height;
 	SDL_GetWindowSize( app::window, &window_width, &window_height );
 
 	ImGuiStyle& style = ImGui::GetStyle();
+
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
 	ImGui::SetNextWindowPos( { 0, 0 } );
 	// ImGui::SetNextWindowSize( { (float)window_width, 32.f } );
@@ -127,8 +151,25 @@ void gallery_view_draw_header()
 
 	// ImGui::Selectable( "Sidebar", &gallery::sidebar_draw );
 	ImGui::SameLine();
-	ImGui::Spacing();
+	//ImGui::Spacing();
+	//ImGui::SameLine();
+
+	draw_vertical_separator( draw_list, style );
+
+	// TODO: add in navigation history
+	ImGui::BeginDisabled();
+
+	if ( ImGui::Button( "<" ) )
+	{
+	}
+
 	ImGui::SameLine();
+	if ( ImGui::Button( ">" ) )
+	{
+	}
+
+	ImGui::SameLine();
+	ImGui::EndDisabled();
 
 	if ( ImGui::Button( "^" ) )
 	{
@@ -157,8 +198,13 @@ void gallery_view_draw_header()
 	}
 
 	ImGui::SameLine();
+	draw_vertical_separator( draw_list, style );
 
-	if ( ImGui::InputText( "Search", g_search_buf, 1024, ImGuiInputTextFlags_EnterReturnsTrue ) )
+	ImGui::TextUnformatted( "Search" );
+
+	ImGui::SameLine();
+
+	if ( ImGui::InputText( "##search", g_search_buf, 1024, ImGuiInputTextFlags_EnterReturnsTrue ) )
 	{
 		g_do_search = true;
 		gallery_view_dir_change();
@@ -167,14 +213,68 @@ void gallery_view_draw_header()
 	}
 
 	ImGui::SameLine();
-	ImGui::Spacing();
+	draw_vertical_separator( draw_list, style );
+
+	// ---------------------------------------------------------------------------------
+	// Center Spacing, rest is aligned to the right
+
+	ImVec2 region_avail    = ImGui::GetContentRegionAvail();
+
+	int    space_needed    = 100;
+
+	ImVec2 zoom_size       = ImGui::CalcTextSize( "Zoom" );
+	ImVec2 sort_size       = ImGui::CalcTextSize( "Sort Mode" );
+	ImVec2 sort_entry_size = ImGui::CalcTextSize( "Date Modified - New to Old" );
+
+	space_needed += zoom_size.x + sort_size.x;
+	space_needed += style.ItemSpacing.x * 2;  // Zoom Text
+	space_needed += style.WindowBorderSize;   // Separator
+	space_needed += style.ItemSpacing.x * 2;  // Sort Mode Text
+	space_needed += style.ItemSpacing.x;      // Padding
+	
+	int sep_space_needed = 0;
+
+	if ( style.WindowBorderSize )
+		sep_space_needed = style.ItemSpacing.x + style.WindowBorderSize;
+
+	// estimate
+	int arrow_size = style.FontSizeBase;
+
+	int sort_width = sort_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
+
+	space_needed += sort_width;
+
+	if ( ( space_needed + sep_space_needed ) < region_avail.x )
+	{
+		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + ( region_avail.x - space_needed ) );
+
+		draw_vertical_separator( draw_list, style );
+
+		// ImColor border_col   = ImVec4( 1, 0, 0, 1 );
+		// ImVec2  cursor_pos   = ImGui::GetCursorPos();
+		// ImVec2  region_avail = ImGui::GetContentRegionAvail();
+		// 
+		// cursor_pos.x += space_needed;
+		// 
+		// ImVec2  line_start   = cursor_pos;
+		// ImVec2  line_end     = cursor_pos;
+		// 
+		// line_start.y -= style.FramePadding.y;
+		// line_end.y += region_avail.y + style.FramePadding.y;
+		// 
+		// draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
+	}
+
+	// ---------------------------------------------------------------------------------
+
+	ImGui::TextUnformatted( "Zoom" );
 	ImGui::SameLine();
 
 	ImGui::SetNextItemWidth( 100 );
 
 	// if ( ImGui::SliderInt( "Zoom", &gallery::item_size, gallery::item_size_min, gallery::item_size_max ) )
 	// if ( ImGui::DragInt( "##zoom", &gallery::item_size, 10, gallery::item_size_min, gallery::item_size_max, "Zoom - %d px" ) )
-	if ( ImGui::SliderScalar( "Zoom", ImGuiDataType_U32, &gallery::item_size, &gallery::item_size_min, &gallery::item_size_max, "%d px" ) )
+	if ( ImGui::SliderScalar( "##zoom", ImGuiDataType_U32, &gallery::item_size, &gallery::item_size_min, &gallery::item_size_max, "%d px" ) )
 	{
 		gallery_view_reset_text_size();
 
@@ -182,6 +282,10 @@ void gallery_view_draw_header()
 			thumbnail_clear_cache();
 	}
 
+	ImGui::SameLine();
+	draw_vertical_separator( draw_list, style );
+
+	ImGui::TextUnformatted( "Sort Mode" );
 	ImGui::SameLine();
 
 	const char* sort_names[] = {
@@ -199,7 +303,9 @@ void gallery_view_draw_header()
 
 	const char* combo_preview_value = sort_names[ gallery::sort_mode ];
 
-	if ( ImGui::BeginCombo( "Sort Mode", combo_preview_value, 0 ) )
+	ImGui::SetNextItemWidth( sort_width );
+
+	if ( ImGui::BeginCombo( "##sort_mode", combo_preview_value, 0 ) )
 	{
 		for ( int n = 0; n < e_gallery_sort_mode_count; n++ )
 		{
