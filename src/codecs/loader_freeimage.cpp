@@ -170,7 +170,15 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	size_t image_size                   = (size_t)pitch * (size_t)load_info.image->frame[ page ].height;
 	// size_t image_size           = load_info.image->width * load_info.image->height * load_info.image->bytes_per_pixel;
 
-	load_info.image->frame[ page ].data = ch_realloc< u8 >( load_info.image->frame[ page ].data, image_size, e_mem_category_image_data );
+	// MEM LEAK TEST
+	if ( load_info.image->frame[ page ].data )
+	{
+		ch_free( e_mem_category_image_data, load_info.image->frame[ page ].data );
+		load_info.image->frame[ page ].data = nullptr;
+	}
+
+	// load_info.image->frame[ page ].data = ch_realloc< u8 >( load_info.image->frame[ page ].data, image_size, e_mem_category_image_data );
+	load_info.image->frame[ page ].data = ch_calloc< u8 >( image_size, e_mem_category_image_data );
 	load_info.image->frame[ page ].size = image_size;
 
 	memset( load_info.image->frame[ page ].data, 0, image_size * sizeof( u8 ) );
@@ -191,6 +199,9 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 		}
 	}
 
+	if ( new_bitmap )
+		FreeImage_Unload( bitmap );
+
 	return true;
 }
 
@@ -199,19 +210,44 @@ struct LoaderFreeImage : public IImageLoader
 {
 	LoaderFreeImage()
 	{
-		// On windows, this is called automatically on dll load
-#if __unix__
-		FreeImage_Initialise();
-#endif
-
 		image_register_codec( this, true );
 	}
 
 	~LoaderFreeImage()
 	{
-#if __unix__
-		FreeImage_DeInitialise();
-#endif
+	}
+
+	void get_supported_extensions( std::vector< std::string >& extensions ) override
+	{
+		for ( int idx = 0; idx < FreeImage_GetFIFCount2(); ++idx )
+		{
+			FREE_IMAGE_FORMAT fif  = FreeImage_GetFIFFromIndex( idx );
+			const char*       exts = FreeImage_GetFIFExtensionList( fif );
+			// const char*       desc = FreeImage_GetFIFDescription( fif );
+
+			char*             ext_cur  = (char*)exts;
+			char*             ext_next = strchr( ext_cur, ',' );
+
+			while ( ext_cur != nullptr )
+			{
+				std::string ext = ".";
+
+				if ( !ext_next )
+					ext.append( ext_cur );
+				else
+					ext.append( ext_cur, ext_next - ext_cur );
+
+				extensions.push_back( ext );
+
+				if ( !ext_next )
+					break;
+
+				ext_cur  = ext_next + 1;
+				ext_next = strchr( ext_cur, ',' );
+			}
+
+			continue;
+		}
 	}
 
 	bool check_extension( std::string_view ext ) override
@@ -271,9 +307,14 @@ struct LoaderFreeImage : public IImageLoader
 			}
 		}
 
+		FREE_IMAGE_COLOR_TYPE color_type    = FIC_RGB;
+		FREE_IMAGE_TYPE       image_type    = FIT_BITMAP;
+
+		FIBITMAP*             single_bitmap = nullptr;
+		FIMULTIBITMAP*        multi_bitmap  = nullptr;
+#if 1
 		// FIBITMAP* bitmap = FreeImage_LoadFromMemory( format, memory, load_flags );
-		FIMULTIBITMAP* multi_bitmap  = FreeImage_LoadMultiBitmapFromMemory( format, memory, load_flags );
-		FIBITMAP*      single_bitmap = nullptr;
+		multi_bitmap  = FreeImage_LoadMultiBitmapFromMemory( format, memory, load_flags );
 
 		if ( multi_bitmap == nullptr )
 		{
@@ -284,10 +325,15 @@ struct LoaderFreeImage : public IImageLoader
 
 		int count = FreeImage_GetPageCount( multi_bitmap );
 
-		load_info.image->frame.resize( count );
+		if ( count < load_info.image->frame.size() )
+		{
+			printf( "funny\n" );
+		}
 
-		FREE_IMAGE_COLOR_TYPE color_type = FIC_RGB;
-		FREE_IMAGE_TYPE       image_type = FIT_BITMAP;
+		load_info.image->frame.clear();
+		load_info.image->frame.resize( count );
+		//load_info.image->frame.clear();
+		//load_info.image->frame.resize( count );
 		
 		bool                  try_single_load = false;
 
@@ -298,6 +344,8 @@ struct LoaderFreeImage : public IImageLoader
 			if ( !base_bitmap )
 			{
 				try_single_load = true;
+				FreeImage_CloseMultiBitmap( multi_bitmap );
+				multi_bitmap = nullptr;
 				break;
 			}
 
@@ -320,9 +368,10 @@ struct LoaderFreeImage : public IImageLoader
 		}
 
 		if ( try_single_load )
+#endif
 		{
-			FreeImage_CloseMultiBitmap( multi_bitmap );
-			multi_bitmap  = nullptr;
+			//FreeImage_CloseMultiBitmap( multi_bitmap );
+			//multi_bitmap  = nullptr;
 
 			single_bitmap = FreeImage_LoadFromMemory( format, memory, load_flags );
 
@@ -332,6 +381,9 @@ struct LoaderFreeImage : public IImageLoader
 				FreeImage_CloseMemory( memory );
 				return false;
 			}
+
+			// load_info.image->frame.clear();
+			load_info.image->frame.resize( 1 );
 
 			if ( !image_load_frame( single_bitmap, load_info, 0 ) )
 			{

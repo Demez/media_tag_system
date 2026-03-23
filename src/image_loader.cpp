@@ -3,12 +3,13 @@
 void* malloc_stbi( size_t size )
 {
 	void* mem = malloc( size );
-	mem_add_item( e_mem_category_stbi_resize, mem, size );
+	// mem_add_item( e_mem_category_stbi_resize, mem, size );
+	mem_add_item( e_mem_category_image_data, mem, size, 1, 6 );
 	return mem;
 }
 
 #define STBIR_MALLOC( size, user_data ) ( (void)( user_data ), malloc_stbi( size ) )
-#define STBIR_FREE( ptr, user_data )    ( (void)( user_data ), ch_free( e_mem_category_stbi_resize, ptr ) )
+#define STBIR_FREE( ptr, user_data )    ( (void)( user_data ), ch_free( e_mem_category_image_data, ptr ) )
 
 #define STB_IMAGE_RESIZE2_IMPLEMENTATION
 #include "stb_image_resize2.h"
@@ -92,7 +93,7 @@ void gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t f
 		if ( textures.frame )
 			glDeleteTextures( textures.count, textures.frame );
 
-		textures.frame = ch_realloc< GLuint >( textures.frame, frame_count, e_mem_category_image_data );
+		textures.frame = ch_realloc< GLuint >( textures.frame, frame_count, e_mem_category_gl_texture_data, 2 );
 		memset( textures.frame, 0, sizeof( GLuint ) * frame_count );
 
 		glGenTextures( frame_count, textures.frame );
@@ -111,7 +112,7 @@ void gl_free_textures( uploaded_textures_t& textures )
 	if ( textures.frame )
 		glDeleteTextures( textures.count, textures.frame );
 
-	ch_free( e_mem_category_image_data, textures.frame );
+	ch_free( e_mem_category_gl_texture_data, textures.frame );
 
 	textures.frame = nullptr;
 	textures.count = 0;
@@ -122,15 +123,42 @@ void gl_free_textures( uploaded_textures_t& textures )
 // Image Loading
 
 
+static std::unordered_map< std::string, IImageLoader* > g_ext_loader_map{};
+
+
 void image_register_codec( IImageLoader* codec, bool fallback )
 {
 	if ( !codec )
 		return;
 
 	if ( fallback )
+	{
+		codec->loader_id = g_codecs_backup.size();
 		g_codecs_backup.push_back( codec );
+	}
 	else
+	{
+		codec->loader_id = g_codecs.size();
 		g_codecs.push_back( codec );
+	}
+
+	std::vector< std::string > exts;
+	codec->get_supported_extensions( exts );
+
+	for ( const std::string& ext : exts )
+	{
+		auto it = g_ext_loader_map.find( ext );
+
+		// Already here
+		if ( it != g_ext_loader_map.end() )
+		{
+			if ( fallback )
+				continue;
+		}
+		
+		// Add it
+		g_ext_loader_map[ ext ] = codec;
+	}
 }
 
 
@@ -140,7 +168,15 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 	const char* path_str        = path_std_string.c_str();
 	std::string ext_str         = path.extension().string();
 
-	if ( !fs_is_file( path_str ) || fs_file_size( path_str ) == 0 )
+	auto        it              = g_ext_loader_map.find( ext_str );
+
+	if ( it == g_ext_loader_map.end() )
+	{
+		printf( "No matching loader for image format!\n" );
+		return false;
+	}
+
+	if ( !fs_is_file( path_str ) /*|| fs_file_size( path_str ) == 0*/ )
 	{
 		if ( !load_info.quiet )
 			printf( "File is Empty or Doesn't exist: %s\n", path_str );
@@ -181,6 +217,10 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 	bool loaded_image = false;
 
+#if 1
+	IImageLoader* loader = it->second;
+	loaded_image         = loader->image_load( path, load_info, file_data, file_len );
+#else
 	for ( IImageLoader* codec : g_codecs )
 	{
 		// if ( !codec->check_extension( ext_str ) )
@@ -208,6 +248,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 				break;
 		}
 	}
+#endif
 
 	if ( !loaded_image && allocated_image )
 	{
@@ -247,8 +288,8 @@ void image_free_frames( image_t& image )
 	if ( image.frame.empty() )
 		return;
 
-	for ( image_frame_t& frame : image.frame )
-		ch_free( e_mem_category_image_data, frame.data );
+	//for ( image_frame_t& frame : image.frame )
+	//	ch_free( e_mem_category_image_data, frame.data );
 
 	image.frame.clear();
 }

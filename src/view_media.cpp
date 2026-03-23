@@ -443,7 +443,7 @@ void media_view_draw_media_info()
 		ImGui::Text( "Size: %dx%d", g_image_data.image.width, g_image_data.image.height );
 
 		ImGui::Text( "Type: %s", g_image_data.image.image_format );
-		ImGui::Text( "Frame Count: %d", g_image_data.image.frame.size() );
+		ImGui::Text( "Frame Count: %zu", g_image_data.image.frame.size() );
 		ImGui::Text( "Channels: %d", g_image_data.image.channels );
 
 		switch ( g_image_data.image.format )
@@ -463,6 +463,18 @@ void media_view_draw_media_info()
 			case GL_LUMINANCE:
 				ImGui::TextUnformatted( "GL Format: LUMINANCE" );
 				break;
+		}
+
+		if ( ImGui::CollapsingHeader( "Frame Data" ) )
+		{
+			for ( size_t frame_i = 0; frame_i < g_image_data.image.frame.size(); frame_i++ )
+			{
+				ImGui::Separator();
+
+				ImGui::Text( "Frame %zu", frame_i );
+				ImGui::Text( "Duration: %.3f", g_image_data.image.frame[ frame_i ].time );
+				ImGui::Text( "Size: %dx%d", g_image_data.image.frame[ frame_i ].width, g_image_data.image.frame[ frame_i ].height );
+			}
 		}
 	}
 

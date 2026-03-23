@@ -118,6 +118,7 @@ enum e_mem_category : u8
 
 	e_mem_category_image_data,
 	e_mem_category_image,
+	e_mem_category_gl_texture_data,
 	e_mem_category_string,
 	e_mem_category_file_data,
 
@@ -142,6 +143,7 @@ struct mem_alloc_info_t
 	size_t           size;
 	u64              app_time;
 	std::stacktrace* stack_trace;
+	bool             freed;
 };
 
 //struct mem_alloc_info_t
@@ -161,7 +163,7 @@ struct mem_category_info_t
 };
 
 
-void                 mem_add_item( e_mem_category category, void* memory, size_t bytes );
+void                 mem_add_item( e_mem_category category, void* memory, size_t bytes, size_t stack_skip = 1, size_t stack_depth = 1 );
 void                 mem_free_item( e_mem_category category, void* memory );
 
 void*                imgui_mem_alloc( size_t sz, void* user_data );
@@ -186,18 +188,22 @@ T CLAMP( T value, T low, T high )
 }
 
 
-inline void ch_free( e_mem_category category, void* memory )
+template< typename T >
+inline void ch_free( e_mem_category category, T*& memory )
 {
 	if ( memory == nullptr )
 		return;
 
 	mem_free_item( category, memory );
 	free( memory );
+
+	memory = nullptr;
 }
 
 
 // shortcut function
-inline void ch_free_str( void* memory )
+template< typename T >
+inline void ch_free_str( T*& memory )
 {
 	ch_free( e_mem_category_string, memory );
 }
@@ -227,14 +233,14 @@ T* ch_calloc( size_t count, e_mem_category category )
 	T* ptr = (T*)calloc( count, sizeof( T ) );
 
 	if ( ptr )
-		mem_add_item( category, ptr, count * sizeof( T ) );
+		mem_add_item( category, ptr, count * sizeof( T ), 1 );
 
 	return ptr;
 }
 
 
 template< typename T >
-T* ch_realloc( T* data, size_t count, e_mem_category category )
+T* ch_realloc( T* data, size_t count, e_mem_category category, size_t stack_skip = 1, size_t stack_depth = 1 )
 {
 	T* ptr = (T*)realloc( data, count * sizeof( T ) );
 
@@ -243,7 +249,7 @@ T* ch_realloc( T* data, size_t count, e_mem_category category )
 		if ( data )
 			mem_free_item( category, data );
 
-		mem_add_item( category, ptr, count * sizeof( T ) );
+		mem_add_item( category, ptr, count * sizeof( T ), stack_skip, stack_depth );
 	}
 
 	return ptr;
@@ -258,7 +264,7 @@ T* ch_recalloc( T* data, size_t count, size_t add_count, e_mem_category category
 	if ( new_data )
 	{
 		mem_free_item( category, data );
-		mem_add_item( category, new_data, ( count + add_count ) * sizeof( T ) );
+		mem_add_item( category, new_data, ( count + add_count ) * sizeof( T ), 1 );
 		memset( &new_data[ count ], 0, add_count * sizeof( T ) );
 	}
 

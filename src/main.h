@@ -125,6 +125,38 @@ struct media_entry_t
 // Image Data
 
 
+// https://www.theimage.com/animation/pages/disposal.html
+// https://www.theimage.com/animation/pages/disposal2.html
+// GIF
+enum e_frame_disposal
+{
+	e_frame_disposal_unspecified,
+
+	e_frame_disposal_none,        // leave rendered image on canvas and draw over it
+	e_frame_disposal_background,  // restore to background color or transparency before drawing
+	e_frame_disposal_previous,    // only keep the previous frame and draw on top of that
+
+	e_frame_disposal_count,
+};
+
+
+// JPEG XL, can i join the above into this somehow? or is this wrong, i haven't touched this yet still
+enum e_frame_blend_mode
+{
+	e_frame_blend_mode_none,
+
+	e_frame_blend_mode_replace,
+	e_frame_blend_mode_add,
+	e_frame_blend_mode_blend,
+	e_frame_blend_mode_multiply_add,
+	e_frame_blend_mode_multiply,
+
+	e_frame_blend_mode_count,
+};
+
+
+// TODO: use shaders for drawing images
+// also apply palette's in the shader itself, maybe it will have a faster load time?
 struct image_frame_t
 {
 	// image data
@@ -139,6 +171,26 @@ struct image_frame_t
 	// frame width and height
 	int    width;
 	int    height;
+
+	// frame draw position relative to image draw position
+	int    pos_x;
+	int    pos_y;
+
+	image_frame_t()
+	{
+		data   = nullptr;
+		size   = 0;
+		time   = 0.0;
+		width  = 0;
+		height = 0;
+		pos_x  = 0;
+		pos_y  = 0;
+	}
+
+	~image_frame_t()
+	{
+		ch_free( e_mem_category_image_data, data );
+	}
 };
 
 
@@ -325,6 +377,7 @@ namespace gallery
 // Media View
 namespace media
 {
+	// Animated image playback information
 	extern double next_frame_timer;
 	extern size_t frame;
 	extern float  playback_speed;
@@ -395,16 +448,56 @@ bool                                 config_load();
 // image loader
 
 
+// internal image loader data
+using image_loader_handle_t = void*;
+
+constexpr image_loader_handle_t INVALID_IMAGE_HANDLE = nullptr;
+
+
+struct image_handle_t
+{
+	size_t                loader_id       = 0;
+	bool                  fallback_loader = false;
+	image_loader_handle_t handle          = INVALID_IMAGE_HANDLE;
+
+	/*bool             operator!()
+	{
+		return handle == INVALID_IMAGE_HANDLE;
+	}*/
+
+	operator bool()
+	{
+		return handle != INVALID_IMAGE_HANDLE;
+	}
+};
+
+
 struct IImageLoader
 {
+	virtual void get_supported_extensions( std::vector< std::string >& extensions )                            = 0;
+
 	virtual bool check_extension( std::string_view ext )                                                       = 0;
 	virtual bool check_header( const fs::path& path )                                                          = 0;
 
 	// Load the smallest version of an image that's larger than the inputted size
 	//virtual bool     image_load_scaled( const fs::path& path, image_t* image_info, int area_width, int area_height ) = 0;
 
+	// OLD INTERFACE
 	virtual bool image_load( const fs::path& path, image_load_info_t& load_info, char* data, size_t data_len ) = 0;
 	//virtual image_t* image_load( const fs::path& path )                                                              = 0;
+
+	// NEW INTERFACE WIP
+	// Allow for background image loading ideally and trying to stream in data
+#if 0
+
+	virtual image_loader_handle_t open( image_load_info_t& load_info, char* data, size_t data_len )                    = 0;
+	virtual void                  close( image_loader_handle_t handle )                                                = 0;
+
+	virtual size_t                get_frame_count( image_loader_handle_t handle )                                      = 0;
+	virtual bool                  load_frames( image_loader_handle_t handle, size_t frame_offset, size_t frame_count ) = 0;
+#endif
+
+	size_t loader_id = 0;
 };
 
 

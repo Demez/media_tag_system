@@ -13,7 +13,7 @@
 static void* jxl_thumbnail_mem_alloc( void* opaque, size_t sz )
 {
 	void* memory = malloc( sz );
-	mem_add_item( e_mem_category_jxl_thumbnail, memory, sz );
+	mem_add_item( e_mem_category_jxl_thumbnail, memory, sz, 1 );
 	return memory;
 }
 

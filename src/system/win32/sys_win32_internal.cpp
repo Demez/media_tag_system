@@ -15,7 +15,7 @@ wchar_t* sys_to_wchar( const char* spStr )
 
 	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst, sSize );
 
-	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( wchar_t ) );
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( wchar_t ), 1 );
 
 	return spDst;
 }
@@ -28,7 +28,7 @@ wchar_t* sys_to_wchar( const char* spStr, int sSize )
 
 	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst, sSize );
 
-	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( wchar_t ) );
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( wchar_t ), 1 );
 
 	return spDst;
 }
@@ -45,7 +45,7 @@ wchar_t* sys_to_wchar_extended( const char* spStr )
 
 	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst + 4, sSize );
 
-	mem_add_item( e_mem_category_string, spDst, ( sSize + 5 ) * sizeof( wchar_t ) );
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 5 ) * sizeof( wchar_t ), 1 );
 
 	return spDst;
 }
@@ -60,7 +60,7 @@ wchar_t* sys_to_wchar_extended( const char* spStr, int sSize )
 
 	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst + 4, sSize );
 
-	mem_add_item( e_mem_category_string, spDst, ( sSize + 5 ) * sizeof( wchar_t ) );
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 5 ) * sizeof( wchar_t ), 1 );
 
 	return spDst;
 }
@@ -75,7 +75,7 @@ char* sys_to_utf8( const wchar_t* spStr )
 
 	int ret = WideCharToMultiByte( CP_UTF8, 0, spStr, -1, spDst, sSize, NULL, NULL );
 
-	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( char ) );
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( char ), 1 );
 
 	return spDst;
 }
@@ -88,7 +88,7 @@ char* sys_to_utf8( const wchar_t* spStr, int sSize )
 
 	WideCharToMultiByte( CP_UTF8, 0, spStr, -1, spDst, sSize, NULL, NULL );
 
-	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( char ) );
+	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( char ), 1 );
 
 	return spDst;
 }

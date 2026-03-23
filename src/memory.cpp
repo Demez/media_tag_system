@@ -32,6 +32,7 @@ const char* mem_category_str[] = {
 
     "image_data",
     "image",
+    "gl_texture_data",
     "string",
     "file_data",
 
@@ -50,7 +51,7 @@ static_assert( ARR_SIZE( mem_category_str ) == e_mem_category_count );
 void* imgui_mem_alloc( size_t sz, void* user_data )
 {
 	void* memory = malloc( sz );
-	mem_add_item( e_mem_category_imgui, memory, sz );
+	mem_add_item( e_mem_category_imgui, memory, sz, 1 );
 	return memory;
 }
 
@@ -65,7 +66,7 @@ void imgui_mem_free( void* ptr, void* user_data )
 static std::mutex alloc_lock;
 
 
-void mem_add_item( e_mem_category category, void* memory, size_t size )
+void mem_add_item( e_mem_category category, void* memory, size_t size, size_t stack_skip, size_t stack_depth )
 {
 #if MEM_TRACK_ENABLE
 	if ( MEM_TRACK_PAUSE )
@@ -82,10 +83,10 @@ void mem_add_item( e_mem_category category, void* memory, size_t size )
 	std::stacktrace* stack = nullptr;
 
 	#if MEM_TRACK_STACK_TRACE
-	stack = new std::stacktrace( std::stacktrace::current() );
+	stack = new std::stacktrace( std::stacktrace::current( stack_skip + 1, stack_depth ) );
 	#endif
 
-	info.sizes[ memory ] = { memory, size, app::total_time, stack };
+	info.sizes[ memory ] = { memory, size, app::total_time, stack, false };
 
 	info.total += size;
 	g_total_memory_allocated += size;
@@ -128,10 +129,12 @@ void mem_free_item( e_mem_category category, void* memory )
 		}
 
 	#if MEM_TRACK_STACK_TRACE
-		delete it->second.stack_trace;
+		// delete it->second.stack_trace;
 	#endif
 
-		info.sizes.erase( it );
+		// info.sizes.erase( it );
+
+		it->second.freed = true;
 	}
 
 	alloc_lock.unlock();
@@ -222,7 +225,7 @@ void mem_draw_debug_ui()
 				{
 					const mem_alloc_info_t& ptr_info = sorted_mem_infos[ i ][ mem_i ];
 
-					ImGui::Text( "%.3f Sec - Ptr: %p - %.3f KB", ptr_info.app_time / ( 1000.f ), ptr_info.ptr, (float)ptr_info.size / MEM_SCALE );
+					ImGui::Text( "%s%.3f Sec - Ptr: %p - %.3f KB", ptr_info.freed ? "FREE: " : "", ptr_info.app_time / ( 1000.f ), ptr_info.ptr, (float)ptr_info.size / MEM_SCALE );
 
 					if ( ptr_info.stack_trace )
 					{

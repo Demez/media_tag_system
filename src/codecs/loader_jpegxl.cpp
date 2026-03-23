@@ -11,7 +11,7 @@
 static void* jxl_mem_alloc( void* opaque, size_t sz )
 {
 	void* memory = malloc( sz );
-	mem_add_item( e_mem_category_jxl, memory, sz );
+	mem_add_item( e_mem_category_jxl, memory, sz, 1 );
 	return memory;
 }
 
@@ -34,6 +34,11 @@ struct LoaderJXL: public IImageLoader
 
 	~LoaderJXL()
 	{
+	}
+
+	void get_supported_extensions( std::vector< std::string >& extensions ) override
+	{
+		extensions.push_back( match_ext );
 	}
 
     bool check_extension( std::string_view ext ) override

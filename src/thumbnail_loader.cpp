@@ -81,15 +81,15 @@ void thumbnail_free_host_image_data( size_t thumbnail_slot, thumbnail_t& thumbna
 	if ( !thumbnail.image )
 		return;
 
-	for ( size_t i = 0; i < thumbnail.image->frame.size(); i++ )
-	{
-		if ( thumbnail.scaled )
-			ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ i ].data );
-		else
-			ch_free( e_mem_category_image_data, thumbnail.image->frame[ i ].data );
-
-		thumbnail.image->frame[ i ].data = nullptr;
-	}
+	// for ( size_t i = 0; i < thumbnail.image->frame.size(); i++ )
+	// {
+	// 	if ( thumbnail.scaled )
+	// 		ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ i ].data );
+	// 	else
+	// 		ch_free( e_mem_category_image_data, thumbnail.image->frame[ i ].data );
+	// 
+	// 	thumbnail.image->frame[ i ].data = nullptr;
+	// }
 
 	thumbnail.image->frame.clear();
 
@@ -442,7 +442,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		// ---------------------------------------------------------------------------------------------------------
 
-		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
+		if ( ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk ) || ( !app::config.thumbnail_jxl_enable ) )
 		{
 			// No thumbnail was found on disk, load the source file and generate one
 			if ( thumbnail->type == e_media_type_video )
@@ -593,6 +593,13 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		// ---------------------------------------------------------------------------------------------------------
 
+		if ( !thumbnail->image )
+		{
+			printf( "THUMBNAIL IMAGE IS NULLPTR ?????\n" );
+			thumbnail->status = e_thumbnail_status_failed;
+			continue;
+		}
+
 		if ( thumbnail->image->frame.empty() || !thumbnail->image->frame[ 0 ].data )
 		{
 			printf( "data is nullptr in worker?\n" );
@@ -638,7 +645,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 						thumbnail_save( new_image, thumbnail_path );
 
-						ch_free( e_mem_category_stbi_resize, new_image.frame[ 0 ].data );
+						// ch_free( e_mem_category_image_data, new_image.frame[ 0 ].data );
 					}
 					else
 					{
@@ -762,15 +769,15 @@ void thumbnail_loader_update()
 		gl_update_textures( thumbnail.textures, thumbnail.image, 1 );
 		thumbnail.im_texture = thumbnail.textures.frame[ 0 ];
 
-		for ( size_t i = 0; i < thumbnail.image->frame.size(); i++ )
-		{
-			if ( thumbnail.scaled )
-				ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ i ].data );
-			else
-				ch_free( e_mem_category_image_data, thumbnail.image->frame[ i ].data );
-
-			thumbnail.image->frame[ i ].data = nullptr;
-		}
+		//for ( size_t i = 0; i < thumbnail.image->frame.size(); i++ )
+		//{
+		//	if ( thumbnail.scaled )
+		//		ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ i ].data );
+		//	else
+		//		ch_free( e_mem_category_image_data, thumbnail.image->frame[ i ].data );
+		//
+		//	thumbnail.image->frame[ i ].data = nullptr;
+		//}
 
 		thumbnail.image->frame.clear();
 

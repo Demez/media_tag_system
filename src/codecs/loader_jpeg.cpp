@@ -28,6 +28,13 @@ struct CodecJPEG: public IImageLoader
 		tjDestroy( tjpg );
 	}
 
+	void get_supported_extensions( std::vector< std::string >& extensions ) override
+	{
+		extensions.reserve( extensions.size() + 2 );
+		extensions.push_back( ".jpg" );
+		extensions.push_back( ".jpeg" );
+	}
+
 	// TODO: have this just be a list of valid extensions on codec register
     bool check_extension( std::string_view ext ) override
     {

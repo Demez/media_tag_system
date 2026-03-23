@@ -307,7 +307,7 @@ char* fs_read_file( const char* path, size_t* len )
 		return nullptr;
 	}
 
-	mem_add_item( e_mem_category_file_data, output, ( size + 1 ) * sizeof( char ) );
+	mem_add_item( e_mem_category_file_data, output, ( size + 1 ) * sizeof( char ), 1 );
 
 	memset( output, 0, ( size + 1 ) * sizeof( char ) );
 	fread( output, size, 1, fp );

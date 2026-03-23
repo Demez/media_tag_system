@@ -17,6 +17,11 @@ struct LoaderPNG: public IImageLoader
 	{
 	}
 
+	void get_supported_extensions( std::vector< std::string >& extensions ) override
+	{
+		extensions.push_back( match_ext );
+	}
+
     bool check_extension( std::string_view ext ) override
     {
         // return ext == match_ext;
@@ -116,6 +121,14 @@ struct LoaderPNG: public IImageLoader
 		// one frame
 		// load_info.image->frame      = ch_realloc( load_info.image->frame, 1, e_mem_category_image_data  );
 		load_info.image->frame.resize( 1 );
+
+		// MEM LEAK TEST
+		if ( load_info.image->frame[ 0 ].data )
+		{
+			ch_free( e_mem_category_image_data, load_info.image->frame[ 0 ].data );
+			load_info.image->frame[ 0 ].data = nullptr;
+		}
+
 		load_info.image->frame[ 0 ].data = ch_realloc( load_info.image->frame[ 0 ].data, size, e_mem_category_image_data );
 		load_info.image->frame[ 0 ].size = size;
 
