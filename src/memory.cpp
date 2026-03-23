@@ -128,10 +128,10 @@ void mem_free_item( e_mem_category category, void* memory )
 
 	#if !MEM_TRACK_KEEP_FREE
 	#if MEM_TRACK_STACK_TRACE
-		// delete it->second.stack_trace;
+		delete it->second.stack_trace;
 	#endif
 
-		// info.sizes.erase( it );
+		info.sizes.erase( it );
 	#else
 		it->second.freed = true;
 	#endif

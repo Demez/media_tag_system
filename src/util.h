@@ -412,6 +412,8 @@ char*       fs_get_filename_no_ext( const char* path );
 char*       fs_get_filename( const char* path, size_t pathLen );
 char*       fs_get_filename_no_ext( const char* path, size_t pathLen );
 
+std::string fs_get_extension( std::string_view );
+
 bool        fs_exists( const char* path );
 bool        fs_make_dir( const char* path );
 bool        fs_is_dir( const char* path );

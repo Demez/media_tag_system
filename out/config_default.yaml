@@ -31,7 +31,7 @@ thumbnail:
   # basic JPEG XL thumbnail quality and speed control
   jxl-enable: 1
 
-  jxl-distance: 4
+  jxl-distance: 3
   jxl-effort: 5
 
 
@@ -39,8 +39,15 @@ thumbnail:
 vsync: 1
 
 # When the window isn't focused, add a sleep time every frame, 0 to disable
-no-focus-sleep-time: 5
-focus-sleep-time: 1
+sleep-time-no-focus: 5
+
+# Sleep time when the program is running normally, ignoring video playback
+sleep-time-focus: 1
+
+# When the window does not need to be redraw, sleep every frame for this time
+sleep-time-idle: 15
+
+font-size: 17
 
 # Disable video support
 no-video: 0
@@ -49,3 +56,10 @@ gallery-show-filenames: 1
 
 # Always draw new frames no matter what
 always-draw: 0
+
+# Default zoom level for gallery view
+gallery-zoom-default: 200
+
+# Scale to zoom in/out by with scroll wheel
+media-zoom-scale: 0.1
+

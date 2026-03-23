@@ -130,6 +130,27 @@ char* fs_replace_path_seps_unix( const char* path )
 }
 
 
+std::string fs_get_extension( std::string_view path )
+{
+	std::string result{};
+
+	if ( path.empty() )
+		return result;
+
+	char* path_c = (char*)path.data();
+	char* dot    = strrchr( path_c, '.' );
+
+	if ( !dot || dot == path_c )
+	{
+		result = path;
+		return result;
+	}
+
+	result.append( dot, ( path_c + path.size() ) - dot );
+	return result;
+}
+
+
 char* fs_get_filename( const char* path, size_t path_len )
 {
 	if ( !path || path_len == 0 )

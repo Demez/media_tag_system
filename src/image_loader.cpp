@@ -164,15 +164,17 @@ void image_register_codec( IImageLoader* codec, bool fallback )
 
 bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_data, size_t file_len )
 {
-	std::string path_std_string = path.string();
-	const char* path_str        = path_std_string.c_str();
-	std::string ext_str         = path.extension().string();
+	std::string   path_std_string = path.string();
+	const char*   path_str        = path_std_string.c_str();
+	std::string   ext             = fs_get_extension( path_std_string );
 
-	auto        it              = g_ext_loader_map.find( ext_str );
+	IImageLoader* loader          = image_check_extension( ext );
 
-	if ( it == g_ext_loader_map.end() )
+	if ( !loader )
 	{
-		printf( "No matching loader for image format!\n" );
+		if ( !load_info.quiet )
+			printf( "No matching loader for image format!\n" );
+
 		return false;
 	}
 
@@ -215,40 +217,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 	if ( !file_data || file_len == 0 )
 		return false;
 
-	bool loaded_image = false;
-
-#if 1
-	IImageLoader* loader = it->second;
-	loaded_image         = loader->image_load( path, load_info, file_data, file_len );
-#else
-	for ( IImageLoader* codec : g_codecs )
-	{
-		// if ( !codec->check_extension( ext_str ) )
-		if ( !codec->check_extension( path_str ) )
-			continue;
-
-		loaded_image = codec->image_load( path, load_info, file_data, file_len );
-
-		if ( loaded_image )
-			break;
-	}
-
-	// Check Fallback codecs
-	if ( !loaded_image )
-	{
-		for ( IImageLoader* codec : g_codecs_backup )
-		{
-			// if ( !codec->check_extension( ext_str ) )
-			if ( !codec->check_extension( path_str ) )
-				continue;
-
-			loaded_image = codec->image_load( path, load_info, file_data, file_len );
-
-			if ( loaded_image )
-				break;
-		}
-	}
-#endif
+	bool loaded_image = loader->image_load( path, load_info, file_data, file_len );
 
 	if ( !loaded_image && allocated_image )
 	{
@@ -258,9 +227,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 	}
 
 	if ( internal_file_ptr )
-	{
 		ch_free( e_mem_category_file_data, file_data );
-	}
 
 	return loaded_image;
 }
@@ -307,27 +274,20 @@ void image_free_alloc( image_t& image )
 }
 
 
-bool image_check_extension( std::string_view ext )
+IImageLoader* image_check_extension( const std::string& ext )
 {
-	for ( IImageLoader* codec : g_codecs )
-	{
-		if ( codec->check_extension( ext ) )
-			return true;
-	}
+	auto it = g_ext_loader_map.find( ext );
 
-	for ( IImageLoader* codec : g_codecs_backup )
-	{
-		if ( codec->check_extension( ext ) )
-			return true;
-	}
+	if ( it == g_ext_loader_map.end() )
+		return nullptr;
 
-	return false;
+	return it->second;
 }
 
 
-bool media_check_extension( std::string_view str_path, e_media_type& type )
+bool media_check_extension( const std::string& ext, e_media_type& type )
 {
-	if ( image_check_extension( str_path ) )
+	if ( image_check_extension( ext ) )
 	{
 		type = e_media_type_image;
 		return true;
@@ -335,7 +295,7 @@ bool media_check_extension( std::string_view str_path, e_media_type& type )
 
 	if ( g_mpv )
 	{
-		if ( mpv_supports_ext( str_path ) )
+		if ( mpv_supports_ext( ext ) )
 		{
 			type = e_media_type_video;
 			return true;

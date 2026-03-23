@@ -143,13 +143,10 @@ void folder_load_media_list()
 			continue;
 		}
 
-		if ( !media_check_extension( media_entry.filename, media_entry.type ) )
-			continue;
+		std::string ext = fs_get_extension( media_entry.filename );
 
-		// if ( !sys_get_file_times_and_size( entry.data(), &file.date_created, nullptr, &file.date_mod, &file.file_size ) )
-		// {
-		// 	printf( "Failed to get file date created and modified, and size: %s\n", entry.data() );
-		// }
+		if ( !media_check_extension( ext, media_entry.type ) )
+			continue;
 
 		directory::media_list.push_back( media_entry );
 	}
@@ -389,7 +386,9 @@ bool on_new_file( const fs::path& file_path )
 	{
 		// can we open this file?
 		e_media_type type = e_media_type_none;
-		if ( !media_check_extension( file_path.string(), type ) )
+		std::string  ext  = fs_get_extension( file_path.string() );
+
+		if ( !media_check_extension( ext, type ) )
 			return false;
 
 		directory::queued = file_path;
@@ -855,8 +854,8 @@ void main_loop()
 
 		if ( !app::window_focused && !playing_back_video )
 		{
-			if ( app::config.no_focus_sleep_time > 0 )
-				SDL_Delay( app::config.no_focus_sleep_time );
+			if ( app::config.sleep_time_no_focus > 0 )
+				SDL_Delay( app::config.sleep_time_no_focus );
 		}
 
 		// never called?
@@ -878,12 +877,13 @@ void main_loop()
 		{
 			frame_draw_end();
 
-			if ( app::config.focus_sleep_time && app::config.always_draw )
-				SDL_Delay( app::config.focus_sleep_time );
+			if ( app::config.sleep_time_focus && app::config.always_draw )
+				SDL_Delay( app::config.sleep_time_focus );
 		}
 		else
 		{
-			SDL_Delay( 15 );
+			if ( app::config.sleep_time_idle )
+				SDL_Delay( app::config.sleep_time_idle );
 		}
 
 		app::draw_frame = false;
@@ -945,13 +945,13 @@ int main( int argc, char* argv[] )
 	sys_set_receive_drag_drop_func( drag_drop_recieve_func );
 
 	g_gl_context = SDL_GL_CreateContext( app::window );
-	
+
 	if ( !g_gl_context )
 	{
 		printf( "Failed to create GL Context\n" );
 		return 1;
 	}
-	
+
 	SDL_GL_MakeCurrent( app::window, g_gl_context );
 
 	if ( !gladLoadGL() )
@@ -977,11 +977,12 @@ int main( int argc, char* argv[] )
 		printf( "Failed to init imgui opengl\n" );
 		return 1;
 	}
-	
+
 	sys_font_data_t font_data = sys_get_font();
-	
+
 	if ( font_data.font_path )
 	{
+		font_data.height = app::config.font_size;
 		//char* exe_path = sys_get_exe_folder();
 
 		{
@@ -995,7 +996,7 @@ int main( int argc, char* argv[] )
 			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bold;
 			load_default_font( font_data, font::normal_bold, font_cfg, false );
 		}
-	
+
 		{
 			ImFontConfig font_cfg{};
 			snprintf( font_cfg.Name, 40, "Default - Oblique" );
@@ -1023,12 +1024,12 @@ int main( int argc, char* argv[] )
 
 	int      width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
-	io.DisplaySize.x   = width;
-	io.DisplaySize.y   = height;
+	io.DisplaySize.x = width;
+	io.DisplaySize.y = height;
 
 	// Set imgui.ini path to exe directory
 	{
-		char* exe_path     = sys_get_exe_folder();
+		char* exe_path = sys_get_exe_folder();
 
 		char  imgui_path[ 1024 ];
 		snprintf( imgui_path, 1024, "%s" SEP_S "imgui.ini", exe_path );
@@ -1057,9 +1058,6 @@ int main( int argc, char* argv[] )
 	}
 
 	media_view_init();
-	
-//	glGenTextures( 1, &g_image_data.texture );
-//	glGenTextures( 1, &g_image_scaled_data.texture );
 
 	// ----------------------------------------------------------------
 
@@ -1090,14 +1088,6 @@ int main( int argc, char* argv[] )
 		}
 	}
 
-//	if ( !directory::queued.empty() )
-//	{
-//		directory::path = directory::queued;
-//
-//		folder_load_media_list();
-//		directory::queued.clear();
-//	}
-
 	// ----------------------------------------------------------------
 
 	if ( !SDL_AddEventWatch( sdl_window_resize_watcher, nullptr ) )
@@ -1123,6 +1113,9 @@ int main( int argc, char* argv[] )
 	thumbnail_loader_shutdown();
 	media_view_shutdown();
 	icon_free();
+
+	image_free( g_image_data.image );
+	image_free( g_image_scaled_data.image );
 
 	SDL_GL_DestroyContext( g_gl_context );
 

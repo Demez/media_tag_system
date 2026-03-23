@@ -349,9 +349,17 @@ bool config_load()
 
 	config_get_doc_value( fyd, "/vsync %d", app::config.vsync );
 	config_get_doc_value( fyd, "/no-video %u", app::config.no_video );
-	config_get_doc_value( fyd, "/no-focus-sleep-time %u", app::config.no_focus_sleep_time );
 	config_get_doc_value( fyd, "/gallery-show-filenames %u", app::config.gallery_show_filenames );
 	config_get_doc_value( fyd, "/always-draw %u", app::config.always_draw );
+
+	config_get_doc_value( fyd, "/sleep-time-no-focus %u", app::config.sleep_time_no_focus );
+	config_get_doc_value( fyd, "/sleep-time-focus %u", app::config.sleep_time_focus );
+	config_get_doc_value( fyd, "/sleep-time-idle %u", app::config.sleep_time_idle );
+
+	config_get_doc_value( fyd, "/font-size %u", app::config.font_size );
+
+	config_get_doc_value( fyd, "/gallery-zoom-default %u", app::config.gallery_zoom_default );
+	config_get_doc_value( fyd, "/media-zoom-scale %.3f", app::config.media_zoom_scale );
 
 	app::config.vsync = std::clamp( app::config.vsync, -1, 1 );
 
@@ -371,6 +379,9 @@ bool config_load()
 
 	if ( !config_mkdir( app::config.thumbnail_video_cache_path, "config: Invalid path for thumbnail/cache-path-video!\n" ) )
 		return false;
+
+	gallery::item_size  = std::clamp( app::config.gallery_zoom_default, gallery::item_size_min, gallery::item_size_max );
+	gallery::image_size = gallery::item_size;
 
 	return true;
 }

@@ -14,14 +14,14 @@ namespace gallery
 	e_gallery_sort_mode           sort_mode         = e_gallery_sort_mode_date_mod_new_to_old;
 	bool                          sort_mode_update  = false;
 
-	int                           row_count         = 0;
-	int                           item_size         = 150;
-	int                           item_size_min     = 70;
-	int                           item_size_max     = 500;
+	u32                           row_count         = 0;
+	u32                           item_size         = 150;
+	u32                           item_size_min     = 70;
+	u32                           item_size_max     = 500;
 	bool                          item_size_changed = true;
 	std::vector< ImVec2 >         item_text_size;
 
-	int                           image_size         = item_size;
+	u32                           image_size         = item_size;
 
 	bool                          sidebar_draw       = true;
 

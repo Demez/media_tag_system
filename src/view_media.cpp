@@ -40,7 +40,6 @@ bool                     g_draw_imgui_demo         = false;
 bool                     g_draw_mem_stats          = false;
 bool                     g_draw_zoom_level         = true;
 
-constexpr double         ZOOM_AMOUNT = 0.1;
 constexpr double         ZOOM_MIN    = 0.01;
 
 // Image Scaling
@@ -338,7 +337,7 @@ void media_view_scroll_zoom( float scroll )
 		if ( image_draw::zoom >= 100.0 )
 			return;
 
-		factor += ( ZOOM_AMOUNT * scroll );
+		factor += ( app::config.media_zoom_scale * scroll );
 	}
 	else
 	{
@@ -346,7 +345,7 @@ void media_view_scroll_zoom( float scroll )
 		if ( image_draw::zoom <= ZOOM_MIN )
 			return;
 
-		factor -= ( ZOOM_AMOUNT * abs( scroll ) );
+		factor -= ( app::config.media_zoom_scale * abs( scroll ) );
 	}
 
 	// TODO: add zoom levels to snap to here

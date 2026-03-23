@@ -105,8 +105,16 @@ struct app_config_t
 	std::string               thumbnail_video_cache_path{};
 
 	int                       vsync                  = 1;
-	u32                       no_focus_sleep_time    = 5;
-	u32                       focus_sleep_time       = 1;
+
+	u32                       sleep_time_no_focus    = 5;
+	u32                       sleep_time_focus       = 1;
+	u32                       sleep_time_idle        = 15;
+
+	u32                       font_size              = 17;
+
+	u32                       gallery_zoom_default   = 200;
+	float                     media_zoom_scale       = 0.1;
+
 	bool                      no_video               = false;
 	bool                      gallery_show_filenames = false;
 	bool                      always_draw            = false;
@@ -356,14 +364,14 @@ namespace gallery
 	extern e_gallery_sort_mode           sort_mode;
 	extern bool                          sort_mode_update;
 
-	extern int                           row_count;
-	extern int                           item_size;
-	extern int                           item_size_min;
-	extern int                           item_size_max;
+	extern u32                           row_count;
+	extern u32                           item_size;
+	extern u32                           item_size_min;
+	extern u32                           item_size_max;
 	extern bool                          item_size_changed;
 	extern std::vector< ImVec2 >         item_text_size;
 
-	extern int                           image_size;
+	extern u32                           image_size;
 
 	extern bool                          sidebar_draw;
 
@@ -516,9 +524,9 @@ void image_free_frames( image_t& image );
 // Free only frames and allocations
 void image_free_alloc( image_t& image );
 
-bool media_check_extension( std::string_view ext, e_media_type& type );
-bool image_check_extension( std::string_view ext );
-bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new_height );
+bool          media_check_extension( const std::string& ext, e_media_type& type );
+IImageLoader* image_check_extension( const std::string& ext );
+bool          image_scale( image_t* old_image, image_t* new_image, int new_width, int new_height );
 
 
 // TODO: add image load functions here
