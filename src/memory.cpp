@@ -1,5 +1,6 @@
 #include "main.h"
 
+#include "imgui_internal.h"
 
 #include <mutex>
 #include <threads.h>
@@ -8,12 +9,9 @@
 
 static thread_local bool MEM_TRACK_PAUSE    = false;
 
-e_mem_category           g_mem_redirect_src = e_mem_category_general;
-e_mem_category           g_mem_redirect_dst = e_mem_category_general;
-bool                     g_mem_redirect     = false;
-
 #define MEM_TRACK_ENABLE      1
 #define MEM_TRACK_STACK_TRACE 0
+#define MEM_TRACK_KEEP_FREE   0
 
 
 // ====================================================================================================
@@ -51,7 +49,7 @@ static_assert( ARR_SIZE( mem_category_str ) == e_mem_category_count );
 void* imgui_mem_alloc( size_t sz, void* user_data )
 {
 	void* memory = malloc( sz );
-	mem_add_item( e_mem_category_imgui, memory, sz, 1 );
+	mem_add_item( e_mem_category_imgui, memory, sz, 2 );
 	return memory;
 }
 
@@ -128,13 +126,15 @@ void mem_free_item( e_mem_category category, void* memory )
 			g_total_memory_allocated -= it->second.size;
 		}
 
+	#if !MEM_TRACK_KEEP_FREE
 	#if MEM_TRACK_STACK_TRACE
 		// delete it->second.stack_trace;
 	#endif
 
 		// info.sizes.erase( it );
-
+	#else
 		it->second.freed = true;
+	#endif
 	}
 
 	alloc_lock.unlock();
@@ -154,6 +154,9 @@ int qsort_memory_newest( const void* left, const void* right )
 
 	return 0;
 }
+
+
+static bool g_mem_allocation_show[ e_mem_category_count ]{};
 
 
 void mem_draw_debug_ui()
@@ -186,6 +189,9 @@ void mem_draw_debug_ui()
 	}
 #endif
 
+	ImGui::Spacing();
+	ImGui::SeparatorEx( ImGuiSeparatorFlags_Horizontal, 2 );
+
 	// show memory usage
 	static std::vector< mem_alloc_info_t > sorted_mem_infos[ e_mem_category_count ];
 
@@ -195,13 +201,23 @@ void mem_draw_debug_ui()
 
 		ImGui::PushID( i + 1 );
 
-		ImGui::Separator();
 		//ImGui::TextUnformatted( mem_category_str[ i ] );
 		//ImGui::Spacing();
 
+		ImVec2 cursor_pos = ImGui::GetCursorPos();
+
+		// ImGui::Selectable( "Show Allocations", &g_mem_allocation_show[ i ] );
+		ImGui::Selectable( "", &g_mem_allocation_show[ i ] );
+
+		ImGui::SetCursorPos( cursor_pos );
+		// ImGui::SameLine();
+
 		ImGui::Text( "%s - %.3f KB - %zd Allocations", mem_category_str[ i ], (float)info.total / MEM_SCALE, info.sizes.size() );
 
-		if ( ImGui::CollapsingHeader( "Allocations" ) )
+		//ImGui::SameLine();
+
+		// if ( ImGui::CollapsingHeader( "Allocations" ) )
+		if ( g_mem_allocation_show[ i ] )
 		{
 			ImGui::PushItemWidth( -1 );
 
@@ -289,6 +305,8 @@ void mem_draw_debug_ui()
 		}
 
 		ImGui::PopID();
+
+		ImGui::Separator();
 	}
 }
 
