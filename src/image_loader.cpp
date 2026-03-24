@@ -474,11 +474,11 @@ static const char* g_icon_names[] = {
 
 
 static const char* g_icon_paths[] = {
-	"icons/none.png",
-	"icons/invalid.png",
-	"icons/folder.png",
-	"icons/loading.png",
-	"icons/video.png",
+	"icons" SEP_S "none.png",
+	"icons" SEP_S "invalid.png",
+	"icons" SEP_S "folder.png",
+	"icons" SEP_S "loading.png",
+	"icons" SEP_S "video.png",
 };
 
 
@@ -500,7 +500,11 @@ bool icon_preload()
 		image_load_info_t load_info{};
 		load_info.image = &g_icon_image[ i ];
 
-		if ( !image_load( exe_path / g_icon_paths[ i ], load_info ) )
+		std::string icon_path = exe_path.string();
+		icon_path += SEP_S;
+		icon_path += g_icon_paths[ i ];
+
+		if ( !image_load( icon_path, load_info ) )
 		{
 			printf( "Failed to load %s icon \"%s\"\n", g_icon_names[ i ], g_icon_paths[ i ] );
 			continue;

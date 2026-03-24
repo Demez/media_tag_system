@@ -77,12 +77,26 @@ bool fs_is_dir( const char* path )
 
 bool fs_is_file( const char* path )
 {
-	DWORD attributes = GetFileAttributesA( path );
+	wchar_t*                  path_w = sys_to_wchar_extended( path );
 
-	if ( attributes == INVALID_FILE_ATTRIBUTES )
+	WIN32_FILE_ATTRIBUTE_DATA data{};
+	BOOL                      ret = GetFileAttributesEx( path_w, GetFileExInfoStandard, &data );
+
+	// DWORD    attributes = GetFileAttributesEx( path_w,  );
+
+	ch_free_str( path_w );
+
+	if ( !ret )
+	{
+		printf( "Failed to get file attributes: %s\n", path );
+		sys_print_last_error();
 		return false;
+	}
 
-	if ( !( attributes & FILE_ATTRIBUTE_DIRECTORY ) )
+	// if ( attributes == INVALID_FILE_ATTRIBUTES )
+	// 	return false;
+
+	if ( !( data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) )
 		return true;
 
 	return false;
