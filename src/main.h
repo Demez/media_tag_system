@@ -177,31 +177,34 @@ enum e_frame_blend_mode
 struct image_frame_t
 {
 	// image data
-	u8*    data;
+	u8*              data;
 
 	// size
-	size_t size;
+	size_t           size;
 
 	// time to spend on frame
-	double time;
+	double           time;
 
 	// frame width and height
-	int    width;
-	int    height;
+	int              width;
+	int              height;
 
 	// frame draw position relative to image draw position
-	int    pos_x;
-	int    pos_y;
+	int              pos_x;
+	int              pos_y;
+
+	e_frame_disposal frame_disposal;
 
 	image_frame_t()
 	{
-		data   = nullptr;
-		size   = 0;
-		time   = 0.0;
-		width  = 0;
-		height = 0;
-		pos_x  = 0;
-		pos_y  = 0;
+		data           = nullptr;
+		size           = 0;
+		time           = 0.0;
+		width          = 0;
+		height         = 0;
+		pos_x          = 0;
+		pos_y          = 0;
+		frame_disposal = e_frame_disposal_unspecified;
 	}
 
 	~image_frame_t()

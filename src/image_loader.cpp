@@ -318,11 +318,12 @@ void image_copy_data( image_t& src, image_t& dst )
 
 void image_copy_frame_data( image_frame_t& src, image_frame_t& dst )
 {
-	dst.width  = src.width;
-	dst.height = src.height;
-	dst.pos_x  = src.pos_x;
-	dst.pos_x  = src.pos_y;
-	dst.time   = src.time;
+	dst.width          = src.width;
+	dst.height         = src.height;
+	dst.pos_x          = src.pos_x;
+	dst.pos_x          = src.pos_y;
+	dst.time           = src.time;
+	dst.frame_disposal = src.frame_disposal;
 }
 
 

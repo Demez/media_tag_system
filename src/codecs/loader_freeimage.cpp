@@ -185,20 +185,178 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	memcpy( load_info.image->frame[ page ].data, image_bits, image_size );
 
 	// Get Frame Time
-
-	FITAG* tag{};
-	if ( FreeImage_GetMetadata( FIMD_ANIMATION, base_bitmap, "FrameTime", &tag ) )
 	{
-		FREE_IMAGE_MDTYPE tag_type       = FreeImage_GetTagType( tag );
-		const void*       frame_time_ptr = FreeImage_GetTagValue( tag );
-
-		if ( tag_type == FIDT_LONG )
+		FITAG* tag{};
+		if ( FreeImage_GetMetadata( FIMD_ANIMATION, base_bitmap, "FrameTime", &tag ) )
 		{
-			s32 frame_time                      = *(s32*)frame_time_ptr;
-			load_info.image->frame[ page ].time = frame_time / 1000.0;
+			FREE_IMAGE_MDTYPE tag_type       = FreeImage_GetTagType( tag );
+			const void*       frame_time_ptr = FreeImage_GetTagValue( tag );
+
+			if ( tag_type == FIDT_LONG )
+			{
+				u32 frame_time = *(u32*)frame_time_ptr;
+
+				if ( frame_time == 0 )
+					frame_time = 100;
+
+				load_info.image->frame[ page ].time = frame_time / 1000.0;
+			}
 		}
 	}
 
+	// Get Disposal Method
+	{
+		FITAG* tag{};
+		if ( FreeImage_GetMetadata( FIMD_ANIMATION, base_bitmap, "DisposalMethod", &tag ) )
+		{
+			FREE_IMAGE_MDTYPE tag_type = FreeImage_GetTagType( tag );
+
+			if ( tag_type == FIDT_BYTE )
+			{
+				u8 value = *(u8*)FreeImage_GetTagValue( tag );
+
+				if ( value == 2 )
+					load_info.image->frame[ page ].frame_disposal = e_frame_disposal_background;
+
+				if ( value == 3 )
+					load_info.image->frame[ page ].frame_disposal = e_frame_disposal_previous;
+			}
+		}
+	}
+
+	// Get Offsets
+	{
+		FITAG* tag{};
+		if ( FreeImage_GetMetadata( FIMD_ANIMATION, base_bitmap, "FrameLeft", &tag ) )
+		{
+			FREE_IMAGE_MDTYPE tag_type = FreeImage_GetTagType( tag );
+
+			if ( tag_type == FIDT_SHORT )
+			{
+				u16 value                            = *(u16*)FreeImage_GetTagValue( tag );
+				load_info.image->frame[ page ].pos_x = value;
+			}
+		}
+
+		if ( FreeImage_GetMetadata( FIMD_ANIMATION, base_bitmap, "FrameTop", &tag ) )
+		{
+			FREE_IMAGE_MDTYPE tag_type = FreeImage_GetTagType( tag );
+
+			if ( tag_type == FIDT_SHORT )
+			{
+				u16 value                            = *(u16*)FreeImage_GetTagValue( tag );
+				load_info.image->frame[ page ].pos_y = value;
+			}
+		}
+	}
+
+	#if 1
+	printf( "\nFRAME %zu\n\n", page );
+
+	for ( int i = 0; i < FIMD_EXIF_RAW + 1; i++ )
+	{
+		FREE_IMAGE_MDMODEL md = (FREE_IMAGE_MDMODEL)i;
+
+		FITAG*             tag{};
+		FIMETADATA*        anim_metadata = FreeImage_FindFirstMetadata( md, base_bitmap, &tag );
+
+		while ( tag )
+		{
+			FREE_IMAGE_MDTYPE tag_type  = FreeImage_GetTagType( tag );
+			const void*       value_ptr = FreeImage_GetTagValue( tag );
+			const char*       name      = FreeImage_GetTagKey( tag );
+
+			{
+				switch ( tag_type )
+				{
+					default:
+						printf( "TAG: %s - %s\n", name, FreeImage_GetTagDescription( tag ) );
+						break;
+
+					case FIDT_SLONG8:
+					{
+						s64 value = *(s64*)value_ptr;
+						printf( "TAG: %s - %s - %zd\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_LONG8:
+					{
+						u64 value = *(u64*)value_ptr;
+						printf( "TAG: %s - %s - %zu\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_LONG:
+					{
+						u32 value = *(u32*)value_ptr;
+						printf( "TAG: %s - %s - %u\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_SHORT:
+					{
+						u16 value = *(u16*)value_ptr;
+						printf( "TAG: %s - %s - %u\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_BYTE:
+					case FIDT_ASCII:
+					{
+						u8 value = *(u8*)value_ptr;
+						printf( "TAG: %s - %s - %u\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_SLONG:
+					{
+						s32 value = *(s32*)value_ptr;
+						printf( "TAG: %s - %s - %d\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_SSHORT:
+					{
+						s16 value = *(s16*)value_ptr;
+						printf( "TAG: %s - %s - %d\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_SBYTE:
+					case FIDT_UNDEFINED:
+					{
+						s8 value = *(s8*)value_ptr;
+						printf( "TAG: %s - %s - %d\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_FLOAT:
+					{
+						float value = *(float*)value_ptr;
+						printf( "TAG: %s - %s - %f\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+
+					case FIDT_DOUBLE:
+					{
+						double value = *(double*)value_ptr;
+						printf( "TAG: %s - %s - %f\n", name, FreeImage_GetTagDescription( tag ), value );
+						break;
+					}
+				}
+			}
+
+			FIBOOL ret = FreeImage_FindNextMetadata( anim_metadata, &tag );
+
+			if ( !ret )
+				break;
+		}
+
+		FreeImage_FindCloseMetadata( anim_metadata );
+	}
+	#endif
+	
 	if ( new_bitmap )
 		FreeImage_Unload( bitmap );
 
@@ -293,7 +451,7 @@ struct LoaderFreeImage : public IImageLoader
 			case FIF_GIF:
 			{
 				// 'Play' the GIF to generate each frame (as 32bpp) instead of returning raw frame data when loading 
-				load_flags = GIF_PLAYBACK;
+				// load_flags = GIF_PLAYBACK;
 				break;
 			}
 			case FIF_JPEG:
