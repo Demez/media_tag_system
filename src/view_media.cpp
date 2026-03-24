@@ -190,6 +190,10 @@ void media_view_scale_check_timer( float frame_time )
 		if ( image_draw::size.x >= ( g_image_data.image.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 			return;
 
+		// ????
+		if ( !g_image_data.image.frame[ 0 ].data )
+			return;
+
 		g_scale_lock.lock();
 
 		image_free( g_scale_src );
@@ -836,8 +840,11 @@ void media_view_load()
 
 		if ( entry.type == e_media_type_image )
 		{
-			// g_image_view.image = g_test_codec->image_load( directory::media_list[ g_folder_index ] );
-			image_load( entry.file.path, image_load_info );
+			if ( image_load( entry.file.path, image_load_info ) )
+			{
+				media_history_add( entry.file.path.string() );
+			}
+
 			mpv_cmd_close_video();
 		}
 		else
@@ -1333,6 +1340,83 @@ float vertices[] = {
 };
 
 
+static void media_view_draw_frame( size_t frame_i )
+{
+	image_frame_t& frame       = g_image_data.image.frame[ frame_i ];
+
+	double         draw_width  = frame.width * image_draw::zoom;
+	double         draw_height = frame.height * image_draw::zoom;
+	double         draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
+	double         draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
+
+	if ( image_draw::flip_h )
+	{
+		draw_width *= -1;
+		draw_x += -draw_width;
+	}
+
+	if ( image_draw::flip_v )
+	{
+		draw_height *= -1;
+		draw_y += -draw_height;
+	}
+
+	// dst_rect.w = round( dst_rect.w );
+	// dst_rect.h = round( dst_rect.h );
+	// dst_rect.x = round( dst_rect.x );
+	// dst_rect.y = round( dst_rect.y );
+
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	glEnable( GL_BLEND );
+	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
+	glEnable( GL_TEXTURE_2D );
+
+	if ( g_scale_state == e_scale_state_finished )
+	{
+		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.textures.frame[ frame_i ] );
+	}
+	else
+	{
+		glBindTexture( GL_TEXTURE_2D, g_image_data.textures.frame[ frame_i ] );
+	}
+
+	glMatrixMode( GL_PROJECTION );
+	glLoadIdentity();
+
+	glOrtho( 0, width, height, 0, -1, 1 );
+
+	glMatrixMode( GL_MODELVIEW );
+	glLoadIdentity();
+
+	// get the center of the image
+	double image_center_x = draw_x + draw_width * 0.5;
+	double image_center_y = draw_y + draw_height * 0.5;
+
+	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
+	glRotatef( image_draw::rot, 0, 0, 1 );                   // rotate around the image
+	glTranslatef( -image_center_x, -image_center_y, 0.0f );  // move back
+
+	glBegin( GL_QUADS );
+
+	glTexCoord2i( 0, 0 );
+	glVertex2d( draw_x, draw_y );
+	glTexCoord2i( 1, 0 );
+	glVertex2d( draw_x + draw_width, draw_y );
+	glTexCoord2i( 1, 1 );
+	glVertex2d( draw_x + draw_width, draw_y + draw_height );
+	glTexCoord2i( 0, 1 );
+	glVertex2d( draw_x, draw_y + draw_height );
+
+	glEnd();
+
+	glDisable( GL_TEXTURE_2D );
+	glDisable( GL_BLEND );
+}
+
+
 static void media_view_draw_image()
 {
 	if ( g_image_data.textures.frame == nullptr )
@@ -1347,6 +1431,14 @@ static void media_view_draw_image()
 		app::draw_next_frame = true;
 	}
 
+	if ( g_image_data.image.frame.size() <= media::frame )
+	{
+		media::frame = 0;
+		printf( "IMAGE FRAME OUT OF BOUNDS\n" );
+		return;
+	}
+
+#if 0
 	SDL_FRect dst_rect{};
 	dst_rect.w = image_draw::size.x;
 	dst_rect.h = image_draw::size.y;
@@ -1372,7 +1464,40 @@ static void media_view_draw_image()
 
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
+#endif
 
+	if ( g_image_data.image.frame.size() > 1 )
+	{
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+	}
+	else
+	{
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	}
+
+	image_frame_t& frame = g_image_data.image.frame[ media::frame ];
+
+	if ( frame.frame_disposal == e_frame_disposal_unspecified || frame.frame_disposal == e_frame_disposal_none )
+	{
+		/// mmmm overdraw hell?
+		for ( u32 i = 0; i < media::frame + 1; i++ )
+		{
+			media_view_draw_frame( i );
+		}
+	}
+	else if ( frame.frame_disposal == e_frame_disposal_previous )
+	{
+		if ( media::frame > 0 )
+			media_view_draw_frame( media::frame - 1 );
+
+		media_view_draw_frame( media::frame );
+	}
+	else // e_frame_disposal_background ?
+	{
+		media_view_draw_frame( media::frame );
+	}
+
+#if 0
 	glEnable( GL_BLEND );
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
@@ -1418,6 +1543,8 @@ static void media_view_draw_image()
 
 	glDisable( GL_TEXTURE_2D );
 	glDisable( GL_BLEND );
+
+#endif
 }
 
 

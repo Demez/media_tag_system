@@ -362,6 +362,8 @@ namespace directory
 	extern fs::path                      queued;  // will change to this folder start of next frame
 	extern std::vector< media_entry_t >  media_list;
 	extern std::vector< h_thumbnail >    thumbnail_list;
+
+	extern std::vector< std::string >    media_history;
 }
 
 
@@ -447,6 +449,8 @@ void                                 gallery_view_input();
 void                                 gallery_view_draw();
 void                                 gallery_view_dir_change();
 
+void                                 media_history_add( const std::string& entry );
+
 void                                 set_view_type_gallery();
 void                                 set_view_type_media();
 void                                 view_type_toggle();
@@ -502,7 +506,6 @@ struct IImageLoader
 {
 	virtual void get_supported_extensions( std::vector< std::string >& extensions )                            = 0;
 
-	virtual bool check_extension( std::string_view ext )                                                       = 0;
 	virtual bool check_header( const fs::path& path )                                                          = 0;
 
 	// Load the smallest version of an image that's larger than the inputted size
@@ -527,20 +530,46 @@ struct IImageLoader
 };
 
 
-void image_register_codec( IImageLoader* codec, bool fallback );
+// Image Loader Threads
+
+enum e_image_queue_state
+{
+	e_image_queue_idle,
+	e_image_queue_start,
+	e_image_queue_open,
+	e_image_queue_loading_frame_0,
+	e_image_queue_loading_frames,
+	e_image_queue_finished,
+
+	e_image_queue_count,
+};
+
+
+struct image_queue_data_t
+{
+	image_load_info_t*  load_info;
+	e_image_queue_state state;
+};
+
+
+image_queue_data_t image_load_queue( const std::string& path, image_load_info_t* load_info );
+void               image_load_cancel( image_queue_data_t& queue_data );
+
+
+void          image_register_codec( IImageLoader* codec, bool fallback );
 
 // Load an image from disk or from memory
 // If nothing is passed in for file_data and data_len, it loads the file internally
-bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_data = nullptr, size_t data_len = 0 );
+bool          image_load( const fs::path& path, image_load_info_t& load_info, char* file_data = nullptr, size_t data_len = 0 );
 
 // Free all image data
-void image_free( image_t& image );
+void          image_free( image_t& image );
 
 // Free only frames
-void image_free_frames( image_t& image );
+void          image_free_frames( image_t& image );
 
 // Free only frames and allocations
-void image_free_alloc( image_t& image );
+void          image_free_alloc( image_t& image );
 
 bool          media_check_extension( const std::string& ext, e_media_type& type );
 IImageLoader* image_check_extension( const std::string& ext );

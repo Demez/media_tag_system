@@ -57,6 +57,8 @@ namespace directory
 	// TODO: get rid of these "thumbnail handles", i don't think it's needed anymore, just use the index in media list
 	// and make sure to clear the thumbnail cache when needed
 	std::vector< h_thumbnail >   thumbnail_list;
+
+	std::vector< std::string >   media_history;
 }
 
 // =================================================================================
@@ -94,14 +96,14 @@ void update_window_title()
 
 	if ( g_gallery_view )
 	{
-		snprintf( buf, 512, "Media Tag System [%zd] - %s", directory::media_list.size(), directory::path.string().c_str() );
+		snprintf( buf, 512, "Media Tag System [%zu] - %s", gallery::sorted_media.size(), directory::path.string().c_str() );
 	}
 	else
 	{
 		if ( gallery::sorted_media.size() >= gallery::cursor )
-			snprintf( buf, 512, "Media Tag System [%zd / %zd] - %s", gallery::cursor, gallery::sorted_media.size(), gallery_item_get_path_string( gallery::cursor ).c_str() );
+			snprintf( buf, 512, "Media Tag System [%zu / %zu] - %s", gallery::cursor, gallery::sorted_media.size(), gallery_item_get_path_string( gallery::cursor ).c_str() );
 		else
-			snprintf( buf, 512, "Media Tag System [%zd]", gallery::sorted_media.size() );
+			snprintf( buf, 512, "Media Tag System [%zu]", gallery::sorted_media.size() );
 	}
 
 	SDL_SetWindowTitle( app::window, buf );
@@ -129,6 +131,8 @@ void folder_load_media_list()
 		printf( "Failed to scan directory\n" );
 		return;
 	}
+
+	media_history_add( root );
 
 	directory::media_list.reserve( files.size() );
 
@@ -159,6 +163,20 @@ void folder_load_media_list()
 	gallery_view_dir_change();
 	
 	gallery::item_text_size.resize( directory::media_list.size() );
+}
+
+constexpr int MAX_HISTORY = 32;
+
+
+void media_history_add( const std::string& entry )
+{
+	if ( directory::media_history.size() > 0 && directory::media_history[ directory::media_history.size() - 1 ] == entry )
+		return;
+
+	if ( directory::media_history.size() == MAX_HISTORY )
+		directory::media_history.erase( directory::media_history.begin() );
+
+	directory::media_history.push_back( entry );
 }
 
 
@@ -831,8 +849,13 @@ void main_loop()
 
 			if ( is_file )
 			{
-				directory::path = directory::queued.parent_path();
-				folder_load_media_list();
+				fs::path path = directory::queued.parent_path();
+
+				if ( path != directory::path )
+				{
+					directory::path = path;
+					folder_load_media_list();
+				}
 
 				for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
 				{

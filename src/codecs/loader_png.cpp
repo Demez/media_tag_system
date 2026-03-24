@@ -22,12 +22,6 @@ struct LoaderPNG: public IImageLoader
 		extensions.push_back( match_ext );
 	}
 
-    bool check_extension( std::string_view ext ) override
-    {
-        // return ext == match_ext;
-		return ext.ends_with( match_ext );
-    }
-
 	bool check_header( const fs::path& path ) override
 	{
 #if 0

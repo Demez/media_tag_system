@@ -35,13 +35,6 @@ struct CodecJPEG: public IImageLoader
 		extensions.push_back( ".jpeg" );
 	}
 
-	// TODO: have this just be a list of valid extensions on codec register
-    bool check_extension( std::string_view ext ) override
-    {
-		// return ext == ".jpg" || ext == ".jpeg";
-		return ext.ends_with( ".jpg" ) || ext.ends_with( ".jpeg" );
-	}
-
 	bool check_header( const fs::path& path ) override
 	{
 		return true;

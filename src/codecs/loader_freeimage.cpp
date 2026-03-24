@@ -93,9 +93,10 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 		case FIC_PALETTE:
 		{
 			//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
-			FIRGBA8*  palette    = FreeImage_GetPalette( bitmap );
+			FIRGBA8*  palette     = FreeImage_GetPalette( bitmap );
 
-			FIBOOL    trans      = FreeImage_IsTransparent( bitmap );
+			FIBOOL    trans       = FreeImage_IsTransparent( bitmap );
+			int       trans_index = FreeImage_GetTransparentIndex( bitmap );
 
 			// FreeImage_ApplyPaletteIndexMapping
 			// FIBITMAP* tmp         = FreeImage_Allocate( load_info.image->width, load_info.image->height, trans ? 32 : 24 );
@@ -117,8 +118,12 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 						printf( "failed to get pixel index for palette\n" );
 					}
 
+
 					FIRGBA8 color = palette[ palette_index ];
 					color.alpha   = 255;
+
+					if ( palette_index == trans_index )
+						color.alpha = 0;
 
 					FreeImage_SetPixelColor( tmp, x, y, &color );
 				}
@@ -250,7 +255,7 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 		}
 	}
 
-	#if 1
+	#if 0
 	printf( "\nFRAME %zu\n\n", page );
 
 	for ( int i = 0; i < FIMD_EXIF_RAW + 1; i++ )
@@ -408,17 +413,6 @@ struct LoaderFreeImage : public IImageLoader
 		}
 	}
 
-	bool check_extension( std::string_view ext ) override
-	{
-		// fucking shit
-		// return ( FreeImage_GetFileType( ext.data() ) != FIF_UNKNOWN );
-
-		return ( FreeImage_GetFIFFromFilename( ext.data() ) != FIF_UNKNOWN );
-		//return ext == ".png" || ext == ".jpg" || ext == ".jpeg";
-		//return ext == ".png";
-		// return ext == ".jpg" || ext == ".jpeg";
-	}
-
 	bool check_header( const fs::path& path ) override
 	{
 		return false;
@@ -465,63 +459,78 @@ struct LoaderFreeImage : public IImageLoader
 			}
 		}
 
-		FREE_IMAGE_COLOR_TYPE color_type    = FIC_RGB;
-		FREE_IMAGE_TYPE       image_type    = FIT_BITMAP;
+		FREE_IMAGE_COLOR_TYPE color_type      = FIC_RGB;
+		FREE_IMAGE_TYPE       image_type      = FIT_BITMAP;
 
-		FIBITMAP*             single_bitmap = nullptr;
-		FIMULTIBITMAP*        multi_bitmap  = nullptr;
-#if 1
-		// FIBITMAP* bitmap = FreeImage_LoadFromMemory( format, memory, load_flags );
-		multi_bitmap  = FreeImage_LoadMultiBitmapFromMemory( format, memory, load_flags );
+		FIBITMAP*             single_bitmap   = nullptr;
+		FIMULTIBITMAP*        multi_bitmap    = nullptr;
 
-		if ( multi_bitmap == nullptr )
-		{
-			printf( "LOADER_FREEIMAGE: Failed to load image from memory\n" );
-			FreeImage_CloseMemory( memory );
-			return false;
-		}
-
-		int count = FreeImage_GetPageCount( multi_bitmap );
-
-		load_info.image->frame.clear();
-		load_info.image->frame.resize( count );
-		//load_info.image->frame.clear();
-		//load_info.image->frame.resize( count );
-		
 		bool                  try_single_load = false;
 
-		for ( int page = 0; page < count; page++ )
+		if ( load_info.single_frame )
 		{
-			FIBITMAP* base_bitmap = FreeImage_LockPage( multi_bitmap, page );
+			try_single_load = true;
+		}
+		else
+		{
+			// FIBITMAP* bitmap = FreeImage_LoadFromMemory( format, memory, load_flags );
+			multi_bitmap  = FreeImage_LoadMultiBitmapFromMemory( format, memory, load_flags );
 
-			if ( !base_bitmap )
+			if ( multi_bitmap == nullptr )
 			{
-				try_single_load = true;
-				FreeImage_CloseMultiBitmap( multi_bitmap );
-				multi_bitmap = nullptr;
-				break;
-			}
-
-			if ( page == 0 )
-			{
-				color_type = FreeImage_GetColorType( base_bitmap );
-				image_type = FreeImage_GetImageType( base_bitmap );
-			}
-			
-			if ( !image_load_frame( base_bitmap, load_info, page ) )
-			{
-				printf( "Failed to load Image Frame!\n" );
-				FreeImage_UnlockPage( multi_bitmap, base_bitmap, false );
-				FreeImage_CloseMultiBitmap( multi_bitmap );
+				printf( "LOADER_FREEIMAGE: Failed to load image from memory\n" );
 				FreeImage_CloseMemory( memory );
 				return false;
 			}
 
-			FreeImage_UnlockPage( multi_bitmap, base_bitmap, false );
+			int count = FreeImage_GetPageCount( multi_bitmap );
+
+			load_info.image->frame.clear();
+			load_info.image->frame.resize( count );
+			//load_info.image->frame.clear();
+			//load_info.image->frame.resize( count );
+		
+			//if ( count == 1 )
+			//{
+			//	FreeImage_CloseMultiBitmap( multi_bitmap );
+			//	try_single_load = true;
+			//	multi_bitmap    = nullptr;
+			//}
+			//else
+			{
+				for ( int page = 0; page < count; page++ )
+				{
+					FIBITMAP* base_bitmap = FreeImage_LockPage( multi_bitmap, page );
+
+					if ( !base_bitmap )
+					{
+						try_single_load = true;
+						FreeImage_CloseMultiBitmap( multi_bitmap );
+						multi_bitmap = nullptr;
+						break;
+					}
+
+					if ( page == 0 )
+					{
+						color_type = FreeImage_GetColorType( base_bitmap );
+						image_type = FreeImage_GetImageType( base_bitmap );
+					}
+			
+					if ( !image_load_frame( base_bitmap, load_info, page ) )
+					{
+						printf( "Failed to load Image Frame!\n" );
+						FreeImage_UnlockPage( multi_bitmap, base_bitmap, false );
+						FreeImage_CloseMultiBitmap( multi_bitmap );
+						FreeImage_CloseMemory( memory );
+						return false;
+					}
+
+					FreeImage_UnlockPage( multi_bitmap, base_bitmap, false );
+				}
+			}
 		}
 
 		if ( try_single_load )
-#endif
 		{
 			//FreeImage_CloseMultiBitmap( multi_bitmap );
 			//multi_bitmap  = nullptr;

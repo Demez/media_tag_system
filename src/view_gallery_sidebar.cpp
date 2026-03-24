@@ -522,6 +522,40 @@ void gallery_view_draw_sidebar()
 
 			sidebar_draw_filesystem();
 
+			ImGui::Separator();
+
+			ImGui::TextUnformatted( "History\n" );
+
+			u32 id = 1;
+			for ( size_t i = directory::media_history.size(); i > 0; i-- )
+			{
+				const std::string& entry = directory::media_history[ i - 1 ];
+
+				ImGui::PushID( id++ );
+
+				if ( fs_is_file( entry.c_str() ) )
+				{
+					char* filename = fs_get_filename( entry.c_str(), entry.size() );
+
+					if ( ImGui::Selectable( filename ) )
+					{
+						directory::queued = entry;
+					}
+
+					ch_free_str( filename );
+				}
+				else
+				{
+					if ( ImGui::Selectable( entry.c_str() ) )
+					{
+						directory::queued = entry;
+					}
+				}
+				
+
+				ImGui::PopID();
+			}
+
 			ImGui::EndTabItem();
 		}
 

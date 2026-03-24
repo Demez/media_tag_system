@@ -579,6 +579,7 @@ void thumbnail_loader_worker( u32 thread_id )
 				load_info.load_quick     = true;
 				load_info.threaded_load  = true;
 				load_info.thumbnail_load = true;
+				load_info.single_frame   = true;
 				load_info.target_size.x  = app::config.thumbnail_size;
 				load_info.target_size.y  = app::config.thumbnail_size;
 
