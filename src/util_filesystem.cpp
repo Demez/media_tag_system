@@ -5,26 +5,11 @@
 #ifdef _WIN32
   #include <direct.h>
   #include <io.h>
-
-  // get rid of the dumb windows posix depreciation warnings
-  #define mkdir  _mkdir
-  #define chdir  _chdir
-  #define access _access
-  #define getcwd _getcwd
-
-  #define stat   _stat
 #else
   #include <dirent.h>
   #include <cstring>
   #include <unistd.h>
   #include <sys/stat.h>
-
-// windows-specific mkdir() is used
-  // #define mkdir( f ) mkdir( f, 666 )
-  // owner read, write, exec
-  // group read, exec
-  // others read, exec
-  #define mkdir( f ) mkdir( f, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH )
 #endif
 
 
@@ -212,40 +197,6 @@ char* fs_get_filename_no_ext( const char* path )
 		return nullptr;
 
 	return fs_get_filename_no_ext( path, strlen( path ) );
-}
-
-
-bool fs_exists( const char* path )
-{
-	return access( path, 0 ) != -1;
-}
-
-
-bool fs_make_dir( const char* path )
-{
-	return mkdir( path ) == 0;
-}
-
-
-bool fs_is_dir( const char* path )
-{
-	struct stat s;
-
-	if ( stat( path, &s ) == 0 )
-		return ( s.st_mode & S_IFDIR );
-
-	return false;
-}
-
-
-bool fs_is_file( const char* path )
-{
-	struct stat s;
-
-	if ( stat( path, &s ) == 0 )
-		return ( s.st_mode & S_IFREG );
-
-	return false;
 }
 
 

@@ -39,6 +39,59 @@ static LARGE_INTEGER g_win_perf_freq;
 // ----------------------------------------------------------------------------------------
 
 
+
+bool fs_exists( const char* path )
+{
+	DWORD attributes = GetFileAttributesA( path );
+	return attributes != INVALID_FILE_ATTRIBUTES;
+}
+
+
+bool fs_make_dir( const char* path )
+{
+	int ret = SHCreateDirectoryExA( g_main_hwnd, path, nullptr );
+
+	if ( ret != 0 )
+	{
+		printf( "Failed to create directory %d\n", ret );
+		sys_print_last_error();
+	}
+
+	return ret;
+}
+
+
+bool fs_is_dir( const char* path )
+{
+	DWORD attributes = GetFileAttributesA( path );
+
+	if ( attributes == INVALID_FILE_ATTRIBUTES )
+		return false;
+
+	if ( attributes & FILE_ATTRIBUTE_DIRECTORY )
+		return true;
+
+	return false;
+}
+
+
+bool fs_is_file( const char* path )
+{
+	DWORD attributes = GetFileAttributesA( path );
+
+	if ( attributes == INVALID_FILE_ATTRIBUTES )
+		return false;
+
+	if ( !( attributes & FILE_ATTRIBUTE_DIRECTORY ) )
+		return true;
+
+	return false;
+}
+
+
+// ----------------------------------------------------------------------------------------
+
+
 bool sys_init()
 {
 	QueryPerformanceFrequency( &g_win_perf_freq );
