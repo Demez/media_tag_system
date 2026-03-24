@@ -34,6 +34,9 @@ namespace media
 // Image Panning
 bool                     g_image_pan               = false;
 
+// Waiting for mouse movement to enter pan mode
+bool                     g_image_pan_wait          = false;
+
 // Draw Information
 bool                     g_draw_media_info         = false;
 bool                     g_draw_imgui_demo         = false;
@@ -761,7 +764,36 @@ void media_view_input()
 			set_view_type_gallery();
 	}
 
-	g_image_pan = ImGui::IsMouseDown( ImGuiMouseButton_Left ) && !( util_mouse_hovering_imgui_window() && !g_image_pan );
+	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
+
+	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) )
+	{
+		media::pause = !media::pause;
+	}
+
+	// Don't toggle playback if in an image pan
+	if ( ( !g_image_pan && !mouse_hover_imgui_window && ImGui::IsKeyReleased( ImGuiKey_MouseLeft, false ) ) )
+	{
+		media::pause = !media::pause;
+	}
+
+	// mouse down and not hovering an imgui window not in an image pan
+	bool mouse_down = ImGui::IsMouseDown( ImGuiMouseButton_Left ) && !( mouse_hover_imgui_window && !g_image_pan );
+
+	if ( mouse_down && !g_image_pan )
+	{
+		// Wait for mouse movement to determine if we are panning the image or not
+		g_image_pan_wait = true;
+
+		if ( !g_image_pan )
+		{
+			if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
+			{
+				g_image_pan = true;
+				g_image_pan_wait = false;
+			}
+		}
+	}
 
 	if ( g_image_pan )
 	{
@@ -769,6 +801,9 @@ void media_view_input()
 		image_draw::pos.x += app::mouse_delta[ 0 ];
 		image_draw::pos.y += app::mouse_delta[ 1 ];
 	}
+
+	if ( !mouse_down )
+		g_image_pan = false;
 }
 
 
@@ -1110,11 +1145,6 @@ void media_view_draw_video_controls()
 void media_view_draw_animated_image_controls()
 {
 	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
-
-	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !mouse_hover_imgui_window && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
-	{
-		media::pause = !media::pause;
-	}
 
 	// Seeking
 	if ( !mouse_hover_imgui_window )
