@@ -356,6 +356,18 @@ int gallery_view_draw_header()
 
 	int im_window_height = ImGui::GetWindowHeight();
 
+	if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, (float)im_window_height } ) && !ImGui::IsAnyItemHovered() )
+	{
+		/*if ( !app::in_window_drag )
+		{
+			app::in_window_drag = ImGui::IsKeyPressed( ImGuiKey_MouseLeft );
+		}
+		else*/ if ( ImGui::IsKeyDown( ImGuiKey_MouseLeft ) )
+		{
+			app::in_window_drag = true;
+		}
+	}
+
 	ImGui::End();
 
 	if ( app::config.use_custom_colors )

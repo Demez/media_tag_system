@@ -32,6 +32,7 @@ namespace app
 
 	bool         draw_frame      = false;
 	bool         draw_next_frame = false;
+	bool         in_window_drag  = false;
 
 	app_config_t config{};
 }
@@ -573,8 +574,10 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 #ifdef _WIN32
 		case SDL_EVENT_WINDOW_EXPOSED:
 		{
+			app::in_window_drag = true;
 			thumbnail_loader_update();
 			window_quick_draw( false );
+			app::in_window_drag = false;
 			break;
 		}
 #endif
@@ -755,11 +758,14 @@ void check_need_draw( bool playing_back_video )
 
 void main_loop()
 {
-	bool  run_after_first_loop_hack = true;
+	bool   run_after_first_loop_hack = true;
 
-	u64   start_time   = sys_get_time_ms();
-	u64   current_time = start_time;
-	float time         = 0.f;
+	u64    start_time                = sys_get_time_ms();
+	u64    current_time              = start_time;
+	float  time                      = 0.f;
+
+	ImVec2 mouse_pos                 = ImGui::GetMousePos();
+	ImVec2 last_mouse_pos            = ImGui::GetMousePos();
 
 	while ( app::running )
 	{
@@ -904,6 +910,13 @@ void main_loop()
 		}
 
 		app::draw_frame = false;
+
+		if ( app::in_window_drag )
+			sys_do_window_drag( last_mouse_pos, mouse_pos );
+
+		app::in_window_drag = false;
+
+		last_mouse_pos      = mouse_pos;
 
 		// -----------------------------------------------------------------------------------
 

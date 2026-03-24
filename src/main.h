@@ -339,6 +339,7 @@ namespace app
 
 	extern bool         draw_frame;
 	extern bool         draw_next_frame;
+	extern bool         in_window_drag;
 }
 
 

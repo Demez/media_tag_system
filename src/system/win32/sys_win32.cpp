@@ -111,6 +111,26 @@ void sys_set_window( SDL_Window* window )
 }
 
 
+constexpr int SC_DRAGMOVE = SC_MOVE | HTCAPTION;
+
+
+void sys_do_window_drag( ImVec2 last_mouse_pos, ImVec2 new_mouse_pos )
+{
+	// POINT cursor_pos;
+	// GetCursorPos( &cursor_pos );
+	// 
+	// ImVec2 new_pos;
+	// new_pos[ 0 ] = cursor_pos.x - last_pos.x;
+	// new_pos[ 1 ] = cursor_pos.y - last_pos.y;
+
+	// MoveWindow( g_main_hwnd, new_pos[ 0 ], new_pos[ 1 ], WINDOW_SIZE[ 0 ], WINDOW_SIZE[ 1 ], false );
+
+	// INSTANT WINDOW DRAGGING
+	// https://stackoverflow.com/a/66919909/12778316
+	SendMessage( g_main_hwnd, WM_SYSCOMMAND, SC_DRAGMOVE, 0 );
+}
+
+
 // ----------------------------------------------------------------------------------------
 // Library Loading
 
