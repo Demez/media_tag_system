@@ -325,11 +325,6 @@ struct LoaderFreeImage : public IImageLoader
 
 		int count = FreeImage_GetPageCount( multi_bitmap );
 
-		if ( count < load_info.image->frame.size() )
-		{
-			printf( "funny\n" );
-		}
-
 		load_info.image->frame.clear();
 		load_info.image->frame.resize( count );
 		//load_info.image->frame.clear();

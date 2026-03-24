@@ -219,6 +219,34 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 	bool loaded_image = loader->image_load( path, load_info, file_data, file_len );
 
+	if ( !loaded_image )
+	{
+		for ( IImageLoader* _loader : g_codecs )
+		{
+			if ( _loader == loader )
+				continue;
+
+			loaded_image = _loader->image_load( path, load_info, file_data, file_len );
+
+			if ( loaded_image )
+				break;
+		}
+	}
+
+	if ( !loaded_image )
+	{
+		for ( IImageLoader* _loader : g_codecs_backup )
+		{
+			if ( _loader == loader )
+				continue;
+
+			loaded_image = _loader->image_load( path, load_info, file_data, file_len );
+
+			if ( loaded_image )
+				break;
+		}
+	}
+
 	if ( !loaded_image && allocated_image )
 	{
 		ch_free( e_mem_category_image, load_info.image );
@@ -271,6 +299,40 @@ void image_free_alloc( image_t& image )
 		ch_free_str( image.image_format );
 
 	image.image_format = nullptr;
+}
+
+
+void image_copy_data( image_t& src, image_t& dst )
+{
+	dst.width           = src.width;
+	dst.height          = src.height;
+	dst.bit_depth       = src.bit_depth;
+	dst.pitch           = src.pitch;
+	dst.bytes_per_pixel = src.bytes_per_pixel;
+	dst.channels        = src.channels;
+	dst.format          = src.format;
+	dst.loop_count      = src.loop_count;
+	dst.image_format    = src.image_format;
+}
+
+
+void image_copy_frame_data( image_frame_t& src, image_frame_t& dst )
+{
+	dst.width  = src.width;
+	dst.height = src.height;
+	dst.pos_x  = src.pos_x;
+	dst.pos_x  = src.pos_y;
+	dst.time   = src.time;
+}
+
+
+bool image_copy_frame_data( image_t& src, image_t& dst, size_t frame_i )
+{
+	if ( frame_i >= src.frame.size() || frame_i >= dst.frame.size() )
+		return false;
+
+	image_copy_frame_data( src.frame[ frame_i ], dst.frame[ frame_i ] );
+	return true;
 }
 
 

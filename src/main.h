@@ -413,10 +413,13 @@ extern bool                          g_mpv_video_ready;
 extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
 
+void                                 image_copy_data( image_t& src, image_t& dst );
+void                                 image_copy_frame_data( image_frame_t& src, image_frame_t& dst );
+bool                                 image_copy_frame_data( image_t& src, image_t& dst, size_t frame_i );
 
 void                                 media_view_init();
 void                                 media_view_shutdown();
-void                                 media_view_scale_check_timer( float frame_time );
+void                                 media_view_update( float frame_time );
 e_media_type                         get_media_type();
 
 // Load currently selected file, does not change view type though

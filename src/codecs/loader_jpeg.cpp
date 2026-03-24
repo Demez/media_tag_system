@@ -117,7 +117,7 @@ struct CodecJPEG: public IImageLoader
 				}
 			}
 
-			printf( "CODEC_JPEG: SCALED %d x %d -> %d x %d\n", image->width, image->height, best_width, best_height );
+			// printf( "CODEC_JPEG: SCALED %d x %d -> %d x %d\n", image->width, image->height, best_width, best_height );
 		}
 		else
 		{
@@ -133,11 +133,14 @@ struct CodecJPEG: public IImageLoader
 
 		// one frame
 		// image->frame      = ch_realloc( image->frame, 1, e_mem_category_image_data );
+		image->frame.clear();
 		image->frame.resize( 1 );
 		// image->frame[ 0 ] = ch_realloc( image->frame[ 0 ], best_width * best_height * tjPixelSize[ pixelFmt ], e_mem_category_image_data );
 		image->frame[ 0 ].data = ch_calloc< u8 >( best_width * best_height * tjPixelSize[ pixelFmt ], e_mem_category_image_data );
 
-		load_info.image->frame[ 0 ].size = best_width * best_height * tjPixelSize[ pixelFmt ];
+		load_info.image->frame[ 0 ].size   = best_width * best_height * tjPixelSize[ pixelFmt ];
+		load_info.image->frame[ 0 ].width  = best_width;
+		load_info.image->frame[ 0 ].height = best_height;
 
 		if ( !image->frame[ 0 ].data )
 		{
@@ -195,5 +198,5 @@ struct CodecJPEG: public IImageLoader
 
 
 // slower than FreeImage for some reason?
-// static CodecJPEG gCodecJPEG;
+static CodecJPEG gCodecJPEG;
 

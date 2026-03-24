@@ -475,7 +475,7 @@ void gallery_view_draw_sidebar()
 
 				if ( ImGui::Button( "Add Current Directory" ) )
 				{
-					app::config.bookmark.emplace_back( directory::path.filename().string(), directory::path.string() );
+					app::config.bookmark.emplace_back( directory::path.filename().string(), directory::path.string(), true );
 				}
 
 				ImGui::PushItemWidth( -1 );

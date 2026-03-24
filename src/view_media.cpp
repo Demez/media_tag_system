@@ -80,39 +80,14 @@ std::mutex           g_scale_lock;
 
 void media_view_filter_image()
 {
-	#if 0
-	g_scale_lock.lock();
-
-	if ( g_image_scaled_data.image.frame.size() )
-		ch_free( e_mem_category_stbi_resize, g_image_scaled_data.image.frame[ 0 ] );
-
-	g_image_scaled_data.image = g_scale_src;
-
-	g_image_scaled_data.image.frame.clear();
-	g_image_scaled_data.image.frame.resize( g_scale_src.frame.size() );
-
-	// Downscale image if size is larger than target size
-	if ( image_draw::size.x < ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
-	{
-		if ( image_scale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
-			g_scale_state = e_scale_state_upload;
-
-		// if ( g_scale_src.width != g_image_data.image.width )
-		// 	printf( "scale source is different from currently displayed image!\n" );
-	}
-	else
-	{
-		g_scale_state = e_scale_state_idle;
-	}
-
-	g_scale_lock.unlock();
+	#if 1
+	
 	#endif
 }
 
 
 void media_view_scale_thread_run()
 {
-#if 0
 	while ( app::running )
 	{
 		if ( g_scale_state != e_scale_state_start )
@@ -123,9 +98,31 @@ void media_view_scale_thread_run()
 
 		g_scale_state = e_scale_state_working;
 
-		media_view_filter_image();
+		g_scale_lock.lock();
+
+		image_copy_data( g_scale_src, g_image_scaled_data.image );
+
+		g_image_scaled_data.image.frame.clear();
+		g_image_scaled_data.image.frame.resize( g_scale_src.frame.size() );
+
+		image_copy_frame_data( g_scale_src.frame[ 0 ], g_image_scaled_data.image.frame[ 0 ] );
+
+		// Downscale image if size is larger than target size
+		if ( image_draw::size.x < ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
+		{
+			if ( image_scale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
+				g_scale_state = e_scale_state_upload;
+
+			// if ( g_scale_src.width != g_image_data.image.width )
+			// 	printf( "scale source is different from currently displayed image!\n" );
+		}
+		else
+		{
+			g_scale_state = e_scale_state_idle;
+		}
+
+		g_scale_lock.unlock();
 	}
-#endif
 }
 
 
@@ -159,14 +156,17 @@ void media_view_frame_set( size_t frame )
 
 void media_view_scale_check_timer( float frame_time )
 {
-#if 0
+	// Don't handle animated images for now
+	if ( g_image_data.image.frame.size() > 1 )
+		return;
+
 	if ( g_scale_state == e_scale_state_finished )
 	{
 		// Are we drawing the image smaller than native size?
-		if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) || round(image_draw::size.x) != g_image_data.image.width )
+		if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) || round( image_draw::size.x ) != g_image_data.image.width )
 		{
 			// Does the scaled image size match the size we draw it as?
-			if ( int(image_draw::size.x) != g_image_scaled_data.image.width )
+			if ( int( image_draw::size.x ) != g_image_scaled_data.image.width )
 			{
 				g_scale_state = e_scale_state_idle;
 				g_scale_timer = SCALE_WAIT_TIME;
@@ -191,24 +191,33 @@ void media_view_scale_check_timer( float frame_time )
 
 		image_free( g_scale_src );
 
-		g_scale_src = g_image_data.image;
+		image_copy_data( g_image_data.image, g_scale_src );
 
 		g_scale_src.frame.clear();
-		g_scale_src.frame.resize( g_image_data.image.frame.size() );
+		g_scale_src.frame.resize( 1 );
+
+		image_copy_frame_data( g_image_data.image.frame[ 0 ], g_scale_src.frame[ 0 ] );
 
 		// don't hold onto this
 		g_scale_src.image_format = nullptr;
 
-		size_t image_size        = (size_t)g_image_data.image.width * (size_t)g_image_data.image.height * (size_t)g_image_data.image.bytes_per_pixel;
-		g_scale_src.frame[ 0 ] = ch_calloc< u8 >( image_size, e_mem_category_image_data );
-		memcpy( g_scale_src.frame[ 0 ], g_image_data.image.frame[ 0 ], image_size * sizeof( u8 ) );
+		size_t image_size           = (size_t)g_image_data.image.width * (size_t)g_image_data.image.height * (size_t)g_image_data.image.bytes_per_pixel;
+		g_scale_src.frame[ 0 ].data = ch_calloc< u8 >( image_size, e_mem_category_image_data );
+		memcpy( g_scale_src.frame[ 0 ].data, g_image_data.image.frame[ 0 ].data, image_size * sizeof( u8 ) );
+
+		g_scale_src.frame[ 0 ].size = image_size;
 
 		g_image_scaled_data.index = gallery::cursor;
 		g_scale_state             = e_scale_state_start;
 
 		g_scale_lock.unlock();
 	}
-#endif
+}
+
+
+void media_view_update( float frame_time )
+{
+	media_view_scale_check_timer( frame_time );
 
 	// Add frame draw timer here for animated images
 	if ( g_image_data.image.frame.size() > 1 )
@@ -241,16 +250,16 @@ void media_view_scale_reset_timer()
 
 void media_view_init()
 {
-	// g_scale_thread = new std::thread( media_view_scale_thread_run );
+	g_scale_thread = new std::thread( media_view_scale_thread_run );
 }
 
 
 void media_view_shutdown()
 {
 	// wait for scale thread to shutdown
-	//g_scale_thread->join();
+	g_scale_thread->join();
 
-	//delete g_scale_thread;
+	delete g_scale_thread;
 }
 
 
@@ -694,15 +703,13 @@ void media_view_context_menu()
 
 void media_view_input()
 {
-#if 0
 	if ( g_scale_state == e_scale_state_upload )
 	{
-		ch_free( e_mem_category_image_data, g_scale_src.frame[ 0 ] );
-		g_scale_src.frame[ 0 ] = nullptr;
+		g_scale_src.frame.clear();
 
 		if ( g_image_scaled_data.index == gallery::cursor )
 		{
-			gl_update_texture( g_image_scaled_data.texture, &g_image_scaled_data.image );
+			gl_update_textures( g_image_scaled_data.textures, &g_image_scaled_data.image, 1 );
 			printf( "Scaled Main Image\n" );
 			g_scale_state   = e_scale_state_finished;
 			app::draw_frame = true;
@@ -715,7 +722,6 @@ void media_view_input()
 			app::draw_frame = true;
 		}
 	}
-#endif
 
 	// for video view
 	if ( !ImGui::IsKeyDown( ImGuiKey_RightCtrl ) )

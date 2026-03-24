@@ -551,6 +551,8 @@ void window_quick_draw( bool resize = false )
 
 	imgui_draw( app::frame_time );
 
+	media_view_update( app::frame_time );
+
 	if ( resize )
 	{
 		app::window_resized = true;
@@ -894,7 +896,7 @@ void main_loop()
 
 		imgui_draw( time );
 
-		media_view_scale_check_timer( time );
+		media_view_update( time );
 
 		if ( app::draw_frame )
 		{
