@@ -147,9 +147,7 @@ struct media_entry_t
 // GIF
 enum e_frame_disposal
 {
-	e_frame_disposal_unspecified,
-
-	e_frame_disposal_none,        // leave rendered image on canvas and draw over it
+	e_frame_disposal_keep,        // leave rendered image on canvas and draw over it
 	e_frame_disposal_background,  // restore to background color or transparency before drawing
 	e_frame_disposal_previous,    // only keep the previous frame and draw on top of that
 
@@ -204,7 +202,7 @@ struct image_frame_t
 		height         = 0;
 		pos_x          = 0;
 		pos_y          = 0;
-		frame_disposal = e_frame_disposal_unspecified;
+		frame_disposal = e_frame_disposal_keep;
 	}
 
 	~image_frame_t()

@@ -1475,17 +1475,48 @@ static void media_view_draw_image()
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	}
 
-	image_frame_t& frame = g_image_data.image.frame[ media::frame ];
+	image_frame_t&   frame         = g_image_data.image.frame[ media::frame ];
+	e_frame_disposal prev_disposal = frame.frame_disposal;
 
-	if ( frame.frame_disposal == e_frame_disposal_unspecified || frame.frame_disposal == e_frame_disposal_none )
+	// frame disposal seems to be how to handle THIS frame for the next frame drawn
+	// so here, the current frame will use the last frame's disposal method for how to draw it
+	// if it's keep, look for all previous frames to draw, until we hit 0 or one that's not keep
+
+	if ( media::frame > 0 )
 	{
+		image_frame_t& frame = g_image_data.image.frame[ media::frame - 1 ];
+		prev_disposal        = frame.frame_disposal;
+	}
+
+	if ( prev_disposal == e_frame_disposal_keep )
+	{
+		size_t last_frame_to_keep = media::frame;
+
+		if ( media::frame > 0 )
+		{
+			for ( last_frame_to_keep--;; last_frame_to_keep-- )
+			{
+				image_frame_t& frame = g_image_data.image.frame[ last_frame_to_keep ];
+
+				if ( frame.frame_disposal != e_frame_disposal_keep )
+					break;
+
+				if ( last_frame_to_keep == 0 )
+					break;
+			}
+		}
+		else
+		{
+			last_frame_to_keep = 0;
+		}
+
 		/// mmmm overdraw hell?
-		for ( u32 i = 0; i < media::frame + 1; i++ )
+		for ( u32 i = last_frame_to_keep; i < media::frame + 1; i++ )
 		{
 			media_view_draw_frame( i );
 		}
 	}
-	else if ( frame.frame_disposal == e_frame_disposal_previous )
+	else if ( prev_disposal == e_frame_disposal_previous )
 	{
 		if ( media::frame > 0 )
 			media_view_draw_frame( media::frame - 1 );

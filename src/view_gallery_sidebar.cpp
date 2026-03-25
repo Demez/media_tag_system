@@ -503,9 +503,10 @@ void gallery_view_draw_sidebar()
 						ImGui::EndDisabled();
 						ImGui::PopID();
 					}
+
+					ImGui::EndListBox();
 				}
 
-				ImGui::EndListBox();
 				ImGui::PopItemWidth();
 			}
 			else
@@ -570,9 +571,8 @@ void gallery_view_draw_sidebar()
 
 			if ( ImGui::BeginListBox( "##TagDatabases" ) )
 			{
+				ImGui::EndListBox();
 			}
-
-			ImGui::EndListBox();
 
 			ImGui::EndTabItem();
 		}

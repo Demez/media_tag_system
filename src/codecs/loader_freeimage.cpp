@@ -122,7 +122,7 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 					FIRGBA8 color = palette[ palette_index ];
 					color.alpha   = 255;
 
-					if ( palette_index == trans_index )
+					if ( trans && palette_index == trans_index )
 						color.alpha = 0;
 
 					FreeImage_SetPixelColor( tmp, x, y, &color );
