@@ -52,6 +52,7 @@ namespace directory
 {
 	fs::path                     path;
 	fs::path                     queued;  // will change to this folder start of next frame
+	bool                         folder_reload = false;
 	std::vector< media_entry_t > media_list;
 
 	// TODO: get rid of these "thumbnail handles", i don't think it's needed anymore, just use the index in media list
@@ -315,6 +316,12 @@ void notification_draw( float frame_time )
 
 void imgui_draw( float frame_time )
 {
+	if ( gallery::sort_mode_update )
+	{
+		gallery_view_sort_dir();
+		gallery::sort_mode_update = false;
+	}
+
 	if ( g_gallery_view )
 	{
 		gallery_view_draw();
@@ -851,7 +858,7 @@ void main_loop()
 			{
 				fs::path path = directory::queued.parent_path();
 
-				if ( path != directory::path )
+				if ( path != directory::path || directory::folder_reload )
 				{
 					directory::path = path;
 					folder_load_media_list();
@@ -871,14 +878,23 @@ void main_loop()
 			}
 			else
 			{
-				gallery::cursor = 0;
-				directory::path = directory::queued;
+				if ( directory::queued != directory::path )
+				{
+					gallery::cursor = 0;
+					directory::path = directory::queued;
+					folder_load_media_list();
+				}
+				else if ( directory::folder_reload )
+				{
+					folder_load_media_list();
+				}
+
 				directory::queued.clear();
 				gallery_view_scroll_to_cursor();
-				folder_load_media_list();
 				set_view_type_gallery();
 			}
 
+			directory::folder_reload = false;
 			update_window_title();
 		}
 

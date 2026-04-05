@@ -213,7 +213,8 @@ int gallery_view_draw_header()
 	// Enter returns true doesn't work because of gallery view hooking that input currently, need to add a check later for if focused in text input
 	if ( ImGui::Button( "->" ) )
 	{
-		directory::queued = g_folder_buf;
+		directory::queued        = g_folder_buf;
+		directory::folder_reload = true;
 	}
 
 	ImGui::SameLine();
@@ -307,20 +308,7 @@ int gallery_view_draw_header()
 	ImGui::TextUnformatted( "Sort Mode" );
 	ImGui::SameLine();
 
-	const char* sort_names[] = {
-		"A to Z",
-		"Z to A",
-		"Date Modified - New to Old",
-		"Date Modified - Old to New",
-		"Date Created - New to Old",
-		"Date Created - Old to New",
-		"File Size - Large to Small",
-		"File Size - Small to Large"
-	};
-
-	static_assert( ARR_SIZE( sort_names ) == e_gallery_sort_mode_count );
-
-	const char* combo_preview_value = sort_names[ gallery::sort_mode ];
+	const char* combo_preview_value = g_gallery_sort_mode_str[ gallery::sort_mode ];
 
 	ImGui::SetNextItemWidth( sort_width );
 
@@ -330,7 +318,7 @@ int gallery_view_draw_header()
 		{
 			const bool is_selected = ( gallery::sort_mode == n );
 
-			if ( ImGui::Selectable( sort_names[ n ], is_selected ) )
+			if ( ImGui::Selectable( g_gallery_sort_mode_str[ n ], is_selected ) )
 			{
 				gallery::sort_mode        = (e_gallery_sort_mode)n;
 				gallery::sort_mode_update = true;

@@ -319,8 +319,9 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 void media_view_zoom_reset()
 {
 	// keep where we are centered on in the image
-	image_draw::pos.x = 1 / image_draw::zoom * ( image_draw::pos.x );
-	image_draw::pos.y = 1 / image_draw::zoom * ( image_draw::pos.y );
+	// FIXME: doesn't work right
+	image_draw::pos.x = 1.0 / image_draw::zoom * ( image_draw::pos.x );
+	image_draw::pos.y = 1.0 / image_draw::zoom * ( image_draw::pos.y );
 
 	image_draw::zoom  = 1.0;
 
@@ -516,7 +517,10 @@ void media_view_context_menu()
 	ImGui::SameLine();
 
 	if ( ImGui::Button( "100%", { 0, 0 } ) )
+	{
 		media_view_zoom_reset();
+		media_view_zoom_reset();
+	}
 
 	ImGui::Separator();
 
@@ -545,50 +549,11 @@ void media_view_context_menu()
 
 	ImGui::Separator();
 
-	ImGui::SliderFloat( "rotate", &image_draw::rot, 0, 360 );
+	ImGui::PushItemWidth( 125.f );
+	ImGui::SliderFloat( "Rotation", &image_draw::rot, 0, 360 );
+	ImGui::PopItemWidth();
 
 	ImGui::Separator();
-
-#if 0
-	if ( ImGui::MenuItem( "Fit In View", nullptr, false, g_image_data.texture ) )
-	{
-		media_view_fit_in_view();
-	}
-
-	if ( ImGui::MenuItem( "Reset Zoom to 100%", nullptr, false, g_image_data.texture ) )
-	{
-		media_view_zoom_reset();
-	}
-
-	if ( ImGui::MenuItem( "Rotate Left", nullptr, false, g_image_data.texture ) )
-	{
-		image_draw::rot -= 90;
-	}
-
-	if ( ImGui::MenuItem( "Rotate Right", nullptr, false, g_image_data.texture ) )
-	{
-		image_draw::rot += 90;
-	}
-
-	// ImGui::SliderFloat( "Rotate Slider", &image_draw::rot, 0, 360 );
-
-	if ( ImGui::MenuItem( "Reset Rotation", nullptr, false, g_image_data.texture ) )
-	{
-		image_draw::rot = 0;
-	}
-
-	if ( ImGui::MenuItem( "Flip Horizontally", nullptr, image_draw::flip_h, g_image_data.texture) )
-	{
-		image_draw::flip_h = !image_draw::flip_h;
-	}
-
-	if ( ImGui::MenuItem( "Flip Vertically", nullptr, image_draw::flip_v, g_image_data.texture ) )
-	{
-		image_draw::flip_v = !image_draw::flip_v;
-	}
-
-	ImGui::Separator();
-#endif
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
 	{
@@ -609,8 +574,28 @@ void media_view_context_menu()
 		push_notification( "Copied" );
 	}
 
-	if ( ImGui::MenuItem( "Copy File Data", nullptr, false, false ) )
+	if ( ImGui::BeginMenu( "Copy As" ) )
 	{
+		// what did this do again ????
+		if ( ImGui::MenuItem( "Copy File Data", nullptr, false, false ) )
+		{
+		}
+
+		// Enable once implemented
+		// ImGui::BeginDisabled( gallery_item_get_media_entry( gallery::cursor ).type != e_media_type_image );
+		ImGui::BeginDisabled( true );
+
+		if ( ImGui::MenuItem( "JPEG", nullptr, false, 1 ) )
+		{
+		}
+
+		if ( ImGui::MenuItem( "PNG", nullptr, false, 1 ) )
+		{
+		}
+
+		ImGui::EndDisabled();
+
+		ImGui::EndMenu();
 	}
 
 	if ( ImGui::MenuItem( "Set As Desktop Background", nullptr, false, false ) )
@@ -649,36 +634,24 @@ void media_view_context_menu()
 
 	if ( ImGui::BeginMenu( "Sort Mode" ) )
 	{
-#if 0
-		auto sortMode = ImageList_GetSortMode();
 
-		if ( ImGui::MenuItem( "None", nullptr, sortMode == FileSort_None, ImageList_InFolder() ) )
-			ImageList_SetSortMode( FileSort_None );
+#define SORT_MENU_ITEM( type )                                                                     \
+	if ( ImGui::MenuItem( g_gallery_sort_mode_str[ type ], nullptr, gallery::sort_mode == type ) ) \
+	{                                                                                              \
+		gallery::sort_mode        = type;                                                          \
+		gallery::sort_mode_update = true;                                                          \
+	}
 
-		if ( ImGui::MenuItem( "File Name - A to Z", nullptr, sortMode == FileSort_AZ, false ) )
-			ImageList_SetSortMode( FileSort_AZ );
+		SORT_MENU_ITEM( e_gallery_sort_mode_name_a_z )
+		SORT_MENU_ITEM( e_gallery_sort_mode_name_z_a )
+		SORT_MENU_ITEM( e_gallery_sort_mode_date_mod_new_to_old )
+		SORT_MENU_ITEM( e_gallery_sort_mode_date_mod_old_to_new )
+		SORT_MENU_ITEM( e_gallery_sort_mode_date_created_new_to_old )
+		SORT_MENU_ITEM( e_gallery_sort_mode_date_created_old_to_new )
+		SORT_MENU_ITEM( e_gallery_sort_mode_size_large_to_small )
+		SORT_MENU_ITEM( e_gallery_sort_mode_size_small_to_large )
 
-		if ( ImGui::MenuItem( "File Name - Z to A", nullptr, sortMode == FileSort_ZA, false ) )
-			ImageList_SetSortMode( FileSort_ZA );
-
-		if ( ImGui::MenuItem( "Date Modified - Newest First", nullptr, sortMode == FileSort_DateModNewest, ImageList_InFolder() ) )
-			ImageList_SetSortMode( FileSort_DateModNewest );
-
-		if ( ImGui::MenuItem( "Date Modified - Oldest First", nullptr, sortMode == FileSort_DateModOldest, ImageList_InFolder() ) )
-			ImageList_SetSortMode( FileSort_DateModOldest );
-
-		if ( ImGui::MenuItem( "Date Created - Newest First", nullptr, sortMode == FileSort_DateCreatedNewest, ImageList_InFolder() ) )
-			ImageList_SetSortMode( FileSort_DateCreatedNewest );
-
-		if ( ImGui::MenuItem( "Date Created - Oldest First", nullptr, sortMode == FileSort_DateCreatedOldest, ImageList_InFolder() ) )
-			ImageList_SetSortMode( FileSort_DateCreatedOldest );
-
-		if ( ImGui::MenuItem( "File Size - Largest First", nullptr, sortMode == FileSort_SizeLargest, false ) )
-			ImageList_SetSortMode( FileSort_SizeLargest );
-
-		if ( ImGui::MenuItem( "File Size - Smallest First", nullptr, sortMode == FileSort_SizeSmallest, false ) )
-			ImageList_SetSortMode( FileSort_SizeSmallest );
-#endif
+#undef SORT_MENU_ITEM
 
 		ImGui::EndMenu();
 	}
@@ -686,12 +659,6 @@ void media_view_context_menu()
 	if ( ImGui::MenuItem( "Reload Folder", nullptr, false ) )
 	{
 		folder_load_media_list();
-	}
-
-	ImGui::Separator();
-
-	if ( ImGui::MenuItem( "Settings", nullptr, false, false ) )
-	{
 	}
 
 	ImGui::Separator();

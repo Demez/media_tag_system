@@ -74,6 +74,9 @@ enum e_gallery_sort_mode
 };
 
 
+extern const char* g_gallery_sort_mode_str[];
+
+
 struct bookmark_t
 {
 	std::string name{};
@@ -358,6 +361,7 @@ namespace directory
 {
 	extern fs::path                      path;
 	extern fs::path                      queued;  // will change to this folder start of next frame
+	extern bool                          folder_reload;
 	extern std::vector< media_entry_t >  media_list;
 	extern std::vector< h_thumbnail >    thumbnail_list;
 
@@ -446,6 +450,7 @@ void                                 gallery_view_scroll_to_cursor();
 void                                 gallery_view_input();
 void                                 gallery_view_draw();
 void                                 gallery_view_dir_change();
+void                                 gallery_view_sort_dir();
 
 void                                 media_history_add( const std::string& entry );
 

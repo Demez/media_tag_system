@@ -34,6 +34,21 @@ namespace gallery
 }
 
 
+
+const char* g_gallery_sort_mode_str[] = {
+	"A to Z",
+	"Z to A",
+	"Date Modified - New to Old",
+	"Date Modified - Old to New",
+	"Date Created - New to Old",
+	"Date Created - Old to New",
+	"File Size - Large to Small",
+	"File Size - Small to Large"
+};
+
+static_assert( ARR_SIZE( g_gallery_sort_mode_str ) == e_gallery_sort_mode_count );
+
+
 extern bool          g_do_search;
 
 
@@ -367,6 +382,8 @@ void gallery_view_sort_dir()
 
 	//if ( g_do_search )
 	//	g_do_search = false;
+
+	update_window_title();
 }
 
 
@@ -1044,12 +1061,6 @@ void gallery_view_draw_content()
 
 void gallery_view_draw()
 {
-	if ( gallery::sort_mode_update )
-	{
-		gallery_view_sort_dir();
-		gallery::sort_mode_update = false;
-	}
-
 	gallery_view_input();
 
 	int window_width, window_height;
