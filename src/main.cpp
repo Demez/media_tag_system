@@ -52,7 +52,6 @@ namespace directory
 {
 	fs::path                     path;
 	fs::path                     queued;  // will change to this folder start of next frame
-	bool                         folder_reload = false;
 	std::vector< media_entry_t > media_list;
 
 	// TODO: get rid of these "thumbnail handles", i don't think it's needed anymore, just use the index in media list
@@ -60,6 +59,9 @@ namespace directory
 	std::vector< h_thumbnail >   thumbnail_list;
 
 	std::vector< std::string >   media_history;
+
+	bool                         folder_reload = false;
+	bool                         recursive     = false;
 }
 
 // =================================================================================
@@ -124,10 +126,15 @@ void folder_load_media_list()
 	gallery::item_size_changed = true;
 	gallery::item_text_size.clear();
 
-	std::string root = directory::path.string();
+	std::string           root = directory::path.string();
 	std::vector< file_t > files{};
 
-	if ( !sys_scandir( root.c_str(), nullptr, files, e_scandir_abs_paths ) )
+	e_scandir_flags       scan_flags = e_scandir_abs_paths;
+
+	if ( directory::recursive )
+		scan_flags |= e_scandir_recursive | e_scandir_no_dirs;
+
+	if ( !sys_scandir( root.c_str(), nullptr, files, scan_flags ) )
 	{
 		printf( "Failed to scan directory\n" );
 		return;

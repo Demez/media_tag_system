@@ -488,18 +488,17 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 
 	if ( path )
 	{
-		scan_dir += SEP_S;
 		scan_dir += path;
+		scan_dir += SEP_S;
 	}
 	
 	scan_dir_wildcard += scan_dir;
-	scan_dir_wildcard += SEP_S;
 	scan_dir_wildcard += "*";
 
-	wchar_t*        scan_dir_wildcard_w = sys_to_wchar( scan_dir_wildcard.c_str() );
+	wchar_t*        scan_dir_wildcard_w = sys_to_wchar_extended( scan_dir_wildcard.c_str() );
 
 	WIN32_FIND_DATA ffd;
-	HANDLE          find = FindFirstFile( scan_dir_wildcard_w, &ffd );
+	HANDLE          find = FindFirstFileEx( scan_dir_wildcard_w, FindExInfoBasic, &ffd, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH );
 
 	ch_free_str( scan_dir_wildcard_w );
 
@@ -511,6 +510,16 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 
 	while ( FindNextFile( find, &ffd ) != 0 )
 	{
+		// NOTE FROM https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstfileexa#remarks
+		// "In rare cases or on a heavily loaded system, file attribute information on NTFS file systems may not be current at the time this function is called.
+		// To be assured of getting the current NTFS file system file attributes, call the GetFileInformationByHandle function."
+		// maybe add a check for that here?
+
+		if ( ffd.dwFileAttributes == INVALID_FILE_ATTRIBUTES )
+		{
+			wprintf( L"File Attributes is Invalid: %s?\n", ffd.cFileName );
+		}
+
 		bool is_dir = ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
 
 		if ( is_dir && wcsncmp( ffd.cFileName, L"..", 2 ) == 0 )
@@ -552,6 +561,8 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 		else
 			file.path = relative_path;
 
+		ch_free_str( filename );
+
 		if ( is_dir )
 		{
 			file.type |= e_file_type_directory;
@@ -564,7 +575,6 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 		}
 
 		files.push_back( file );
-		ch_free_str( filename );
 	}
 
 	FindClose( find );

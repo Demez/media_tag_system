@@ -224,12 +224,21 @@ int gallery_view_draw_header()
 
 	ImGui::SameLine();
 
-	if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
+	// if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
+	if ( ImGui::InputText( "##search", gallery::search, 512 ) )
 	{
 		g_do_search = true;
 		gallery_view_dir_change();
 		gallery_view_reset_text_size();
-		printf( "SEARCH\n" );
+	}
+
+	ImGui::SameLine();
+	draw_vertical_separator( draw_list, style );
+
+	if ( ImGui::Checkbox( "Recursive", &directory::recursive ) )
+	{
+		directory::queued        = g_folder_buf;
+		directory::folder_reload = true;
 	}
 
 	ImGui::SameLine();
@@ -511,9 +520,101 @@ void gallery_view_draw_sidebar()
 
 			sidebar_draw_filesystem();
 
+			ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
+			ImGui::TextUnformatted( "File Information\n" );
 			ImGui::Separator();
+			ImGui::PopFont();
 
+			{
+				if ( gallery::sorted_media.size() )
+				{
+					ImGui::PushItemWidth( -1 );
+
+					if ( ImGui::BeginChild( "##file_info", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY, 0 ) )
+					{
+						const media_entry_t& entry = gallery_item_get_media_entry( gallery::cursor );
+
+						ImGui::PushTextWrapPos();
+						ImGui::TextUnformatted( entry.filename.c_str() );
+						ImGui::PopTextWrapPos();
+
+						ImGui::Separator();
+
+						ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
+
+						char date_created[ DATE_TIME_BUFFER ]{};
+						char date_mod[ DATE_TIME_BUFFER ]{};
+
+						util_format_date_time( date_created, DATE_TIME_BUFFER, entry.file.date_created );
+						util_format_date_time( date_mod, DATE_TIME_BUFFER, entry.file.date_mod );
+
+						ImGui::Text( "Date Created: %s", date_created );
+						ImGui::Text( "Date Modified: %s", date_mod );
+
+						if ( get_media_type() == e_media_type_directory )
+						{
+							ImGui::TextUnformatted( "Type: Folder" );
+						}
+						else if ( get_media_type() == e_media_type_image )
+						{
+							ImGui::TextUnformatted( "Type: Image" );
+						}
+						else if ( get_media_type() == e_media_type_video )
+						{
+							ImGui::TextUnformatted( "Type: Video" );
+						}
+
+						// unsure what i want to do with this for the long term, but for now, im gonna have this be here
+						if ( entry.filename.starts_with( "[twitter]" ) )
+						{
+							// if it's a twitter url, construct the original url from the post
+							const char* start = entry.filename.c_str();
+							
+							// offset past the start, skipping "[twitter] "
+							start += 10;
+							const char* last  = start;
+
+							// find the end of the artist name
+							const char* find = strchr( start, '—' );
+
+							if ( find )
+							{
+								std::string artist_name( start, ( find - 2 ) - start );
+
+								start = find + 14; // offset the date and — character
+
+								// find the end of the url string
+								find  = strchr( start, '—' );
+
+								if ( find )
+								{
+									// length of 19, is it always like that?
+									std::string post_id( start, ( find - 2 ) - start );
+
+									char post_url[ 512 ]{};
+									snprintf( post_url, 512, "https://x.com/%s/status/%s", artist_name.c_str(), post_id.c_str() );
+
+									ImGui::TextLinkOpenURL( post_url, post_url );
+
+									ImGui::SameLine();
+
+									if ( ImGui::Selectable( "Copy" ) )
+									{
+										ImGui::SetClipboardText( post_url );
+									}
+								}
+							}
+						}
+					}
+
+					ImGui::EndChild();
+				}
+			}
+
+			ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
 			ImGui::TextUnformatted( "History\n" );
+			ImGui::Separator();
+			ImGui::PopFont();
 
 			u32 id = 1;
 			for ( size_t i = directory::media_history.size(); i > 0; i-- )

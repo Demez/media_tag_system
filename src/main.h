@@ -121,6 +121,8 @@ struct app_config_t
 	bool                      no_video               = false;
 	bool                      gallery_show_filenames = false;
 	bool                      always_draw            = false;
+	
+	// Theming
 	bool                      dwm_extend             = true;
 	bool                      use_custom_colors      = true;
 
@@ -130,6 +132,26 @@ struct app_config_t
 	ImVec4                    content_bg_color{};
 
 	ImVec4                    media_bg_color{};
+};
+
+
+// add this to the thumbnail cache system
+// saves metadata on the image or video here
+// useful for more file info in the gallery
+// or maybe if you do more background loading of thumbnails
+// not sure if i do want background loading for the whole folder though, may eat cpu on large folders or searches
+// but, then you could sort media by some info here
+struct cached_media_info_t
+{
+	// maybe add a file path here?
+	// this may be saved and never removed in the program unless a directory change happens
+	// so then we can store more of these than thumbnails
+
+	int width;
+	int height;
+
+	// time in miliseconds
+	u64 video_duration;
 };
 
 
@@ -361,11 +383,13 @@ namespace directory
 {
 	extern fs::path                      path;
 	extern fs::path                      queued;  // will change to this folder start of next frame
-	extern bool                          folder_reload;
 	extern std::vector< media_entry_t >  media_list;
 	extern std::vector< h_thumbnail >    thumbnail_list;
 
 	extern std::vector< std::string >    media_history;
+
+	extern bool                          folder_reload;
+	extern bool                          recursive;
 }
 
 

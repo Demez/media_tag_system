@@ -394,7 +394,8 @@ void gallery_view_dir_change()
 {
 	gallery_view_update_header_directory();
 
-	gallery::sorted_media.clear();
+	if ( !directory::folder_reload )
+		gallery::sorted_media.clear();
 
 	// SORT FILE LIST
 	gallery_view_sort_dir();
