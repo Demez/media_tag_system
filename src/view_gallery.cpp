@@ -624,13 +624,29 @@ void gallery_view_draw_content()
 
 	// ScrollToBringRectIntoView
 
-	gallery::row_count = (int)( region_avail.x - style.ScrollbarSize ) / ( gallery::item_size );
+	int region_x       = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
 
-	float item_size_x  = gallery::item_size - style.ItemSpacing.x;
+	gallery::row_count = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
+
+	// float item_size_x  = gallery::item_size - style.ItemSpacing.x;
+	float item_size_x  = gallery::item_size;
 	float item_size_y  = item_size_x;
 
 	if ( app::config.gallery_show_filenames )
 		item_size_y += ImGui::GetFontSize() + style.ItemSpacing.y;
+
+	float  item_spacing_x      = 0.f;
+
+	if ( gallery::row_count > 2 )
+	{
+		item_spacing_x = ( ( region_x ) - ( item_size_x * gallery::row_count ) ) / ( gallery::row_count - 1 );
+	}
+	else
+	{
+		item_spacing_x = ( ( region_x ) - ( item_size_x * gallery::row_count ) ) / ( gallery::row_count + 1 );
+	}
+
+	// item_spacing_x             = std::max( style.ItemSpacing.x, item_spacing_x );
 
 	int    grid_pos_x          = 0;
 	size_t i                   = 0;
@@ -692,6 +708,11 @@ void gallery_view_draw_content()
 	static size_t last_selected         = SIZE_MAX;
 	bool          any_item_hovered      = false;
 
+	if ( gallery::row_count <= 2 )
+		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + item_spacing_x );
+
+	bool scroll_queued = false;
+
 	// ----------------------------------------------------------------------------------------------------------
 
 	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
@@ -728,7 +749,11 @@ void gallery_view_draw_content()
 
 		if ( grid_pos_x == gallery::row_count )
 		{
-			ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
+			if ( gallery::row_count <= 2 )
+				ImGui::SetCursorPosX( ImGui::GetCursorPosX() + item_spacing_x );
+			else
+				ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
+
 			ImGui::SetCursorPosY( last_grid_row_y + last_max_item_height + style.ItemSpacing.y );
 
 			grid_pos_x           = 0;
@@ -736,7 +761,8 @@ void gallery_view_draw_content()
 		}
 		else if ( grid_pos_x > 0 )
 		{
-			ImGui::SameLine();
+			ImGui::SameLine( 0.f, 0.f );
+			ImGui::SetCursorPosX( ImGui::GetCursorPosX() + item_spacing_x );
 		}
 
 		ImVec2 cursor_pos = ImGui::GetCursorPos();
@@ -1024,6 +1050,9 @@ void gallery_view_draw_content()
 		{
 			gallery::cursor = i;
 
+			// the item may be a bit out of frame, scroll a little to have it fully in view
+			scroll_queued = true;
+
 			if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
 			{
 				gallery_selected_item_action( media );
@@ -1053,7 +1082,7 @@ void gallery_view_draw_content()
 	for ( size_t i = 0; i < thumbnail_requests.size(); i++ )
 		directory::thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_loader_queue_push( thumbnail_requests[ i ].media );
 
-	gallery::scroll_to_cursor        = false;
+	gallery::scroll_to_cursor  = false | scroll_queued;
 	gallery::item_size_changed = false;
 
 	// ImGui::PopStyleColor();
