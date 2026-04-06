@@ -1,5 +1,7 @@
 #include "main.h"
 
+#include <cctype>
+
 void* malloc_stbi( size_t size )
 {
 	void* mem = malloc( size );
@@ -168,7 +170,12 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 	const char*   path_str        = path_std_string.c_str();
 	std::string   ext             = fs_get_extension( path_std_string );
 
-	IImageLoader* loader          = image_check_extension( ext );
+	for ( size_t i = 0; i < ext.size(); i++ )
+	{
+		ext[ i ] = std::tolower( static_cast< unsigned char >( ext.data()[ i ] ) );
+	}
+
+	IImageLoader* loader = image_check_extension( ext );
 
 	if ( !loader )
 	{
@@ -350,7 +357,14 @@ IImageLoader* image_check_extension( const std::string& ext )
 
 bool media_check_extension( const std::string& ext, e_media_type& type )
 {
-	if ( image_check_extension( ext ) )
+	std::string lower_ext = ext;
+
+	for ( size_t i = 0; i < ext.size(); i++ )
+	{
+		lower_ext[ i ] = std::tolower( static_cast< unsigned char >( ext.data()[ i ] ) );
+	}
+
+	if ( image_check_extension( lower_ext ) )
 	{
 		type = e_media_type_image;
 		return true;
@@ -358,7 +372,7 @@ bool media_check_extension( const std::string& ext, e_media_type& type )
 
 	if ( g_mpv )
 	{
-		if ( mpv_supports_ext( ext ) )
+		if ( mpv_supports_ext( lower_ext ) )
 		{
 			type = e_media_type_video;
 			return true;
