@@ -140,7 +140,6 @@ int gallery_view_draw_header()
 	ImGui::SetNextWindowSizeConstraints( { (float)window_width, 0.f }, { (float)window_width, -1.f } );
 
 	ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, app::config.gallery_header_padding );
-	ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0 );
 
 	if ( app::config.use_custom_colors )
 	{
@@ -149,15 +148,24 @@ int gallery_view_draw_header()
 		ImGui::PushStyleColor( ImGuiCol_FrameBgActive, style.Colors[ ImGuiCol_WindowBg ] );
 
 		ImGui::PushStyleColor( ImGuiCol_WindowBg, app::config.header_bg_color );
+		ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0 );
 	}
 
 	// if ( !ImGui::Begin( "##gallery_header", { (float)window_width, 0.f }, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AlwaysUseWindowPadding ) )
 	if ( !ImGui::Begin( "##gallery_header", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav ) )
 	{
 		ImGui::End();
+
 		if ( app::config.use_custom_colors )
+		{
 			ImGui::PopStyleColor( 4 );
-		ImGui::PopStyleVar( 2 );
+			ImGui::PopStyleVar( 2 );
+		}
+		else
+		{
+			ImGui::PopStyleVar( 1 );
+		}
+
 		return 0;
 	}
 
@@ -246,6 +254,12 @@ int gallery_view_draw_header()
 	{
 		directory::queued        = g_folder_buf;
 		directory::folder_reload = true;
+
+		if ( !directory::recursive )
+		{
+			gallery::sorted_media.clear();
+			gallery::cursor = 0;
+		}
 	}
 
 	ImGui::SameLine();
@@ -375,9 +389,14 @@ int gallery_view_draw_header()
 	ImGui::End();
 
 	if ( app::config.use_custom_colors )
+	{
 		ImGui::PopStyleColor( 4 );
-
-	ImGui::PopStyleVar( 2 );
+		ImGui::PopStyleVar( 2 );
+	}
+	else
+	{
+		ImGui::PopStyleVar( 1 );
+	}
 
 	return im_window_height;
 }

@@ -338,7 +338,9 @@ void gallery_view_sort_dir()
 		if ( search_len )
 		{
 			media_entry_t& entry = directory::media_list[ i ];
-			if ( entry.filename.find( gallery::search, search_len ) == std::string::npos )
+			char*          find  = SDL_strcasestr( entry.filename.c_str(), gallery::search );
+
+			if ( !find )
 				continue;
 		}
 
@@ -394,7 +396,8 @@ void gallery_view_dir_change()
 {
 	gallery_view_update_header_directory();
 
-	if ( !directory::folder_reload )
+	// TODO: make it work with recursive, so if the selected item is still within the results, use that to snap scroll view to
+	if ( !directory::folder_reload || directory::recursive )
 		gallery::sorted_media.clear();
 
 	// SORT FILE LIST
@@ -584,6 +587,12 @@ void gallery_view_draw_content()
 	{
 		ImGui::EndChild();
 		// ImGui::PopStyleColor();
+		return;
+	}
+
+	if ( gallery::sorted_media.empty() )
+	{
+		ImGui::EndChild();
 		return;
 	}
 
