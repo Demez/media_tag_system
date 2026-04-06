@@ -224,6 +224,13 @@ int gallery_view_draw_header()
 
 	ImGui::SameLine();
 
+	// Press Ctrl+F to focus the search text input
+	if ( !ImGui::GetIO().WantTextInput )
+	{
+		if ( ImGui::IsKeyChordPressed( ImGuiMod_Ctrl | ImGuiKey_F ) )
+			ImGui::SetKeyboardFocusHere();
+	}
+
 	// if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 	if ( ImGui::InputText( "##search", gallery::search, 512 ) )
 	{
