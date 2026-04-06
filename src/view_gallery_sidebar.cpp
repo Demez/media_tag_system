@@ -681,6 +681,11 @@ void gallery_view_draw_sidebar()
 
 		if ( ImGui::BeginTabItem( "Settings" ) )
 		{
+			if ( ImGui::Checkbox( "Gallery - Fixed Thumbnail Sizes", &app::config.thumbnail_use_fixed_size ) )
+			{
+				thumbnail_clear_cache();
+			}
+
 			if ( ImGui::Checkbox( "Gallery - Show Filenames", &app::config.gallery_show_filenames ) )
 			{
 				gallery_view_reset_text_size();
