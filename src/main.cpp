@@ -148,7 +148,19 @@ void folder_load_media_list()
 	{
 		media_entry_t media_entry{};
 		media_entry.file     = entry;
-		media_entry.filename = entry.path.filename().string();
+
+		try
+		{
+			media_entry.filename = entry.path.filename().string();
+		}
+		catch ( const std::system_error& T )
+		{
+			// std::string ext      = entry.path.extension().string();
+			// media_entry.filename = "INVALID" + ext;
+
+			// Skip this file, probably has an invalid character in the filename
+			continue;
+		}
 
 		// if ( fs_is_dir( entry.data() ) )
 		if ( entry.type & e_file_type_directory )
