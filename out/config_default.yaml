@@ -22,7 +22,7 @@ thumbnail:
   cache-path-video: $app_path$/thumbnail_video_cache
   memory-cache-size: 20000
 
-  size: 500
+  size: 600
 
   # if 1, use the size above for thumbnails
   # if 0, remake them on the fly whenever the zoom size changes
@@ -31,7 +31,7 @@ thumbnail:
   # basic JPEG XL thumbnail quality and speed control
   jxl-enable: 1
 
-  jxl-distance: 3
+  jxl-distance: 1
   jxl-effort: 5
 
 
