@@ -88,8 +88,8 @@ bool fs_is_file( const char* path )
 
 	if ( !ret )
 	{
-		printf( "Failed to get file attributes: %s\n", path );
-		sys_print_last_error();
+		// printf( "Failed to get file attributes: %s\n", path );
+		// sys_print_last_error();
 		return false;
 	}
 
@@ -481,30 +481,27 @@ bool sys_get_drives( std::vector< std::string >& drives )
 }
 
 
-bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
+bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std::vector< file_t >& files, e_scandir_flags flags )
 {
-	std::string scan_dir = root, scan_dir_wildcard{};
-	scan_dir += SEP_S;
+	std::wstring scan_dir = root, scan_dir_wildcard{};
+	scan_dir += L"\\";
 
 	if ( path )
 	{
 		scan_dir += path;
-		scan_dir += SEP_S;
+		scan_dir += L"\\";
 	}
 	
+	scan_dir_wildcard += L"\\\\?\\";
 	scan_dir_wildcard += scan_dir;
-	scan_dir_wildcard += "*";
-
-	wchar_t*        scan_dir_wildcard_w = sys_to_wchar_extended( scan_dir_wildcard.c_str() );
+	scan_dir_wildcard += L"*";
 
 	WIN32_FIND_DATA ffd;
-	HANDLE          find = FindFirstFileEx( scan_dir_wildcard_w, FindExInfoBasic, &ffd, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH );
-
-	ch_free_str( scan_dir_wildcard_w );
+	HANDLE          find = FindFirstFileEx( scan_dir_wildcard.c_str(), FindExInfoBasic, &ffd, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH );
 
 	if ( INVALID_HANDLE_VALUE == find )
 	{
-		printf( "Failed to find first file in directory: \"%s\"\n", path );
+		wprintf( L"Failed to find first file in directory: \"%s\"\n", path );
 		return false;
 	}
 
@@ -525,43 +522,42 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 		if ( is_dir && wcsncmp( ffd.cFileName, L"..", 2 ) == 0 )
 			continue;
 
-		std::string relative_path;
+		std::wstring relative_path;
 
 		if ( path )
 		{
 			relative_path += path;
-			relative_path += SEP_S;
+			relative_path += L"\\";
 		}
 
-		char* filename = sys_to_utf8( ffd.cFileName );
-		relative_path += filename;
+		//char* filename = sys_to_utf8( ffd.cFileName );
+		relative_path += ffd.cFileName;
 
 		if ( ( flags & e_scandir_recursive ) && is_dir )
-			sys_scandir( root, relative_path.data(), files, flags );
+		{
+			sys_scandir_internal( root, relative_path.c_str(), files, flags );
+		}
 
 		if ( ( flags & e_scandir_no_dirs ) && is_dir )
-		{
-			ch_free_str( filename );
 			continue;
-		}
 
 		// if ( ( flags & e_scandir_no_files ) && fs_is_file( relative_path.data() ) )
 		if ( ( flags & e_scandir_no_files ) && !is_dir )
-		{
-			ch_free_str( filename );
 			continue;
-		}
 
 		file_t file{};
 		file.date_created = file_time_to_unix( ffd.ftCreationTime );
 		file.date_mod = file_time_to_unix( ffd.ftLastWriteTime );
 
 		if ( flags & e_scandir_abs_paths )
-			file.path = scan_dir + filename;
+		{
+			file.path = scan_dir;
+			file.path += ffd.cFileName;
+		}
 		else
+		{
 			file.path = relative_path;
-
-		ch_free_str( filename );
+		}
 
 		if ( is_dir )
 		{
@@ -579,6 +575,20 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 
 	FindClose( find );
 	return true;
+}
+
+
+bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
+{
+	wchar_t* root_w = sys_to_wchar( root );
+	wchar_t* path_w = sys_to_wchar( path );
+
+	bool     ret    = sys_scandir_internal( root_w, path_w, files, flags );
+
+	ch_free_str( root_w );
+	ch_free_str( path_w );
+
+	return ret;
 }
 
 
