@@ -186,19 +186,19 @@ int gallery_view_draw_header()
 	// TODO: add in navigation history
 	ImGui::BeginDisabled();
 
-	if ( ImGui::Button( "<" ) )
+	if ( ImGui::Button( "＜" ) )
 	{
 	}
 
 	ImGui::SameLine();
-	if ( ImGui::Button( ">" ) )
+	if ( ImGui::Button( "＞" ) )
 	{
 	}
 
 	ImGui::SameLine();
 	ImGui::EndDisabled();
 
-	if ( ImGui::Button( "^" ) )
+	if ( ImGui::Button( "˄" ) )
 	{
 		directory::queued = directory::path.parent_path();
 	}
@@ -554,8 +554,6 @@ void gallery_view_draw_sidebar()
 			{
 				if ( gallery::sorted_media.size() )
 				{
-					ImGui::PushItemWidth( -1 );
-
 					if ( ImGui::BeginChild( "##file_info", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY, 0 ) )
 					{
 						const media_entry_t& entry = gallery_item_get_media_entry( gallery::cursor );
@@ -600,17 +598,38 @@ void gallery_view_draw_sidebar()
 							start += 10;
 							const char* last  = start;
 
+							size_t      sep_len = strlen( "—" );
+
 							// find the end of the artist name
 							const char* find = strchr( start, '—' );
 
 							if ( find )
 							{
+								// new style, user id added, skip it
+								// check if this is a date
+								if ( ( find + 1 )[ 0 ] != '2' )
+								{
+									start = find + 1;  // offset the — character
+
+									// find the end of the url string
+									find  = strchr( start, '—' );
+								}
+
+								const char* check = find + 11;
+
 								std::string artist_name( start, ( find - 2 ) - start );
 
-								start = find + 14; // offset the date and — character
+								start = find + 14;  // offset the date and — character
 
 								// find the end of the url string
 								find  = strchr( start, '—' );
+
+								// std::string artist_name( start, ( find - 2 ) - start );
+								// 
+								// start = find + 14; // offset the date and — character
+								// 
+								// // find the end of the url string
+								// find  = strchr( start, '—' );
 
 								if ( find )
 								{
@@ -627,6 +646,7 @@ void gallery_view_draw_sidebar()
 									if ( ImGui::Selectable( "Copy" ) )
 									{
 										ImGui::SetClipboardText( post_url );
+										push_notification( "URL Copied" );
 									}
 								}
 							}
@@ -637,6 +657,7 @@ void gallery_view_draw_sidebar()
 				}
 			}
 
+			#if 0
 			ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
 			ImGui::TextUnformatted( "History\n" );
 			ImGui::Separator();
@@ -671,6 +692,7 @@ void gallery_view_draw_sidebar()
 
 				ImGui::PopID();
 			}
+			#endif
 
 			ImGui::EndTabItem();
 		}
