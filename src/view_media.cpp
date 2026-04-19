@@ -351,7 +351,7 @@ void media_view_scroll_zoom( float scroll )
 	if ( scroll > 0 )
 	{
 		// max zoom level
-		if ( image_draw::zoom >= 100.0 )
+		if ( image_draw::zoom >= 1000.0 )
 			return;
 
 		factor += ( app::config.media_zoom_scale * scroll );
@@ -552,6 +552,12 @@ void media_view_context_menu()
 	ImGui::PushItemWidth( 125.f );
 	ImGui::SliderFloat( "Rotation", &image_draw::rot, 0, 360 );
 	ImGui::PopItemWidth();
+
+	ImGui::Separator();
+
+	if ( ImGui::MenuItem( "Invert Colors", nullptr, false, false ) )
+	{
+	}
 
 	ImGui::Separator();
 
@@ -837,7 +843,7 @@ void media_view_load()
 			}
 			else
 			{
-				printf( "%f FAILED Load - %s\n", load_time, entry.file.path.string().c_str() );
+				printf( "%f FAILED Load - %s\n", load_time, entry.file.path.wstring().c_str() );
 			}
 		}
 
@@ -1311,10 +1317,10 @@ static void media_view_draw_frame( size_t frame_i )
 {
 	image_frame_t& frame       = g_image_data.image.frame[ frame_i ];
 
-	double         draw_width  = frame.width * image_draw::zoom;
-	double         draw_height = frame.height * image_draw::zoom;
-	double         draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
-	double         draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
+	int            draw_width  = frame.width * image_draw::zoom;
+	int            draw_height = frame.height * image_draw::zoom;
+	int            draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
+	int            draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
 
 	if ( image_draw::flip_h )
 	{
@@ -1334,7 +1340,8 @@ static void media_view_draw_frame( size_t frame_i )
 	// dst_rect.y = round( dst_rect.y );
 
 	int width, height;
-	SDL_GetWindowSize( app::window, &width, &height );
+	// SDL_GetWindowSize( app::window, &width, &height );
+	SDL_GetWindowSizeInPixels( app::window, &width, &height );
 
 	glEnable( GL_BLEND );
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
@@ -1359,8 +1366,8 @@ static void media_view_draw_frame( size_t frame_i )
 	glLoadIdentity();
 
 	// get the center of the image
-	double image_center_x = draw_x + draw_width * 0.5;
-	double image_center_y = draw_y + draw_height * 0.5;
+	int image_center_x = draw_x + draw_width * 0.5;
+	int image_center_y = draw_y + draw_height * 0.5;
 
 	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
 	glRotatef( image_draw::rot, 0, 0, 1 );                   // rotate around the image
@@ -1369,13 +1376,13 @@ static void media_view_draw_frame( size_t frame_i )
 	glBegin( GL_QUADS );
 
 	glTexCoord2i( 0, 0 );
-	glVertex2d( draw_x, draw_y );
+	glVertex2i( draw_x, draw_y );
 	glTexCoord2i( 1, 0 );
-	glVertex2d( draw_x + draw_width, draw_y );
+	glVertex2i( draw_x + draw_width, draw_y );
 	glTexCoord2i( 1, 1 );
-	glVertex2d( draw_x + draw_width, draw_y + draw_height );
+	glVertex2i( draw_x + draw_width, draw_y + draw_height );
 	glTexCoord2i( 0, 1 );
-	glVertex2d( draw_x, draw_y + draw_height );
+	glVertex2i( draw_x, draw_y + draw_height );
 
 	glEnd();
 

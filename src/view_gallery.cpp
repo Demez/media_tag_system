@@ -19,7 +19,7 @@ namespace gallery
 	u32                           row_count         = 0;
 	u32                           item_size         = 150;
 	u32                           item_size_min     = 70;
-	u32                           item_size_max     = 500;
+	u32                           item_size_max     = 600;
 	bool                          item_size_changed = true;
 	std::vector< ImVec2 >         item_text_size;
 
@@ -524,18 +524,30 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 im
 	float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
 	ImVec2 image_size{};
-	image_size.x    = image->width * zoom_level;
-	image_size.y    = image->height * zoom_level;
+	image_size.x    = int( image->width * zoom_level );
+	image_size.y    = int( image->height * zoom_level );
 
 	if ( upscale )
 		out_image_size = image_size;
 
 	// center the image
 	ImVec2 image_offset = ImGui::GetCursorPos();
-	image_offset.x += ( image_bounds.x - image_size.x ) / 2;
-	image_offset.y += ( image_bounds.y - image_size.y ) / 2;
+	image_offset.x += int( ( image_bounds.x - image_size.x ) / 2 );
+	image_offset.y += int( ( image_bounds.y - image_size.y ) / 2 );
 
 	ImGui::SetCursorPos( image_offset );
+
+	glBindTexture( GL_TEXTURE_2D, (GLuint)im_texture.GetTexID() );
+
+	 // upscaling image
+	if ( zoom_level > 2.f )
+	{
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+	}
+	else
+	{
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	}
 
 	ImGui::Image( im_texture, image_size );
 }
@@ -721,6 +733,8 @@ void gallery_view_draw_content()
 		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + item_spacing_x );
 
 	bool scroll_queued = false;
+
+	static h_thumbnail icons_scaled[ e_icon_count ]{};
 
 	// ----------------------------------------------------------------------------------------------------------
 
@@ -913,7 +927,7 @@ void gallery_view_draw_content()
 
 		if ( media.type == e_media_type_directory )
 		{
-			gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), image_bounds, false, scaled_image_size );
+			gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), image_bounds, true, scaled_image_size );
 		}
 		// videos don't have thumbnail generation yet
 		// else if ( media.type == e_media_type_video )
