@@ -84,9 +84,9 @@ struct notification_t
 	float       time_remain;
 };
 
-constexpr float               NOTIFICATION_DURATION     = 5;
-constexpr float               NOTIFICATION_FADE_IN_TIME = 0.5;
-constexpr size_t              NOTIFICATION_MAX_SHOWN    = 5;
+constexpr float               NOTIFICATION_DURATION  = 5;
+constexpr float               NOTIFICATION_FADE_TIME = 0.5;
+constexpr size_t              NOTIFICATION_MAX_SHOWN = 5;
 
 std::vector< notification_t > g_notification_queue;
 
@@ -280,12 +280,14 @@ void notification_draw( float frame_time )
 			break;
 	}
 
-	if ( max_notif_time < NOTIFICATION_FADE_IN_TIME )
+	if ( max_notif_time < NOTIFICATION_FADE_TIME )
 	{
-		fade_amount = max_notif_time / NOTIFICATION_FADE_IN_TIME;
+		fade_amount = max_notif_time / NOTIFICATION_FADE_TIME;
 
 		//border_color.w = max_notif_time * border_color.w;
 		//bg_color.w     = max_notif_time;
+
+		app::draw_frame = true;
 	}
 	//else // if ( max_notif_time > NOTIFICATION_DURATION - NOTIFICATION_FADE_IN_TIME )
 	{
@@ -309,7 +311,7 @@ void notification_draw( float frame_time )
 			ImVec4          text_color = style.Colors[ ImGuiCol_Text ];
 
 			// nice fade out effect
-			if ( notif.time_remain < NOTIFICATION_FADE_IN_TIME )
+			if ( notif.time_remain < NOTIFICATION_FADE_TIME )
 				text_color.w *= notif.time_remain;
 
 			ImGui::PushStyleColor( ImGuiCol_Text, text_color );
