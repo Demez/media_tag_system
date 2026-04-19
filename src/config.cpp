@@ -376,6 +376,7 @@ bool config_load()
 		config_get_node_value( thumbnail, "/jxl-enable %u", app::config.thumbnail_jxl_enable );
 		config_get_node_value( thumbnail, "/jxl-effort %u", app::config.thumbnail_jxl_effort );
 		config_get_node_value( thumbnail, "/jxl-distance %f", app::config.thumbnail_jxl_distance );
+		config_get_node_value( thumbnail, "/size %u", app::config.thumbnail_size );
 
 		if ( app::config.thumbnail_threads == 0 )
 		{

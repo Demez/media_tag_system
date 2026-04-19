@@ -96,7 +96,7 @@ struct app_config_t
 	u32                       thumbnail_mem_cache_size    = 20000;
 
 	// resoultion of thumbnail
-	u32                       thumbnail_size              = 500;
+	u32                       thumbnail_size              = 600;
 
 	bool                      thumbnail_use_fixed_size    = false;
 
