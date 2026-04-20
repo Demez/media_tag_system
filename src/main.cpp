@@ -691,6 +691,9 @@ bool handle_events()
 				// app::draw_frame = true;
 				break;
 
+			#if __unix__
+			case SDL_EVENT_WINDOW_EXPOSED:
+			#endif
 			case SDL_EVENT_WINDOW_RESIZED:
 				int width, height;
 				SDL_GetWindowSize( app::window, &width, &height );
