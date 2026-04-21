@@ -18,18 +18,10 @@ extern void*        g_mpv_module;
 
 constexpr bool      THUMBNAIL_DEBUG_PRINT = false;
 
-enum e_job_state
-{
-	e_job_state_free,
-	e_job_state_working,
-	e_job_state_finished,
-};
-
 
 struct thumbnail_job_t
 {
 	h_thumbnail thumbnail;
-	e_job_state state;
 	file_t      file;
 };
 
@@ -201,12 +193,11 @@ h_thumbnail thumbnail_loader_queue_push( const media_entry_t& media_entry )
 		g_thumbnail_cache.used_this_frame[ cache_pos ] = true;
 
 		h_thumbnail handle;
-		handle.index                                   = cache_pos;
-		handle.generation                              = ++g_thumbnail_cache.generation[ cache_pos ];
+		handle.index      = cache_pos;
+		handle.generation = ++g_thumbnail_cache.generation[ cache_pos ];
 
-		job.thumbnail                                  = handle;
-		job.state                                      = e_job_state_working;
-		job.file                                       = media_entry.file;
+		job.thumbnail     = handle;
+		job.file          = media_entry.file;
 
 		// update the write position in the queue, use release to wait for all reads to finish before updating this
 		g_thumbnail_queue.write_pos.store( next_pos, std::memory_order_release );
@@ -547,11 +538,6 @@ void thumbnail_loader_worker( u32 thread_id )
 			continue;
 		}
 
-		if ( job->state == e_job_state_free )
-		{
-			continue;
-		}
-
 		thumbnail_t* thumbnail = &g_thumbnail_cache.buffer[ job->thumbnail.index ];
 
 		if ( !thumbnail )
@@ -702,17 +688,18 @@ void thumbnail_loader_worker( u32 thread_id )
 		// Scale image to give a nicer thumbnail preview
 
 		{
-			float factor[ 2 ]  = {
+			float factor[ 2 ] = {
 				(float)thumbnail_size / (float)thumbnail->image->width,
 				(float)thumbnail_size / (float)thumbnail->image->height
 			};
 
 			float scale_amount = std::min( factor[ 0 ], factor[ 1 ] );
-			
-			if ( scale_amount != 0.f && scale_amount < 2.f )
+
+			if ( scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f )
 			{
 				float new_width  = thumbnail->image->width * scale_amount;
 				float new_height = thumbnail->image->height * scale_amount;
+
 				u8*   old_frame  = thumbnail->image->frame[ 0 ].data;
 
 				if ( image_scale( thumbnail->image, thumbnail->image, new_width, new_height ) )
@@ -722,8 +709,6 @@ void thumbnail_loader_worker( u32 thread_id )
 				}
 			}
 		}
-
-		job->state = e_job_state_free;
 
 		thumbnail->status.store( e_thumbnail_status_uploading, std::memory_order_release );
 	}
