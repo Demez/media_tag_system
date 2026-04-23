@@ -426,7 +426,7 @@ namespace gallery
 
 
 // Media View
-namespace media
+namespace image_draw
 {
 	// Animated image playback information
 	extern double next_frame_timer;

@@ -6,6 +6,7 @@
 #include <thread>
 #include <mutex>
 
+
 // Image Draw Data
 namespace image_draw
 {
@@ -15,16 +16,15 @@ namespace image_draw
 	ImVec2      size{};
 	bool        flip_v = false;
 	bool        flip_h = false;
-	float       rot    = 0.f;
+	float       rot              = 0.f;
+
+	// Animated image playback information
+	double      next_frame_timer = 0.0;
+	size_t      frame            = 0;
+	float       playback_speed   = 1.f;
+	bool        pause            = false;
 }
 
-namespace media
-{
-	double next_frame_timer = 0.0;
-	size_t frame            = 0;
-	float  playback_speed   = 1.f;
-	bool   pause            = false;
-}
 
 // This doesn't let you move the image outside the window
 // if zoomed in, and you move the image down and to the right, the top left corner of the image will be at the top left
@@ -81,14 +81,6 @@ static image_t       g_scale_src{};
 std::mutex           g_scale_lock;
 
 
-void media_view_filter_image()
-{
-	#if 1
-	
-	#endif
-}
-
-
 void media_view_scale_thread_run()
 {
 	while ( app::running )
@@ -133,17 +125,17 @@ void media_view_frame_advance( bool backwards = false )
 {
 	if ( backwards )
 	{
-		if ( media::frame == 0 )
-			media::frame = g_image_data.image.frame.size();
+		if ( image_draw::frame == 0 )
+			image_draw::frame = g_image_data.image.frame.size();
 
-		media::frame--;
+		image_draw::frame--;
 	}
 	else
 	{
-		media::frame = ( media::frame + 1 ) % g_image_data.image.frame.size();
+		image_draw::frame = ( image_draw::frame + 1 ) % g_image_data.image.frame.size();
 	}
 
-	media::next_frame_timer = g_image_data.image.frame[ media::frame ].time;
+	image_draw::next_frame_timer = g_image_data.image.frame[ image_draw::frame ].time;
 }
 
 
@@ -152,8 +144,8 @@ void media_view_frame_set( size_t frame )
 	if ( frame >= g_image_data.image.frame.size() )
 		return;
 
-	media::frame            = frame;
-	media::next_frame_timer = g_image_data.image.frame[ media::frame ].time;
+	image_draw::frame            = frame;
+	image_draw::next_frame_timer = g_image_data.image.frame[ image_draw::frame ].time;
 }
 
 
@@ -229,11 +221,11 @@ void media_view_update( float frame_time )
 	// Add frame draw timer here for animated images
 	if ( g_image_data.image.frame.size() > 1 )
 	{
-		if ( !media::pause )
+		if ( !image_draw::pause )
 		{
-			media::next_frame_timer -= frame_time * media::playback_speed;
+			image_draw::next_frame_timer -= frame_time * image_draw::playback_speed;
 
-			if ( media::next_frame_timer < 0.f )
+			if ( image_draw::next_frame_timer < 0.f )
 			{
 				media_view_frame_advance();
 			}
@@ -241,7 +233,7 @@ void media_view_update( float frame_time )
 	}
 	else
 	{
-		media::next_frame_timer = 0.0;
+		image_draw::next_frame_timer = 0.0;
 	}
 }
 
@@ -279,6 +271,74 @@ e_media_type get_media_type()
 }
 
 
+// UNFINISHED
+void media_view_clamp_to_bounds()
+{
+#if 0
+	ImVec2 min_bounds{};
+	ImVec2 max_bounds{};
+
+	int    width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	// Fit image in window size
+	float factor[ 2 ] = { 1.f, 1.f };
+
+	factor[ 0 ] = (float)width / (float)g_image_data.image.width;
+	factor[ 1 ] = (float)height / (float)g_image_data.image.height;
+
+	float zoom  = std::min( factor[ 0 ], factor[ 1 ] );
+
+	ImVec2 scaled_size = {
+		g_image_data.image.width * zoom,
+		g_image_data.image.height * zoom
+	};
+
+	// max_bounds.x      = width - ( scaled_size.x / 2.f );
+	// max_bounds.y      = height - ( scaled_size.y / 2.f );
+	// 
+	// min_bounds.x      = -( scaled_size.x / 2.f );
+	// min_bounds.y      = -( scaled_size.y / 2.f );
+
+	// max_bounds.x      = ( image_draw::size.x ) + ( width / 2.f );
+	// max_bounds.y      = ( image_draw::size.y ) + ( height / 2.f );
+
+	max_bounds.x = width - image_draw::size.x;
+	max_bounds.y = height - image_draw::size.y;
+
+	// min_bounds.x      = -image_draw::size.x + ( width / 2.f );
+	// min_bounds.y      = -image_draw::size.y + ( height / 2.f );
+
+	// min_bounds.x      = -( image_draw::size.x * 1.5f ) + ( width / 2.f );
+	// min_bounds.y      = -( image_draw::size.y * 1.5f ) + ( height / 2.f );
+
+	// max_bounds.x      = width - ( width / 2.f );
+	// max_bounds.y      = height - ( height / 2.f );
+	// 
+	// min_bounds.x      = -( width / 2.f );
+	// min_bounds.y      = -( height / 2.f );
+
+	// doesn't work properly with panning when zoomed in
+	if ( width < image_draw::size.x )
+	{
+		float out_of_bounds = image_draw::size.x - width;
+		min_bounds.x -= out_of_bounds / 2.f;
+		max_bounds.x += out_of_bounds / 2.f;
+	}
+
+	if ( height < image_draw::size.y )
+	{
+		float out_of_bounds = image_draw::size.y - height;
+		min_bounds.y -= out_of_bounds / 2.f;
+		max_bounds.y += out_of_bounds / 2.f;
+	}
+
+	image_draw::pos.x = CLAMP( image_draw::pos.x, min_bounds.x, max_bounds.x );
+	image_draw::pos.y = CLAMP( image_draw::pos.y, min_bounds.y, max_bounds.y );
+#endif
+}
+
+
 void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 {
 	// new image size
@@ -306,13 +366,11 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 	// TODO: only adjust this if needed, check image zoom type
 	// if image doesn't fit window size, keep locked to center
 
-	//if ( factor[ 0 ] < 1.f )
-		image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
-
-	//if ( factor[ 1 ] < 1.f )
-		image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
+	image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
+	image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
 
 	media_view_scale_reset_timer();
+	media_view_clamp_to_bounds();
 }
 
 
@@ -334,6 +392,7 @@ void media_view_zoom_reset()
 	image_draw::size.y = g_image_data.image.height;
 
 	media_view_scale_reset_timer();
+	media_view_clamp_to_bounds();
 }
 
 
@@ -405,6 +464,7 @@ void media_view_scroll_zoom( float scroll )
 	image_draw::pos.y  = (double)app::mouse_pos[ 1 ] + ( image_draw::pos.y - (double)app::mouse_pos[ 1 ] ) * factor;
 
 	media_view_scale_reset_timer();
+	media_view_clamp_to_bounds();
 
 	image_draw::zoom_mode = e_zoom_mode_fixed;
 	app::draw_frame       = true;
@@ -452,6 +512,7 @@ void media_view_draw_media_info()
 		ImGui::Text( "Scale Thread Timer: %.3f", g_scale_timer );
 		ImGui::Text( "Scaled: %dx%d", g_image_scaled_data.image.width, g_image_scaled_data.image.height );
 		ImGui::Text( "Render Size: %.0fx%.0f", image_draw::size.x, image_draw::size.y );
+		ImGui::Text( "Render Pos: %.0fx%.0f", image_draw::pos.x, image_draw::pos.y );
 
 		ImGui::SeparatorText( "Image Info" );
 
@@ -513,6 +574,11 @@ void media_view_context_menu()
 
 	if ( ImGui::Button( "FIT", { 0, 0 } ) )
 		media_view_fit_in_view();
+
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "CENTER", { 0, 0 } ) )
+		media_view_fit_in_view( false );
 
 	ImGui::SameLine();
 
@@ -745,13 +811,13 @@ void media_view_input()
 
 	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) )
 	{
-		media::pause = !media::pause;
+		image_draw::pause = !image_draw::pause;
 	}
 
 	// Don't toggle playback if in an image pan
 	if ( ( !g_image_pan && !mouse_hover_imgui_window && ImGui::IsKeyReleased( ImGuiKey_MouseLeft, false ) ) )
 	{
-		media::pause = !media::pause;
+		image_draw::pause = !image_draw::pause;
 	}
 
 	// mouse down and not hovering an imgui window not in an image pan
@@ -777,6 +843,8 @@ void media_view_input()
 		app::draw_frame = true;
 		image_draw::pos.x += app::mouse_delta[ 0 ];
 		image_draw::pos.y += app::mouse_delta[ 1 ];
+
+		media_view_clamp_to_bounds();
 	}
 
 	if ( !mouse_down )
@@ -789,6 +857,10 @@ void media_view_window_resize()
 	if ( image_draw::zoom_mode == e_zoom_mode_fit || image_draw::zoom_mode == e_zoom_mode_fit_width )
 	{
 		media_view_fit_in_view();
+	}
+	else
+	{
+		media_view_clamp_to_bounds();
 	}
 }
 
@@ -838,12 +910,12 @@ void media_view_load()
 				gl_update_textures( g_image_data.textures, &g_image_data.image, g_image_data.image.frame.size() );
 				media_view_fit_in_view();
 
-				media::frame            = 0;
-				media::next_frame_timer = g_image_data.image.frame[ media::frame ].time;
+				image_draw::frame            = 0;
+				image_draw::next_frame_timer = g_image_data.image.frame[ image_draw::frame ].time;
 			}
 			else
 			{
-				printf( "%f FAILED Load - %s\n", load_time, entry.file.path.wstring().c_str() );
+				printf( "%f FAILED Load - %s\n", load_time, entry.file.path.string().c_str() );
 			}
 		}
 
@@ -1184,18 +1256,18 @@ void media_view_draw_animated_image_controls()
 	const ImVec2 label_size    = ImGui::CalcTextSize( "Pause", NULL, true );
 	ImVec2       play_btn_size = ImGui::CalcItemSize( { 0, 0 }, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f );
 
-	if ( media::pause )
+	if ( image_draw::pause )
 	{
 		if ( ImGui::Button( "Play", play_btn_size ) )
 		{
-			media::pause = false;
+			image_draw::pause = false;
 		}
 	}
 	else
 	{
 		if ( ImGui::Button( "Pause", play_btn_size ) )
 		{
-			media::pause = true;
+			image_draw::pause = true;
 		}
 	}
 
@@ -1220,14 +1292,14 @@ void media_view_draw_animated_image_controls()
 	ImGui::SameLine();
 	if ( ImGui::Button( "<" ) )
 	{
-		media::pause = true;
+		image_draw::pause = true;
 		media_view_frame_advance( true );
 	}
 
 	ImGui::SameLine();
 	if ( ImGui::Button( ">" ) )
 	{
-		media::pause = true;
+		image_draw::pause = true;
 		media_view_frame_advance();
 	}
 	
@@ -1237,7 +1309,7 @@ void media_view_draw_animated_image_controls()
 
 	char str_position[ 256 ]{};
 
-	snprintf( str_position, 256, "%zu / %zu", media::frame + 1, g_image_data.image.frame.size() );
+	snprintf( str_position, 256, "%zu / %zu", image_draw::frame + 1, g_image_data.image.frame.size() );
 
 	const ImVec2 time_size             = ImGui::CalcTextSize( str_position, NULL, true );
 
@@ -1250,7 +1322,7 @@ void media_view_draw_animated_image_controls()
 
 	ImGui::SetNextItemWidth( seek_bar_width );
 
-	int desired_frame = media::frame + 1;
+	int desired_frame = image_draw::frame + 1;
 	if ( ImGui::SliderInt( "##seek", &desired_frame, 1, g_image_data.image.frame.size(), "" ) )
 	{
 		media_view_frame_set( desired_frame - 1 );
@@ -1405,9 +1477,9 @@ static void media_view_draw_image()
 		app::draw_next_frame = true;
 	}
 
-	if ( g_image_data.image.frame.size() <= media::frame )
+	if ( g_image_data.image.frame.size() <= image_draw::frame )
 	{
-		media::frame = 0;
+		image_draw::frame = 0;
 		printf( "IMAGE FRAME OUT OF BOUNDS\n" );
 		return;
 	}
@@ -1449,24 +1521,24 @@ static void media_view_draw_image()
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	}
 
-	image_frame_t&   frame         = g_image_data.image.frame[ media::frame ];
+	image_frame_t&   frame         = g_image_data.image.frame[ image_draw::frame ];
 	e_frame_disposal prev_disposal = frame.frame_disposal;
 
 	// frame disposal seems to be how to handle THIS frame for the next frame drawn
 	// so here, the current frame will use the last frame's disposal method for how to draw it
 	// if it's keep, look for all previous frames to draw, until we hit 0 or one that's not keep
 
-	if ( media::frame > 0 )
+	if ( image_draw::frame > 0 )
 	{
-		image_frame_t& frame = g_image_data.image.frame[ media::frame - 1 ];
+		image_frame_t& frame = g_image_data.image.frame[ image_draw::frame - 1 ];
 		prev_disposal        = frame.frame_disposal;
 	}
 
 	if ( prev_disposal == e_frame_disposal_keep )
 	{
-		size_t last_frame_to_keep = media::frame;
+		size_t last_frame_to_keep = image_draw::frame;
 
-		if ( media::frame > 0 )
+		if ( image_draw::frame > 0 )
 		{
 			for ( last_frame_to_keep--;; last_frame_to_keep-- )
 			{
@@ -1485,21 +1557,21 @@ static void media_view_draw_image()
 		}
 
 		/// mmmm overdraw hell?
-		for ( u32 i = last_frame_to_keep; i < media::frame + 1; i++ )
+		for ( u32 i = last_frame_to_keep; i < image_draw::frame + 1; i++ )
 		{
 			media_view_draw_frame( i );
 		}
 	}
 	else if ( prev_disposal == e_frame_disposal_previous )
 	{
-		if ( media::frame > 0 )
-			media_view_draw_frame( media::frame - 1 );
+		if ( image_draw::frame > 0 )
+			media_view_draw_frame( image_draw::frame - 1 );
 
-		media_view_draw_frame( media::frame );
+		media_view_draw_frame( image_draw::frame );
 	}
 	else // e_frame_disposal_background ?
 	{
-		media_view_draw_frame( media::frame );
+		media_view_draw_frame( image_draw::frame );
 	}
 
 #if 0
@@ -1510,11 +1582,11 @@ static void media_view_draw_image()
 
 	if ( g_scale_state == e_scale_state_finished )
 	{
-		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.textures.frame[ media::frame ] );
+		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.textures.frame[ image_draw::frame ] );
 	}
 	else
 	{
-		glBindTexture( GL_TEXTURE_2D, g_image_data.textures.frame[ media::frame ] );
+		glBindTexture( GL_TEXTURE_2D, g_image_data.textures.frame[ image_draw::frame ] );
 	}
 
  	glMatrixMode( GL_PROJECTION );
