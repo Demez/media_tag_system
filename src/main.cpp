@@ -745,6 +745,9 @@ bool handle_events()
 			// Current set of drops is now complete (NULL filename)
 			case SDL_EVENT_DROP_COMPLETE:
 			{
+				if ( app::in_drag_drop )
+					break;
+
 				app::draw_frame = true;
 				if ( drag_drop_recieve_func( g_drag_drop_files ) )
 					SDL_RaiseWindow( app::window );
@@ -764,6 +767,8 @@ bool handle_events()
 				return true;
 		}
 	}
+
+	app::in_drag_drop = false;
 
 	return false;
 }

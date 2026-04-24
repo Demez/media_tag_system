@@ -261,9 +261,16 @@ void drag_drop_remove( HWND hwnd )
 struct DropSourceNotify : public IDropSourceNotify
 {
 	LONG            ref = 0L;
+	HWND            hwnd{};
 
 	virtual HRESULT DragEnterTarget( HWND hwndTarget ) override
 	{
+		hwnd = hwndTarget;
+
+		// does nothing???
+		if ( hwndTarget == g_main_hwnd )
+			return S_FALSE;
+
 		return S_OK;
 	}
 
@@ -324,6 +331,11 @@ struct DropSource : public IDropSource
 
 	virtual HRESULT GiveFeedback( DWORD dwEffect ) override
 	{
+		if ( notify.hwnd == g_main_hwnd )
+		{
+			return S_OK;
+		}
+
 		return DRAGDROP_S_USEDEFAULTCURSORS;
 	}
 
@@ -400,9 +412,11 @@ void sys_do_drag_drop_files( const std::vector< fs::path >& files )
 
 	app::in_drag_drop     = true;
 
-	HRESULT res           = DoDragDrop( file_obj, &source, DROPEFFECT_COPY, &out_effect );
+	// HRESULT res           = DoDragDrop( file_obj, &source, DROPEFFECT_COPY, &out_effect );
 
-	app::in_drag_drop     = false;
+	// SHDoDragDrop adds an IMAGE PREVIEW TO THE DRAG DROP AUTOMATICALLY
+	// though, you may need to implement this yourself with IDragSourceHelper for other image types
+	HRESULT res           = SHDoDragDrop( g_main_hwnd, file_obj, &source, DROPEFFECT_COPY, &out_effect );
 
 	if ( res != DRAGDROP_S_DROP && res != DRAGDROP_S_CANCEL )
 	{

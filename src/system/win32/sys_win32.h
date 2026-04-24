@@ -9,6 +9,10 @@
 
 #include <Windows.h>
 
+
+extern HWND    g_main_hwnd;
+
+
 // Internal functions only
 const wchar_t* sys_get_error_w();
 

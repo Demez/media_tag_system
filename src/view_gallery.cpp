@@ -1069,7 +1069,7 @@ void gallery_view_draw_content()
 		// ----------------------------------------------------------------------------------------------------------
 		// Handle Actions
 
-		if ( item_hovered && ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
+		if ( item_hovered && ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) || ImGui::IsMouseClicked( ImGuiMouseButton_Middle ) ) )
 		{
 			gallery::cursor = i;
 
@@ -1085,6 +1085,36 @@ void gallery_view_draw_content()
 		if ( selected_item && !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
 		{
 			gallery_selected_item_action( media );
+		}
+
+		if ( selected_item )
+		{
+			SDL_MouseButtonFlags mouse_btns        = SDL_GetMouseState( nullptr, nullptr );
+
+			// mouse down and not hovering an imgui window not in an image pan
+			// bool        mouse_middle_down = ImGui::IsMouseDown( ImGuiMouseButton_Middle ) && !( mouse_hover_imgui_window );
+			bool                 mouse_middle_down = mouse_btns & SDL_BUTTON_MMASK;
+
+			static bool          drag_cooldown     = false;
+
+			if ( mouse_middle_down )
+			{
+				if ( !drag_cooldown )
+				{
+					if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
+					{
+						std::vector< fs::path > files{ gallery_item_get_path( gallery::cursor ) };
+						sys_do_drag_drop_files( files );
+
+						// this way we don't try to start another drag drop instantly after somehow
+						drag_cooldown = true;
+					}
+				}
+			}
+			else
+			{
+				drag_cooldown = false;
+			}
 		}
 
 		grid_pos_x++;
