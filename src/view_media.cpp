@@ -1406,7 +1406,7 @@ float vertices[] = {
 };
 
 
-static void media_view_draw_frame( size_t frame_i )
+static void media_view_draw_frame( int width, int height, size_t frame_i )
 {
 	image_frame_t& frame       = g_image_data.image.frame[ frame_i ];
 
@@ -1549,6 +1549,10 @@ static void media_view_draw_image()
 	// so here, the current frame will use the last frame's disposal method for how to draw it
 	// if it's keep, look for all previous frames to draw, until we hit 0 or one that's not keep
 
+	int              width, height;
+	// SDL_GetWindowSize( app::window, &width, &height );
+	SDL_GetWindowSizeInPixels( app::window, &width, &height );
+
 	if ( image_draw::frame > 0 )
 	{
 		image_frame_t& frame = g_image_data.image.frame[ image_draw::frame - 1 ];
@@ -1580,69 +1584,20 @@ static void media_view_draw_image()
 		/// mmmm overdraw hell?
 		for ( u32 i = last_frame_to_keep; i < image_draw::frame + 1; i++ )
 		{
-			media_view_draw_frame( i );
+			media_view_draw_frame( width, height, i );
 		}
 	}
 	else if ( prev_disposal == e_frame_disposal_previous )
 	{
 		if ( image_draw::frame > 0 )
-			media_view_draw_frame( image_draw::frame - 1 );
+			media_view_draw_frame( width, height, image_draw::frame - 1 );
 
-		media_view_draw_frame( image_draw::frame );
+		media_view_draw_frame( width, height, image_draw::frame );
 	}
 	else // e_frame_disposal_background ?
 	{
-		media_view_draw_frame( image_draw::frame );
+		media_view_draw_frame( width, height, image_draw::frame );
 	}
-
-#if 0
-	glEnable( GL_BLEND );
-	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-
-	glEnable( GL_TEXTURE_2D );
-
-	if ( g_scale_state == e_scale_state_finished )
-	{
-		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.textures.frame[ image_draw::frame ] );
-	}
-	else
-	{
-		glBindTexture( GL_TEXTURE_2D, g_image_data.textures.frame[ image_draw::frame ] );
-	}
-
- 	glMatrixMode( GL_PROJECTION );
-	glLoadIdentity();
-
-	glOrtho( 0, width, height, 0, -1, 1 );
-
- 	glMatrixMode( GL_MODELVIEW );
-	glLoadIdentity();
-
-	// get the center of the image
-	float image_center_x = dst_rect.x + dst_rect.w * 0.5f;
-	float image_center_y = dst_rect.y + dst_rect.h * 0.5f;
-
-	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
-	glRotatef( image_draw::rot, 0, 0, 1 );                       // rotate around the image
-	glTranslatef( -image_center_x, -image_center_y, 0.0f );  // move back
- 
- 	glBegin( GL_QUADS );
-
-	glTexCoord2f( 0, 0 );
-	glVertex2f( dst_rect.x, dst_rect.y );
-	glTexCoord2f( 1, 0 );
-	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y );
-	glTexCoord2f( 1, 1 );
-	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y + dst_rect.h );
-	glTexCoord2f( 0, 1 );
-	glVertex2f( dst_rect.x, dst_rect.y + dst_rect.h );
-
- 	glEnd();
-
-	glDisable( GL_TEXTURE_2D );
-	glDisable( GL_BLEND );
-
-#endif
 }
 
 
