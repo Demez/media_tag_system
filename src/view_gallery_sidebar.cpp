@@ -219,7 +219,7 @@ int gallery_view_draw_header()
 	ImGui::SameLine();
 
 	// Enter returns true doesn't work because of gallery view hooking that input currently, need to add a check later for if focused in text input
-	if ( ImGui::Button( ">" ) )
+	if ( ImGui::Button( "->" ) )
 	{
 		directory::queued        = g_folder_buf;
 		directory::folder_reload = true;
