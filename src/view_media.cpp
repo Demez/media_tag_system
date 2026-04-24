@@ -271,6 +271,13 @@ e_media_type get_media_type()
 }
 
 
+// New Position = Scale Origin + ( Scale Point - Scale Origin ) * Scale Factor
+double scale_point_from_origin( double origin, double point, double factor )
+{
+	return origin + ( point - origin ) * factor;
+}
+
+
 void media_view_clamp_to_bounds()
 {
 	ImVec2 min_bounds{};
@@ -367,12 +374,18 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 
 void media_view_zoom_reset()
 {
-	// keep where we are centered on in the image
-	// FIXME: doesn't work right
-	image_draw::pos.x = 1.0 / image_draw::zoom * ( image_draw::pos.x );
-	image_draw::pos.y = 1.0 / image_draw::zoom * ( image_draw::pos.y );
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
 
-	image_draw::zoom  = 1.0;
+	// keep where we are centered on in the image
+	// New Position = Scale Origin + ( Scale Point - Scale Origin ) * Scale Factor
+	// image_draw::pos.x     = ( width / 2.0 ) + ( image_draw::pos.x - ( width / 2.0 ) ) * ( 1.0 / image_draw::zoom );
+	// image_draw::pos.y     = ( height / 2.0 ) + ( image_draw::pos.y - ( height / 2.0 ) ) * ( 1.0 / image_draw::zoom );
+
+	image_draw::pos.x     = scale_point_from_origin( width / 2.0, image_draw::pos.x, 1.0 / image_draw::zoom );
+	image_draw::pos.y     = scale_point_from_origin( height / 2.0, image_draw::pos.y, 1.0 / image_draw::zoom );
+
+	image_draw::zoom      = 1.0;
 
 	image_draw::zoom_mode = e_zoom_mode_fixed;
 
@@ -451,8 +464,11 @@ void media_view_scroll_zoom( float scroll )
 	// recalculate image position to keep image where cursor is
 
 	// New Position = Scale Origin + ( Scale Point - Scale Origin ) * Scale Factor
-	image_draw::pos.x  = (double)app::mouse_pos[ 0 ] + ( image_draw::pos.x - (double)app::mouse_pos[ 0 ] ) * factor;
-	image_draw::pos.y  = (double)app::mouse_pos[ 1 ] + ( image_draw::pos.y - (double)app::mouse_pos[ 1 ] ) * factor;
+	// image_draw::pos.x  = (double)app::mouse_pos[ 0 ] + ( image_draw::pos.x - (double)app::mouse_pos[ 0 ] ) * factor;
+	// image_draw::pos.y  = (double)app::mouse_pos[ 1 ] + ( image_draw::pos.y - (double)app::mouse_pos[ 1 ] ) * factor;
+
+	image_draw::pos.x  = scale_point_from_origin( app::mouse_pos[ 0 ], image_draw::pos.x, factor );
+	image_draw::pos.y  = scale_point_from_origin( app::mouse_pos[ 1 ], image_draw::pos.y, factor );
 
 	media_view_scale_reset_timer();
 	media_view_clamp_to_bounds();
@@ -575,7 +591,6 @@ void media_view_context_menu()
 
 	if ( ImGui::Button( "100%", { 0, 0 } ) )
 	{
-		media_view_zoom_reset();
 		media_view_zoom_reset();
 	}
 
