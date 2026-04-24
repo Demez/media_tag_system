@@ -279,6 +279,8 @@ void media_view_clamp_to_bounds()
 	int    width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
+	// If image is larger than width or height, we need to change the bounds a bit, to allow most of image itself to go past it
+	// so the side of the window can be half filled with part of the image
 	if ( width < image_draw::size.x )
 	{
 		float out_of_bounds = width / 2.f;
@@ -289,8 +291,10 @@ void media_view_clamp_to_bounds()
 	}
 	else
 	{
+		// centers the image, this works ok, but feels a bit off when zooming out
 		// image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
 
+		// this is similar to above, but only allows half the image to go out of bounds instead of most
 		min_bounds.x        = -image_draw::size.x / 2.f;
 		max_bounds.x        = width - ( image_draw::size.x / 2.f );
 
