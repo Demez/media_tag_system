@@ -271,71 +271,55 @@ e_media_type get_media_type()
 }
 
 
-// UNFINISHED
 void media_view_clamp_to_bounds()
 {
-#if 0
 	ImVec2 min_bounds{};
 	ImVec2 max_bounds{};
 
 	int    width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
-	// Fit image in window size
-	float factor[ 2 ] = { 1.f, 1.f };
-
-	factor[ 0 ] = (float)width / (float)g_image_data.image.width;
-	factor[ 1 ] = (float)height / (float)g_image_data.image.height;
-
-	float zoom  = std::min( factor[ 0 ], factor[ 1 ] );
-
-	ImVec2 scaled_size = {
-		g_image_data.image.width * zoom,
-		g_image_data.image.height * zoom
-	};
-
-	// max_bounds.x      = width - ( scaled_size.x / 2.f );
-	// max_bounds.y      = height - ( scaled_size.y / 2.f );
-	// 
-	// min_bounds.x      = -( scaled_size.x / 2.f );
-	// min_bounds.y      = -( scaled_size.y / 2.f );
-
-	// max_bounds.x      = ( image_draw::size.x ) + ( width / 2.f );
-	// max_bounds.y      = ( image_draw::size.y ) + ( height / 2.f );
-
-	max_bounds.x = width - image_draw::size.x;
-	max_bounds.y = height - image_draw::size.y;
-
-	// min_bounds.x      = -image_draw::size.x + ( width / 2.f );
-	// min_bounds.y      = -image_draw::size.y + ( height / 2.f );
-
-	// min_bounds.x      = -( image_draw::size.x * 1.5f ) + ( width / 2.f );
-	// min_bounds.y      = -( image_draw::size.y * 1.5f ) + ( height / 2.f );
-
-	// max_bounds.x      = width - ( width / 2.f );
-	// max_bounds.y      = height - ( height / 2.f );
-	// 
-	// min_bounds.x      = -( width / 2.f );
-	// min_bounds.y      = -( height / 2.f );
-
-	// doesn't work properly with panning when zoomed in
 	if ( width < image_draw::size.x )
 	{
-		float out_of_bounds = image_draw::size.x - width;
-		min_bounds.x -= out_of_bounds / 2.f;
-		max_bounds.x += out_of_bounds / 2.f;
+		float out_of_bounds = width / 2.f;
+		min_bounds.x        = -image_draw::size.x + out_of_bounds;
+		max_bounds.x        = out_of_bounds;
+
+		image_draw::pos.x   = CLAMP( image_draw::pos.x, min_bounds.x, max_bounds.x );
+	}
+	else
+	{
+		// image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
+
+		min_bounds.x        = -image_draw::size.x / 2.f;
+		max_bounds.x        = width - ( image_draw::size.x / 2.f );
+
+		// min_bounds.x        = 0;
+		// max_bounds.x        = width - image_draw::size.x ;
+
+		image_draw::pos.x   = CLAMP( image_draw::pos.x, min_bounds.x, max_bounds.x );
 	}
 
 	if ( height < image_draw::size.y )
 	{
-		float out_of_bounds = image_draw::size.y - height;
-		min_bounds.y -= out_of_bounds / 2.f;
-		max_bounds.y += out_of_bounds / 2.f;
-	}
+		float out_of_bounds = height / 2.f;
+		min_bounds.y        = -image_draw::size.y + out_of_bounds;
+		max_bounds.y        = out_of_bounds;
 
-	image_draw::pos.x = CLAMP( image_draw::pos.x, min_bounds.x, max_bounds.x );
-	image_draw::pos.y = CLAMP( image_draw::pos.y, min_bounds.y, max_bounds.y );
-#endif
+		image_draw::pos.y   = CLAMP( image_draw::pos.y, min_bounds.y, max_bounds.y );
+	}
+	else
+	{
+		// image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
+
+		min_bounds.y      = -image_draw::size.y / 2.f;
+		max_bounds.y      = height - ( image_draw::size.y / 2.f );
+
+		// min_bounds.y      = 0;
+		// max_bounds.y      = height - image_draw::size.y;
+
+		image_draw::pos.y = CLAMP( image_draw::pos.y, min_bounds.y, max_bounds.y );
+	}
 }
 
 
@@ -366,8 +350,11 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 	// TODO: only adjust this if needed, check image zoom type
 	// if image doesn't fit window size, keep locked to center
 
-	image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
-	image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
+	if ( center_image )
+	{
+		image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
+		image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
+	}
 
 	media_view_scale_reset_timer();
 	media_view_clamp_to_bounds();
@@ -1432,10 +1419,6 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 	// dst_rect.x = round( dst_rect.x );
 	// dst_rect.y = round( dst_rect.y );
 
-	int width, height;
-	// SDL_GetWindowSize( app::window, &width, &height );
-	SDL_GetWindowSizeInPixels( app::window, &width, &height );
-
 	glEnable( GL_BLEND );
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
@@ -1504,34 +1487,6 @@ static void media_view_draw_image()
 		printf( "IMAGE FRAME OUT OF BOUNDS\n" );
 		return;
 	}
-
-#if 0
-	SDL_FRect dst_rect{};
-	dst_rect.w = image_draw::size.x;
-	dst_rect.h = image_draw::size.y;
-	dst_rect.x = image_draw::pos.x;
-	dst_rect.y = image_draw::pos.y;
-
-	if ( image_draw::flip_h )
-	{
-		dst_rect.w = -image_draw::size.x;
-		dst_rect.x += image_draw::size.x;
-	}
-
-	if ( image_draw::flip_v )
-	{
-		dst_rect.h = -image_draw::size.y;
-		dst_rect.y += image_draw::size.y;
-	}
-
-	dst_rect.w = round( dst_rect.w );
-	dst_rect.h = round( dst_rect.h );
-	dst_rect.x = round( dst_rect.x );
-	dst_rect.y = round( dst_rect.y );
-
-	int width, height;
-	SDL_GetWindowSize( app::window, &width, &height );
-#endif
 
 	if ( g_image_data.image.frame.size() > 1 )
 	{
