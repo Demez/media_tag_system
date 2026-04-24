@@ -654,7 +654,7 @@ void sys_open_file_properties( const char* file )
 
 // GetUIObjectOfFile incorporated by reference
 // https://web.archive.org/web/20140424230840/http://blogs.msdn.com/b/oldnewthing/archive/2004/09/21/231739.aspx
-static HRESULT GetUIObjectOfFile( HWND hwnd, LPCWSTR pszPath, REFIID riid, void** ppv )
+HRESULT GetUIObjectOfFile( HWND hwnd, LPCWSTR pszPath, REFIID riid, void** ppv )
 {
 	*ppv = NULL;
 	HRESULT      hr;

@@ -3,7 +3,8 @@
 
 
 // #include <WinUser.h>
-// #include <Windows.h>
+#include <Windows.h>
+#include <atlbase.h>
 // #include <direct.h>
 //#include <fileapi.h>
 // #include <handleapi.h>
@@ -257,10 +258,161 @@ void drag_drop_remove( HWND hwnd )
 // Public Functions
 
 
-// Start drag and drop of multiple files in the system shell, like dragging to another folder to copy, into discord, etc.
-void sys_begin_drag_drop( const std::vector< fs::path >& files )
+struct DropSourceNotify : public IDropSourceNotify
 {
-	printf( "NOT IMPLEMENTED YET !\n" );
+	LONG            ref = 0L;
+
+	virtual HRESULT DragEnterTarget( HWND hwndTarget ) override
+	{
+		return S_OK;
+	}
+
+	virtual HRESULT DragLeaveTarget() override
+	{
+		return S_OK;
+	}
+
+	HRESULT STDMETHODCALLTYPE QueryInterface( REFIID riid, void** ppvObject ) override
+	{
+		// IID_IDropSourceNotify
+
+		if ( riid == IID_IDropSourceNotify )
+		{
+			AddRef();
+			*ppvObject = this;
+			return S_OK;
+		}
+		else
+		{
+			*ppvObject = 0;
+			return E_NOINTERFACE;
+		};
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef() override
+	{
+		return ++ref;
+	}
+
+	ULONG STDMETHODCALLTYPE Release() override
+	{
+		if ( ref == 0 )
+			return 0;
+
+		ULONG uRet = --ref;
+
+		return uRet;
+	}
+};
+
+
+struct DropSource : public IDropSource
+{
+	LONG             ref = 0L;
+	DropSourceNotify notify{};
+
+	virtual HRESULT QueryContinueDrag( BOOL fEscapePressed, DWORD grfKeyState ) override
+	{
+		if ( fEscapePressed )
+			return DRAGDROP_S_CANCEL;
+
+		if ( !(grfKeyState & MK_MBUTTON) )
+			return DRAGDROP_S_DROP;
+
+		return S_OK;
+	}
+
+	virtual HRESULT GiveFeedback( DWORD dwEffect ) override
+	{
+		return DRAGDROP_S_USEDEFAULTCURSORS;
+	}
+
+	// IUnknown
+	HRESULT STDMETHODCALLTYPE QueryInterface( REFIID riid, void** ppvObject ) override
+	{
+		// IID_IDropSourceNotify
+
+		if ( ppvObject == nullptr )
+		{
+			return E_POINTER;
+		}
+
+		if ( riid == IID_IUnknown || riid == IID_IDropSource )
+		{
+			AddRef();
+			*ppvObject = this;
+			return S_OK;
+		}
+		// https://gitlab.com/tortoisegit/tortoisegit/-/blob/master/src/Utils/DragDropImpl.cpp
+		else if ( riid == IID_IDropSourceNotify )
+		{
+			return notify.QueryInterface( riid, ppvObject );
+		}
+		else
+		{
+			*ppvObject = 0;
+			return E_NOINTERFACE;
+		}
+	}
+
+	ULONG STDMETHODCALLTYPE AddRef() override
+	{
+		return ++ref;
+		// printf( "AddRef\n" );
+		// return 0;
+	}
+
+	ULONG STDMETHODCALLTYPE Release() override
+	{
+		if ( ref == 0 )
+			return 0;
+
+		ULONG uRet = --ref;
+
+		return uRet;
+
+		// printf( "Release\n" );
+		// return 0;
+	}
+};
+
+
+// Start drag and drop of multiple files in the system shell, like dragging to another folder to copy, into discord, etc.
+void sys_do_drag_drop_files( const std::vector< fs::path >& files )
+{
+	// for now, only the first file
+	if ( files.empty() )
+		return;
+
+	const wchar_t*         path_w = files[ 0 ].c_str();
+	bool                   ret    = false;
+
+	CComPtr< IDataObject > file_obj;
+
+	if ( !SUCCEEDED( GetUIObjectOfFile( nullptr, path_w, IID_PPV_ARGS( &file_obj ) ) ) )
+	{
+		printf( "Failed to find file to drag!\n" );
+		return;
+	}
+
+	DropSource source{};
+	DWORD      out_effect = 0;
+
+	app::in_drag_drop     = true;
+
+	HRESULT res           = DoDragDrop( file_obj, &source, DROPEFFECT_COPY, &out_effect );
+
+	app::in_drag_drop     = false;
+
+	if ( res != DRAGDROP_S_DROP && res != DRAGDROP_S_CANCEL )
+	{
+		// the page says E_UNSPEC, but that doesn't exist?
+		if ( res == E_UNEXPECTED )
+		{
+			printf( "drag and drop weird error\n" );
+			sys_print_last_error();
+		}
+	}
 }
 
 

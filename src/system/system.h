@@ -172,7 +172,7 @@ int                     sys_execute( const char* command );
 // Drag and Drop Interface
 
 // Start drag and drop of multiple files in the system shell, like dragging to another folder to copy, into discord, etc.
-void                    sys_begin_drag_drop( const std::vector< fs::path >& files );
+void                    sys_do_drag_drop_files( const std::vector< fs::path >& files );
 
 // files have been dragged into this program, the drag and drop system will call this function when it recieves it
 void                    sys_set_receive_drag_drop_func( f_drag_drop_receive* callback );

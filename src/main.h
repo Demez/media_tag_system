@@ -358,6 +358,7 @@ namespace app
 	extern ImVec2       mouse_delta;
 	extern ImVec2       mouse_pos;
 	extern int          mouse_scroll;
+	extern bool         mouse_middle_press;
 
 	// extern ImVec4       clear_color;
 
@@ -366,6 +367,7 @@ namespace app
 	extern bool         draw_frame;
 	extern bool         draw_next_frame;
 	extern bool         in_window_drag;
+	extern bool         in_drag_drop;
 }
 
 

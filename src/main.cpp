@@ -28,11 +28,13 @@ namespace app
 
 	ImVec2       mouse_delta;
 	ImVec2       mouse_pos;
-	int          mouse_scroll    = 0;
+	int          mouse_scroll       = 0;
+	bool         mouse_middle_press = false;
 
-	bool         draw_frame      = false;
-	bool         draw_next_frame = false;
-	bool         in_window_drag  = false;
+	bool         draw_frame         = false;
+	bool         draw_next_frame    = false;
+	bool         in_window_drag     = false;
+	bool         in_drag_drop       = false;
 
 	app_config_t config{};
 }
@@ -615,6 +617,9 @@ void window_quick_draw( bool resize = false )
 
 bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 {
+	if ( app::in_drag_drop )
+		return true;
+
 	switch ( event->type )
 	{
 		// Redraw window - Window is being resized
@@ -668,7 +673,17 @@ bool handle_events()
 				break;
 
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+				app::mouse_middle_press = true;
+				app::draw_frame         = true;
+				app::draw_next_frame    = true;
+				break;
+
 			case SDL_EVENT_MOUSE_BUTTON_UP:
+				app::mouse_middle_press = false;
+				app::draw_frame         = true;
+				app::draw_next_frame    = true;
+				break;
+
 			case SDL_EVENT_KEY_DOWN:
 			case SDL_EVENT_KEY_UP:
 				app::draw_frame      = true;
@@ -1170,12 +1185,10 @@ int main( int argc, char* argv[] )
 				if ( fs_is_dir( arg ) )
 				{
 					directory::queued = arg;
-					//g_gallery_view  = true;
 				}
 				else
 				{
 					on_new_file( arg );
-					//g_gallery_view = false;
 				}
 
 				break;

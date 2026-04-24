@@ -820,21 +820,42 @@ void media_view_input()
 		image_draw::pause = !image_draw::pause;
 	}
 
+	SDL_MouseButtonFlags mouse_btns = SDL_GetMouseState( nullptr, nullptr );
+
+	// mouse down and not hovering an imgui window not in an image pan
+	// bool        mouse_middle_down = ImGui::IsMouseDown( ImGuiMouseButton_Middle ) && !( mouse_hover_imgui_window );
+	bool                 mouse_middle_down = mouse_btns & SDL_BUTTON_MMASK && !( mouse_hover_imgui_window );
+
+	static bool drag_cooldown     = false;
+
+	if ( mouse_middle_down )
+	{
+		if ( !drag_cooldown )
+		{
+			if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
+			{
+				std::vector< fs::path > files{ gallery_item_get_path( gallery::cursor ) };
+				sys_do_drag_drop_files( files );
+
+				// this way we don't try to start another drag drop instantly after somehow
+				drag_cooldown = true;
+			}
+		}
+	}
+	else
+	{
+		drag_cooldown = false;
+	}
+
 	// mouse down and not hovering an imgui window not in an image pan
 	bool mouse_down = ImGui::IsMouseDown( ImGuiMouseButton_Left ) && !( mouse_hover_imgui_window && !g_image_pan );
 
 	if ( mouse_down && !g_image_pan )
 	{
 		// Wait for mouse movement to determine if we are panning the image or not
-		g_image_pan_wait = true;
-
-		if ( !g_image_pan )
+		if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
 		{
-			if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
-			{
-				g_image_pan = true;
-				g_image_pan_wait = false;
-			}
+			g_image_pan = true;
 		}
 	}
 

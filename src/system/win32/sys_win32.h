@@ -33,3 +33,8 @@ char*          sys_to_utf8( const wchar_t* spStr );
 bool           drag_drop_register( HWND hwnd );
 void           drag_drop_remove( HWND hwnd );
 
+
+// --------------------------------------------------------------------------------------------------------
+
+HRESULT        GetUIObjectOfFile( HWND hwnd, LPCWSTR pszPath, REFIID riid, void** ppv );
+
