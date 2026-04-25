@@ -306,6 +306,26 @@ void gallery_view_sort_list( std::vector< size_t >& gallery_list )
 }
 
 
+static media_entry_t g_selected_item_cache{};
+
+
+void gallery_view_set_selection( size_t gallery_item_index )
+{
+	if ( directory::media_list.empty() )
+		return;
+
+	if ( gallery_item_index >= gallery::sorted_media.size() )
+	{
+		g_selected_item_cache.file = {};
+		g_selected_item_cache.type = e_media_type_none;
+		g_selected_item_cache.filename.clear();
+		return;
+	}
+
+	g_selected_item_cache     = gallery_item_get_media_entry( gallery_item_index );
+}
+
+
 void gallery_view_sort_dir()
 {
 	static std::vector< size_t > folders;
@@ -316,18 +336,6 @@ void gallery_view_sort_dir()
 
 	folders.reserve( directory::media_list.size() );
 	files.reserve( directory::media_list.size() );
-
-	size_t         selected_item_idx = gallery::cursor;
-	media_entry_t  selected_item{};
-	size_t         selected_item_gallery{};
-	bool           selected_folder = false;
-
-	if ( gallery::sorted_media.size() )
-	{
-		selected_item_gallery = gallery::sorted_media[ selected_item_idx ];
-		selected_item         = gallery_item_get_media_entry( selected_item_idx );
-		selected_folder       = selected_item.type == e_media_type_directory;
-	}
 
 	size_t search_len = strlen( gallery::search );
 
@@ -367,20 +375,33 @@ void gallery_view_sort_dir()
 	std::copy( files.begin(), files.end(), gallery::sorted_media.begin() + folders.size() );
 
 	// Find Selected File
-	if ( !selected_item.file.path.empty() )
+	if ( !g_selected_item_cache.file.path.empty() )
 	{
-		for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
+		size_t i = 0;
+		for ( ; i < gallery::sorted_media.size(); i++ )
 		{
 			const file_t& file = gallery_item_get_file( i );
 
-			if ( selected_item.file != file )
+			if ( g_selected_item_cache.file != file )
 				continue;
 
 			gallery::cursor = i;
 			gallery_view_scroll_to_cursor();
 			break;
 		}
+
+		if ( i == gallery::sorted_media.size() )
+		{
+			g_selected_item_cache.file = {};
+			g_selected_item_cache.type = e_media_type_none;
+			g_selected_item_cache.filename.clear();
+
+			// if ( gallery::cursor > 0 )
+			// 	gallery::cursor--;
+		}
 	}
+
+	gallery_view_reset_text_size();
 
 	//if ( g_do_search )
 	//	g_do_search = false;
@@ -392,9 +413,12 @@ void gallery_view_sort_dir()
 // =============================================================================================
 
 
-void gallery_view_dir_change()
+void gallery_view_dir_change( bool keep_selection )
 {
 	gallery_view_update_header_directory();
+
+	//if ( keep_selection )
+	//	gallery_view_set_selection( gallery::cursor );
 
 	// TODO: make it work with recursive, so if the selected item is still within the results, use that to snap scroll view to
 	if ( !directory::folder_reload || directory::recursive )
@@ -427,7 +451,7 @@ void gallery_view_context_menu()
 	// if ( !ImGui::BeginPopup( "##gallery ctx menu" ) )
 	// 	return;
 
-	if ( !ImGui::BeginPopupContextVoid( "##gallery ctx menu", ImGuiPopupFlags_AnyPopup ) )
+	if ( !ImGui::BeginPopupContextWindow( "##gallery ctx menu", ImGuiPopupFlags_AnyPopup ) )
 	 	return;
 
 	ImGuiStyle& style        = ImGui::GetStyle();
@@ -1202,7 +1226,7 @@ void gallery_view_draw()
 	if ( app::config.use_custom_colors )
 		ImGui::PopStyleColor();
 
-	// gallery_view_context_menu();
+	gallery_view_context_menu();
 
 	ImGui::End();
 

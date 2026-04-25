@@ -178,6 +178,13 @@ void                    sys_do_drag_drop_files( const std::vector< fs::path >& f
 void                    sys_set_receive_drag_drop_func( f_drag_drop_receive* callback );
 
 // --------------------------------------------------------------------------------------------------------
+// Folder Monitor
+
+// Return true if something in the folder changed, indicating we need a refresh
+bool                    sys_folder_mon_changed();
+void                    sys_folder_mon_shutdown();
+
+// --------------------------------------------------------------------------------------------------------
 // Other
 
 proc_mem_info_t         sys_get_mem_info();
@@ -187,3 +194,6 @@ proc_mem_info_t         sys_get_mem_info();
 sys_font_data_t         sys_get_font();
 
 u64                     sys_get_time_ms();
+
+// non-exception based path conversion
+std::string             sys_path_to_string( const fs::path& path );

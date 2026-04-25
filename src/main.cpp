@@ -56,11 +56,17 @@ namespace directory
 	fs::path                     queued;  // will change to this folder start of next frame
 	std::vector< media_entry_t > media_list;
 
+	// the folder path split by path separators
+	std::vector< std::string >   path_chunks;
+	bool                         path_edit;
+
 	// TODO: get rid of these "thumbnail handles", i don't think it's needed anymore, just use the index in media list
 	// and make sure to clear the thumbnail cache when needed
 	std::vector< h_thumbnail >   thumbnail_list;
 
 	std::vector< std::string >   media_history;
+	std::vector< fs::path >      folder_history;
+	size_t                       folder_history_pos;
 
 	bool                         folder_reload = false;
 	bool                         recursive     = false;
@@ -119,6 +125,15 @@ void folder_load_media_list()
 {
 	thumbnail_clear_cache();
 
+	if ( directory::folder_reload )
+	{
+		gallery_view_set_selection( gallery::cursor );
+	}
+	else
+	{
+		gallery::cursor = 0;
+	}
+
 	directory::media_list.clear();
 	directory::thumbnail_list.clear();
 
@@ -128,7 +143,40 @@ void folder_load_media_list()
 	gallery::item_size_changed = true;
 	gallery::item_text_size.clear();
 
-	std::string           root = directory::path.string();
+	std::string root = directory::path.string();
+
+	// split into chunks
+	directory::path_chunks.clear();
+
+	size_t path_i = 0;
+	for ( fs::path::iterator it = directory::path.begin(); it != directory::path.end(); it++ )
+	{
+		#if _WIN32
+		if ( path_i != 1 )
+		#endif
+
+		directory::path_chunks.push_back( sys_path_to_string( *it ) );
+		path_i++;
+	}
+
+	// const char* root_c = root.c_str();
+	// const char* sep    = strchr( root_c, SEP );
+	// 
+	// while ( sep )
+	// {
+	// 	root_c++;
+	// 
+	// 	if ( root_c == '\0' )
+	// 		break;
+	// 
+	// 	const char* next_sep = strchr( root_c, SEP );
+	// 
+	// 	if ( !next_sep )
+	// 		break;
+	// 
+	// 	fs::path chunk( directory::path )
+	// }
+
 	std::vector< file_t > files{};
 
 	e_scandir_flags       scan_flags = e_scandir_abs_paths;
@@ -143,6 +191,7 @@ void folder_load_media_list()
 	}
 
 	media_history_add( root );
+	folder_history_add( directory::path );
 
 	directory::media_list.reserve( files.size() );
 
@@ -150,19 +199,7 @@ void folder_load_media_list()
 	{
 		media_entry_t media_entry{};
 		media_entry.file     = entry;
-
-		try
-		{
-			media_entry.filename = entry.path.filename().string();
-		}
-		catch ( const std::system_error& T )
-		{
-			// std::string ext      = entry.path.extension().string();
-			// media_entry.filename = "INVALID" + ext;
-
-			// Skip this file, probably has an invalid character in the filename
-			continue;
-		}
+		media_entry.filename = sys_path_to_string( entry.path.filename() );
 
 		// if ( fs_is_dir( entry.data() ) )
 		if ( entry.type & e_file_type_directory )
@@ -182,7 +219,7 @@ void folder_load_media_list()
 
 	directory::thumbnail_list.resize( directory::media_list.size() );
 
-	gallery_view_dir_change();
+	gallery_view_dir_change( false );
 	
 	gallery::item_text_size.resize( directory::media_list.size() );
 }
@@ -199,6 +236,63 @@ void media_history_add( const std::string& entry )
 		directory::media_history.erase( directory::media_history.begin() );
 
 	directory::media_history.push_back( entry );
+}
+
+
+void folder_history_add( const fs::path& entry )
+{
+	if ( directory::folder_history.size() > 0 && directory::folder_history[ directory::folder_history_pos - 1 ] == entry )
+		return;
+
+	if ( directory::folder_history.size() == MAX_HISTORY )
+		directory::folder_history.erase( directory::folder_history.begin() );
+
+	// we went back a bit in the history, clear everything after this pos
+	if ( directory::folder_history.size() > 0 && directory::folder_history_pos < directory::folder_history.size() )
+	{
+		directory::folder_history.resize( directory::folder_history_pos );
+	}
+
+	directory::folder_history.push_back( entry );
+	directory::folder_history_pos++;
+}
+
+
+const fs::path& folder_history_get_prev()
+{
+	if ( directory::folder_history.empty() || directory::folder_history_pos <= 1 )
+		return {};
+
+	return directory::folder_history[ --directory::folder_history_pos ];
+}
+
+
+const fs::path& folder_history_get_next()
+{
+	if ( directory::folder_history.empty() || directory::folder_history_pos == directory::folder_history.size() )
+		return {};
+
+	return directory::folder_history[ ++directory::folder_history_pos ];
+}
+
+
+bool folder_history_nav_prev()
+{
+	if ( directory::folder_history.empty() || directory::folder_history_pos <= 1 )
+		return false;
+
+	directory::queued = directory::folder_history[ --directory::folder_history_pos - 1 ];
+	return true;
+}
+
+
+bool folder_history_nav_next()
+{
+	if ( directory::folder_history.empty() || directory::folder_history_pos == directory::folder_history.size() )
+		return false;
+
+	directory::queued = directory::folder_history[ ++directory::folder_history_pos - 1 ];
+	return true;
 }
 
 
@@ -341,6 +435,7 @@ void imgui_draw( float frame_time )
 {
 	if ( gallery::sort_mode_update )
 	{
+		gallery_view_set_selection( gallery::cursor );
 		gallery_view_sort_dir();
 		gallery::sort_mode_update = false;
 	}
@@ -627,6 +722,10 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 #ifdef _WIN32
 		case SDL_EVENT_WINDOW_EXPOSED:
 		{
+			// clear focusing of any windows
+			ImGui::SetNextFrameWantCaptureKeyboard( false );
+			ImGui::SetWindowFocus( nullptr );
+
 			app::in_window_drag = true;
 			thumbnail_loader_update();
 			window_quick_draw( false );
@@ -636,6 +735,10 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 #endif
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
+			// clear focusing of any windows
+			ImGui::SetNextFrameWantCaptureKeyboard( false );
+			ImGui::SetWindowFocus( nullptr );
+
 			thumbnail_loader_update();
 			window_quick_draw( true );
 			break;
@@ -712,8 +815,12 @@ bool handle_events()
 			case SDL_EVENT_WINDOW_RESIZED:
 				int width, height;
 				SDL_GetWindowSize( app::window, &width, &height );
-				ImGui::GetIO().DisplaySize.x    = width;
-				ImGui::GetIO().DisplaySize.y    = height;
+				ImGui::GetIO().DisplaySize.x = width;
+				ImGui::GetIO().DisplaySize.y = height;
+
+				// clear focusing of any windows
+				ImGui::SetNextFrameWantCaptureKeyboard( false );
+				ImGui::SetWindowFocus( nullptr );
 
 				app::window_resized             = true;
 				app::draw_frame                 = true;
@@ -729,6 +836,10 @@ bool handle_events()
 
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
 				app::window_focused = false;
+
+				// clear focusing of any windows
+				ImGui::SetNextFrameWantCaptureKeyboard( false );
+				ImGui::SetWindowFocus( nullptr );
 				break;
 
 			// The system requests a file open
@@ -891,6 +1002,12 @@ void main_loop()
 
 		// -----------------------------------------------------------------------------------
 		// Queued Directory/File to Change to/Load
+
+		if ( sys_folder_mon_changed() )
+		{
+			directory::queued        = directory::path;
+			directory::folder_reload = true;
+		}
 
 		if ( !directory::queued.empty() )
 		{
@@ -1224,6 +1341,7 @@ int main( int argc, char* argv[] )
 
 	stop_mpv();
 	thumbnail_loader_shutdown();
+	sys_folder_mon_shutdown();
 	media_view_shutdown();
 	icon_free();
 

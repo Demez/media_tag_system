@@ -6,8 +6,6 @@
 static char g_folder_buf[ 512 ]{};
 bool        g_do_search = false;
 
-void        gallery_view_reset_text_size();
-
 
 #if 0
 bool        SliderStepInt( const char* label, int* value, const int step_size, const int min_size, const int max_size, const char* format, ImGuiSliderFlags flags )
@@ -183,20 +181,24 @@ int gallery_view_draw_header()
 
 	draw_vertical_separator( draw_list, style );
 
-	// TODO: add in navigation history
-	ImGui::BeginDisabled();
-
+	ImGui::BeginDisabled( !(directory::folder_history.size() && directory::folder_history_pos > 1) );
 	if ( ImGui::Button( "<" ) )
 	{
+		folder_history_nav_prev();
 	}
 
+	ImGui::EndDisabled();
+
 	ImGui::SameLine();
+
+	ImGui::BeginDisabled( !(directory::folder_history.size() && directory::folder_history.size() > directory::folder_history_pos) );
 	if ( ImGui::Button( ">" ) )
 	{
+		folder_history_nav_next();
 	}
+	ImGui::EndDisabled();
 
 	ImGui::SameLine();
-	ImGui::EndDisabled();
 
 	if ( ImGui::Button( "^" ) )
 	{
@@ -205,15 +207,165 @@ int gallery_view_draw_header()
 
 	ImGui::SameLine();
 
-	// ImGui::TextUnformatted( directory::path.string().c_str() );
-	ImGui::SetNextItemWidth( 400 );
+	ImVec2      path_text_size  = ImGui::CalcTextSize( sys_path_to_string( directory::path ).c_str() );
+	ImVec2      space_text_size = ImGui::CalcTextSize( "          " );
 
-	if ( ImGui::InputText( "##directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
+	static bool was_in_path_edit = false;
+	static bool path_edit_hover  = false;
+
+	if ( !directory::path_edit )
 	{
-		if ( fs_is_dir( g_folder_buf ) )
-			directory::queued = g_folder_buf;
-		else
-			snprintf( g_folder_buf, 512, directory::path.string().c_str() );
+		was_in_path_edit  = false;
+
+		ImGuiStyle& style = ImGui::GetStyle();
+		ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { ImGui::GetFontSize() / 8.f, style.ItemSpacing.y } );
+		//ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, { 0, style.FramePadding.y } );
+
+		// ImVec2 bar_size = ImGui::CalcItemSize( path_text_size, 0, 0 );
+		// ImGui::SetNextItemWidth( bar_size.x * 1.25 );
+
+		// ImGui::SetNextWindowSizeConstraints( { 100, -1 }, { 600, -1 } );
+
+		if ( path_edit_hover )
+		{
+			ImVec4 color = style.Colors[ ImGuiCol_FrameBg ];
+			color.x *= 1.75;
+			color.y *= 1.75;
+			color.z *= 1.75;
+			color.w *= 1.75;
+
+			ImGui::PushStyleColor( ImGuiCol_FrameBg, color );
+		}
+
+		// ImGuiChildFlags_AutoResizeX
+		if ( ImGui::BeginChild( "##breadcrumb_bar", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove ) )
+		{
+			bool   item_hovered      = false;
+
+			size_t id = 1;
+			ImVec2 item_size{};
+			for ( size_t i = 0; i < directory::path_chunks.size(); i++ )
+			{
+				ImGui::PushID( id++ );
+
+				ImVec2 text_size = ImGui::CalcTextSize( directory::path_chunks[ i ].c_str() );
+				item_size = ImGui::CalcItemSize( text_size, 0, 0 );
+				// item_size.x += style.ItemInnerSpacing.x * 2;
+				// item_size.y      = ImGui::GetWindowHeight();
+				
+				if ( ImGui::Selectable( directory::path_chunks[ i ].c_str(), false, 0, item_size ) )
+				{
+					directory::queued.clear();
+
+					// build new path where we are currently
+					for ( size_t j = 0; j < i + 1; j++ )
+					{
+						directory::queued += directory::path_chunks[ j ];
+
+						if ( j < i )
+							directory::queued += SEP_S;
+					}
+				}
+
+				if ( ImGui::IsItemHovered() )
+					item_hovered |= true;
+
+				ImGui::PopID();
+
+				if ( i + 1 < directory::path_chunks.size() )
+				{
+					ImGui::SameLine();
+
+					ImGui::PushID( id++ );
+					ImGui::TextUnformatted( SEP_S );
+					ImGui::PopID();
+				}
+
+				if ( ImGui::IsItemHovered() )
+					item_hovered |= true;
+
+				ImGui::SameLine();
+			}
+
+			float region_avail             = ImGui::GetContentRegionAvail().x;
+			float region_avail_y             = ImGui::GetContentRegionAvail().y;
+
+			ImVec2 cursor_pos = ImGui::GetCursorPos();
+			region_avail                  = 500 - ( cursor_pos.x + style.FramePadding.x );
+
+			ImVec2      cursor_screen_pos   = ImGui::GetCursorScreenPos();
+			ImVec2      window_pos          = ImGui::GetWindowPos();
+
+			// ImVec2      window_cursor_pos( window_pos.x + cursor_base_pos.x, ( window_pos.y + cursor_base_pos.y ) );
+			ImVec2      window_cursor_pos( window_pos.x + cursor_pos.x, cursor_pos.y );
+			ImVec2      global_item_size = ImVec2( window_cursor_pos.x + region_avail + style.FramePadding.x, window_cursor_pos.y + ImGui::GetWindowHeight() );
+
+			ImColor     main_bg_color     = item_hovered ? style.Colors[ ImGuiCol_ButtonActive ] : style.Colors[ ImGuiCol_ButtonActive ];
+
+			// draw_list->AddRectFilled( child_size_min, child_size_max, main_bg_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
+
+			bool rect_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, global_item_size, true );
+
+			if ( path_edit_hover )
+			{
+				ImGui::PopStyleColor();
+			}
+
+			if ( rect_hovered && !item_hovered )
+			{
+				path_edit_hover      = true;
+				app::draw_frame      = true;
+				app::draw_next_frame = true;
+
+				if ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
+				{
+					directory::path_edit = true;
+				}
+			}
+			else
+			{
+				if ( path_edit_hover )
+				{
+					path_edit_hover      = false;
+					app::draw_frame      = true;
+					app::draw_next_frame = true;
+				}
+			}
+
+			ImGui::Dummy( { region_avail, item_size.y } );
+			ImGui::PopStyleVar();
+		}
+
+		ImGui::EndChild();
+	}
+	else
+	{
+		ImGui::SetNextItemWidth( 500 );
+
+		if ( !was_in_path_edit )
+		{
+			ImGui::SetKeyboardFocusHere();
+		}
+
+		if ( ImGui::InputText( "##directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
+		{
+			if ( fs_is_dir( g_folder_buf ) )
+				directory::queued = g_folder_buf;
+			else
+				snprintf( g_folder_buf, 512, directory::path.string().c_str() );
+
+			directory::path_edit = false;
+		}
+
+		if ( was_in_path_edit && !ImGui::IsItemFocused() )
+		{
+			directory::path_edit = false;
+		}
+
+		if ( !was_in_path_edit )
+		{
+			was_in_path_edit = true;
+		}
 	}
 
 	ImGui::SameLine();
@@ -223,6 +375,7 @@ int gallery_view_draw_header()
 	{
 		directory::queued        = g_folder_buf;
 		directory::folder_reload = true;
+		directory::path_edit     = false;
 	}
 
 	ImGui::SameLine();
@@ -239,12 +392,16 @@ int gallery_view_draw_header()
 			ImGui::SetKeyboardFocusHere();
 	}
 
+	if ( strlen( gallery::search ) == 0 )
+	{
+		gallery_view_set_selection( gallery::cursor );
+	}
+
 	// if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 	if ( ImGui::InputText( "##search", gallery::search, 512 ) )
 	{
 		g_do_search = true;
-		gallery_view_dir_change();
-		gallery_view_reset_text_size();
+		gallery_view_dir_change( true );
 	}
 
 	ImGui::SameLine();

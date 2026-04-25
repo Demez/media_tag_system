@@ -985,3 +985,18 @@ u64 sys_get_time_ms()
 	return (uint64_t)( counter.QuadPart * 1000 / g_win_perf_freq.QuadPart );
 }
 
+
+// non-exception based path conversion
+std::string sys_path_to_string( const fs::path& path )
+{
+	std::wstring wstring = path.native();
+
+	char* utf8 = sys_to_utf8( wstring.c_str() );
+
+	std::string  ret     = utf8;
+
+	ch_free_str( utf8 );
+
+	return ret;
+}
+

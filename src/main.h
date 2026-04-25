@@ -388,7 +388,13 @@ namespace directory
 	extern std::vector< media_entry_t >  media_list;
 	extern std::vector< h_thumbnail >    thumbnail_list;
 
+	// the folder path split by path separators
+	extern std::vector< std::string >    path_chunks;
+	extern bool                          path_edit;
+
 	extern std::vector< std::string >    media_history;
+	extern std::vector< fs::path >       folder_history;
+	extern size_t                        folder_history_pos;
 
 	extern bool                          folder_reload;
 	extern bool                          recursive;
@@ -475,10 +481,17 @@ std::string                          gallery_item_get_path_string( size_t index 
 void                                 gallery_view_scroll_to_cursor();
 void                                 gallery_view_input();
 void                                 gallery_view_draw();
-void                                 gallery_view_dir_change();
+void                                 gallery_view_dir_change( bool keep_selection );
 void                                 gallery_view_sort_dir();
+void                                 gallery_view_set_selection( size_t gallery_item_index );
+void                                 gallery_view_reset_text_size();
 
 void                                 media_history_add( const std::string& entry );
+void                                 folder_history_add( const fs::path& entry );
+const fs::path&                      folder_history_get_prev();
+const fs::path&                      folder_history_get_next();
+bool                                 folder_history_nav_prev();
+bool                                 folder_history_nav_next();
 
 void                                 set_view_type_gallery();
 void                                 set_view_type_media();
