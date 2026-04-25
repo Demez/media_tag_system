@@ -331,10 +331,11 @@ struct DropSource : public IDropSource
 
 	virtual HRESULT GiveFeedback( DWORD dwEffect ) override
 	{
-		if ( notify.hwnd == g_main_hwnd )
-		{
-			return S_OK;
-		}
+		// TODO: use the deny cursor or whatever it's called
+		// if ( notify.hwnd == g_main_hwnd )
+		// {
+		// 	return S_OK;
+		// }
 
 		return DRAGDROP_S_USEDEFAULTCURSORS;
 	}
