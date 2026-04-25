@@ -57,7 +57,7 @@ bool fs_make_dir( const char* path )
 		sys_print_last_error();
 	}
 
-	return ret;
+	return ret != 0;
 }
 
 
