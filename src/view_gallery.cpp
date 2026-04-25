@@ -1109,7 +1109,7 @@ void gallery_view_draw_content()
 			gallery_selected_item_action( media );
 		}
 
-		if ( selected_item )
+		if ( selected_item && item_hovered )
 		{
 			SDL_MouseButtonFlags mouse_btns        = SDL_GetMouseState( nullptr, nullptr );
 
