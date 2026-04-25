@@ -207,11 +207,9 @@ int gallery_view_draw_header()
 
 	ImGui::SameLine();
 
-	ImVec2      path_text_size  = ImGui::CalcTextSize( sys_path_to_string( directory::path ).c_str() );
-	ImVec2      space_text_size = ImGui::CalcTextSize( "          " );
-
-	static bool was_in_path_edit = false;
-	static bool path_edit_hover  = false;
+	static bool  was_in_path_edit = false;
+	static bool  path_edit_hover  = false;
+	static float bar_width        = 0.f;
 
 	if ( !directory::path_edit )
 	{
@@ -332,11 +330,13 @@ int gallery_view_draw_header()
 			ImGui::PopStyleVar();
 		}
 
+		bar_width = ImGui::GetWindowWidth();
+
 		ImGui::EndChild();
 	}
 	else
 	{
-		ImGui::SetNextItemWidth( 500 );
+		ImGui::SetNextItemWidth( bar_width );
 
 		if ( !was_in_path_edit )
 		{
