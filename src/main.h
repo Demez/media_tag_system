@@ -351,6 +351,7 @@ namespace app
 	extern SDL_Window*  window;
 	extern bool         window_focused;
 	extern bool         window_resized;
+	extern float        dpi;
 
 	extern u64          total_time;
 	extern float        frame_time;
@@ -452,6 +453,7 @@ extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
 
 void                                 set_frame_draw( u32 count = 1 );
+void                                 update_dpi( float dpi_override = 0.f );
 
 void                                 image_copy_data( image_t& src, image_t& dst );
 void                                 image_copy_frame_data( image_frame_t& src, image_frame_t& dst );

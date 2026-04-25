@@ -17,6 +17,7 @@ namespace app
 	SDL_Window*  window         = nullptr;
 	bool         window_focused = false;
 	bool         window_resized = false;
+	float        dpi            = 1.0;
 
 	// ImVec4                       clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
 	// ImVec4       clear_color    = ImVec4( 0.05f, 0.05f, 0.05f, 0.0f );
@@ -81,6 +82,7 @@ main_image_data_t            g_image_data;
 main_image_data_t            g_image_scaled_data;
 
 static SDL_GLContext         g_gl_context;
+static bool                  g_in_draw = false;
 
 // =================================================================================
 
@@ -657,6 +659,8 @@ void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& 
 
 void frame_draw_start()
 {
+	g_in_draw = true;
+
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
@@ -688,12 +692,19 @@ void frame_draw_end()
 
 	if ( g_mpv )
 		p_mpv_render_context_report_swap( g_mpv_gl );
+
+	g_in_draw = false;
 }
 
 
 // called initially on startup and on window resize
 void window_quick_draw( bool resize = false )
 {
+	if ( g_in_draw )
+		return;
+
+	g_in_draw = true;
+
 	set_frame_draw();
 
 	frame_draw_start();
@@ -713,6 +724,33 @@ void window_quick_draw( bool resize = false )
 	frame_draw_end();
 
 	set_frame_draw();
+
+	g_in_draw = false;
+}
+
+
+void update_dpi( float dpi_override )
+{
+	float scale = 0.f;
+
+	if ( dpi_override == 0.f )
+	{
+		scale = SDL_GetWindowDisplayScale( app::window );
+	}
+	else
+	{
+		scale = CLAMP( dpi_override, 0.25f, 5.f );
+	}
+
+	app::dpi          = scale;
+	ImGui::GetStyle() = ImGuiStyle();
+
+	style_imgui();
+
+	ImGui::GetStyle().ScaleAllSizes( scale );
+	ImGui::GetStyle().FontScaleDpi = scale;
+
+	gallery_view_reset_text_size();
 }
 
 
@@ -721,8 +759,18 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 	if ( app::in_drag_drop )
 		return true;
 
+	if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
+		return true;
+
 	switch ( event->type )
 	{
+		case SDL_EVENT_WINDOW_MINIMIZED:
+			return true;
+
+		case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+			update_dpi();
+			break;
+
 		// Redraw window - Window is being resized
 		// NOTE: this is also called when dragging the window around
 #ifdef _WIN32
@@ -871,6 +919,10 @@ bool handle_events()
 			// Position while moving over the window
 			case SDL_EVENT_DROP_POSITION:
 				set_frame_draw();
+				break;
+
+			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+				update_dpi();
 				break;
 
 			case SDL_EVENT_QUIT:
@@ -1104,6 +1156,8 @@ void main_loop()
 		{
 			if ( app::config.sleep_time_idle )
 				SDL_Delay( app::config.sleep_time_idle );
+
+			g_in_draw = false;
 		}
 
 		if ( app::draw_frame_count > 0 )
@@ -1158,7 +1212,7 @@ int main( int argc, char* argv[] )
 		return 1;
 	}
 
-	app::window = SDL_CreateWindow( "Media Tag System", 1000, 600, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL );
+	app::window = SDL_CreateWindow( "Media Tag System", 1000, 600, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY );
 
 	if ( !app::window )
 	{

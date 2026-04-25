@@ -137,7 +137,7 @@ int gallery_view_draw_header()
 	//ImGui::SetNextWindowSize( { (float)window_width, 0.f } );
 	ImGui::SetNextWindowSizeConstraints( { (float)window_width, 0.f }, { (float)window_width, -1.f } );
 
-	ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, app::config.gallery_header_padding );
+	ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, app::config.gallery_header_padding * app::dpi );
 
 	if ( app::config.use_custom_colors )
 	{
@@ -287,14 +287,16 @@ int gallery_view_draw_header()
 				ImGui::SameLine();
 			}
 
-			float region_avail             = ImGui::GetContentRegionAvail().x;
-			float region_avail_y             = ImGui::GetContentRegionAvail().y;
+			float  region_avail           = ImGui::GetContentRegionAvail().x;
+			float  region_avail_y         = ImGui::GetContentRegionAvail().y;
 
-			ImVec2 cursor_pos = ImGui::GetCursorPos();
+			ImVec2 cursor_pos             = ImGui::GetCursorPos();
 			region_avail                  = 500 - ( cursor_pos.x + style.FramePadding.x );
 
-			ImVec2      cursor_screen_pos   = ImGui::GetCursorScreenPos();
-			ImVec2      window_pos          = ImGui::GetWindowPos();
+			region_avail                  = std::max( ImGui::GetFontSize() * 3.f, region_avail );
+
+			ImVec2      cursor_screen_pos = ImGui::GetCursorScreenPos();
+			ImVec2      window_pos        = ImGui::GetWindowPos();
 
 			// ImVec2      window_cursor_pos( window_pos.x + cursor_base_pos.x, ( window_pos.y + cursor_base_pos.y ) );
 			ImVec2      window_cursor_pos( window_pos.x + cursor_pos.x, cursor_pos.y );
@@ -884,6 +886,13 @@ void gallery_view_draw_sidebar()
 			}
 
 			ImGui::Checkbox( "Always Draw", &app::config.always_draw );
+
+			static float dpi_scale = 0.f;
+			dpi_scale              = app::dpi;
+			if ( ImGui::InputFloat( "DPI Override", &dpi_scale, 0.25, 0.5, "%.3f" ) )
+			{
+				update_dpi( dpi_scale );
+			}
 
 			ImGui::EndTabItem();
 		}
