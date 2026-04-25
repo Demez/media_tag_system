@@ -512,7 +512,7 @@ void mpv_sdl_event( SDL_Event& event )
 			else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
 			{
 				// Video Loaded
-				app::draw_frame = true;
+				set_frame_draw();
 				g_mpv_video_ready = true;
 				continue;
 			}
@@ -725,7 +725,7 @@ void mpv_handle_wait_event( mpv_handle* mpv, double timeout, const char* prefix 
 		if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
 		{
 			// Video Loaded
-			app::draw_frame = true;
+			set_frame_draw();
 			g_mpv_video_ready = true;
 		}
 
@@ -846,7 +846,7 @@ void mpv_cmd_loadfile( const char* file )
 	// Video Loaded
 	g_current_video = util_strdup( file );
 
-	app::draw_frame = true;
+	set_frame_draw();
 
 	// or use video-params?
 //	p_mpv_get_property( g_mpv, "width", MPV_FORMAT_INT64, &g_video_width );

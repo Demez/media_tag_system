@@ -356,6 +356,8 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 
 		image_draw::size.x    = g_image_data.image.width * image_draw::zoom;
 		image_draw::size.y    = g_image_data.image.height * image_draw::zoom;
+
+		media_view_scale_reset_timer();
 	}
 
 	// TODO: only adjust this if needed, check image zoom type
@@ -367,7 +369,6 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 		image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
 	}
 
-	media_view_scale_reset_timer();
 	media_view_clamp_to_bounds();
 }
 
@@ -474,7 +475,7 @@ void media_view_scroll_zoom( float scroll )
 	media_view_clamp_to_bounds();
 
 	image_draw::zoom_mode = e_zoom_mode_fixed;
-	app::draw_frame       = true;
+	set_frame_draw( 2 );
 }
 
 
@@ -579,12 +580,12 @@ void media_view_context_menu()
 
 	float       button_width = ( region_avail.x / 2 ) + style.ItemSpacing.x;
 
-	if ( ImGui::Button( "FIT", { 0, 0 } ) )
+	if ( ImGui::Button( "Fit", { 0, 0 } ) )
 		media_view_fit_in_view();
 
 	ImGui::SameLine();
 
-	if ( ImGui::Button( "CENTER", { 0, 0 } ) )
+	if ( ImGui::Button( "Center", { 0, 0 } ) )
 		media_view_fit_in_view( false );
 
 	ImGui::SameLine();
@@ -764,14 +765,14 @@ void media_view_input()
 			gl_update_textures( g_image_scaled_data.textures, &g_image_scaled_data.image, 1 );
 			printf( "Scaled Main Image\n" );
 			g_scale_state   = e_scale_state_finished;
-			app::draw_frame = true;
+			set_frame_draw();
 
 		}
 		else
 		{
 			printf( "SCALE MISMATCH\n" );
 			g_scale_state   = e_scale_state_idle;
-			app::draw_frame = true;
+			set_frame_draw();
 		}
 	}
 
@@ -867,7 +868,7 @@ void media_view_input()
 
 	if ( g_image_pan )
 	{
-		app::draw_frame = true;
+		set_frame_draw();
 		image_draw::pos.x += app::mouse_delta[ 0 ];
 		image_draw::pos.y += app::mouse_delta[ 1 ];
 
@@ -958,7 +959,7 @@ void media_view_load()
 
 	media_view_scale_reset_timer();
 
-	app::draw_frame = true;
+	set_frame_draw();
 }
 
 
@@ -1040,14 +1041,14 @@ void media_view_draw_video_controls()
 	if ( !mouse_in_rect( { 0.f, height - ( 80.f + ( controls_height * 2 ) ) }, { (float)width, (float)height } ) )
 	{
 		if ( was_drawing_controls )
-			app::draw_frame = true;
+			set_frame_draw();
 
 		was_drawing_controls = false;
 		return;
 	}
 
 	if ( !was_drawing_controls )
-		app::draw_frame = true;
+		set_frame_draw();
 
 	was_drawing_controls = true;
 
@@ -1254,14 +1255,14 @@ void media_view_draw_animated_image_controls()
 	if ( !mouse_in_rect( { 0.f, height - ( 80.f + ( controls_height * 2 ) ) }, { (float)width, (float)height } ) )
 	{
 		if ( was_drawing_controls )
-			app::draw_frame = true;
+			set_frame_draw();
 
 		was_drawing_controls = false;
 		return;
 	}
 
 	if ( !was_drawing_controls )
-		app::draw_frame = true;
+		set_frame_draw();
 
 	was_drawing_controls = true;
 
@@ -1496,8 +1497,7 @@ static void media_view_draw_image()
 
 	if ( g_image_data.textures.count > 1 )
 	{
-		app::draw_frame      = true;
-		app::draw_next_frame = true;
+		set_frame_draw( 2 );
 	}
 
 	if ( g_image_data.image.frame.size() <= image_draw::frame )

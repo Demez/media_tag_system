@@ -364,8 +364,7 @@ namespace app
 
 	extern app_config_t config;
 
-	extern bool         draw_frame;
-	extern bool         draw_next_frame;
+	extern u32          draw_frame_count;
 	extern bool         in_window_drag;
 	extern bool         in_drag_drop;
 }
@@ -451,6 +450,8 @@ extern bool                          g_mpv_video_ready;
 // Main Image
 extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
+
+void                                 set_frame_draw( u32 count = 1 );
 
 void                                 image_copy_data( image_t& src, image_t& dst );
 void                                 image_copy_frame_data( image_frame_t& src, image_frame_t& dst );

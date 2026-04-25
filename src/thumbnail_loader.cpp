@@ -803,7 +803,7 @@ void thumbnail_loader_update()
 
 		thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
 
-		app::draw_frame = true;
+		set_frame_draw();
 
 		if ( thumbnail.textures.count )
 		{

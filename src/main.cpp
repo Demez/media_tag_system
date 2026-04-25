@@ -31,8 +31,7 @@ namespace app
 	int          mouse_scroll       = 0;
 	bool         mouse_middle_press = false;
 
-	bool         draw_frame         = false;
-	bool         draw_next_frame    = false;
+	u32          draw_frame_count   = 0;
 	bool         in_window_drag     = false;
 	bool         in_drag_drop       = false;
 
@@ -99,6 +98,13 @@ constexpr size_t              NOTIFICATION_MAX_SHOWN = 5;
 std::vector< notification_t > g_notification_queue;
 
 // =================================================================================
+
+
+void set_frame_draw( u32 count )
+{
+	if ( count > app::draw_frame_count )
+		app::draw_frame_count = count;
+}
 
 
 void update_window_title()
@@ -383,7 +389,7 @@ void notification_draw( float frame_time )
 		//border_color.w = max_notif_time * border_color.w;
 		//bg_color.w     = max_notif_time;
 
-		app::draw_frame = true;
+		set_frame_draw();
 	}
 	//else // if ( max_notif_time > NOTIFICATION_DURATION - NOTIFICATION_FADE_IN_TIME )
 	{
@@ -451,7 +457,7 @@ void imgui_draw( float frame_time )
 
 	notification_draw( frame_time );
 
-	if ( app::draw_frame )
+	if ( app::draw_frame_count )
 		ImGui::Render();
 	else
 		ImGui::EndFrame();
@@ -688,7 +694,7 @@ void frame_draw_end()
 // called initially on startup and on window resize
 void window_quick_draw( bool resize = false )
 {
-	app::draw_frame = true;
+	set_frame_draw();
 
 	frame_draw_start();
 
@@ -706,7 +712,7 @@ void window_quick_draw( bool resize = false )
 
 	frame_draw_end();
 
-	app::draw_frame = false;
+	set_frame_draw();
 }
 
 
@@ -777,25 +783,21 @@ bool handle_events()
 
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 				app::mouse_middle_press = true;
-				app::draw_frame         = true;
-				app::draw_next_frame    = true;
+				set_frame_draw( 2 );
 				break;
 
 			case SDL_EVENT_MOUSE_BUTTON_UP:
 				app::mouse_middle_press = false;
-				app::draw_frame         = true;
-				app::draw_next_frame    = true;
+				set_frame_draw( 2 );
 				break;
 
 			case SDL_EVENT_KEY_DOWN:
 			case SDL_EVENT_KEY_UP:
-				app::draw_frame      = true;
-				app::draw_next_frame = true;
+				set_frame_draw( 2 );
 				break;
 
 			case SDL_EVENT_MOUSE_WHEEL:
-				app::draw_frame      = true;
-				app::draw_next_frame = true;
+				set_frame_draw( 2 );
 				app::mouse_scroll += event.wheel.integer_y;
 
 				media_view_scroll_zoom( event.wheel.integer_y );
@@ -806,7 +808,7 @@ bool handle_events()
 				app::mouse_pos[ 1 ] = event.motion.y;
 				app::mouse_delta[ 0 ] += event.motion.xrel;
 				app::mouse_delta[ 1 ] += event.motion.yrel;
-				// app::draw_frame = true;
+				// set_frame_draw();
 				break;
 
 			#if __unix__
@@ -822,8 +824,8 @@ bool handle_events()
 				ImGui::SetNextFrameWantCaptureKeyboard( false );
 				ImGui::SetWindowFocus( nullptr );
 
-				app::window_resized             = true;
-				app::draw_frame                 = true;
+				app::window_resized = true;
+				set_frame_draw();
 				media_view_window_resize();
 				gallery_view_scroll_to_cursor();
 				mpv_window_resize();
@@ -831,7 +833,7 @@ bool handle_events()
 
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
 				app::window_focused = true;
-				app::draw_frame     = true;
+				set_frame_draw();
 				break;
 
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
@@ -859,7 +861,7 @@ bool handle_events()
 				if ( app::in_drag_drop )
 					break;
 
-				app::draw_frame = true;
+				set_frame_draw();
 				if ( drag_drop_recieve_func( g_drag_drop_files ) )
 					SDL_RaiseWindow( app::window );
 
@@ -868,12 +870,12 @@ bool handle_events()
 
 			// Position while moving over the window
 			case SDL_EVENT_DROP_POSITION:
-				app::draw_frame = true;
+				set_frame_draw();
 				break;
 
 			case SDL_EVENT_QUIT:
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-				app::draw_frame = true;
+				set_frame_draw();
 				app::running = false;
 				return true;
 		}
@@ -889,52 +891,45 @@ void check_need_draw( bool playing_back_video )
 {
 	if ( app::config.always_draw )
 	{
-		app::draw_frame = true;
+		set_frame_draw();
 		return;
 	}
 
 	ImGuiContext* ctx = ImGui::GetCurrentContext();
 	ImGuiIO&      io  = ImGui::GetIO();
 
-	// hack
-	if ( app::draw_next_frame )
-	{
-		app::draw_frame      = true;
-		app::draw_next_frame = false;
-	}
-
 	// Check if a popup was opened or closed
 	static bool popup_open_last = false;
 	bool        popup_open      = ImGui::IsPopupOpen( "", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel );
 
-	app::draw_frame |= ( popup_open_last != popup_open );
+	set_frame_draw( popup_open_last != popup_open );
 
 	popup_open_last = popup_open;
 
 	if ( ctx->ActiveIdHasBeenEditedThisFrame || ctx->NavActivateFlags != 0 || ctx->NavAnyRequest )
-		app::draw_frame = true;
+		set_frame_draw();
 
 	if ( ctx->HoveredId != ctx->HoveredIdPreviousFrame )
-		app::draw_frame = true;
+		set_frame_draw();
 
 	if ( ctx->ActiveId != ctx->ActiveIdPreviousFrame )
-		app::draw_frame = true;
+		set_frame_draw();
 
 	if ( ctx->WantTextInputNextFrame || ctx->WantCaptureKeyboardNextFrame != -1 )
-		app::draw_frame = true;
+		set_frame_draw();
 
 	//if ( ctx->WantCaptureMouseNextFrame )
-	//	app::draw_frame = true;
+	//	set_frame_draw();
 
 	//if ( io.WantCaptureMouse != ( ctx->WantCaptureMouseNextFrame == -1 ) )
-	//	app::draw_frame = true;
+	//	set_frame_draw();
 
 	if ( io.WantTextInput || io.WantCaptureKeyboard /*|| io.WantCaptureMouse || !io.WantCaptureMouseUnlessPopupClose*/ || io.WantSetMousePos )
-		app::draw_frame = true;
+		set_frame_draw();
 
 	// Always draw on video playback
 	if ( playing_back_video )
-		app::draw_frame = true;
+		set_frame_draw();
 }
 
 
@@ -1098,7 +1093,7 @@ void main_loop()
 
 		media_view_update( time );
 
-		if ( app::draw_frame )
+		if ( app::draw_frame_count )
 		{
 			frame_draw_end();
 
@@ -1111,7 +1106,8 @@ void main_loop()
 				SDL_Delay( app::config.sleep_time_idle );
 		}
 
-		app::draw_frame = false;
+		if ( app::draw_frame_count > 0 )
+			app::draw_frame_count--;
 
 		if ( app::in_window_drag )
 			sys_do_window_drag( last_mouse_pos, mouse_pos );
@@ -1129,7 +1125,7 @@ void main_loop()
 		{
 			icon_preload();
 			run_after_first_loop_hack = false;
-			app::draw_frame           = true;
+			set_frame_draw();
 		}
 
 		start_time = current_time;

@@ -718,8 +718,7 @@ void gallery_view_draw_content()
 		if ( app::mouse_scroll != 0 )
 		{
 			scroll -= scroll_amount * app::mouse_scroll;
-			app::draw_frame      = true;
-			app::draw_next_frame = true;
+			set_frame_draw( 2 );
 		}
 
 		if ( app::window_resized )
@@ -872,8 +871,7 @@ void gallery_view_draw_content()
 				ImGui::SetScrollY( ImGui::GetScrollY() + scroll_offset );
 			}
 
-			app::draw_frame      = true;
-			app::draw_next_frame = true;
+			set_frame_draw( 2 );
 		}
 
 		// ----------------------------------------------------------------------------------------------------------
@@ -907,19 +905,19 @@ void gallery_view_draw_content()
 
 		if ( selected_item && !item_hovered && i == last_hovered )
 		{
-			app::draw_frame = true;
+			set_frame_draw();
 		}
 
 		if ( item_hovered && i != last_hovered )
 		{
 			last_hovered = i;
-			app::draw_frame = true;
+			set_frame_draw();
 		}
 
 		if ( selected_item && i != last_selected )
 		{
 			last_selected   = i;
-			app::draw_frame = true;
+			set_frame_draw();
 		}
 
 		// Draw a background if needed
@@ -1149,7 +1147,7 @@ void gallery_view_draw_content()
 	if ( !any_item_hovered && last_hovered != SIZE_MAX )
 	{
 		last_hovered    = SIZE_MAX;
-		app::draw_frame = true;
+		set_frame_draw();
 	}
 
 	// ----------------------------------------------------------------------------------------------------------

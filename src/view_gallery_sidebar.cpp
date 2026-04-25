@@ -307,28 +307,22 @@ int gallery_view_draw_header()
 			bool rect_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, global_item_size, true );
 
 			if ( path_edit_hover )
-			{
 				ImGui::PopStyleColor();
-			}
 
 			if ( rect_hovered && !item_hovered )
 			{
-				path_edit_hover      = true;
-				app::draw_frame      = true;
-				app::draw_next_frame = true;
+				path_edit_hover = true;
+				set_frame_draw( 2 );
 
 				if ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
-				{
 					directory::path_edit = true;
-				}
 			}
 			else
 			{
 				if ( path_edit_hover )
 				{
-					path_edit_hover      = false;
-					app::draw_frame      = true;
-					app::draw_next_frame = true;
+					path_edit_hover = false;
+					set_frame_draw( 2 );
 				}
 			}
 
