@@ -808,7 +808,7 @@ void media_view_input()
 	if ( io.WantCaptureMouseUnlessPopupClose && !g_image_pan )
 		return;
 
-	if ( !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
+	if ( !ImGui::GetIO().WantTextInput && ( ImGui::IsKeyPressed( ImGuiKey_Enter, false ) || ImGui::IsKeyPressed( ImGuiKey_Escape, false ) ) )
 	{
 		if ( !g_gallery_view )
 			set_view_type_gallery();
