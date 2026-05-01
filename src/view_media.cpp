@@ -567,6 +567,19 @@ void media_view_draw_media_info()
 }
 
 
+void rotate_image( float rot )
+{
+	image_draw::rot += rot;
+
+	if ( image_draw::rot < 0.f )
+		image_draw::rot += 360.f;
+	else if ( image_draw::rot > 360.f )
+		image_draw::rot -= 360.f;
+
+	image_draw::rot = CLAMP( image_draw::rot, 0.f, 360.f );
+}
+
+
 void media_view_context_menu()
 {
 	if ( !ImGui::BeginPopupContextVoid( "main ctx menu" ) )
@@ -591,38 +604,60 @@ void media_view_context_menu()
 	ImGui::SameLine();
 
 	if ( ImGui::Button( "100%", { 0, 0 } ) )
-	{
 		media_view_zoom_reset();
-	}
+
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "Gallery" ) )
+		set_view_type_gallery();
 
 	ImGui::Separator();
 
-	if ( ImGui::Button( "RL" ) )
-		image_draw::rot -= 90;
+	// ?????
+	float saved_pos_y = ImGui::GetCursorPosY();
+	ImGui::SetCursorPosY( saved_pos_y + style.FramePadding.y );
+
+	ImGui::TextUnformatted( "Rotate" );
+	ImGui::SameLine();
+	ImGui::SetCursorPosY( saved_pos_y );
+
+	if ( ImGui::Button( "L" ) )
+		rotate_image( -90 );
 
 	ImGui::SameLine();
-
-	if ( ImGui::Button( "RR" ) )
-		image_draw::rot += 90;
-
-	ImGui::SameLine();
+	ImGui::SetCursorPosY( saved_pos_y );
 
 	if ( ImGui::Button( "R" ) )
+		rotate_image( 90 );
+
+	ImGui::SameLine();
+	ImGui::SetCursorPosY( saved_pos_y );
+
+	if ( ImGui::Button( "Reset" ) )
 		image_draw::rot = 0;
 
 	ImGui::SameLine();
+	ImGui::SetCursorPosY( saved_pos_y );
+	ImGui::SeparatorEx( ImGuiSeparatorFlags_Vertical );
+	ImGui::SameLine();
+	ImGui::SetCursorPosY( saved_pos_y );
+
+	ImGui::TextUnformatted( "Flip" );
+	ImGui::SameLine();
+	ImGui::SetCursorPosY( saved_pos_y );
 
 	if ( ImGui::Button( "H" ) )
 		image_draw::flip_h = !image_draw::flip_h;
 
 	ImGui::SameLine();
+	ImGui::SetCursorPosY( saved_pos_y );
 
 	if ( ImGui::Button( "V" ) )
 		image_draw::flip_v = !image_draw::flip_v;
 
 	ImGui::Separator();
 
-	ImGui::PushItemWidth( 125.f );
+	ImGui::PushItemWidth( 150.f );
 	ImGui::SliderFloat( "Rotation", &image_draw::rot, 0, 360 );
 	ImGui::PopItemWidth();
 
