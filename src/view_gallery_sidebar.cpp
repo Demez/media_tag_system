@@ -169,7 +169,7 @@ int gallery_view_draw_header()
 
 	ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-	if ( ImGui::Button( "Toggle Sidebar" ) )
+	if ( ImGui::Button( "Sidebar" ) )
 	{
 		gallery::sidebar_draw = !gallery::sidebar_draw;
 	}
@@ -182,7 +182,7 @@ int gallery_view_draw_header()
 	draw_vertical_separator( draw_list, style );
 
 	ImGui::BeginDisabled( !(directory::folder_history.size() && directory::folder_history_pos > 1) );
-	if ( ImGui::Button( "<" ) )
+	if ( ImGui::ArrowButton( "##nav_history_back", ImGuiDir_Left ) )
 	{
 		folder_history_nav_prev();
 	}
@@ -191,8 +191,8 @@ int gallery_view_draw_header()
 
 	ImGui::SameLine();
 
-	ImGui::BeginDisabled( !(directory::folder_history.size() && directory::folder_history.size() > directory::folder_history_pos) );
-	if ( ImGui::Button( ">" ) )
+	ImGui::BeginDisabled( !( directory::folder_history.size() && directory::folder_history.size() > directory::folder_history_pos ) );
+	if ( ImGui::ArrowButton( "##nav_history_next", ImGuiDir_Right ) )
 	{
 		folder_history_nav_next();
 	}
@@ -200,7 +200,7 @@ int gallery_view_draw_header()
 
 	ImGui::SameLine();
 
-	if ( ImGui::Button( "^" ) )
+	if ( ImGui::ArrowButton( "##nav_parent_path", ImGuiDir_Up ) )
 	{
 		directory::queued = directory::path.parent_path();
 	}
@@ -367,7 +367,7 @@ int gallery_view_draw_header()
 	ImGui::SameLine();
 
 	// Enter returns true doesn't work because of gallery view hooking that input currently, need to add a check later for if focused in text input
-	if ( ImGui::Button( "->" ) )
+	if ( ImGui::ArrowButton( "##nav_enter_path", ImGuiDir_Right ) )
 	{
 		directory::queued        = g_folder_buf;
 		directory::folder_reload = true;
@@ -425,14 +425,17 @@ int gallery_view_draw_header()
 
 	int    space_needed    = 100;
 
-	ImVec2 zoom_size       = ImGui::CalcTextSize( "Zoom" );
-	ImVec2 sort_size       = ImGui::CalcTextSize( "Sort Mode" );
-	ImVec2 sort_entry_size = ImGui::CalcTextSize( "Date Modified - New to Old" );
+	ImVec2 zoom_size         = ImGui::CalcTextSize( "Zoom" );
+	ImVec2 sort_size         = ImGui::CalcTextSize( "Sort Mode" );
+	ImVec2 filter_size       = ImGui::CalcTextSize( "Quick Filter" );
+	ImVec2 sort_entry_size   = ImGui::CalcTextSize( "Date Modified - New to Old" );
+	ImVec2 filter_entry_size = ImGui::CalcTextSize( "Folders" );
 
-	space_needed += zoom_size.x + sort_size.x;
+	space_needed += zoom_size.x + sort_size.x + filter_size.x;
 	space_needed += style.ItemSpacing.x * 2;  // Zoom Text
 	space_needed += style.WindowBorderSize;   // Separator
 	space_needed += style.ItemSpacing.x * 2;  // Sort Mode Text
+	space_needed += style.ItemSpacing.x * 2;  // Fiter Size Text
 	space_needed += style.ItemSpacing.x;      // Padding
 	
 	int sep_space_needed = 0;
@@ -443,9 +446,15 @@ int gallery_view_draw_header()
 	// estimate
 	int arrow_size = style.FontSizeBase;
 
-	int sort_width = sort_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
+	int sort_width   = sort_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
+	int filter_width = filter_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
 
 	space_needed += sort_width;
+	space_needed += filter_width;
+
+	// ??
+	// space_needed += 60.f;
+	space_needed += style.ItemSpacing.x;
 
 	if ( ( space_needed + sep_space_needed ) < region_avail.x )
 	{
@@ -484,6 +493,40 @@ int gallery_view_draw_header()
 		if ( !app::config.thumbnail_use_fixed_size )
 			thumbnail_clear_cache();
 	}
+
+	ImGui::SameLine();
+	draw_vertical_separator( draw_list, style );
+
+	ImGui::TextUnformatted( "Quick Filter" );
+	ImGui::SameLine();
+
+	ImGui::SetNextItemWidth( filter_width );
+
+	ImGui::BeginDisabled();
+
+	// this could be a check box thing for toggling what you want to view, all enabled by default, but that is slower
+	if ( ImGui::BeginCombo( "##quick_filter", "None", 0 ) )
+	{
+		if ( ImGui::Selectable( "None", false ) )
+		{
+		}
+
+		if ( ImGui::Selectable( "Images", false ) )
+		{
+		}
+
+		if ( ImGui::Selectable( "Videos", false ) )
+		{
+		}
+
+		if ( ImGui::Selectable( "Folders", false ) )
+		{
+		}
+
+		ImGui::EndCombo();
+	}
+
+	ImGui::EndDisabled();
 
 	ImGui::SameLine();
 	draw_vertical_separator( draw_list, style );
@@ -717,7 +760,15 @@ void gallery_view_draw_sidebar()
 
 						ImGui::Separator();
 
-						ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
+						// CONFIG_TODO
+						if ( entry.file.size < 1000000 )
+						{
+							ImGui::Text( "Size: %.3f KB", (float)entry.file.size / ( STORAGE_SCALE ) );
+						}
+						else
+						{
+							ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
+						}
 
 						char date_created[ DATE_TIME_BUFFER ]{};
 						char date_mod[ DATE_TIME_BUFFER ]{};
@@ -792,11 +843,11 @@ void gallery_view_draw_sidebar()
 									char post_url[ 512 ]{};
 									snprintf( post_url, 512, "https://x.com/%s/status/%s", artist_name.c_str(), post_id.c_str() );
 
+									ImGui::Separator();
+
 									ImGui::TextLinkOpenURL( post_url, post_url );
 
-									ImGui::SameLine();
-
-									if ( ImGui::Selectable( "Copy" ) )
+									if ( ImGui::Button( "Copy URL" ) )
 									{
 										ImGui::SetClipboardText( post_url );
 										push_notification( "URL Copied" );
