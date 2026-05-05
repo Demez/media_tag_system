@@ -12,6 +12,7 @@ namespace image_draw
 {
 	e_zoom_mode zoom_mode = e_zoom_mode_fit;
 	double      zoom      = 1.f;
+	int         zoom_step = 0;  // 0 = 100% zoom
 	ImVec2      pos{};
 	ImVec2      size{};
 	bool        flip_v = false;
@@ -103,7 +104,7 @@ void media_view_scale_thread_run()
 		image_copy_frame_data( g_scale_src.frame[ 0 ], g_image_scaled_data.image.frame[ 0 ] );
 
 		// Downscale image if size is larger than target size
-		if ( image_draw::size.x < ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
+		if ( image_draw::size.x <= ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 		{
 			if ( image_scale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
 				g_scale_state = e_scale_state_upload;
@@ -158,7 +159,7 @@ void media_view_scale_check_timer( float frame_time )
 	if ( g_scale_state == e_scale_state_finished )
 	{
 		// Are we drawing the image smaller than native size?
-		if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) || round( image_draw::size.x ) != g_image_data.image.width )
+		if ( image_draw::size.x <= ( g_image_data.image.width * UPSCALE_LIMIT ) || round( image_draw::size.x ) != g_image_data.image.width )
 		{
 			// Does the scaled image size match the size we draw it as?
 			if ( int( image_draw::size.x ) != g_image_scaled_data.image.width )
@@ -179,7 +180,8 @@ void media_view_scale_check_timer( float frame_time )
 
 	if ( g_scale_timer < 0.f && g_image_data.image.frame.size() && g_scale_state == e_scale_state_idle )
 	{
-		if ( image_draw::size.x >= ( g_image_data.image.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
+		// if ( image_draw::size.x >= ( g_image_data.image.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
+		if ( image_draw::zoom > UPSCALE_LIMIT && image_draw::size.x != g_image_data.image.width )
 			return;
 
 		// ????
@@ -299,16 +301,16 @@ void media_view_clamp_to_bounds()
 	else
 	{
 		// centers the image, this works ok, but feels a bit off when zooming out
-		// image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
+		image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
 
 		// this is similar to above, but only allows half the image to go out of bounds instead of most
-		min_bounds.x        = -image_draw::size.x / 2.f;
-		max_bounds.x        = width - ( image_draw::size.x / 2.f );
-
-		// min_bounds.x        = 0;
-		// max_bounds.x        = width - image_draw::size.x ;
-
-		image_draw::pos.x   = CLAMP( image_draw::pos.x, min_bounds.x, max_bounds.x );
+		// min_bounds.x        = -image_draw::size.x / 2.f;
+		// max_bounds.x        = width - ( image_draw::size.x / 2.f );
+		// 
+		// // min_bounds.x        = 0;
+		// // max_bounds.x        = width - image_draw::size.x ;
+		// 
+		// image_draw::pos.x   = CLAMP( image_draw::pos.x, min_bounds.x, max_bounds.x );
 	}
 
 	if ( height < image_draw::size.y )
@@ -321,15 +323,15 @@ void media_view_clamp_to_bounds()
 	}
 	else
 	{
-		// image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
+		image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
 
-		min_bounds.y      = -image_draw::size.y / 2.f;
-		max_bounds.y      = height - ( image_draw::size.y / 2.f );
-
-		// min_bounds.y      = 0;
-		// max_bounds.y      = height - image_draw::size.y;
-
-		image_draw::pos.y = CLAMP( image_draw::pos.y, min_bounds.y, max_bounds.y );
+		// min_bounds.y      = -image_draw::size.y / 2.f;
+		// max_bounds.y      = height - ( image_draw::size.y / 2.f );
+		// 
+		// // min_bounds.y      = 0;
+		// // max_bounds.y      = height - image_draw::size.y;
+		// 
+		// image_draw::pos.y = CLAMP( image_draw::pos.y, min_bounds.y, max_bounds.y );
 	}
 }
 
@@ -356,6 +358,32 @@ void media_view_fit_in_view( bool adjust_zoom, bool center_image )
 
 		image_draw::size.x    = g_image_data.image.width * image_draw::zoom;
 		image_draw::size.y    = g_image_data.image.height * image_draw::zoom;
+
+		image_draw::zoom_step = 0;
+
+		double new_zoom       = 1.0;
+
+		// calc a close enough zoom step from zoom level
+		if ( image_draw::zoom < 1.0 )
+		{
+			for ( ;; image_draw::zoom_step-- )
+			{
+				new_zoom *= 1.0 - app::config.media_zoom_scale;
+
+				if ( image_draw::zoom > new_zoom )
+					break;
+			}
+		}
+		else if ( image_draw::zoom < 1.0 )
+		{
+			for ( ;; image_draw::zoom_step++ )
+			{
+				new_zoom *= 1.0 + app::config.media_zoom_scale;
+
+				if ( image_draw::zoom < new_zoom )
+					break;
+			}
+		}
 
 		media_view_scale_reset_timer();
 	}
@@ -387,6 +415,7 @@ void media_view_zoom_reset()
 	image_draw::pos.y     = scale_point_from_origin( height / 2.0, image_draw::pos.y, 1.0 / image_draw::zoom );
 
 	image_draw::zoom      = 1.0;
+	image_draw::zoom_step = 0;
 
 	image_draw::zoom_mode = e_zoom_mode_fixed;
 
@@ -418,7 +447,8 @@ void media_view_scroll_zoom( float scroll )
 		if ( image_draw::zoom >= 1000.0 )
 			return;
 
-		factor += ( app::config.media_zoom_scale * scroll );
+		// factor += ( app::config.media_zoom_scale * scroll );
+		image_draw::zoom_step += scroll;
 	}
 	else
 	{
@@ -426,8 +456,34 @@ void media_view_scroll_zoom( float scroll )
 		if ( image_draw::zoom <= ZOOM_MIN )
 			return;
 
-		factor -= ( app::config.media_zoom_scale * abs( scroll ) );
+		// factor -= ( app::config.media_zoom_scale * abs( scroll ) );
+		image_draw::zoom_step += scroll;
 	}
+
+	double new_zoom = 1.0;
+
+	// calc new zoom from zoom steps
+	if ( image_draw::zoom_step == 0 )
+	{
+		new_zoom = 1.0;
+	}
+	else if ( image_draw::zoom_step < 0 )
+	{
+		for ( int step = 0; step < abs( image_draw::zoom_step ); step++ )
+		{
+			new_zoom *= 1.0 - app::config.media_zoom_scale;
+		}
+	}
+	else if ( image_draw::zoom_step > 0 )
+	{
+		for ( int step = 0; step < image_draw::zoom_step; step++ )
+		{
+			new_zoom *= 1.0 + app::config.media_zoom_scale;
+		}
+	}
+
+	// ??
+	// factor              = new_zoom / image_draw::zoom;
 
 	// TODO: add zoom levels to snap to here
 	// 100, 200, 400, 500, 50, 25, etc
@@ -439,11 +495,16 @@ void media_view_scroll_zoom( float scroll )
 
 	double old_zoom = image_draw::zoom;
 
-	image_draw::zoom    = (double)( std::max( 1.f, image_draw::size.x ) * factor ) / (double)g_image_data.image.width;
+	// image_draw::zoom    = (double)( std::max( 1.f, image_draw::size.x ) * factor ) / (double)g_image_data.image.width;
+	image_draw::zoom = new_zoom;
 
 	// Snap to 100% zoom level
 	if ( old_zoom < 1.0 && image_draw::zoom >= 1.0 || old_zoom > 1.0 && image_draw::zoom <= 1.0 )
 		image_draw::zoom = 1.0;
+
+	// Snap to 200% zoom level
+	if ( old_zoom < 2.0 && image_draw::zoom >= 2.0 || old_zoom > 2.0 && image_draw::zoom <= 2.0 )
+		image_draw::zoom = 2.0;
 
 	// round it so we don't get something like 0.9999564598 or whatever instead of 1.0
 	//if ( image_draw::zoom < 0.01 )
@@ -746,7 +807,7 @@ void media_view_context_menu()
 
 	ImGui::Separator();
 
-	if ( ImGui::BeginMenu( "Sort Mode" ) )
+	if ( ImGui::BeginMenu( "Sort By" ) )
 	{
 
 #define SORT_MENU_ITEM( type )                                                                     \
