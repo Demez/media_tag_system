@@ -735,7 +735,7 @@ void update_dpi( float dpi_override )
 
 	if ( dpi_override == 0.f )
 	{
-		scale = SDL_GetWindowDisplayScale( app::window );
+		scale = std::max( 0.25f, SDL_GetWindowDisplayScale( app::window ) );
 	}
 	else
 	{
@@ -751,6 +751,7 @@ void update_dpi( float dpi_override )
 	ImGui::GetStyle().FontScaleDpi = scale;
 
 	gallery_view_reset_text_size();
+	set_frame_draw();
 }
 
 
@@ -1255,13 +1256,13 @@ int main( int argc, char* argv[] )
 
 	if ( !ImGui_ImplSDL3_InitForOpenGL( app::window, g_gl_context ) )
 	{
-		printf( "Failed to init imgui for sdl3\n" );
+		printf( "Failed to init ImGui\n" );
 		return 1;
 	}
 
 	if ( !ImGui_ImplOpenGL3_Init() )
 	{
-		printf( "Failed to init imgui opengl\n" );
+		printf( "Failed to init ImGui OpenGL\n" );
 		return 1;
 	}
 
