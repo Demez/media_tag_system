@@ -7,31 +7,49 @@
 #include <queue>
 #include <unordered_map>
 
-constexpr int       JOB_QUEUE_SIZE    = 64;  // if this is too high, it can cause noticable hitches when uploading thumbnails
 constexpr int       MAX_THUMBNAILS    = 512;
 
 std::atomic< bool > g_thumbnails_running;
 std::thread**       g_thumbnail_worker;
-std::mutex          g_thumbnail_mutex;
+std::thread**       g_thumbnail_save_worker;
 
 extern void*        g_mpv_module;
 
 constexpr bool      THUMBNAIL_DEBUG_PRINT = false;
 
 
-struct thumbnail_job_t
+enum e_thumbnail_thread_state
 {
-	h_thumbnail thumbnail;
-	file_t      file;
+	e_thumbnail_thread_idle,
+	e_thumbnail_thread_queued,
+	e_thumbnail_thread_working,
+	// e_thumbnail_thread_upload
+
+	e_thumbnail_thread_exit,
 };
 
 
-// ring buffer attempt
-struct thumbnail_queue_t
+struct thumbnail_thread_data_t
 {
-	thumbnail_job_t    buffer[ JOB_QUEUE_SIZE ];
-	std::atomic< u32 > write_pos;  // write position in buffer for adding new jobs from main thread
-	std::atomic< u32 > read_pos;   // where to read the next job from a worker thread
+	// both set to nothing when free 
+	h_thumbnail                             thumbnail;
+	file_t                                  file;
+	std::atomic< e_thumbnail_thread_state > state;
+};
+
+
+struct thumbnail_saver_entry_t
+{
+	h_thumbnail thumbnail;
+	size_t      file_hash;
+};
+
+
+struct thumbnail_saver_queue_t
+{
+	std::forward_list< thumbnail_saver_entry_t > queue;
+	std::mutex                                   mutex;
+	size_t                                       count;
 };
 
 
@@ -44,12 +62,13 @@ struct thumbnail_cache_t
 };
 
 
-thumbnail_queue_t g_thumbnail_queue;
-thumbnail_cache_t g_thumbnail_cache;
+// array the size of the amount of threads used for thumbnails
+// threads wait for data to populate it
+thumbnail_thread_data_t* g_thumbnail_thread_data = nullptr;
+thumbnail_cache_t        g_thumbnail_cache;
+thumbnail_saver_queue_t  g_thumbnail_save;
 
-
-extern bool       thumbnail_save( image_t& image, const std::string& output );
-
+extern bool              thumbnail_save( image_t& image, const std::string& output );
 
 // debug printing
 void thumbnail_printf( const char* format, ... )
@@ -68,46 +87,30 @@ void thumbnail_printf( const char* format, ... )
 }
 
 
-void thumbnail_free_host_image_data( size_t thumbnail_slot, thumbnail_t& thumbnail )
-{
-	if ( !thumbnail.image )
-		return;
-
-	// for ( size_t i = 0; i < thumbnail.image->frame.size(); i++ )
-	// {
-	// 	if ( thumbnail.scaled )
-	// 		ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ i ].data );
-	// 	else
-	// 		ch_free( e_mem_category_image_data, thumbnail.image->frame[ i ].data );
-	// 
-	// 	thumbnail.image->frame[ i ].data = nullptr;
-	// }
-
-	thumbnail.image->frame.clear();
-
-	image_free_alloc( *thumbnail.image );
-
-	thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", thumbnail_slot, thumbnail.path );
-}
-
-
 void thumbnail_loader_free_data( u32 index )
 {
 	thumbnail_t& thumbnail = g_thumbnail_cache.buffer[ index ];
 
-	thumbnail_free_host_image_data( index, thumbnail );
+	if ( thumbnail.image && thumbnail.image->frame.size() )
+		image_free_alloc( *thumbnail.image );
+
+	if ( thumbnail.image_scaled && thumbnail.image_scaled->frame.size() )
+		image_free_alloc( *thumbnail.image_scaled );
 
 	if ( thumbnail.textures.count )
 	{
 		thumbnail_printf( "FREED %d - %s\n", index, thumbnail.path );
 		gl_free_textures( thumbnail.textures );
-		thumbnail.im_texture = nullptr;
 	}
 
 	ch_free( e_mem_category_image, thumbnail.image );
+	ch_free( e_mem_category_image, thumbnail.image_scaled );
+
 	ch_free_str( thumbnail.path );
 
 	memset( &thumbnail, 0, sizeof( thumbnail_t ) );
+
+	thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", index, thumbnail.path );
 }
 
 
@@ -116,53 +119,57 @@ h_thumbnail thumbnail_loader_queue_push( const media_entry_t& media_entry )
 	if ( media_entry.filename.empty() )
 		return {};
 
-	// TODO: some jobs here may be invalidated quickly if the user is scrolling very fast
-	// maybe we could use the same distance value to determine if a queued job could be thrown out,
-	// and instead replaced with an image just requested now?
-
-	// don't care about load order since this is called from the main thread, just get current value
-	u32 current_pos = g_thumbnail_queue.write_pos.load( std::memory_order_relaxed );
-	u32 next_pos    = ( current_pos + 1 ) % JOB_QUEUE_SIZE;
-
-	// make sure the queue isn't full, this slot might be used by a worker
-	// also use acquire to make sure reads/writes happen after
-	if ( next_pos == g_thumbnail_queue.read_pos.load( std::memory_order_acquire ) )
+	// find a free thread
+	u32 thread_id = 0;
+	for ( ; thread_id < app::config.thumbnail_threads; thread_id++ )
 	{
-		thumbnail_printf( "THUMBNAIL QUEUE FULL\n" );
-		return {};
+		if ( g_thumbnail_thread_data[ thread_id ].state == e_thumbnail_thread_idle )
+			break;
 	}
 
-	// the queue is not full, so create a new job for it
-	thumbnail_job_t& job = g_thumbnail_queue.buffer[ current_pos ];
+	// no free threads found, all busy
+	if ( thread_id == app::config.thumbnail_threads )
+		return {};
 	
 	// find a thumbnail not used this frame, it's probably off screen and we can unload it
+search:
 	u32  cache_pos         = 0;
 	bool found_best_fit    = false;
 	u32  best_fit          = 0;
 	u32  best_fit_distance = 0;
+
 	for ( ; cache_pos < MAX_THUMBNAILS; cache_pos++ )
 	{
+		thumbnail_t& thumbnail = g_thumbnail_cache.buffer[ cache_pos ];
+
+		e_thumbnail_save_status save_status = thumbnail.save_status.load( std::memory_order_acquire );
+
+		if ( save_status == e_thumbnail_save_saving )
+			continue;
+
+		// must be after save status check, thumbnail may be marked free, but image data is still in use
 		if ( g_thumbnail_cache.buffer[ cache_pos ].status == e_thumbnail_status_free )
 		{
 			found_best_fit = false;
 			break;
 		}
 
-		e_thumbnail_status status = g_thumbnail_cache.buffer[ cache_pos ].status.load( std::memory_order_acquire );
-		
-		if ( status == e_thumbnail_status_queued || status == e_thumbnail_status_loading || status == e_thumbnail_status_uploading )
-			continue;
-		
-		// if ( status == e_thumbnail_status_queued || status == e_thumbnail_status_loading )
-		// 	continue;
-
 		if ( g_thumbnail_cache.used_this_frame[ cache_pos ] )
 			continue;
 
-		thumbnail_t& thumbnail = g_thumbnail_cache.buffer[ cache_pos ];
-
-		if ( thumbnail.distance == 0 )
+		e_thumbnail_status status = thumbnail.status.load( std::memory_order_acquire );
+		
+		if ( status == e_thumbnail_status_queued || status == e_thumbnail_status_loading || status == e_thumbnail_status_uploading || status == e_thumbnail_status_save_waiting )
+		// if ( status == e_thumbnail_status_loading || status == e_thumbnail_status_uploading )
 			continue;
+		
+		// distance only applied after thumbnail is created, thumbnail can't be free
+		// not needed since best_fit_distance is already 0?
+		// if ( thumbnail.distance == 0 )
+		// 	continue;
+		
+		// if ( status == e_thumbnail_status_queued || status == e_thumbnail_status_loading )
+		// 	continue;
 
 		if ( thumbnail.distance > best_fit_distance )
 		{
@@ -177,30 +184,43 @@ h_thumbnail thumbnail_loader_queue_push( const media_entry_t& media_entry )
 
 	if ( cache_pos == MAX_THUMBNAILS )
 	{
-		thumbnail_printf( "THUMBNAIL CACHE FULL\n" );
+		printf( "THUMBNAIL CACHE FULL\n" );
 		return {};
+	}
+
+	if ( g_thumbnail_cache.buffer[ cache_pos ].save_status == e_thumbnail_save_saving )
+	{
+		//printf( "WHAT\n" );
+		goto search;
+	}
+
+	g_thumbnail_cache.buffer[ cache_pos ].save_status = e_thumbnail_save_cancel;
+
+	if ( g_thumbnail_cache.buffer[ cache_pos ].status == e_thumbnail_status_queued )
+	{
+		//printf( "REPLACING QUEUED THUMBNAIL - %d\n", cache_pos );
 	}
 
 	thumbnail_loader_free_data( cache_pos );
 	//printf( "THUMBNAIL %d USED\n", cache_pos );
-	//printf( "ADDED JOB %d\n", current_pos );
 
 	try
 	{
-		g_thumbnail_cache.buffer[ cache_pos ].path     = util_strdup( media_entry.file.path.string().c_str() );
-		g_thumbnail_cache.buffer[ cache_pos ].status   = e_thumbnail_status_queued;
-		g_thumbnail_cache.buffer[ cache_pos ].type     = media_entry.type;
-		g_thumbnail_cache.used_this_frame[ cache_pos ] = true;
+		g_thumbnail_cache.buffer[ cache_pos ].path        = util_strdup( media_entry.file.path.string().c_str() );
+		g_thumbnail_cache.buffer[ cache_pos ].status      = e_thumbnail_status_queued;
+		g_thumbnail_cache.buffer[ cache_pos ].save_status = e_thumbnail_save_idle;
+		g_thumbnail_cache.buffer[ cache_pos ].type        = media_entry.type;
+		g_thumbnail_cache.used_this_frame[ cache_pos ]    = true;
 
 		h_thumbnail handle;
 		handle.index      = cache_pos;
 		handle.generation = ++g_thumbnail_cache.generation[ cache_pos ];
 
-		job.thumbnail     = handle;
-		job.file          = media_entry.file;
+		g_thumbnail_thread_data[ thread_id ].thumbnail = handle;
+		g_thumbnail_thread_data[ thread_id ].file      = media_entry.file;
 
-		// update the write position in the queue, use release to wait for all reads to finish before updating this
-		g_thumbnail_queue.write_pos.store( next_pos, std::memory_order_release );
+		g_thumbnail_thread_data[ thread_id ].state.store( e_thumbnail_thread_queued );
+		g_thumbnail_thread_data[ thread_id ].state.notify_one();
 
 		return handle;
 	}
@@ -212,29 +232,6 @@ h_thumbnail thumbnail_loader_queue_push( const media_entry_t& media_entry )
 	}
 
 	return {};
-}
-
-
-thumbnail_job_t* thumbnail_loader_queue_pop( u32& job_id )
-{
-	g_thumbnail_mutex.lock();
-
-	u32 current_pos = g_thumbnail_queue.read_pos.load( std::memory_order_relaxed );
-
-	// make sure we aren't at the write position, nothing new added yet then
-	if ( current_pos == g_thumbnail_queue.write_pos.load( std::memory_order_acquire ) )
-	{
-		g_thumbnail_mutex.unlock();
-		return nullptr;
-	}
-
-	thumbnail_job_t* job = &g_thumbnail_queue.buffer[ current_pos ];
-	job_id               = current_pos;
-
-	g_thumbnail_queue.read_pos.store( ( current_pos + 1 ) % JOB_QUEUE_SIZE, std::memory_order_release );
-
-	g_thumbnail_mutex.unlock();
-	return job;
 }
 
 
@@ -357,6 +354,104 @@ size_t thumbnail_generate_hash( file_t& file )
 	hash ^= std::hash< u32 >{}( app::config.thumbnail_size );
 
 	return hash;
+}
+
+
+void thumbnail_save_worker()
+{
+	while ( g_thumbnails_running.load( std::memory_order_acquire ) )
+	{
+		if ( g_thumbnail_save.queue.empty() )
+		{
+			SDL_Delay( 250 );
+			continue;
+		}
+
+		g_thumbnail_save.mutex.lock();
+
+		// already taken?
+		if ( g_thumbnail_save.queue.empty() )
+		{
+			g_thumbnail_save.mutex.unlock();
+			continue;
+		}
+
+		thumbnail_saver_entry_t entry = g_thumbnail_save.queue.front();
+		g_thumbnail_save.queue.pop_front();
+		g_thumbnail_save.count--;
+
+		g_thumbnail_save.mutex.unlock();
+
+		// is this invalid now? waited too long
+		if ( !handle_list_valid( MAX_THUMBNAILS, g_thumbnail_cache.generation, entry.thumbnail ) )
+			continue;
+
+		thumbnail_t* thumbnail = &g_thumbnail_cache.buffer[ entry.thumbnail.index ];
+
+		if ( thumbnail->save_status == e_thumbnail_save_cancel )
+			continue;
+
+		if ( thumbnail->save_status == e_thumbnail_save_idle )
+			continue;
+
+		thumbnail->save_status     = e_thumbnail_save_saving;
+
+		std::string thumbnail_path = app::config.thumbnail_cache_path;
+		thumbnail_path += SEP_S;
+		thumbnail_path += std::to_string( entry.file_hash );
+		thumbnail_path += ".jxl";
+
+		float image_size = std::max( thumbnail->image->width, thumbnail->image->height );
+
+		// Downscale first if needed
+		if ( image_size > app::config.thumbnail_size )
+		{
+			float factor[ 2 ]  = { 1.f, 1.f };
+
+			factor[ 0 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->width;
+			factor[ 1 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->height;
+
+			float   scale      = std::min( factor[ 0 ], factor[ 1 ] );
+
+			float   new_width  = thumbnail->image->width * scale;
+			float   new_height = thumbnail->image->height * scale;
+
+			image_t new_image{};
+
+			//printf( "[THUMBNAIL %d] SAVING %s\n", entry.thumbnail.index, thumbnail->path );
+
+			if ( image_scale( thumbnail->image, &new_image, new_width, new_height ) )
+			{
+				thumbnail_save( new_image, thumbnail_path );
+				image_free( new_image );
+			}
+			else
+			{
+				printf( "Failed to downscale image for thumbnail cache!\n" );
+			}
+		}
+		else
+		{
+			thumbnail_save( *thumbnail->image, thumbnail_path );
+		}
+
+		//printf( "[THUMBNAIL %d] SAVED %s\n", entry.thumbnail.index, thumbnail->path );
+		thumbnail->save_status = e_thumbnail_save_finished;
+	}
+}
+
+
+void thumbnail_save_push( h_thumbnail thumbnail_handle, thumbnail_t* thumbnail, size_t file_hash )
+{
+	std::lock_guard lock( g_thumbnail_save.mutex );
+
+	thumbnail_saver_entry_t entry{
+		.thumbnail = thumbnail_handle,
+		.file_hash = file_hash,
+	};
+
+	g_thumbnail_save.queue.emplace_front( entry );
+	g_thumbnail_save.count++;
 }
 
 
@@ -523,22 +618,30 @@ void thumbnail_loader_worker( u32 thread_id )
 
 	mpv_handle* local_mpv = nullptr;
 
+	thumbnail_thread_data_t& thread_data = g_thumbnail_thread_data[ thread_id ];
+
 	// Enter Loop
 	while ( g_thumbnails_running.load( std::memory_order_acquire ) )
 	{
-		u32              job_id = 0;
-		thumbnail_job_t* job = thumbnail_loader_queue_pop( job_id );
+		// set to idle
+		thread_data.state.store( e_thumbnail_thread_idle );
 
-		if ( !job )
-		{
-			if ( local_mpv )
-				thumbnail_mpv_ctx_free( local_mpv );
+		// wait for queued data here
+		thread_data.state.wait( e_thumbnail_thread_idle );
 
-			SDL_Delay( 250 );
-			continue;
-		}
+		if ( thread_data.state == e_thumbnail_thread_exit )
+			break;
 
-		thumbnail_t* thumbnail = &g_thumbnail_cache.buffer[ job->thumbnail.index ];
+		// if (  == e_thumbnail_thread_idle )
+		// {
+		// 	if ( local_mpv )
+		// 		thumbnail_mpv_ctx_free( local_mpv );
+		// 
+		// 	SDL_Delay( 250 );
+		// 	continue;
+		// }
+
+		thumbnail_t* thumbnail = &g_thumbnail_cache.buffer[ thread_data.thumbnail.index ];
 
 		if ( !thumbnail )
 			continue;
@@ -546,11 +649,11 @@ void thumbnail_loader_worker( u32 thread_id )
 		if ( thumbnail->status == e_thumbnail_status_failed )
 			continue;
 
-		thumbnail_printf( "[THUMBNAIL %d][JOB %d][THREAD %d] STARTING LOAD OF IMAGE: %s\n", job->thumbnail.index, job_id, thread_id, thumbnail->path );
+		thumbnail->status.store( e_thumbnail_status_loading );
 
-		thumbnail->status.store( e_thumbnail_status_loading, std::memory_order_release );
+		thumbnail_printf( "[THUMBNAIL %d][THREAD %d] STARTING LOAD OF IMAGE: %s\n", thread_data.thumbnail.index, thread_id, thumbnail->path );
 
-		size_t            file_hash      = thumbnail_generate_hash( job->file );
+		size_t            file_hash               = thumbnail_generate_hash( thread_data.file );
 
 		u32               thumbnail_size = gallery::image_size;
 
@@ -627,12 +730,14 @@ void thumbnail_loader_worker( u32 thread_id )
 			continue;
 		}
 
-		thumbnail_printf( "[THUMBNAIL %d] LOADED IMAGE: %s\n", job->thumbnail.index, thumbnail->path );
+		thumbnail_printf( "[THUMBNAIL %d] LOADED IMAGE: %s\n", thread_data.thumbnail.index, thumbnail->path );
 
 		float max_image_size = std::max( thumbnail->image->width, thumbnail->image->height );
 
 		// ---------------------------------------------------------------------------------------------------------
 		// If we didn't find the thumbnail on disk, write it!
+
+		bool  saving_thumbnail = false;
 
 		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
 		{
@@ -641,46 +746,50 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			if ( !cleaned_path.starts_with( app::config.thumbnail_cache_path ) )
 			{
+				//printf( "SAVING JXL THUMBNAIL FOR %s\n", thumbnail->path );
+				thumbnail->save_status = e_thumbnail_save_queued;
+				thumbnail_save_push( thread_data.thumbnail, thumbnail, file_hash );
+
 				// Downscale first
-				if ( max_image_size > app::config.thumbnail_size )
-				{
-					float factor[ 2 ]  = { 1.f, 1.f };
-
-					factor[ 0 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->width;
-					factor[ 1 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->height;
-
-					float   scale      = std::min( factor[ 0 ], factor[ 1 ] );
-
-					float   new_width  = thumbnail->image->width * scale;
-					float   new_height = thumbnail->image->height * scale;
-
-					image_t new_image{};
-
-					if ( image_scale( thumbnail->image, &new_image, new_width, new_height ) )
-					{
-						std::string thumbnail_path = app::config.thumbnail_cache_path;
-						thumbnail_path += SEP_S;
-						thumbnail_path += std::to_string( file_hash );
-						thumbnail_path += ".jxl";
-
-						thumbnail_save( new_image, thumbnail_path );
-
-						// ch_free( e_mem_category_image_data, new_image.frame[ 0 ].data );
-					}
-					else
-					{
-						printf( "Failed to downscale image for thumbnail cache!\n" );
-					}
-				}
-				else
-				{
-					std::string thumbnail_path = app::config.thumbnail_cache_path;
-					thumbnail_path += SEP_S;
-					thumbnail_path += std::to_string( file_hash );
-					thumbnail_path += ".jxl";
-
-					thumbnail_save( *thumbnail->image, thumbnail_path );
-				}
+			//	if ( max_image_size > app::config.thumbnail_size )
+			//	{
+			//		float factor[ 2 ]  = { 1.f, 1.f };
+			//
+			//		factor[ 0 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->width;
+			//		factor[ 1 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->height;
+			//
+			//		float   scale      = std::min( factor[ 0 ], factor[ 1 ] );
+			//
+			//		float   new_width  = thumbnail->image->width * scale;
+			//		float   new_height = thumbnail->image->height * scale;
+			//
+			//		image_t new_image{};
+			//
+			//		if ( image_scale( thumbnail->image, &new_image, new_width, new_height ) )
+			//		{
+			//			std::string thumbnail_path = app::config.thumbnail_cache_path;
+			//			thumbnail_path += SEP_S;
+			//			thumbnail_path += std::to_string( file_hash );
+			//			thumbnail_path += ".jxl";
+			//
+			//			thumbnail_save( new_image, thumbnail_path );
+			//
+			//			// ch_free( e_mem_category_image_data, new_image.frame[ 0 ].data );
+			//		}
+			//		else
+			//		{
+			//			printf( "Failed to downscale image for thumbnail cache!\n" );
+			//		}
+			//	}
+			//	else
+			//	{
+			//		std::string thumbnail_path = app::config.thumbnail_cache_path;
+			//		thumbnail_path += SEP_S;
+			//		thumbnail_path += std::to_string( file_hash );
+			//		thumbnail_path += ".jxl";
+			//
+			//		thumbnail_save( *thumbnail->image, thumbnail_path );
+			//	}
 			}
 		}
 
@@ -697,15 +806,17 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			if ( scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f )
 			{
-				float new_width  = thumbnail->image->width * scale_amount;
-				float new_height = thumbnail->image->height * scale_amount;
+				float new_width         = thumbnail->image->width * scale_amount;
+				float new_height        = thumbnail->image->height * scale_amount;
 
-				u8*   old_frame  = thumbnail->image->frame[ 0 ].data;
+				u8*   old_frame         = thumbnail->image->frame[ 0 ].data;
 
-				if ( image_scale( thumbnail->image, thumbnail->image, new_width, new_height ) )
+				thumbnail->image_scaled = ch_calloc< image_t >( 1, e_mem_category_image );
+
+				if ( image_scale( thumbnail->image, thumbnail->image_scaled, new_width, new_height ) )
 				{
-					thumbnail->scaled = true;
-					ch_free( e_mem_category_image_data, old_frame );
+					// thumbnail->scaled = true;
+					// ch_free( e_mem_category_image_data, old_frame );
 				}
 			}
 		}
@@ -717,11 +828,16 @@ void thumbnail_loader_worker( u32 thread_id )
 
 bool thumbnail_loader_init()
 {
-	g_thumbnail_queue.write_pos = 0;
-	g_thumbnail_queue.read_pos  = 0;
-
 	g_thumbnails_running.store( true );
-	g_thumbnail_worker = ch_calloc< std::thread* >( app::config.thumbnail_threads, e_mem_category_general );
+
+	g_thumbnail_worker      = ch_calloc< std::thread* >( app::config.thumbnail_threads, e_mem_category_general );
+	g_thumbnail_save_worker = ch_calloc< std::thread* >( app::config.thumbnail_save_threads, e_mem_category_general );
+	g_thumbnail_thread_data = new thumbnail_thread_data_t[ app::config.thumbnail_threads ];
+
+	for ( int i = 0; i < app::config.thumbnail_save_threads; i++ )
+	{
+		g_thumbnail_save_worker[ i ] = new std::thread( thumbnail_save_worker );
+	}
 
 	for ( int i = 0; i < app::config.thumbnail_threads; i++ )
 	{
@@ -737,11 +853,27 @@ void thumbnail_loader_shutdown()
 	g_thumbnails_running.store( false );
 
 	// wait for threads to shutdown
+	for ( int i = 0; i < app::config.thumbnail_save_threads; i++ )
+	{
+		g_thumbnail_save_worker[ i ]->join();
+		delete g_thumbnail_save_worker[ i ];
+	}
+
 	for ( int i = 0; i < app::config.thumbnail_threads; i++ )
 	{
+		g_thumbnail_thread_data[ i ].state = e_thumbnail_thread_exit;
+		g_thumbnail_thread_data[ i ].state.notify_one();
 		g_thumbnail_worker[ i ]->join();
 		delete g_thumbnail_worker[ i ];
 	}
+
+	ch_free( e_mem_category_general, g_thumbnail_worker );
+
+	delete[] g_thumbnail_thread_data;
+
+	g_thumbnail_thread_data = nullptr;
+	g_thumbnail_save_worker = nullptr;
+	g_thumbnail_worker      = nullptr;
 }
 
 
@@ -765,56 +897,40 @@ void thumbnail_loader_update()
 		if ( g_thumbnail_cache.generation[ i ] == 0 )
 			continue;
 
-		// thumbnail_t& thumbnail = g_thumbnail_cache.buffer[ g_thumbnail_cache.read_pos ];
 		thumbnail_t&       thumbnail = g_thumbnail_cache.buffer[ i ];
 
-		// if ( thumbnail.status != e_thumbnail_status_uploading )
-		// 	break;
-		//
-		// if ( ++g_thumbnail_cache.read_pos == MAX_THUMBNAILS )
-		// 	g_thumbnail_cache.read_pos = 0;
+		bool               uploaded_image = false;
 
-		if ( thumbnail.status.load( std::memory_order_acquire ) != e_thumbnail_status_uploading )
-			continue;
-
-		// printf( "UPLOADING IMAGE: %s\n", thumbnail.path );
-
-		if ( thumbnail.image->frame.empty() || !thumbnail.image->frame[ 0 ].data )
+		if ( thumbnail.status.load( std::memory_order_acquire ) == e_thumbnail_status_uploading )
 		{
-			printf( "thumbnail data is nullptr\n" );
-		}
+			if ( thumbnail.image->frame.empty() || !thumbnail.image->frame[ 0 ].data )
+			{
+				printf( "thumbnail data is nullptr\n" );
+			}
 
-		gl_update_textures( thumbnail.textures, thumbnail.image, 1 );
-		thumbnail.im_texture = thumbnail.textures.frame[ 0 ];
+			if ( thumbnail.image_scaled )
+			{
+				gl_update_textures( thumbnail.textures, thumbnail.image_scaled, 1 );
+				image_free_alloc( *thumbnail.image_scaled );
+			}
+			else
+			{
+				gl_update_textures( thumbnail.textures, thumbnail.image, 1 );
+			}
 
-		//for ( size_t i = 0; i < thumbnail.image->frame.size(); i++ )
-		//{
-		//	if ( thumbnail.scaled )
-		//		ch_free( e_mem_category_stbi_resize, thumbnail.image->frame[ i ].data );
-		//	else
-		//		ch_free( e_mem_category_image_data, thumbnail.image->frame[ i ].data );
-		//
-		//	thumbnail.image->frame[ i ].data = nullptr;
-		//}
-
-		thumbnail.image->frame.clear();
-
-		image_free_alloc( *thumbnail.image );
-
-		thumbnail_printf( "[THUMBNAIL %d] FREED IMAGE DATA %s\n", i, thumbnail.path );
-
-		set_frame_draw();
-
-		if ( thumbnail.textures.count )
-		{
 			thumbnail.status = e_thumbnail_status_finished;
-			//thumbnail_printf( "IMAGE FINISHED: %s\n", thumbnail.path );
-
+			uploaded_image   = true;
 			upload_count++;
+			set_frame_draw();
 		}
-		else
+
+		if ( thumbnail.status == e_thumbnail_status_finished && thumbnail.save_status != e_thumbnail_save_saving && thumbnail.save_status != e_thumbnail_save_queued )
 		{
-			thumbnail.status = e_thumbnail_status_failed;
+			if ( thumbnail.image && thumbnail.image->frame.size() )
+			{
+				//printf( "[THUMBNAIL %d] FREED SRC DATA FOR %s\n", i, thumbnail.path );
+				image_free_alloc( *thumbnail.image );
+			}
 		}
 	}
 }
@@ -845,8 +961,6 @@ void thumbnail_update_distance( h_thumbnail handle, u32 distance )
 
 void thumbnail_clear_cache()
 {
-	g_thumbnail_mutex.lock();
-
 	for ( u32 i = 0; i < MAX_THUMBNAILS; i++ )
 	{
 		g_thumbnail_cache.used_this_frame[ i ] = false;
@@ -854,20 +968,16 @@ void thumbnail_clear_cache()
 		if ( g_thumbnail_cache.buffer[ i ].status == e_thumbnail_status_queued || g_thumbnail_cache.buffer[ i ].status == e_thumbnail_status_finished )
 			g_thumbnail_cache.buffer[ i ].status = e_thumbnail_status_free;
 	}
-
-	g_thumbnail_queue.write_pos = 0;
-	g_thumbnail_queue.read_pos  = 0;
-
-	g_thumbnail_mutex.unlock();
 }
 
 
 void thumbnail_cache_debug_draw()
 {
 	ImGui::SeparatorText( "Thumbnail System" );
-	ImGui::Text( "Thread Count: %d", app::config.thumbnail_threads );
+	ImGui::Text( "Thread Count: %u", app::config.thumbnail_threads );
+	ImGui::Text( "Save Thread Count: %u", app::config.thumbnail_save_threads );
 
-	ImGui::Text( "Job Queue Write Pos: %d", g_thumbnail_queue.write_pos.load() );
-	ImGui::Text( "Job Queue Read Pos: %d", g_thumbnail_queue.read_pos.load() );
+	ImGui::Text( "Drawn Image Count: %u", gallery::drawn_image_count );
+	ImGui::Text( "Thumbnail Save Queue Size: %u", g_thumbnail_save.count );
 }
 

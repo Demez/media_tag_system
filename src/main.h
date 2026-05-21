@@ -22,7 +22,7 @@ HANDLE_GEN_32( h_thumbnail );
 // ---------------------------------------------------------
 
 
-enum e_media_type
+enum e_media_type : u8
 {
 	e_media_type_none,
 	e_media_type_directory,
@@ -90,6 +90,7 @@ struct app_config_t
 	std::vector< bookmark_t > bookmark{};
 
 	u32                       thumbnail_threads           = 8;
+	u32                       thumbnail_save_threads      = 4;
 	u32                       thumbnail_uploads_per_frame = 4;
 
 	// size in kilobytes
@@ -319,6 +320,9 @@ enum e_thumbnail_status
 	// Thumbnail is uploading to the GPU
 	e_thumbnail_status_uploading,
 
+	// Waiting for the save function to finish
+	e_thumbnail_status_save_waiting,
+
 	// Thumbnail is uploaded and ready for use
 	e_thumbnail_status_finished,
 
@@ -327,16 +331,27 @@ enum e_thumbnail_status
 };
 
 
+enum e_thumbnail_save_status
+{
+	e_thumbnail_save_idle,
+	e_thumbnail_save_queued,
+	e_thumbnail_save_saving,
+	e_thumbnail_save_finished,
+	e_thumbnail_save_cancel,
+};
+
+
 struct thumbnail_t
 {
-	std::atomic< e_thumbnail_status > status;
-	u32                               distance;  // higher distances get freed first for other thumbnails
-	char*                             path;      // mainly for debugging
-	image_t*                          image;
-	uploaded_textures_t               textures{};
-	e_media_type                      type;
-	ImTextureRef                      im_texture;
-	bool                              scaled;
+	std::atomic< e_thumbnail_status >      status;
+	std::atomic< e_thumbnail_save_status > save_status;
+	char*                                  path;      // mainly for debugging
+	image_t*                               image;
+	image_t*                               image_scaled;
+	uploaded_textures_t                    textures{};
+	u32                                    distance;  // higher distances get freed first for other thumbnails
+	e_media_type                           type;
+	// bool                                   scaled;
 };
 
 
@@ -427,6 +442,8 @@ namespace gallery
 	extern bool                          sidebar_draw;
 
 	extern bool                          scroll_to_cursor;
+
+	extern u32                           drawn_image_count;
 
 	// Files selected in the gallery view
 	extern std::vector< u32 >            selection;

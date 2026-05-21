@@ -90,6 +90,9 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 
 void gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t frame_count )
 {
+	if ( !image )
+		return;
+
 	if ( textures.count != frame_count )
 	{
 		if ( textures.frame )
@@ -307,6 +310,30 @@ void image_free_alloc( image_t& image )
 
 	image.image_format = nullptr;
 }
+
+
+// set frame_count to 0 to copy all frames
+#if 0
+void image_copy_all( image_t& src, image_t& dst, size_t frame_count = 0 )
+{
+	image_copy_data( src, dst );
+
+	if ( frame_count == 0 )
+		frame_count = src.frame.size();
+
+	// copy first frame
+	dst.frame.resize( frame_count );
+
+	for ( size_t i = 0; i < dst.)
+
+	image_frame_t& src = thumbnail->image->frame[ 0 ];
+	image_frame_t& dst = entry.image.frame[ 0 ];
+
+	image_copy_frame_data( src, dst );
+
+	dst.data = ch_calloc < = src.frame_disposal;
+}
+#endif
 
 
 void image_copy_data( image_t& src, image_t& dst )

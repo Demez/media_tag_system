@@ -13,6 +13,7 @@ bookmarks:
 # new layout for thumbnail options
 thumbnail:
   threads: 8
+  threads-save: 4
 
   # Max amount of thumbnails you can upload at a time,
   # this blocks the main thread for a second to upload, so don't set this number too high

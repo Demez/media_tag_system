@@ -29,6 +29,8 @@ namespace gallery
 
 	bool                          scroll_to_cursor   = false;
 
+	u32                           drawn_image_count  = 0;
+
 	// Files selected in the gallery view
 	std::vector< u32 >            selection{};
 }
@@ -759,6 +761,8 @@ void gallery_view_draw_content()
 
 	static h_thumbnail icons_scaled[ e_icon_count ]{};
 
+	gallery::drawn_image_count = 0;
+
 	// ----------------------------------------------------------------------------------------------------------
 
 	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
@@ -964,7 +968,12 @@ void gallery_view_draw_content()
 			{
 				if ( thumbnail->status == e_thumbnail_status_finished )
 				{
-					gallery_view_draw_image( thumbnail->image, thumbnail->im_texture, image_bounds, true, scaled_image_size );
+					if ( thumbnail->image_scaled )
+						gallery_view_draw_image( thumbnail->image_scaled, thumbnail->textures.frame[ 0 ], image_bounds, true, scaled_image_size );
+					else
+						gallery_view_draw_image( thumbnail->image, thumbnail->textures.frame[ 0 ], image_bounds, true, scaled_image_size );
+
+					gallery::drawn_image_count++;
 				}
 				else if ( thumbnail->status == e_thumbnail_status_failed )
 				{

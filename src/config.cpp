@@ -368,6 +368,7 @@ bool config_load()
 			config_parse_path( app_dir, cache_video_dir, app::config.thumbnail_video_cache_path );
 
 		config_get_node_u32( thumbnail, "/threads", app::config.thumbnail_threads );
+		config_get_node_u32( thumbnail, "/threads-save", app::config.thumbnail_save_threads );
 
 		//config_get_node_value( thumbnail, "/threads %u", app::config.thumbnail_threads );
 		config_get_node_value( thumbnail, "/uploads-per-frame %u", app::config.thumbnail_uploads_per_frame );
