@@ -571,7 +571,7 @@ TASK_LIST = {
         },
         {
             "name": "FreeImageRe",
-            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/v4.1.1/FreeImageRe-v4.1.1-win64.zip",
+            "url":  "https://github.com/agruzdev/FreeImageRe/releases/download/v4.2.0/FreeImageRe-v4.2.0-win64.zip",
             "extract_folder": "FreeImageRe",
             "file": "FreeImageRe-v4.1.1-win64.zip",
         },
