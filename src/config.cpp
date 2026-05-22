@@ -122,6 +122,18 @@ bool config_mkdir( std::string_view path, const char* fail_str )
 }
 
 
+static void config_get_bool_value( fy_document* doc, const char* fmt, bool& value )
+{
+	u32 number = 0;
+	int count  = fy_document_scanf( doc, fmt, &number );
+
+	if ( count <= 0 )
+		printf( "config: Failed to get value of \"%s\"\n", fmt );
+	else
+		value = number > 0;
+}
+
+
 template< typename T >
 static void config_get_doc_value( fy_document* doc, const char* fmt, T& value )
 {
@@ -408,11 +420,12 @@ bool config_load()
 	// =====================================================================================================================
 
 	config_get_doc_value( fyd, "/vsync %d", app::config.vsync );
-	config_get_doc_value( fyd, "/no-video %u", app::config.no_video );
-	config_get_doc_value( fyd, "/gallery-show-filenames %u", app::config.gallery_show_filenames );
-	config_get_doc_value( fyd, "/always-draw %u", app::config.always_draw );
-	config_get_doc_value( fyd, "/dwm-extend %u", app::config.dwm_extend );
-	config_get_doc_value( fyd, "/use-custom-colors %u", app::config.use_custom_colors );
+
+	config_get_bool_value( fyd, "/no-video %u", app::config.no_video );
+	config_get_bool_value( fyd, "/gallery-show-filenames %u", app::config.gallery_show_filenames );
+	config_get_bool_value( fyd, "/always-draw %u", app::config.always_draw );
+	config_get_bool_value( fyd, "/dwm-extend %u", app::config.dwm_extend );
+	config_get_bool_value( fyd, "/use-custom-colors %u", app::config.use_custom_colors );
 
 	config_get_doc_value( fyd, "/sleep-time-no-focus %u", app::config.sleep_time_no_focus );
 	config_get_doc_value( fyd, "/sleep-time-focus %u", app::config.sleep_time_focus );
