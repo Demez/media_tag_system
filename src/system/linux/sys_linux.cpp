@@ -32,6 +32,7 @@ bool fs_make_dir( const char* path )
 
 bool fs_is_dir( const char* path )
 {
+	// TODO: USE STATX
 	struct stat s;
 
 	if ( stat( path, &s ) == 0 )
@@ -43,6 +44,7 @@ bool fs_is_dir( const char* path )
 
 bool fs_is_file( const char* path )
 {
+	// TODO: USE STATX
 	struct stat s;
 
 	if ( stat( path, &s ) == 0 )
@@ -188,6 +190,7 @@ bool sys_get_file_times_and_size( const char* path, u64* creation, u64* access, 
 	if ( !path )
 		return false;
 
+	// TODO: USE STATX
 	struct stat s{};
 	if ( stat( path, &s ) != 0 )
 		return false;
@@ -453,6 +456,7 @@ bool sys_copy_to_clipboard( const char* path )
 	if ( SDL_SetClipboardData( sdl_clipboard_callback, nullptr, buffer, &mime_type, 1 ) )
 		return true;
 
+	printf( "Failed to copy to clipboard!\n" );
 	return false;
 }
 
@@ -484,7 +488,7 @@ void sys_browse_to_file( const char* path )
 		return;
 	}
 
-	printf("Failed to copy to clipboard, could not find terminal tools xdg-open or gio!\n" );
+	printf( "Failed to browse to file, could not find terminal tools xdg-open or gio!\n" );
 }
 
 
