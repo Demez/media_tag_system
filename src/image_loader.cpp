@@ -574,7 +574,8 @@ void icon_free()
 {
 	for ( u8 i = 0; i < e_icon_count; i++ )
 	{
-		glDeleteTextures( 1, &g_icon_texture[ i ] );
+		if ( g_icon_texture[ i ] > 0 )
+			glDeleteTextures( 1, &g_icon_texture[ i ] );
 	}
 }
 

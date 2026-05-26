@@ -801,6 +801,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 
 		default:
 			mpv_sdl_event( *event );
+			break;
 	}
 
 	return true;
@@ -827,7 +828,6 @@ bool handle_events()
 		switch ( event.type )
 		{
 			default:
-				mpv_sdl_event( event );
 				break;
 
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -1188,6 +1188,31 @@ void main_loop()
 }
 
 
+void shutdown()
+{
+	if ( app::window )
+		SDL_DestroyWindow( app::window );
+
+	app::window = nullptr;
+
+	stop_mpv();
+	thumbnail_loader_shutdown();
+	sys_folder_mon_shutdown();
+	media_view_shutdown();
+	icon_free();
+
+	image_free( g_image_data.image );
+	image_free( g_image_scaled_data.image );
+
+	SDL_GL_DestroyContext( g_gl_context );
+
+	args_free();
+	sys_shutdown();
+
+	SDL_Quit();
+}
+
+
 int main( int argc, char* argv[] )
 {
 	args_init( argc, argv );
@@ -1197,10 +1222,19 @@ int main( int argc, char* argv[] )
 		printf( "Failed to load config, using defaults\n" );
 	}
 
-	if ( !sys_init() )
+	e_sys_init sys_init_ret = sys_init( argc, argv );
+
+	if ( sys_init_ret == e_sys_init_fail )
 	{
 		printf( "Failed to init system backend!\n" );
+		shutdown();
 		return 1;
+	}
+
+	if ( sys_init_ret == e_sys_init_single_instance )
+	{
+		shutdown();
+		return 0;
 	}
 
 	u64   start_time   = sys_get_time_ms();
@@ -1210,6 +1244,7 @@ int main( int argc, char* argv[] )
 	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
 	{
 		printf( "Failed to init SDL\n" );
+		shutdown();
 		return 1;
 	}
 
@@ -1218,6 +1253,7 @@ int main( int argc, char* argv[] )
 	if ( !app::window )
 	{
 		printf( "Failed to create SDL window\n" );
+		shutdown();
 		return 1;
 	}
 
@@ -1229,7 +1265,12 @@ int main( int argc, char* argv[] )
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_COMPLETE, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_POSITION, false );
 
-	sys_set_window( app::window );
+	if ( !sys_set_window( app::window ) )
+	{
+		shutdown();
+		return 1;
+	}
+
 	sys_set_receive_drag_drop_func( drag_drop_recieve_func );
 
 	g_gl_context = SDL_GL_CreateContext( app::window );
@@ -1237,6 +1278,7 @@ int main( int argc, char* argv[] )
 	if ( !g_gl_context )
 	{
 		printf( "Failed to create GL Context\n" );
+		shutdown();
 		return 1;
 	}
 
@@ -1245,6 +1287,7 @@ int main( int argc, char* argv[] )
 	if ( !gladLoadGL() )
 	{
 		printf( "Failed to load GL\n" );
+		shutdown();
 		return 1;
 	}
 
@@ -1257,12 +1300,14 @@ int main( int argc, char* argv[] )
 	if ( !ImGui_ImplSDL3_InitForOpenGL( app::window, g_gl_context ) )
 	{
 		printf( "Failed to init ImGui\n" );
+		shutdown();
 		return 1;
 	}
 
 	if ( !ImGui_ImplOpenGL3_Init() )
 	{
 		printf( "Failed to init ImGui OpenGL\n" );
+		shutdown();
 		return 1;
 	}
 
@@ -1337,6 +1382,7 @@ int main( int argc, char* argv[] )
 	if ( !thumbnail_loader_init() )
 	{
 		printf( "Failed to init thumbnail loader\n" );
+		shutdown();
 		return 1;
 	}
 
@@ -1346,27 +1392,11 @@ int main( int argc, char* argv[] )
 
 	directory::queued = sys_get_cwd();
 
-	if ( argc > 1 )
+	// take the first path here
+	for ( int i = 1; i < argc; i++ )
 	{
-		// take the first path here
-		for ( int i = 1; i < argc; i++ )
-		{
-			char* arg = argv[ i ];
-
-			if ( fs_exists( arg ) )
-			{
-				if ( fs_is_dir( arg ) )
-				{
-					directory::queued = arg;
-				}
-				else
-				{
-					on_new_file( arg );
-				}
-
-				break;
-			}
-		}
+		if ( on_new_file( argv[ i ] ) )
+			break;
 	}
 
 	// ----------------------------------------------------------------
@@ -1390,20 +1420,7 @@ int main( int argc, char* argv[] )
 
 	// -----------------------------------------------------------------------------------
 
-	stop_mpv();
-	thumbnail_loader_shutdown();
-	sys_folder_mon_shutdown();
-	media_view_shutdown();
-	icon_free();
-
-	image_free( g_image_data.image );
-	image_free( g_image_scaled_data.image );
-
-	SDL_GL_DestroyContext( g_gl_context );
-
-	args_free();
-	sys_shutdown();
-	SDL_Quit();
+	shutdown();
 	return 0;
 }
 

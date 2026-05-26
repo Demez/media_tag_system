@@ -19,10 +19,13 @@
 #include <atlbase.h>
 #include <psapi.h>
 #include <dwmapi.h>
+#include <strsafe.h>
 #include <sys/stat.h>
 
 #include <profileapi.h>
 #include <stdint.h>
+#include <thread>
+#include <atomic>
 
 #include <SDL3/SDL_system.h>
 #include <SDL3/SDL_video.h>
@@ -31,9 +34,14 @@
 // ----------------------------------------------------------------------------------------
 
 
-HANDLE               g_con_out   = INVALID_HANDLE_VALUE;
-HWND                 g_main_hwnd = 0;
-static LARGE_INTEGER g_win_perf_freq;
+static HANDLE                  g_singleton_pipe  = INVALID_HANDLE_VALUE;
+static std::thread*            g_pipe_thread     = nullptr;
+static std::atomic< wchar_t* > g_pipe_buffer     = nullptr;
+static std::atomic< bool >     g_focus_window    = false;
+
+HANDLE                         g_con_out         = INVALID_HANDLE_VALUE;
+HWND                           g_main_hwnd       = 0;
+static LARGE_INTEGER           g_win_perf_freq;
 
 
 // ----------------------------------------------------------------------------------------
@@ -106,8 +114,151 @@ bool fs_is_file( const char* path )
 // ----------------------------------------------------------------------------------------
 
 
-bool sys_init()
+constexpr const wchar_t* WINDOW_PIPE_PATH     = L"\\\\.\\pipe\\media_tag_system";
+constexpr const size_t   WINDOW_PIPE_SIZE     = 1024 * sizeof( wchar_t );
+
+
+// https://learn.microsoft.com/en-us/windows/win32/ipc/multithreaded-pipe-server
+// https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-client
+static int open_pipe()
 {
+	g_singleton_pipe = CreateFile( WINDOW_PIPE_PATH, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL );
+
+	// PIPE_UNLIMITED_INSTANCES
+
+	if ( g_singleton_pipe == INVALID_HANDLE_VALUE )
+	{
+		// doesn't exist, create new one
+		g_singleton_pipe = CreateNamedPipe(
+		  WINDOW_PIPE_PATH,
+		  PIPE_ACCESS_INBOUND,       // read/write access
+		  PIPE_TYPE_MESSAGE |        // message type pipe
+			PIPE_READMODE_MESSAGE |  // message-read mode
+			PIPE_WAIT,             // blocking mode
+		  1,  // max. instances
+		  WINDOW_PIPE_SIZE,          // output buffer size
+		  WINDOW_PIPE_SIZE,          // input buffer size
+		  0,                         // client time-out
+		  NULL );                    // default security attribute 
+
+		if ( g_singleton_pipe == INVALID_HANDLE_VALUE )
+		{
+			printf( "Failed to create pipe for interprocess communication!\n" );
+			sys_print_last_error();
+			return 0;
+		}
+
+		return 1;  // new pipe created
+	}
+
+	return 2;  // pipe opened
+}
+
+
+void pipe_read_worker()
+{
+	while ( app::running )
+	{
+		// wait for any other instance to connect to this pipe
+		BOOL connected = ConnectNamedPipe( g_singleton_pipe, NULL );
+
+		if ( !connected )
+		{
+			SDL_Delay( 500 );
+			break;
+		}
+		
+		if ( !app::running )
+		{
+			DisconnectNamedPipe( g_singleton_pipe );
+			break;
+		}
+
+		wchar_t buffer[ WINDOW_PIPE_SIZE ]{};
+		DWORD   bytes_read    = 0;
+
+		BOOL    read_file_ret = ReadFile(
+          g_singleton_pipe,  // handle to pipe
+          buffer,            // buffer to receive data
+          WINDOW_PIPE_SIZE,  // size of buffer
+          &bytes_read,       // number of bytes read
+          NULL );            // not overlapped I/O
+
+		if ( read_file_ret )
+		{
+			g_pipe_buffer.store( wcsdup( buffer ) );
+		}
+		else
+		{
+			// user didn't write anything, probably just called the main exe again
+			g_focus_window = true;
+		}
+
+		// disconnect it, and wait for the next instance
+		DisconnectNamedPipe( g_singleton_pipe );
+	}
+}
+
+
+e_sys_init sys_init( int argc, char* argv[] )
+{
+	if ( app::config.single_instance )
+	{
+		// NOTE: Using pipes here since WM_COPYDATA didn't want to work at all for me
+		
+		// try to open a pipe
+		int pipe_state = open_pipe();
+
+		if ( pipe_state == 2 )
+		{
+			// opened existing pipe, write to it and close
+			char* path = nullptr;
+
+			// take the first path here
+			for ( int i = 1; i < argc; i++ )
+			{
+				if ( !fs_exists( argv[ i ] ) )
+					continue;
+
+				path = argv[ i ];
+				break;
+			}
+
+			// optional path to write, still focuses the window either way and keeps it as one program
+			if ( path )
+			{
+				wchar_t* path_w = sys_to_wchar( path );
+				size_t   len    = ( wcslen( path_w ) + 1 ) * sizeof( wchar_t );
+
+				if ( len > WINDOW_PIPE_SIZE )
+				{
+					printf( "PATH TOO LONG!!!\n" );
+					return e_sys_init_fail;
+				}
+
+				// Write to the pipe
+				DWORD bytes_written = 0;
+				BOOL  pipe_write    = WriteFile( g_singleton_pipe, path_w, len, &bytes_written, NULL );
+
+				ch_free_str( path_w );
+			}
+			
+			CloseHandle( g_singleton_pipe );
+			g_singleton_pipe = INVALID_HANDLE_VALUE;
+
+			// exit out of program
+			return e_sys_init_single_instance;
+		}
+		else if ( pipe_state == 1 )
+		{
+			g_pipe_thread = new std::thread( pipe_read_worker );
+		}
+		else
+		{
+			return e_sys_init_fail;
+		}
+	}
+
 	QueryPerformanceFrequency( &g_win_perf_freq );
 
 	g_con_out = GetStdHandle( STD_OUTPUT_HANDLE );
@@ -116,22 +267,41 @@ bool sys_init()
 	{
 		printf( "Failed to get console output handle\n" );
 		sys_print_last_error();
-		return false;
+		return e_sys_init_fail;
 	}
 
 	if ( !SUCCEEDED( OleInitialize( NULL ) ) )
 	{
 		printf( "Failed to init OLE\n" );
 		sys_print_last_error();
-		return false;
+		return e_sys_init_fail;
 	}
 
-	return true;
+	return e_sys_init_success;
 }
 
 
 void sys_shutdown()
 {
+	if ( app::config.single_instance )
+	{
+		// ffs, stop the pipe from waiting so the loop knows we are closing
+		HANDLE pipe_temp = CreateFile( WINDOW_PIPE_PATH, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL );
+		CloseHandle( pipe_temp );
+
+		if ( g_pipe_thread )
+		{
+			g_pipe_thread->join();
+			g_pipe_thread = nullptr;
+		}
+
+		if ( g_singleton_pipe != INVALID_HANDLE_VALUE )
+		{
+			CloseHandle( g_singleton_pipe );
+			g_singleton_pipe = INVALID_HANDLE_VALUE;
+		}
+	}
+
 	OleUninitialize();
 	// drag_drop_remove( g_main_hwnd );
 }
@@ -139,40 +309,117 @@ void sys_shutdown()
 
 void sys_update()
 {
+	if ( app::config.single_instance )
+	{
+#if 0
+		static bool window_raised = false;
+
+		// wait for any other instance to connect to this pipe
+		ConnectNamedPipe( g_singleton_pipe, NULL );
+
+		DWORD pipe_state = GetLastError();
+
+		switch ( pipe_state )
+		{
+			default:
+				printf( "UNKNOWN PIPE STATE: %d\n", pipe_state );
+				// SDL_Delay( 500 );
+				break;
+
+			// client dropped
+			case ERROR_NO_DATA:
+				// user didn't write anything, probably just called the main exe again
+				if ( !window_raised )
+					SDL_RaiseWindow( app::window );
+
+				window_raised = false;
+				DisconnectNamedPipe( g_singleton_pipe );
+				break;
+
+			// waiting for a client
+			case ERROR_PIPE_LISTENING:
+				window_raised = false;
+				// SDL_Delay( 500 );
+				break;
+
+			case ERROR_PIPE_CONNECTED:
+			{
+				wchar_t buffer[ WINDOW_PIPE_SIZE ]{};
+				DWORD   bytes_read    = 0;
+
+				BOOL    read_file_ret = ReadFile(
+                  g_singleton_pipe,  // handle to pipe
+                  buffer,            // buffer to receive data
+                  WINDOW_PIPE_SIZE,  // size of buffer
+                  &bytes_read,       // number of bytes read
+                  NULL );            // not overlapped I/O
+
+				if ( read_file_ret )
+				{
+					on_new_file( buffer );
+					SDL_RaiseWindow( app::window );
+					window_raised = true;
+					// g_pipe_buffer.store( wcsdup( buffer ) );
+
+					// disconnect it, and wait for the next instance
+					DisconnectNamedPipe( g_singleton_pipe );
+				}
+
+				break;
+			}
+		}
+#endif
+		wchar_t* buffer = g_pipe_buffer.load();
+
+		if ( buffer )
+		{
+			on_new_file( buffer );
+			free( buffer );
+			g_pipe_buffer.store( nullptr );
+
+			SDL_RaiseWindow( app::window );
+		}
+		else if ( g_focus_window )
+		{
+			SDL_RaiseWindow( app::window );
+			g_focus_window = false;
+		}
+	}
 }
 
 
-void sys_set_window( SDL_Window* window )
+bool sys_set_window( SDL_Window* window )
 {
 	SDL_PropertiesID props = SDL_GetWindowProperties( window );
 	void*            hwnd  = SDL_GetPointerProperty( props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr );
 
-	if ( hwnd )
-	{
-		g_main_hwnd = (HWND)hwnd;
-		// drag_drop_register( g_main_hwnd );
-
-		if ( app::config.dwm_extend )
-		{
-			MARGINS margins{ -1 };
-			// margins.cxLeftWidth = 0;
-			// margins.cxRightWidth = 800;
-			// margins.cyBottomHeight = 400;
-			// margins.cyTopHeight = 0;
-
-			HRESULT res = DwmExtendFrameIntoClientArea( g_main_hwnd, &margins );
-
-			if ( res != S_OK )
-			{
-				printf( "Failed to extend frame into client area\n" );
-				sys_print_last_error();
-			}
-		}
-	}
-	else
+	if ( !hwnd )
 	{
 		printf( "Failed to get HWND from Window: %s\n", SDL_GetError() );
+		return false;
 	}
+
+	g_main_hwnd = (HWND)hwnd;
+	// drag_drop_register( g_main_hwnd );
+
+	if ( app::config.dwm_extend )
+	{
+		MARGINS margins{ -1 };
+		// margins.cxLeftWidth = 0;
+		// margins.cxRightWidth = 800;
+		// margins.cyBottomHeight = 400;
+		// margins.cyTopHeight = 0;
+
+		HRESULT res = DwmExtendFrameIntoClientArea( g_main_hwnd, &margins );
+
+		if ( res != S_OK )
+		{
+			printf( "Failed to extend frame into client area\n" );
+			sys_print_last_error();
+		}
+	}
+
+	return true;
 }
 
 

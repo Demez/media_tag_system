@@ -58,6 +58,9 @@ gallery-show-filenames: 1
 # Always draw new frames no matter what
 always-draw: 0
 
+# Only one instance open at a time
+single-instance: 0
+
 # Default zoom level for gallery view
 gallery-zoom-default: 200
 

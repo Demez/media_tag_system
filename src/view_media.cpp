@@ -257,6 +257,9 @@ void media_view_init()
 
 void media_view_shutdown()
 {
+	if ( !g_scale_thread )
+		return;
+
 	// wait for scale thread to shutdown
 	g_scale_thread->join();
 

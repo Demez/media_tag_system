@@ -55,9 +55,10 @@ bool fs_is_file( const char* path )
 // ----------------------------------------------------------------------------------------
 
 
-bool sys_init()
+e_sys_init sys_init( int argc, char* argv[] )
 {
-	return true;
+	// TODO: add single instance support
+	return e_sys_init_success;
 }
 
 
@@ -71,8 +72,9 @@ void sys_update()
 }
 
 
-void sys_set_window( SDL_Window* window )
+bool sys_set_window( SDL_Window* window )
 {
+	return true;
 }
 
 
@@ -528,6 +530,21 @@ int sys_execute( const char* command )
 
 
 // --------------------------------------------------------------------------------------------------------
+// Folder Monitor
+
+// Return true if something in the folder changed, indicating we need a refresh
+bool sys_folder_mon_changed()
+{
+	return false;
+}
+
+
+void sys_folder_mon_shutdown()
+{
+}
+
+
+// --------------------------------------------------------------------------------------------------------
 // Other
 
 
@@ -614,5 +631,11 @@ void sys_begin_drag_drop( const std::vector< fs::path >& files )
 // files have been dragged into this program, the drag and drop system will call this function when it recieves it
 void sys_set_receive_drag_drop_func( f_drag_drop_receive* callback )
 {
+}
+
+
+std::string sys_path_to_string( const fs::path& path )
+{
+	return path.native();
 }
 

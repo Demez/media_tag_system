@@ -850,6 +850,9 @@ bool thumbnail_loader_init()
 
 void thumbnail_loader_shutdown()
 {
+	if ( !g_thumbnails_running )
+		return;
+
 	g_thumbnails_running.store( false );
 
 	// wait for threads to shutdown

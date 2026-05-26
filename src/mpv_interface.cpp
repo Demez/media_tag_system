@@ -233,6 +233,9 @@ void mpv_update_frame()
 }
 
 
+
+// IDEA: maybe for watching a video, you want to zoom into a video as if it was an image
+// maybe integrate some of the panning and zoom controls into the video view
 void mpv_draw_frame()
 {
 	if ( !g_mpv )

@@ -122,6 +122,7 @@ struct app_config_t
 	bool                      no_video               = false;
 	bool                      gallery_show_filenames = false;
 	bool                      always_draw            = false;
+	bool                      single_instance        = false;
 	
 	// Theming
 	bool                      dwm_extend             = true;
@@ -234,6 +235,7 @@ struct image_frame_t
 	~image_frame_t()
 	{
 		ch_free( e_mem_category_image_data, data );
+		data = nullptr;
 	}
 };
 
@@ -471,6 +473,9 @@ extern main_image_data_t             g_image_scaled_data;
 
 void                                 set_frame_draw( u32 count = 1 );
 void                                 update_dpi( float dpi_override = 0.f );
+
+// Handle new file or path from external source
+bool                                 on_new_file( const fs::path& file_path );
 
 void                                 image_copy_data( image_t& src, image_t& dst );
 void                                 image_copy_frame_data( image_frame_t& src, image_frame_t& dst );

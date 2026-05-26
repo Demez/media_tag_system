@@ -34,6 +34,12 @@ using e_file_type = u8;
 
 using module_t = void*;
 
+enum e_sys_init : u8
+{
+	e_sys_init_fail,
+	e_sys_init_success,
+	e_sys_init_single_instance,
+};
 
 struct sys_font_data_t
 {
@@ -91,11 +97,11 @@ using f_drag_drop_receive = bool( const std::vector< fs::path >& files );
 
 // --------------------------------------------------------------------------------------------------------
 
-bool                    sys_init();
+e_sys_init              sys_init( int argc, char* argv[] );
 void                    sys_shutdown();
 void                    sys_update();
 
-void                    sys_set_window( SDL_Window* window );
+bool                    sys_set_window( SDL_Window* window );
 void                    sys_do_window_drag( ImVec2 last_mouse_pos, ImVec2 new_mouse_pos );
 
 // library loading
