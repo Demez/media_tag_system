@@ -283,6 +283,18 @@ double scale_point_from_origin( double origin, double point, double factor )
 }
 
 
+bool media_view_can_pan_image()
+{
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	if ( width >= image_draw::size.x && height >= image_draw::size.y )
+		return true;
+
+	return false;
+}
+
+
 void media_view_clamp_to_bounds()
 {
 	ImVec2 min_bounds{};
@@ -930,18 +942,31 @@ void media_view_input()
 
 	// mouse down and not hovering an imgui window not in an image pan
 	// bool        mouse_middle_down = ImGui::IsMouseDown( ImGuiMouseButton_Middle ) && !( mouse_hover_imgui_window );
-	bool                 mouse_middle_down = mouse_btns & SDL_BUTTON_MMASK && !( mouse_hover_imgui_window );
+	bool                 mouse_middle_down = mouse_btns & SDL_BUTTON_LMASK || mouse_btns & SDL_BUTTON_RMASK;
 
 	static bool drag_cooldown     = false;
 
-	if ( mouse_middle_down )
+	if ( mouse_middle_down && !mouse_hover_imgui_window )
 	{
 		if ( !drag_cooldown )
 		{
 			if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
 			{
-				std::vector< fs::path > files{ gallery_item_get_path( gallery::cursor ) };
-				sys_do_drag_drop_files( files );
+				u32 button = 0;
+				if ( mouse_btns & SDL_BUTTON_LMASK )
+					button = SDL_BUTTON_LEFT;
+
+				else if ( mouse_btns & SDL_BUTTON_RMASK )
+					button = SDL_BUTTON_RIGHT;
+
+				// if it's left click, make sure we can't pan the image around
+				bool skip = button == SDL_BUTTON_LEFT && !media_view_can_pan_image();
+
+				if ( !skip )
+				{
+					std::vector< fs::path > files{ gallery_item_get_path( gallery::cursor ) };
+					sys_do_drag_drop_files( files, button );
+				}
 
 				// this way we don't try to start another drag drop instantly after somehow
 				drag_cooldown = true;
@@ -961,7 +986,7 @@ void media_view_input()
 		// Wait for mouse movement to determine if we are panning the image or not
 		if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
 		{
-			g_image_pan = true;
+			g_image_pan = media_view_can_pan_image();
 		}
 	}
 

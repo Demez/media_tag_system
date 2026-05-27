@@ -317,13 +317,14 @@ struct DropSource : public IDropSource
 {
 	LONG             ref = 0L;
 	DropSourceNotify notify{};
+	DWORD            key = 0;
 
 	virtual HRESULT QueryContinueDrag( BOOL fEscapePressed, DWORD grfKeyState ) override
 	{
 		if ( fEscapePressed )
 			return DRAGDROP_S_CANCEL;
 
-		if ( !(grfKeyState & MK_MBUTTON) )
+		if ( !(grfKeyState & key) )
 			return DRAGDROP_S_DROP;
 
 		return S_OK;
@@ -391,7 +392,7 @@ struct DropSource : public IDropSource
 
 
 // Start drag and drop of multiple files in the system shell, like dragging to another folder to copy, into discord, etc.
-void sys_do_drag_drop_files( const std::vector< fs::path >& files )
+void sys_do_drag_drop_files( const std::vector< fs::path >& files, u32 sdl_mouse_btn )
 {
 	// for now, only the first file
 	if ( files.empty() )
@@ -410,6 +411,18 @@ void sys_do_drag_drop_files( const std::vector< fs::path >& files )
 
 	DropSource source{};
 	DWORD      out_effect = 0;
+
+	switch ( sdl_mouse_btn )
+	{
+		default:
+		case SDL_BUTTON_LEFT:
+			source.key = MK_LBUTTON;
+			break;
+
+		case SDL_BUTTON_RIGHT:
+			source.key = MK_RBUTTON;
+			break;
+	}
 
 	app::in_drag_drop     = true;
 

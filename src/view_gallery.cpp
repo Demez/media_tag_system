@@ -1124,18 +1124,25 @@ void gallery_view_draw_content()
 
 			// mouse down and not hovering an imgui window not in an image pan
 			// bool        mouse_middle_down = ImGui::IsMouseDown( ImGuiMouseButton_Middle ) && !( mouse_hover_imgui_window );
-			bool                 mouse_middle_down = mouse_btns & SDL_BUTTON_MMASK;
+			bool                 drag_button_down = ( mouse_btns & SDL_BUTTON_LMASK ) || ( mouse_btns & SDL_BUTTON_RMASK );
 
 			static bool          drag_cooldown     = false;
 
-			if ( mouse_middle_down )
+			if ( drag_button_down )
 			{
 				if ( !drag_cooldown )
 				{
 					if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
 					{
+						u32 button = 0;
+						if ( mouse_btns & SDL_BUTTON_LMASK )
+							button = SDL_BUTTON_LEFT;
+
+						else if ( mouse_btns & SDL_BUTTON_RMASK )
+							button = SDL_BUTTON_RIGHT;
+
 						std::vector< fs::path > files{ gallery_item_get_path( gallery::cursor ) };
-						sys_do_drag_drop_files( files );
+						sys_do_drag_drop_files( files, button );
 
 						// this way we don't try to start another drag drop instantly after somehow
 						drag_cooldown = true;
