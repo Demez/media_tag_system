@@ -924,27 +924,25 @@ HRESULT GetUIObjectOfFile( HWND hwnd, LPCWSTR pszPath, REFIID riid, void** ppv )
 }
 
 
-bool sys_copy_to_clipboard( const char* path )
+bool sys_copy_to_clipboard( const std::vector< fs::path >& files )
 {
-	wchar_t*               path_w = sys_to_wchar( path );
-	bool                   ret    = false;
+	if ( files.empty() )
+		return false;
 
+	// TODO: support multiple items, maybe use SDL_SetClipboardData to make this easier?
+	std::wstring path_str = files[ 0 ].native();
 	CComPtr< IDataObject > spdto;
 
-	if ( !SUCCEEDED( GetUIObjectOfFile( nullptr, path_w, IID_PPV_ARGS( &spdto ) ) ) )
-		goto end;
+	if ( !SUCCEEDED( GetUIObjectOfFile( nullptr, path_str.c_str(), IID_PPV_ARGS( &spdto ) ) ) )
+		return false;
 
 	if ( !SUCCEEDED( OleSetClipboard( spdto ) ) )
-		goto end;
+		return false;
 
 	if ( !SUCCEEDED( OleFlushClipboard() ) )
-		goto end;
+		return false;
 
-	ret = true;
-
-end:
-	ch_free_str( path_w );
-	return ret;
+	return true;
 }
 
 
@@ -1235,13 +1233,20 @@ u64 sys_get_time_ms()
 std::string sys_path_to_string( const fs::path& path )
 {
 	std::wstring wstring = path.native();
-
-	char* utf8 = sys_to_utf8( wstring.c_str() );
-
+	char*        utf8    = sys_to_utf8( wstring.c_str() );
 	std::string  ret     = utf8;
 
 	ch_free_str( utf8 );
-
 	return ret;
+}
+
+
+fs::path sys_string_to_path( const std::string& path_str )
+{
+	wchar_t*     path_w = sys_to_wchar( path_str.c_str() );
+	fs::path     path( path_w );
+	ch_free_str( path_w );
+
+	return path;
 }
 

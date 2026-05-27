@@ -119,8 +119,8 @@ void update_window_title()
 	}
 	else
 	{
-		if ( gallery::sorted_media.size() >= gallery::cursor )
-			snprintf( buf, 512, "Media Tag System [%zu / %zu] - %s", gallery::cursor, gallery::sorted_media.size(), gallery_item_get_path_string( gallery::cursor ).c_str() );
+		if ( gallery::sorted_media.size() >= g_image_data.index )
+			snprintf( buf, 512, "Media Tag System [%zu / %zu] - %s", g_image_data.index, gallery::sorted_media.size(), gallery_item_get_path_string( g_image_data.index ).c_str() );
 		else
 			snprintf( buf, 512, "Media Tag System [%zu]", gallery::sorted_media.size() );
 	}
@@ -135,11 +135,11 @@ void folder_load_media_list()
 
 	if ( directory::folder_reload )
 	{
-		gallery_view_set_selection( gallery::cursor );
+		//gallery_view_set_selection( gallery::cursor );
 	}
 	else
 	{
-		gallery::cursor = 0;
+		//gallery::cursor = 0;
 	}
 
 	directory::media_list.clear();
@@ -443,7 +443,7 @@ void imgui_draw( float frame_time )
 {
 	if ( gallery::sort_mode_update )
 	{
-		gallery_view_set_selection( gallery::cursor );
+		//gallery_view_set_selection( gallery::cursor );
 		gallery_view_sort_dir();
 		gallery::sort_mode_update = false;
 	}
@@ -487,7 +487,7 @@ void set_view_type_gallery()
 	if ( g_gallery_view )
 		return;
 
-	media_entry_t entry = gallery_item_get_media_entry( gallery::cursor );
+	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
 
 	// clear mpv
 	// mpv_cmd_loadfile( "" );
@@ -515,8 +515,13 @@ void set_view_type_media()
 	//if ( !g_gallery_view )
 	//	return;
 
-	if ( g_image_data.index != gallery::cursor )
+	u32 selected = gallery_view_get_last_selected();
+
+	if ( g_image_data.index != selected )
+	{
+		g_image_data.index = selected;
 		media_view_load();
+	}
 
 	if ( g_mpv_resume_on_focus )
 	{
@@ -1006,7 +1011,7 @@ void main_loop()
 
 		if ( !g_gallery_view && gallery::sorted_media.size() )
 		{
-			media_entry_t entry = gallery_item_get_media_entry( gallery::cursor );
+			media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
 
 			if ( entry.type == e_media_type_video /*&& g_mpv_video_ready*/ )
 			{
@@ -1077,7 +1082,7 @@ void main_loop()
 				{
 					if ( gallery_item_get_path( i ) == directory::queued )
 					{
-						gallery::cursor = i;
+						//gallery::cursor = i;
 						directory::queued.clear();
 						//media_view_load();
 						set_view_type_media();
@@ -1089,7 +1094,7 @@ void main_loop()
 			{
 				if ( directory::queued != directory::path )
 				{
-					gallery::cursor = 0;
+					//gallery::cursor = 0;
 					directory::path = directory::queued;
 					folder_load_media_list();
 				}

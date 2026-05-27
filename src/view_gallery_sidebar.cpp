@@ -458,7 +458,7 @@ int gallery_view_draw_header()
 
 	if ( strlen( gallery::search ) == 0 )
 	{
-		gallery_view_set_selection( gallery::cursor );
+		// gallery_view_set_selection( gallery::cursor );
 	}
 
 	ImGui::SetNextItemWidth( search_box_size );
@@ -481,7 +481,8 @@ int gallery_view_draw_header()
 		if ( !directory::recursive )
 		{
 			gallery::sorted_media.clear();
-			gallery::cursor = 0;
+			gallery_view_clear_selection();
+			//gallery::cursor = 0;
 		}
 	}
 
@@ -826,7 +827,7 @@ void gallery_view_draw_sidebar()
 				{
 					if ( ImGui::BeginChild( "##file_info", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY, 0 ) )
 					{
-						const media_entry_t& entry = gallery_item_get_media_entry( gallery::cursor );
+						const media_entry_t& entry = gallery_item_get_media_entry( gallery_view_get_last_selected() );
 
 						ImGui::PushTextWrapPos();
 						ImGui::TextUnformatted( entry.filename.c_str() );

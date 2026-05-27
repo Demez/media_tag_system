@@ -11,7 +11,7 @@ namespace gallery
 	char                          search[ 512 ];
 
 	// cursor position/index in items
-	size_t                        cursor            = 0;
+	// size_t                        cursor            = 0;
 
 	e_gallery_sort_mode           sort_mode         = e_gallery_sort_mode_date_mod_new_to_old;
 	bool                          sort_mode_update  = false;
@@ -32,9 +32,11 @@ namespace gallery
 	u32                           drawn_image_count  = 0;
 
 	// Files selected in the gallery view
-	std::vector< u32 >            selection{};
-}
+	std::vector< selection_t >    selection{};
 
+	// used for memory with media advancing with arrow keys
+	selection_t                   last_selection{};
+}
 
 
 const char* g_gallery_sort_mode_str[] = {
@@ -92,6 +94,7 @@ std::string gallery_item_get_path_string( size_t index )
 
 
 // =============================================================================================
+// Selection System
 
 
 void gallery_view_input_check_clear_multi_select()
@@ -106,80 +109,194 @@ void gallery_view_input_check_clear_multi_select()
 }
 
 
-void gallery_view_input_update_multi_select()
+void gallery_view_input_update_multi_select( u32 index )
 {
-	if ( ImGui::IsKeyDown( ImGuiKey_LeftShift ) )
+	// check if this exists in the list already
+	// if it does, remove it so we can add it to the end
+	for ( u32 i = 0; i < gallery::selection.size(); i++ )
 	{
-		gallery::selection.push_back( gallery::cursor );
+		if ( gallery::selection[ i ].index == index )
+		{
+			gallery::selection.erase( gallery::selection.begin() + i );
+			break;
+		}
 	}
+
+	selection_t selection{
+		.index = index,
+		.entry = gallery_item_get_media_entry( index ),
+	};
+
+	gallery::selection.push_back( selection );
+	gallery::last_selection = selection;
+
+	// if ( ImGui::IsKeyDown( ImGuiKey_LeftShift ) )
+	// {
+	// 	gallery::selection.push_back( gallery::cursor );
+	// }
+}
+
+
+u32 gallery_view_get_last_selected()
+{
+	if ( gallery::selection.empty() )
+		return 0;
+
+	return gallery::selection.back().index;
+}
+
+
+media_entry_t gallery_view_get_last_selected_entry()
+{
+	if ( gallery::selection.empty() )
+		return {};
+
+	return gallery::selection.back().entry;
+}
+
+
+void gallery_view_set_selection( size_t gallery_item_index )
+{
+	if ( directory::media_list.empty() )
+		return;
+
+	gallery::selection.clear();
+
+	selection_t selection{
+		.index = (u32)gallery_item_index,
+		.entry = gallery_item_get_media_entry( gallery_item_index ),
+	};
+
+	gallery::selection.push_back( selection );
+	gallery::last_selection = selection;
+
+#if 0
+	if ( gallery_item_index >= gallery::sorted_media.size() )
+	{
+		g_selected_item_cache.clear();
+
+		g_selected_item_cache.file = {};
+		g_selected_item_cache.type = e_media_type_none;
+		g_selected_item_cache.filename.clear();
+		return;
+	}
+
+	g_selected_item_cache = gallery_item_get_media_entry( gallery_item_index );
+#endif
+}
+
+
+void gallery_view_clear_selection()
+{
+	gallery::selection.clear();
+
+	gallery::last_selection.index = 0;
+	gallery::last_selection.entry.filename.clear();
+	gallery::last_selection.entry.type              = e_media_type_none;
+	gallery::last_selection.entry.file.size         = 0;
+	gallery::last_selection.entry.file.date_mod     = 0;
+	gallery::last_selection.entry.file.date_created = 0;
+	gallery::last_selection.entry.file.type         = e_file_type_invalid;
+	gallery::last_selection.entry.file.path.clear();
 }
 
 
 void gallery_view_input()
 {
-	// ctrl moves the cursor position, but not what is currently selected
+	u32  selection = gallery_view_get_last_selected();
+	bool empty     = gallery::selection.empty();
 
-	if ( ImGui::IsKeyDown( ImGuiKey_LeftShift ) )
+	if ( empty && gallery::last_selection.entry.type != e_media_type_none )
 	{
+		selection = gallery::last_selection.index;
+		empty     = false;
 	}
 
-	if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) )
+	if ( ImGui::IsKeyPressed( ImGuiKey_Home ) )
+	{
+		gallery_view_scroll_to_cursor();
+		gallery_view_input_update_multi_select( 0 );
+	}
+	else if ( ImGui::IsKeyPressed( ImGuiKey_End ) )
+	{
+		if ( gallery::sorted_media.size() )
+			selection = gallery::sorted_media.size() - 1;
+
+		gallery_view_scroll_to_cursor();
+		gallery_view_input_update_multi_select( selection );
+	}
+	else if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow ) )
 	{
 		gallery_view_input_check_clear_multi_select();
 
-		if ( gallery::cursor == 0 )
-			gallery::cursor = gallery::sorted_media.size();
+		if ( !empty )
+		{
+			if ( selection == 0 )
+				selection = gallery::sorted_media.size();
 
-		gallery::cursor--;
+			selection--;
+		}
+
 		gallery_view_scroll_to_cursor();
-		gallery_view_input_update_multi_select();
+		gallery_view_input_update_multi_select( selection );
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_RightArrow ) )
 	{
-		gallery::cursor = ( gallery::cursor + 1 ) % gallery::sorted_media.size();
+		gallery_view_input_check_clear_multi_select();
+
+		if ( !empty )
+			selection = ( selection + 1 ) % gallery::sorted_media.size();
+
 		gallery_view_scroll_to_cursor();
-		gallery_view_input_update_multi_select();
+		gallery_view_input_update_multi_select( selection );
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_UpArrow ) )
 	{
-		if ( gallery::cursor < gallery::row_count )
-		{
-			size_t count_in_row   = gallery::sorted_media.size() % gallery::row_count;
-			size_t missing_in_row = gallery::row_count - count_in_row;
-			size_t row_diff       = gallery::row_count - gallery::cursor;
+		gallery_view_input_check_clear_multi_select();
 
-			// advance up a row
-			if ( missing_in_row >= row_diff )
-				row_diff += gallery::row_count;
-
-			gallery::cursor = gallery::sorted_media.size() - ( row_diff - missing_in_row );
-		}
-		else
+		if ( !empty )
 		{
-			gallery::cursor = ( gallery::cursor - gallery::row_count ) % gallery::sorted_media.size();
+			if ( selection < gallery::row_count )
+			{
+				size_t count_in_row   = gallery::sorted_media.size() % gallery::row_count;
+				size_t missing_in_row = gallery::row_count - count_in_row;
+				size_t row_diff       = gallery::row_count - selection;
+
+				// advance up a row
+				if ( missing_in_row >= row_diff )
+					row_diff += gallery::row_count;
+
+				selection = gallery::sorted_media.size() - ( row_diff - missing_in_row );
+			}
+			else
+			{
+				selection = ( selection - gallery::row_count ) % gallery::sorted_media.size();
+			}
 		}
 
 		gallery_view_scroll_to_cursor();
+		gallery_view_input_update_multi_select( selection );
 	}
 	else if ( ImGui::IsKeyPressed( ImGuiKey_DownArrow ) )
 	{
-		if ( gallery::cursor + gallery::row_count >= gallery::sorted_media.size() )
+		gallery_view_input_check_clear_multi_select();
+		
+		if ( !empty )
 		{
-			size_t count_in_row  = gallery::sorted_media.size() % gallery::row_count;
-			size_t row_pos      = gallery::cursor % gallery::row_count;
-			gallery::cursor      = row_pos;
-		}
-		else
-		{
-			gallery::cursor = ( gallery::cursor + gallery::row_count ) % gallery::sorted_media.size();
+			if ( selection + gallery::row_count >= gallery::sorted_media.size() )
+			{
+				size_t count_in_row = gallery::sorted_media.size() % gallery::row_count;
+				size_t row_pos      = selection % gallery::row_count;
+				selection           = row_pos;
+			}
+			else
+			{
+				selection = ( selection + gallery::row_count ) % gallery::sorted_media.size();
+			}
 		}
 
 		gallery_view_scroll_to_cursor();
-	}
-
-	// shift adds to the selecction amount
-	if ( ImGui::IsKeyDown( ImGuiKey_LeftShift ) )
-	{
+		gallery_view_input_update_multi_select( selection );
 	}
 }
 
@@ -308,26 +425,6 @@ void gallery_view_sort_list( std::vector< size_t >& gallery_list )
 }
 
 
-static media_entry_t g_selected_item_cache{};
-
-
-void gallery_view_set_selection( size_t gallery_item_index )
-{
-	if ( directory::media_list.empty() )
-		return;
-
-	if ( gallery_item_index >= gallery::sorted_media.size() )
-	{
-		g_selected_item_cache.file = {};
-		g_selected_item_cache.type = e_media_type_none;
-		g_selected_item_cache.filename.clear();
-		return;
-	}
-
-	g_selected_item_cache     = gallery_item_get_media_entry( gallery_item_index );
-}
-
-
 void gallery_view_sort_dir()
 {
 	static std::vector< size_t > folders;
@@ -375,7 +472,8 @@ void gallery_view_sort_dir()
 
 	// Add Files next
 	std::copy( files.begin(), files.end(), gallery::sorted_media.begin() + folders.size() );
-
+	
+#if 0
 	// Find Selected File
 	if ( !g_selected_item_cache.file.path.empty() )
 	{
@@ -402,6 +500,9 @@ void gallery_view_sort_dir()
 			// 	gallery::cursor--;
 		}
 	}
+#endif
+
+	gallery_view_clear_selection();
 
 	gallery_view_reset_text_size();
 
@@ -461,7 +562,7 @@ void gallery_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
 	{
-		sys_browse_to_file( gallery_item_get_path_string( gallery::cursor ).c_str() );
+		//sys_browse_to_file( gallery_item_get_path_string( gallery::cursor ).c_str() );
 		//ctx_open = false;
 	}
 
@@ -639,9 +740,9 @@ void gallery_view_draw_content()
 	{
 		ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
 		content_area_hovered     = ImGui::IsMouseHoveringRect(
-			cursor_screen_pos,
-			{ cursor_screen_pos.x + region_avail.x + style.WindowPadding.x,
-			region_avail.y + style.WindowPadding.y } );
+          cursor_screen_pos,
+          { cursor_screen_pos.x + region_avail.x + style.WindowPadding.x,
+		        cursor_screen_pos.y + region_avail.y + style.WindowPadding.y } );
 
 		if ( content_area_hovered && ImGui::IsPopupOpen( "", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel ) )
 		{
@@ -695,10 +796,8 @@ void gallery_view_draw_content()
 
 	// item_spacing_x             = std::max( style.ItemSpacing.x, item_spacing_x );
 
-	int    grid_pos_x          = 0;
-	size_t i                   = 0;
-
-	int    image_visible_count = 0;
+	int grid_pos_x          = 0;
+	int image_visible_count = 0;
 
 	struct delayed_load_t
 	{
@@ -841,7 +940,10 @@ void gallery_view_draw_content()
 		// ----------------------------------------------------------------------------------------------------------
 		// If we need to scroll to the selected item this frame
 		// adjust the scroll position as needed to keep it on screen
-		if ( gallery::cursor == i && gallery::scroll_to_cursor )
+
+		u32 last_selected = gallery_view_get_last_selected();
+
+		if ( last_selected == i && gallery::scroll_to_cursor )
 		{
 			bool   scroll_needed  = false;
 			bool   scroll_up      = false;
@@ -900,7 +1002,16 @@ void gallery_view_draw_content()
 		ImVec2 global_item_size = ImVec2( window_cursor_pos.x + item_size_x, window_cursor_pos.y + current_item_size_y );
 
 		bool   item_hovered     = false;
-		bool   selected_item    = gallery::cursor == i;
+		bool   selected_item    = false;
+
+		for ( selection_t& selection : gallery::selection )
+		{
+			if ( selection.index != i )
+				continue;
+
+			selected_item = true;
+			break;
+		}
 
 		if ( content_area_hovered )
 			item_hovered = ImGui::IsMouseHoveringRect( cursor_screen_pos, { cursor_screen_pos.x + item_size_x, cursor_screen_pos.y + current_item_size_y } );
@@ -935,6 +1046,15 @@ void gallery_view_draw_content()
 
 			// if ( style.FrameBorderSize )
 				draw_list->AddRect( window_cursor_pos, global_item_size, main_border_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
+		}
+
+		if ( gallery::last_selection.entry.type != e_media_type_none && gallery::last_selection.index == i )
+		{
+			// why is this not using Active color?
+			ImColor main_bg_color     = item_hovered ? style.Colors[ ImGuiCol_FrameBgHovered ] : style.Colors[ ImGuiCol_FrameBg ];
+			ImColor main_border_color = style.Colors[ ImGuiCol_Border ];
+
+			draw_list->AddRect( window_cursor_pos, global_item_size, main_bg_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
 		}
 
 		ImVec2 current_pos = ImGui::GetCursorPos();
@@ -1102,7 +1222,8 @@ void gallery_view_draw_content()
 
 		if ( item_hovered && ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) || ImGui::IsMouseClicked( ImGuiMouseButton_Middle ) ) )
 		{
-			gallery::cursor = i;
+			gallery_view_input_check_clear_multi_select();
+			gallery_view_input_update_multi_select( i );
 
 			// the item may be a bit out of frame, scroll a little to have it fully in view
 			scroll_queued = true;
@@ -1111,11 +1232,6 @@ void gallery_view_draw_content()
 			{
 				gallery_selected_item_action( media );
 			}
-		}
-
-		if ( selected_item && !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
-		{
-			gallery_selected_item_action( media );
 		}
 
 		if ( selected_item && item_hovered )
@@ -1141,7 +1257,11 @@ void gallery_view_draw_content()
 						else if ( mouse_btns & SDL_BUTTON_RMASK )
 							button = SDL_BUTTON_RIGHT;
 
-						std::vector< fs::path > files{ gallery_item_get_path( gallery::cursor ) };
+						std::vector< fs::path > files{};
+
+						for ( selection_t& selection : gallery::selection )
+							files.push_back( selection.entry.file.path );
+
 						sys_do_drag_drop_files( files, button );
 
 						// this way we don't try to start another drag drop instantly after somehow
@@ -1167,6 +1287,27 @@ void gallery_view_draw_content()
 	}
 
 	// ----------------------------------------------------------------------------------------------------------
+
+	int im_window_height = ImGui::GetWindowHeight();
+
+	if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, (float)im_window_height } ) && !any_item_hovered )
+	{
+		if ( ImGui::IsKeyDown( ImGuiKey_MouseLeft ) )
+		{
+			gallery::selection.clear();
+		}
+	}
+
+	if ( ImGui::IsKeyDown( ImGuiKey_Escape ) )
+	{
+		// also clears last selection cache
+		gallery_view_clear_selection();
+	}
+
+	if ( !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
+	{
+		gallery_selected_item_action( gallery_view_get_last_selected_entry() );
+	}
 	
 	// printf( "IMAGE COUNT: %d\n", image_visible_count );
 
@@ -1250,9 +1391,19 @@ void gallery_view_draw()
 	// TODO: Test ImGui::Shortcut()
 	if ( app::window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 	{
-		sys_copy_to_clipboard( gallery_item_get_path_string( gallery::cursor ).data() );
-		printf( "Copied to Clipboard\n" );
-		push_notification( "Copied" );
+		std::string path_str = gallery_item_get_path_string( gallery_view_get_last_selected() );
+		fs::path    path     = sys_string_to_path( path_str );
+
+		if ( sys_copy_to_clipboard( { path } ) )
+		{
+			printf( "Copied to Clipboard\n" );
+			push_notification( "Copied" );
+		}
+		else
+		{
+			printf( "Failed to Copy to Clipboard\n" );
+			push_notification( "COPY FAILED" );
+		}
 	}
 }
 

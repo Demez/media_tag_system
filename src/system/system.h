@@ -152,7 +152,7 @@ bool                    sys_recycle_file( const char* path );
 // on windows, this opens the file properties dialog
 void                    sys_open_file_properties( const char* path );
 
-bool                    sys_copy_to_clipboard( const char* path );
+bool                    sys_copy_to_clipboard( const std::vector< fs::path >& files );
 
 // NOTE: path cannot be over MAX_PATH (260 characters), thanks windows shell
 void                    sys_browse_to_file( const char* path );
@@ -203,3 +203,4 @@ u64                     sys_get_time_ms();
 
 // non-exception based path conversion
 std::string             sys_path_to_string( const fs::path& path );
+fs::path                sys_string_to_path( const std::string& path_str );

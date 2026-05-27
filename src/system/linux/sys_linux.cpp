@@ -442,16 +442,18 @@ const void* sdl_clipboard_callback( void *userdata, const char *mime_type, size_
 }
 
 
-bool sys_copy_to_clipboard( const char* path )
+bool sys_copy_to_clipboard( const std::vector< fs::path >& files )
 {
-	if ( !path )
+	if ( files.empty() )
 		return false;
+
+	std::string path      = files[ 0 ].string();
 
 	const char* mime_type = "text/uri-list";
 
 	static char buffer[ 1024 ]{};
 	memset( buffer, 0, 1024 );
-	snprintf( buffer, 1024, "file://%s", path );
+	snprintf( buffer, 1024, "file://%s", path.c_str() );
 
 	if ( SDL_SetClipboardData( sdl_clipboard_callback, nullptr, buffer, &mime_type, 1 ) )
 		return true;
@@ -641,5 +643,12 @@ void sys_set_receive_drag_drop_func( f_drag_drop_receive* callback )
 std::string sys_path_to_string( const fs::path& path )
 {
 	return path.native();
+}
+
+
+fs::path sys_string_to_path( const std::string& path_str )
+{
+	fs::path path = path_str;
+	return path;
 }
 

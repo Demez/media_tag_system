@@ -159,9 +159,16 @@ struct cached_media_info_t
 
 struct media_entry_t
 {
-	file_t       file;
-	std::string  filename;
-	e_media_type type;
+	file_t       file{};
+	std::string  filename{};
+	e_media_type type{};
+};
+
+
+struct selection_t
+{
+	u32           index = 0;
+	media_entry_t entry{};
 };
 
 
@@ -427,7 +434,7 @@ namespace gallery
 	extern char                          search[ 512 ];
 
 	// cursor position/index in items
-	extern size_t                        cursor;
+	// extern size_t                        cursor;
 
 	extern e_gallery_sort_mode           sort_mode;
 	extern bool                          sort_mode_update;
@@ -448,7 +455,7 @@ namespace gallery
 	extern u32                           drawn_image_count;
 
 	// Files selected in the gallery view
-	extern std::vector< u32 >            selection;
+	extern std::vector< selection_t >    selection;
 }
 
 
@@ -509,6 +516,9 @@ void                                 gallery_view_draw();
 void                                 gallery_view_dir_change( bool keep_selection );
 void                                 gallery_view_sort_dir();
 void                                 gallery_view_set_selection( size_t gallery_item_index );
+void                                 gallery_view_clear_selection();
+u32                                  gallery_view_get_last_selected();
+media_entry_t                        gallery_view_get_last_selected_entry();
 void                                 gallery_view_reset_text_size();
 
 void                                 media_history_add( const std::string& entry );

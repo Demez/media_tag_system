@@ -24,6 +24,9 @@ namespace image_draw
 	size_t      frame            = 0;
 	float       playback_speed   = 1.f;
 	bool        pause            = false;
+
+	// index into gallery::sorted_media
+	//size_t      media_index      = 0;
 }
 
 
@@ -208,8 +211,8 @@ void media_view_scale_check_timer( float frame_time )
 
 		g_scale_src.frame[ 0 ].size = image_size;
 
-		g_image_scaled_data.index = gallery::cursor;
-		g_scale_state             = e_scale_state_start;
+		g_image_scaled_data.index   = g_image_data.index;
+		g_scale_state               = e_scale_state_start;
 
 		g_scale_lock.unlock();
 	}
@@ -269,10 +272,10 @@ void media_view_shutdown()
 
 e_media_type get_media_type()
 {
-	if ( gallery::sorted_media.size() <= gallery::cursor )
+	if ( gallery::sorted_media.size() <= g_image_data.index )
 		return e_media_type_none;
 
-	return gallery_item_get_media_entry( gallery::cursor ).type;
+	return gallery_item_get_media_entry( g_image_data.index ).type;
 }
 
 
@@ -289,9 +292,9 @@ bool media_view_can_pan_image()
 	SDL_GetWindowSize( app::window, &width, &height );
 
 	if ( width >= image_draw::size.x && height >= image_draw::size.y )
-		return true;
+		return false;
 
-	return false;
+	return true;
 }
 
 
@@ -566,7 +569,7 @@ void media_view_draw_media_info()
 		return;
 	}
 
-	media_entry_t entry  = gallery_item_get_media_entry( gallery::cursor );
+	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
 
 	ImGui::TextUnformatted( entry.filename.c_str() );
 
@@ -747,7 +750,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
 	{
-		sys_browse_to_file( gallery_item_get_path_string( gallery::cursor ).c_str() );
+		sys_browse_to_file( gallery_item_get_path_string( g_image_data.index ).c_str() );
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -760,8 +763,22 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Copy File", nullptr, false ) )
 	{
-		sys_copy_to_clipboard( gallery_item_get_path_string( gallery::cursor ).data() );
-		push_notification( "Copied" );
+		std::string path_str = gallery_item_get_path_string( g_image_data.index );
+		fs::path    path     = sys_string_to_path( path_str );
+
+		if ( sys_copy_to_clipboard( { path } ) )
+		{
+			printf( "Copied to Clipboard\n" );
+			push_notification( "Copied" );
+		}
+		else
+		{
+			printf( "Failed to Copy to Clipboard\n" );
+			push_notification( "COPY FAILED" );
+		}
+
+		//sys_copy_to_clipboard( gallery_item_get_path_string( g_image_data.index ).data() );
+		//push_notification( "Copied" );
 	}
 
 	if ( ImGui::BeginMenu( "Copy As" ) )
@@ -772,7 +789,7 @@ void media_view_context_menu()
 		}
 
 		// Enable once implemented
-		// ImGui::BeginDisabled( gallery_item_get_media_entry( gallery::cursor ).type != e_media_type_image );
+		// ImGui::BeginDisabled( gallery_item_get_media_entry( g_image_data.index ).type != e_media_type_image );
 		ImGui::BeginDisabled( true );
 
 		if ( ImGui::MenuItem( "JPEG", nullptr, false, 1 ) )
@@ -797,7 +814,7 @@ void media_view_context_menu()
 		// TODO: create our own imgui file properties for more info
 		// Plat_OpenFileProperties( ImageView_GetImagePath() );
 
-		sys_open_file_properties( gallery_item_get_path_string( gallery::cursor ).c_str() );
+		sys_open_file_properties( gallery_item_get_path_string( g_image_data.index ).c_str() );
 	}
 
 	// TODO: side menu to show information on the image or video overlayed next to the image in a window
@@ -871,7 +888,7 @@ void media_view_input()
 	{
 		g_scale_src.frame.clear();
 
-		if ( g_image_scaled_data.index == gallery::cursor )
+		if ( g_image_scaled_data.index == g_image_data.index )
 		{
 			gl_update_textures( g_image_scaled_data.textures, &g_image_scaled_data.image, 1 );
 			printf( "Scaled Main Image\n" );
@@ -903,9 +920,19 @@ void media_view_input()
 	// TODO: Test ImGui::Shortcut()
 	if ( app::window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 	{
-		sys_copy_to_clipboard( gallery_item_get_path_string( gallery::cursor ).data() );
-		printf( "Copied to Clipboard\n" );
-		push_notification( "Copied" );
+		std::string path_str = gallery_item_get_path_string( g_image_data.index );
+		fs::path    path     = sys_string_to_path( path_str );
+
+		if ( sys_copy_to_clipboard( { path } ) )
+		{
+			printf( "Copied to Clipboard\n" );
+			push_notification( "Copied" );
+		}
+		else
+		{
+			printf( "Failed to Copy to Clipboard\n" );
+			push_notification( "COPY FAILED" );
+		}
 	}
 
 	media_view_context_menu();
@@ -960,11 +987,11 @@ void media_view_input()
 					button = SDL_BUTTON_RIGHT;
 
 				// if it's left click, make sure we can't pan the image around
-				bool skip = button == SDL_BUTTON_LEFT && !media_view_can_pan_image();
+				bool skip = button == SDL_BUTTON_LEFT && media_view_can_pan_image();
 
 				if ( !skip )
 				{
-					std::vector< fs::path > files{ gallery_item_get_path( gallery::cursor ) };
+					std::vector< fs::path > files{ gallery_item_get_path( g_image_data.index ) };
 					sys_do_drag_drop_files( files, button );
 				}
 
@@ -1022,12 +1049,11 @@ void media_view_load()
 	if ( gallery::sorted_media.empty() )
 		return;
 
-	if ( gallery::cursor >= gallery::sorted_media.size() )
+	if ( g_image_data.index >= gallery::sorted_media.size() )
 		return;
 
 	float             load_time    = 0.f;
-	// gallery_item_t&   gallery_item = gallery::sorted_media[ gallery::cursor ];
-	media_entry_t     entry        = gallery_item_get_media_entry( gallery::cursor );
+	media_entry_t     entry     = gallery_item_get_media_entry( g_image_data.index );
 
 	image_load_info_t image_load_info{};
 	image_load_info.image = &g_image_data.image;
@@ -1077,7 +1103,7 @@ void media_view_load()
 		printf( "%f Load - %s\n", load_time, entry.file.path.string().c_str() );
 	}
 
-	g_image_data.index = gallery::cursor;
+	// g_image_data.index = image_draw::media_index;
 
 	update_window_title();
 
@@ -1098,20 +1124,22 @@ void media_view_advance( bool prev )
 advance:
 	if ( prev )
 	{
-		if ( gallery::cursor == 0 )
-			gallery::cursor = gallery::sorted_media.size();
+		if ( g_image_data.index == 0 )
+			g_image_data.index = gallery::sorted_media.size();
 
-		gallery::cursor--;
+		g_image_data.index--;
 	}
 	else
 	{
-		gallery::cursor++;
+		g_image_data.index++;
 
-		if ( gallery::cursor == gallery::sorted_media.size() )
-			gallery::cursor = 0;
+		if ( g_image_data.index == gallery::sorted_media.size() )
+			g_image_data.index = 0;
 	}
 
-	if ( gallery_item_get_media_entry( gallery::cursor ).type == e_media_type_directory )
+	gallery_view_set_selection( g_image_data.index );
+
+	if ( gallery_item_get_media_entry( g_image_data.index ).type == e_media_type_directory )
 		goto advance;
 
 	media_view_load();
