@@ -1307,8 +1307,9 @@ void gallery_view_draw_content()
 		grid_pos_x++;
 	}
 
-	ImVec2 end_window_pos  = ImGui::GetWindowPos();
-	ImVec2 end_window_size = ImGui::GetWindowSize();
+	ImVec2 end_window_pos      = ImGui::GetWindowPos();
+	ImVec2 end_window_size     = ImGui::GetWindowSize();
+	ImVec2 end_window_size_pos = { end_window_pos.x + end_window_size.x, end_window_pos.y + end_window_size.y };
 
 	ImGui::EndChild();
 
@@ -1321,7 +1322,7 @@ void gallery_view_draw_content()
 	// ----------------------------------------------------------------------------------------------------------
 
 	// if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, ImGui::GetWindowHeight() } ) && !any_item_hovered )
-	if ( ImGui::IsMouseHoveringRect( end_window_pos, end_window_size ) && !any_item_hovered )
+	if ( ImGui::IsMouseHoveringRect( end_window_pos, end_window_size_pos ) && !any_item_hovered )
 	// if ( ImGui::IsWindowHovered() && !any_item_hovered )
 	{
 		if ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
