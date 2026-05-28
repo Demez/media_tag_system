@@ -41,6 +41,7 @@ enum e_icon : u8
 	e_icon_folder,
 	e_icon_loading,
 	e_icon_video,
+	e_icon_image,
 
 	e_icon_count,
 };
@@ -467,6 +468,9 @@ namespace image_draw
 	extern size_t frame;
 	extern float  playback_speed;
 	extern bool   pause;
+
+	// index into gallery::sorted_media
+	//extern size_t media_index;
 }
 
 

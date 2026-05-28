@@ -742,7 +742,7 @@ void gallery_view_draw_content()
 		content_area_hovered     = ImGui::IsMouseHoveringRect(
           cursor_screen_pos,
           { cursor_screen_pos.x + region_avail.x + style.WindowPadding.x,
-		        cursor_screen_pos.y + region_avail.y + style.WindowPadding.y } );
+		        window_height + style.WindowPadding.y } );
 
 		if ( content_area_hovered && ImGui::IsPopupOpen( "", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel ) )
 		{
@@ -1108,11 +1108,13 @@ void gallery_view_draw_content()
 					if ( media.type != e_media_type_directory )
 						thumbnail_requests.emplace_back( media, gallery_index );
 
-					ImGui::Dummy( image_bounds );
+					// ImGui::Dummy( image_bounds );
+					gallery_view_draw_image( icon_get_image( e_icon_image ), icon_get_imtexture( e_icon_image ), image_bounds, true, scaled_image_size );
 				}
 				else  // if ( thumbnail->status == e_thumbnail_status_free )
 				{
-					ImGui::Dummy( image_bounds );
+					//ImGui::Dummy( image_bounds );
+					gallery_view_draw_image( icon_get_image( e_icon_image ), icon_get_imtexture( e_icon_image ), image_bounds, true, scaled_image_size );
 				}
 			}
 			else
@@ -1121,7 +1123,8 @@ void gallery_view_draw_content()
 					thumbnail_requests.emplace_back( media, gallery_index );
 				// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
-				ImGui::Dummy( image_bounds );
+				//ImGui::Dummy( image_bounds );
+				gallery_view_draw_image( icon_get_image( e_icon_image ), icon_get_imtexture( e_icon_image ), image_bounds, true, scaled_image_size );
 			}
 		}
 

@@ -512,6 +512,7 @@ static const char* g_icon_names[] = {
 	"folder",
 	"loading",
 	"video",
+	"image",
 };
 
 
@@ -521,6 +522,7 @@ static const char* g_icon_paths[] = {
 	"icons" SEP_S "folder.png",
 	"icons" SEP_S "loading.png",
 	"icons" SEP_S "video.png",
+	"icons" SEP_S "image.png",
 };
 
 

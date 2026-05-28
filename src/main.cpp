@@ -263,6 +263,9 @@ void folder_history_add( const fs::path& entry )
 
 	directory::folder_history.push_back( entry );
 	directory::folder_history_pos++;
+
+	if ( directory::folder_history_pos > directory::folder_history.size() )
+		directory::folder_history_pos = directory::folder_history.size();
 }
 
 
@@ -517,7 +520,7 @@ void set_view_type_media()
 
 	u32 selected = gallery_view_get_last_selected();
 
-	if ( g_image_data.index != selected )
+	// if ( g_image_data.index != selected )
 	{
 		g_image_data.index = selected;
 		media_view_load();
