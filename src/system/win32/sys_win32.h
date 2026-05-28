@@ -8,6 +8,7 @@
 #endif
 
 #include <Windows.h>
+#include <shlobj_core.h>
 
 
 extern HWND    g_main_hwnd;
@@ -39,6 +40,8 @@ void           drag_drop_remove( HWND hwnd );
 
 
 // --------------------------------------------------------------------------------------------------------
+// Shell Helpers
 
 HRESULT        GetUIObjectOfFile( HWND hwnd, LPCWSTR pszPath, REFIID riid, void** ppv );
+bool           sys_get_data_obj_for_files( const std::vector< fs::path >& paths, IDataObject*& file_obj );
 

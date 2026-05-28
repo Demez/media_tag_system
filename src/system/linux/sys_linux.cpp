@@ -629,7 +629,7 @@ u64 sys_get_time_ms()
 
 
 // Start drag and drop of multiple files in the system shell, like dragging to another folder to copy, into discord, etc.
-void sys_begin_drag_drop( const std::vector< fs::path >& files, u32 sdl_mouse_btn )
+void sys_do_drag_drop_files( const std::vector< fs::path >& files, u32 sdl_mouse_btn )
 {
 }
 

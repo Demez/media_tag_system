@@ -91,3 +91,90 @@ char* sys_to_utf8( const wchar_t* spStr )
 
 	return nullptr;
 }
+
+
+// --------------------------------------------------------------------------------------------------------
+// Shell Helpers
+
+
+bool sys_get_data_obj_for_files( const std::vector< fs::path >& paths, IDataObject*& file_obj )
+{
+	//std::vector< PIDLIST_ABSOLUTE > absolute_pidls{};
+	std::vector< PCUITEMID_CHILD >  child_pidls{};
+
+	//absolute_pidls.reserve( paths.size() );
+	child_pidls.reserve( paths.size() );
+
+	HRESULT hr = E_FAIL;
+
+	for ( const auto& path : paths )
+	{
+		PIDLIST_ABSOLUTE pidl = nullptr;
+		HRESULT          hr   = SHParseDisplayName( path.c_str(), nullptr, &pidl, 0, nullptr );
+
+		if ( SUCCEEDED( hr ) && pidl )
+		{
+			// store this to free it later
+			//absolute_pidls.push_back( pidl );
+
+			// same as absolute since desktop is root here
+			child_pidls.push_back( reinterpret_cast< PCUITEMID_CHILD >( pidl ) );
+		}
+		else
+		{
+			goto end;
+		}
+	}
+
+	if ( !child_pidls.empty() )
+	{
+		// https://stackoverflow.com/questions/34549603/display-file-properties-dialog-for-files-in-different-directories
+		IShellFolder* pDesktop = nullptr;
+		hr = SHGetDesktopFolder( &pDesktop );
+		
+		if ( FAILED( hr ) )
+			goto end;
+
+		hr = pDesktop->GetUIObjectOf( HWND_DESKTOP, static_cast< UINT >( child_pidls.size() ), (LPCITEMIDLIST*)child_pidls.data(), IID_IDataObject, NULL, (void**)&file_obj );
+		
+		// alternatively, you can also use SHCreateDataObject() or CIDLData_CreateFromIDArray() to create the IDataObject
+		pDesktop->Release();
+	}
+
+end:
+	for ( auto pidl : child_pidls )
+		CoTaskMemFree( (PIDLIST_ABSOLUTE)pidl );
+
+	// absolute_pidls.clear();
+	child_pidls.clear();
+
+	return SUCCEEDED( hr );
+}
+
+
+// GetUIObjectOfFile incorporated by reference
+// https://web.archive.org/web/20140424230840/http://blogs.msdn.com/b/oldnewthing/archive/2004/09/21/231739.aspx
+HRESULT GetUIObjectOfFile( HWND hwnd, LPCWSTR pszPath, REFIID riid, void** ppv )
+{
+	*ppv = NULL;
+	HRESULT      hr;
+	LPITEMIDLIST pidl;
+	SFGAOF       sfgao;
+
+	if ( SUCCEEDED( hr = SHParseDisplayName( pszPath, NULL, &pidl, 0, &sfgao ) ) )
+	{
+		IShellFolder* psf;
+		LPCITEMIDLIST pidlChild;
+
+		if ( SUCCEEDED( hr = SHBindToParent( pidl, IID_IShellFolder, (void**)&psf, &pidlChild ) ) )
+		{
+			hr = psf->GetUIObjectOf( hwnd, 1, &pidlChild, riid, NULL, ppv );
+			psf->Release();
+		}
+
+		CoTaskMemFree( pidl );
+	}
+
+	return hr;
+}
+

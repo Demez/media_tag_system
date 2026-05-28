@@ -97,9 +97,16 @@ std::string gallery_item_get_path_string( size_t index )
 // Selection System
 
 
+bool gallery_view_input_do_multi_select()
+{
+	return ImGui::IsKeyDown( ImGuiKey_LeftShift ) || ImGui::IsKeyDown( ImGuiKey_LeftCtrl );
+}
+
+
 void gallery_view_input_check_clear_multi_select()
 {
 	if ( !ImGui::IsKeyDown( ImGuiKey_LeftShift ) && !ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) )
+	// if ( !gallery_view_input_do_multi_select() )
 	{
 		if ( gallery::selection.size() )
 		{
@@ -109,16 +116,19 @@ void gallery_view_input_check_clear_multi_select()
 }
 
 
-void gallery_view_input_update_multi_select( u32 index )
+void gallery_view_input_update_multi_select( u32 index, bool readd = true )
 {
 	// check if this exists in the list already
 	// if it does, remove it so we can add it to the end
+	// instead, just remove it and move on
 	for ( u32 i = 0; i < gallery::selection.size(); i++ )
 	{
 		if ( gallery::selection[ i ].index == index )
 		{
 			gallery::selection.erase( gallery::selection.begin() + i );
-			break;
+
+			if ( !readd )
+				return;
 		}
 	}
 
@@ -554,7 +564,7 @@ void gallery_view_context_menu()
 	// if ( !ImGui::BeginPopup( "##gallery ctx menu" ) )
 	// 	return;
 
-	if ( !ImGui::BeginPopupContextWindow( "##gallery ctx menu", ImGuiPopupFlags_AnyPopup ) )
+	if ( !ImGui::BeginPopupContextVoid( "##gallery ctx menu", ImGuiPopupFlags_AnyPopup ) )
 	 	return;
 
 	ImGuiStyle& style        = ImGui::GetStyle();
@@ -1223,20 +1233,6 @@ void gallery_view_draw_content()
 		// ----------------------------------------------------------------------------------------------------------
 		// Handle Actions
 
-		if ( item_hovered && ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) || ImGui::IsMouseClicked( ImGuiMouseButton_Middle ) ) )
-		{
-			gallery_view_input_check_clear_multi_select();
-			gallery_view_input_update_multi_select( i );
-
-			// the item may be a bit out of frame, scroll a little to have it fully in view
-			scroll_queued = true;
-
-			if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
-			{
-				gallery_selected_item_action( media );
-			}
-		}
-
 		if ( selected_item && item_hovered )
 		{
 			SDL_MouseButtonFlags mouse_btns        = SDL_GetMouseState( nullptr, nullptr );
@@ -1278,26 +1274,59 @@ void gallery_view_draw_content()
 			}
 		}
 
+		bool mouse_release = ( ImGui::IsMouseReleased( ImGuiMouseButton_Left ) || ImGui::IsMouseReleased( ImGuiMouseButton_Middle ) );
+		bool mouse_press   = ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) || ImGui::IsMouseClicked( ImGuiMouseButton_Middle ) );
+
+		if ( item_hovered )
+		{
+			if ( mouse_release && gallery::selection.size() > 1 )
+			{
+				gallery_view_input_check_clear_multi_select();
+
+				if ( !gallery_view_input_do_multi_select() )
+					gallery_view_input_update_multi_select( i, false );
+			}
+
+			if ( mouse_press )
+			{
+				if ( !gallery_view_input_do_multi_select() )
+					gallery::selection.clear();
+
+				gallery_view_input_update_multi_select( i, false );
+
+				// the item may be a bit out of frame, scroll a little to have it fully in view
+				scroll_queued = true;
+			}
+
+			if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
+			{
+				gallery_selected_item_action( media );
+			}
+		}
+
 		grid_pos_x++;
 	}
+
+	ImVec2 end_window_pos  = ImGui::GetWindowPos();
+	ImVec2 end_window_size = ImGui::GetWindowSize();
 
 	ImGui::EndChild();
 
 	if ( !any_item_hovered && last_hovered != SIZE_MAX )
 	{
-		last_hovered    = SIZE_MAX;
+		last_hovered = SIZE_MAX;
 		set_frame_draw();
 	}
 
 	// ----------------------------------------------------------------------------------------------------------
 
-	int im_window_height = ImGui::GetWindowHeight();
-
-	if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, (float)im_window_height } ) && !any_item_hovered )
+	// if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, ImGui::GetWindowHeight() } ) && !any_item_hovered )
+	if ( ImGui::IsMouseHoveringRect( end_window_pos, end_window_size ) && !any_item_hovered )
+	// if ( ImGui::IsWindowHovered() && !any_item_hovered )
 	{
-		if ( ImGui::IsKeyDown( ImGuiKey_MouseLeft ) )
+		if ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
 		{
-			gallery::selection.clear();
+			gallery_view_input_check_clear_multi_select();
 		}
 	}
 
@@ -1394,10 +1423,13 @@ void gallery_view_draw()
 	// TODO: Test ImGui::Shortcut()
 	if ( app::window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 	{
-		std::string path_str = gallery_item_get_path_string( gallery_view_get_last_selected() );
-		fs::path    path     = sys_string_to_path( path_str );
+		std::vector< fs::path > files{};
+		files.reserve( gallery::selection.size() );
 
-		if ( sys_copy_to_clipboard( { path } ) )
+		for ( const selection_t& selection : gallery::selection )
+			files.push_back( selection.entry.file.path );
+
+		if ( sys_copy_to_clipboard( files ) )
 		{
 			printf( "Copied to Clipboard\n" );
 			push_notification( "Copied" );

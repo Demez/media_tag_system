@@ -763,8 +763,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Copy File", nullptr, false ) )
 	{
-		std::string path_str = gallery_item_get_path_string( g_image_data.index );
-		fs::path    path     = sys_string_to_path( path_str );
+		fs::path path = gallery_item_get_path( g_image_data.index );
 
 		if ( sys_copy_to_clipboard( { path } ) )
 		{
@@ -920,8 +919,7 @@ void media_view_input()
 	// TODO: Test ImGui::Shortcut()
 	if ( app::window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 	{
-		std::string path_str = gallery_item_get_path_string( g_image_data.index );
-		fs::path    path     = sys_string_to_path( path_str );
+		fs::path path = gallery_item_get_path( g_image_data.index );
 
 		if ( sys_copy_to_clipboard( { path } ) )
 		{

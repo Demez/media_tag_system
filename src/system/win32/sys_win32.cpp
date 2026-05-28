@@ -47,7 +47,6 @@ static LARGE_INTEGER           g_win_perf_freq;
 // ----------------------------------------------------------------------------------------
 
 
-
 bool fs_exists( const char* path )
 {
 	DWORD attributes = GetFileAttributesA( path );
@@ -273,6 +272,13 @@ e_sys_init sys_init( int argc, char* argv[] )
 	if ( !SUCCEEDED( OleInitialize( NULL ) ) )
 	{
 		printf( "Failed to init OLE\n" );
+		sys_print_last_error();
+		return e_sys_init_fail;
+	}
+
+	if ( !SUCCEEDED( CoInitialize( NULL ) ) )
+	{
+		printf( "Failed to init COM\n" );
 		sys_print_last_error();
 		return e_sys_init_fail;
 	}
@@ -897,46 +903,16 @@ void sys_open_file_properties( const char* file )
 }
 
 
-// GetUIObjectOfFile incorporated by reference
-// https://web.archive.org/web/20140424230840/http://blogs.msdn.com/b/oldnewthing/archive/2004/09/21/231739.aspx
-HRESULT GetUIObjectOfFile( HWND hwnd, LPCWSTR pszPath, REFIID riid, void** ppv )
-{
-	*ppv = NULL;
-	HRESULT      hr;
-	LPITEMIDLIST pidl;
-	SFGAOF       sfgao;
-
-	if ( SUCCEEDED( hr = SHParseDisplayName( pszPath, NULL, &pidl, 0, &sfgao ) ) )
-	{
-		IShellFolder* psf;
-		LPCITEMIDLIST pidlChild;
-
-		if ( SUCCEEDED( hr = SHBindToParent( pidl, IID_IShellFolder, (void**)&psf, &pidlChild ) ) )
-		{
-			hr = psf->GetUIObjectOf( hwnd, 1, &pidlChild, riid, NULL, ppv );
-			psf->Release();
-		}
-
-		CoTaskMemFree( pidl );
-	}
-
-	return hr;
-}
-
-
 bool sys_copy_to_clipboard( const std::vector< fs::path >& files )
 {
 	if ( files.empty() )
 		return false;
 
-	// TODO: support multiple items, maybe use SDL_SetClipboardData to make this easier?
-	std::wstring path_str = files[ 0 ].native();
-	CComPtr< IDataObject > spdto;
-
-	if ( !SUCCEEDED( GetUIObjectOfFile( nullptr, path_str.c_str(), IID_PPV_ARGS( &spdto ) ) ) )
+	IDataObject* file_obj = nullptr;
+	if ( !sys_get_data_obj_for_files( files, file_obj ) )
 		return false;
 
-	if ( !SUCCEEDED( OleSetClipboard( spdto ) ) )
+	if ( !SUCCEEDED( OleSetClipboard( file_obj ) ) )
 		return false;
 
 	if ( !SUCCEEDED( OleFlushClipboard() ) )
