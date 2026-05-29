@@ -27,7 +27,6 @@ enum e_media_type : u8
 	e_media_type_none,
 	e_media_type_directory,
 	e_media_type_image,
-	e_media_type_image_animated,
 	e_media_type_video,
 
 	e_media_type_count,
@@ -73,6 +72,22 @@ enum e_gallery_sort_mode
 
 	e_gallery_sort_mode_count,
 };
+
+
+enum e_gallery_filter_ : u8
+{
+	e_gallery_filter_none,
+	e_gallery_filter_folders = 1 << 0,
+	e_gallery_filter_images  = 1 << 1,
+	e_gallery_filter_videos  = 1 << 2,
+
+	e_gallery_filter_media   = e_gallery_filter_images | e_gallery_filter_videos,
+	e_gallery_filter_all     = e_gallery_filter_folders | e_gallery_filter_images | e_gallery_filter_videos,
+	e_gallery_filter_count   = 4,
+};
+
+
+using e_gallery_filter = u8;
 
 
 extern const char* g_gallery_sort_mode_str[];
@@ -454,9 +469,16 @@ namespace gallery
 	extern bool                          scroll_to_cursor;
 
 	extern u32                           drawn_image_count;
+	extern u32                           first_visible_item;
+
+	// Quick Filter
+	extern e_gallery_filter              filter;
 
 	// Files selected in the gallery view
 	extern std::vector< selection_t >    selection;
+
+	// used for memory with media advancing with arrow keys
+	extern selection_t                   last_selection;
 }
 
 
@@ -519,11 +541,13 @@ void                                 gallery_view_input();
 void                                 gallery_view_draw();
 void                                 gallery_view_dir_change( bool keep_selection );
 void                                 gallery_view_sort_dir();
+void                                 gallery_view_reset_text_size();
+
 void                                 gallery_view_set_selection( size_t gallery_item_index );
 void                                 gallery_view_clear_selection();
-u32                                  gallery_view_get_last_selected();
+selection_t                          gallery_view_get_last_selected();
+u32                                  gallery_view_get_last_selected_index();
 media_entry_t                        gallery_view_get_last_selected_entry();
-void                                 gallery_view_reset_text_size();
 
 void                                 media_history_add( const std::string& entry );
 void                                 folder_history_add( const fs::path& entry );

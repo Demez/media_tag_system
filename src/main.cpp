@@ -139,7 +139,7 @@ void folder_load_media_list()
 	}
 	else
 	{
-		//gallery::cursor = 0;
+		gallery_view_clear_selection();
 	}
 
 	directory::media_list.clear();
@@ -192,6 +192,7 @@ void folder_load_media_list()
 	if ( directory::recursive )
 		scan_flags |= e_scandir_recursive | e_scandir_no_dirs;
 
+	// TODO: make this a background task, especially for large folders/recursive mode
 	if ( !sys_scandir( root.c_str(), nullptr, files, scan_flags ) )
 	{
 		printf( "Failed to scan directory\n" );
@@ -310,6 +311,7 @@ bool folder_history_nav_next()
 void push_notification( const char* msg )
 {
 	g_notification_queue.emplace_back( msg, app::total_time, NOTIFICATION_DURATION );
+	printf( "NOTIFICATION: %.4f - %s\n", app::total_time * 1000.f, msg );
 }
 
 
@@ -518,7 +520,7 @@ void set_view_type_media()
 	//if ( !g_gallery_view )
 	//	return;
 
-	u32 selected = gallery_view_get_last_selected();
+	u32 selected = gallery_view_get_last_selected_index();
 
 	// if ( g_image_data.index != selected )
 	{
@@ -706,7 +708,7 @@ void frame_draw_end()
 
 
 // called initially on startup and on window resize
-void window_quick_draw( bool resize = false )
+void window_quick_draw()
 {
 	if ( g_in_draw )
 		return;
@@ -721,9 +723,8 @@ void window_quick_draw( bool resize = false )
 
 	media_view_update( app::frame_time );
 
-	if ( resize )
+	if ( app::window_resized )
 	{
-		app::window_resized = true;
 		media_view_window_resize();
 		gallery_view_scroll_to_cursor();
 		// mpv_window_resize();
@@ -791,7 +792,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 
 			app::in_window_drag = true;
 			thumbnail_loader_update();
-			window_quick_draw( false );
+			window_quick_draw();
 			app::in_window_drag = false;
 			break;
 		}
@@ -799,11 +800,12 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
 			// clear focusing of any windows
+			app::window_resized = true;
 			ImGui::SetNextFrameWantCaptureKeyboard( false );
 			ImGui::SetWindowFocus( nullptr );
 
 			thumbnail_loader_update();
-			window_quick_draw( true );
+			window_quick_draw();
 			break;
 		}
 
@@ -1085,7 +1087,7 @@ void main_loop()
 				{
 					if ( gallery_item_get_path( i ) == directory::queued )
 					{
-						//gallery::cursor = i;
+						gallery_view_set_selection( i );
 						directory::queued.clear();
 						//media_view_load();
 						set_view_type_media();
@@ -1097,17 +1099,18 @@ void main_loop()
 			{
 				if ( directory::queued != directory::path )
 				{
-					//gallery::cursor = 0;
+					// gallery_view_clear_selection();
 					directory::path = directory::queued;
 					folder_load_media_list();
 				}
 				else if ( directory::folder_reload )
 				{
+					gallery_view_scroll_to_cursor();
 					folder_load_media_list();
 				}
 
 				directory::queued.clear();
-				gallery_view_scroll_to_cursor();
+				// gallery_view_scroll_to_cursor();
 				set_view_type_gallery();
 			}
 

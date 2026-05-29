@@ -120,7 +120,7 @@ if ( MSVC )
 	)
 	
 	set( LINK_OPTIONS_DEBUG
-		""
+		"/INCREMENTAL"
 	)
 	
 	set( LINK_OPTIONS_RELEASE

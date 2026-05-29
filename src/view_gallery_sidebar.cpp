@@ -125,6 +125,18 @@ static void draw_vertical_separator( ImDrawList* draw_list, ImGuiStyle& style )
 }
 
 
+void gallery_update_filter( e_gallery_filter filter )
+{
+	if ( gallery::filter & filter )
+		gallery::filter &= ~filter;
+	else
+		gallery::filter |= filter;
+
+	// gallery::sort_mode_update = true;
+	gallery_view_dir_change( true );
+}
+
+
 int gallery_view_draw_header()
 {
 	int window_width, window_height;
@@ -495,7 +507,7 @@ int gallery_view_draw_header()
 	ImVec2 filter_size       = ImGui::CalcTextSize( "Quick Filter" );
 	ImVec2 sort_size         = ImGui::CalcTextSize( "Sort By" );
 	ImVec2 sort_entry_size   = ImGui::CalcTextSize( "Date Modified - New to Old" );
-	ImVec2 filter_entry_size = ImGui::CalcTextSize( "Folders" );
+	ImVec2 filter_entry_size = ImGui::CalcTextSize( "Quick Filter" );
 
 	int    sort_width   = sort_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
 	int    filter_width = filter_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
@@ -564,6 +576,7 @@ int gallery_view_draw_header()
 	if ( ImGui::SliderScalar( "##zoom", ImGuiDataType_U32, &gallery::item_size, &gallery::item_size_min, &gallery::item_size_max, "%d px" ) )
 	{
 		gallery_view_reset_text_size();
+		gallery_view_scroll_to_cursor();
 
 		if ( !app::config.thumbnail_use_fixed_size )
 			thumbnail_clear_cache();
@@ -572,36 +585,42 @@ int gallery_view_draw_header()
 	ImGui::SameLine();
 	draw_vertical_separator( draw_list, style );
 
-	ImGui::TextUnformatted( "Quick Filter" );
-	ImGui::SameLine();
+	//ImGui::TextUnformatted( "Quick Filter" );
+	//ImGui::SameLine();
 
 	ImGui::SetNextItemWidth( filter_width );
 
-	ImGui::BeginDisabled();
-
 	// this could be a check box thing for toggling what you want to view, all enabled by default, but that is slower
-	if ( ImGui::BeginCombo( "##quick_filter", "None", 0 ) )
+	if ( ImGui::BeginCombo( "##quick_filter", "Quick Filter", 0 ) )
 	{
-		if ( ImGui::Selectable( "None", false ) )
+		if ( ImGui::MenuItem( "None", 0, gallery::filter == 0 ) )
 		{
+			gallery::filter           = 0;
+			gallery::sort_mode_update = true;
 		}
 
-		if ( ImGui::Selectable( "Images", false ) )
+		// No folders in recursive mode
+		ImGui::BeginDisabled( directory::recursive );
+		if ( ImGui::MenuItem( "Folders", 0, gallery::filter & e_gallery_filter_folders ) )
 		{
+			gallery_update_filter( e_gallery_filter_folders );
+		}
+		ImGui::EndDisabled();
+
+		if ( ImGui::MenuItem( "Images", 0, gallery::filter & e_gallery_filter_images ) )
+		{
+			gallery_update_filter( e_gallery_filter_images );
 		}
 
-		if ( ImGui::Selectable( "Videos", false ) )
+		ImGui::BeginDisabled( !g_mpv );
+		if ( ImGui::MenuItem( "Videos", 0, gallery::filter & e_gallery_filter_videos ) )
 		{
+			gallery_update_filter( e_gallery_filter_videos );
 		}
-
-		if ( ImGui::Selectable( "Folders", false ) )
-		{
-		}
+		ImGui::EndDisabled();
 
 		ImGui::EndCombo();
 	}
-
-	ImGui::EndDisabled();
 
 	ImGui::SameLine();
 	draw_vertical_separator( draw_list, style );
@@ -623,6 +642,7 @@ int gallery_view_draw_header()
 			{
 				gallery::sort_mode        = (e_gallery_sort_mode)n;
 				gallery::sort_mode_update = true;
+				gallery_view_dir_change( true );
 			}
 
 			// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
@@ -823,26 +843,42 @@ void gallery_view_draw_sidebar()
 			ImGui::PopFont();
 
 			{
-				if ( gallery::sorted_media.size() )
+				// if ( gallery::sorted_media.size() && gallery::last_selection.entry.type != e_media_type_none )
+				if ( gallery::sorted_media.size() && gallery::selection.size() )
 				{
 					if ( ImGui::BeginChild( "##file_info", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY, 0 ) )
 					{
-						const media_entry_t& entry = gallery_item_get_media_entry( gallery_view_get_last_selected() );
+						// const media_entry_t& entry = gallery_item_get_media_entry( gallery_view_get_last_selected() );
+						const media_entry_t& entry = gallery::last_selection.entry;
 
 						ImGui::PushTextWrapPos();
+
+						if ( entry.file.type & e_file_type_file )
+						{
+							fs::path    dir     = entry.file.path.parent_path();
+							std::string dir_str = sys_path_to_string( dir );
+
+							ImGui::TextUnformatted( dir_str.c_str() );
+							ImGui::Separator();
+						}
+
 						ImGui::TextUnformatted( entry.filename.c_str() );
+
 						ImGui::PopTextWrapPos();
 
 						ImGui::Separator();
 
 						// CONFIG_TODO
-						if ( entry.file.size < 1000000 )
+						if ( entry.file.type & e_file_type_file )
 						{
-							ImGui::Text( "Size: %.3f KB", (float)entry.file.size / ( STORAGE_SCALE ) );
-						}
-						else
-						{
-							ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
+							if ( entry.file.size < 1000000 )
+							{
+								ImGui::Text( "Size: %.3f KB", (float)entry.file.size / ( STORAGE_SCALE ) );
+							}
+							else
+							{
+								ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
+							}
 						}
 
 						char date_created[ DATE_TIME_BUFFER ]{};
@@ -854,21 +890,21 @@ void gallery_view_draw_sidebar()
 						ImGui::Text( "Date Created: %s", date_created );
 						ImGui::Text( "Date Modified: %s", date_mod );
 
-						if ( get_media_type() == e_media_type_directory )
+						if ( entry.type == e_media_type_directory )
 						{
 							ImGui::TextUnformatted( "Type: Folder" );
 						}
-						else if ( get_media_type() == e_media_type_image )
+						else if ( entry.type == e_media_type_image )
 						{
 							ImGui::TextUnformatted( "Type: Image" );
 						}
-						else if ( get_media_type() == e_media_type_video )
+						else if ( entry.type == e_media_type_video )
 						{
 							ImGui::TextUnformatted( "Type: Video" );
 						}
 
 						// unsure what i want to do with this for the long term, but for now, im gonna have this be here
-						if ( entry.filename.starts_with( "[twitter]" ) )
+						if ( entry.file.type & e_file_type_file && entry.filename.starts_with( "[twitter]" ) )
 						{
 							// if it's a twitter url, construct the original url from the post
 							const char* start = entry.filename.c_str();
@@ -1009,6 +1045,7 @@ void gallery_view_draw_sidebar()
 			if ( ImGui::Checkbox( "Gallery - Show Filenames", &app::config.gallery_show_filenames ) )
 			{
 				gallery_view_reset_text_size();
+				gallery_view_scroll_to_cursor();
 			}
 
 			ImGui::Checkbox( "Always Draw", &app::config.always_draw );

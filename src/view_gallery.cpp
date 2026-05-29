@@ -30,6 +30,10 @@ namespace gallery
 	bool                          scroll_to_cursor   = false;
 
 	u32                           drawn_image_count  = 0;
+	u32                           first_visible_item = 0;
+
+	// Quick Filter
+	e_gallery_filter              filter{};
 
 	// Files selected in the gallery view
 	std::vector< selection_t >    selection{};
@@ -147,12 +151,27 @@ void gallery_view_input_update_multi_select( u32 index, bool readd = true )
 }
 
 
-u32 gallery_view_get_last_selected()
+selection_t gallery_view_get_last_selected()
+{
+	if ( gallery::selection.empty() )
+		return {};
+
+	return gallery::selection.back();
+}
+
+
+u32 gallery_view_get_last_selected_index()
 {
 	if ( gallery::selection.empty() )
 		return 0;
 
 	return gallery::selection.back().index;
+}
+
+
+bool gallery_view_selection_cleared()
+{
+	return ( gallery::selection.empty() && gallery::last_selection.entry.type == e_media_type_none );
 }
 
 
@@ -213,7 +232,7 @@ void gallery_view_clear_selection()
 
 void gallery_view_input()
 {
-	u32  selection = gallery_view_get_last_selected();
+	u32  selection = gallery_view_get_last_selected_index();
 	bool empty     = gallery::selection.empty();
 
 	if ( empty && gallery::last_selection.entry.type != e_media_type_none )
@@ -451,6 +470,20 @@ void gallery_view_sort_dir()
 	// Split up lists
 	for ( size_t i = 0; i < directory::media_list.size(); i++ )
 	{
+		e_media_type type = directory::media_list[ i ].type;
+
+		if ( gallery::filter )
+		{
+			if ( type == e_media_type_directory && !( gallery::filter & e_gallery_filter_folders ) )
+				continue;
+
+			if ( type == e_media_type_image && !( gallery::filter & e_gallery_filter_images ) )
+				continue;
+
+			if ( type == e_media_type_video && !( gallery::filter & e_gallery_filter_videos ) )
+				continue;
+		}
+
 		//if ( g_do_search )
 		if ( search_len )
 		{
@@ -461,9 +494,8 @@ void gallery_view_sort_dir()
 				continue;
 		}
 
-		if ( directory::media_list[ i ].type == e_media_type_directory )
+		if ( type == e_media_type_directory )
 			folders.push_back( i );
-
 		else
 			files.push_back( i );
 	}
@@ -483,41 +515,47 @@ void gallery_view_sort_dir()
 	// Add Files next
 	std::copy( files.begin(), files.end(), gallery::sorted_media.begin() + folders.size() );
 	
-#if 0
+#if 1
 	// Find Selected File
-	if ( !g_selected_item_cache.file.path.empty() )
+	if ( !gallery::selection.empty() )
 	{
+		// make a copy of this
+		std::vector< selection_t > selection_copy( gallery::selection );
+
+		gallery_view_clear_selection();
+
 		size_t i = 0;
 		for ( ; i < gallery::sorted_media.size(); i++ )
 		{
+			if ( selection_copy.empty() )
+				break;
+
 			const file_t& file = gallery_item_get_file( i );
 
-			if ( g_selected_item_cache.file != file )
-				continue;
+			for ( size_t s = 0; s < selection_copy.size(); s++ )
+			{
+				if ( selection_copy[ s ].entry.file != file )
+					continue;
 
-			gallery::cursor = i;
-			gallery_view_scroll_to_cursor();
-			break;
-		}
+				selection_t selection{
+					.index = (u32)i,
+					.entry = gallery_item_get_media_entry( i ),
+				};
 
-		if ( i == gallery::sorted_media.size() )
-		{
-			g_selected_item_cache.file = {};
-			g_selected_item_cache.type = e_media_type_none;
-			g_selected_item_cache.filename.clear();
+				gallery::selection.push_back( selection );
+				gallery::last_selection = selection;
 
-			// if ( gallery::cursor > 0 )
-			// 	gallery::cursor--;
+				selection_copy.erase( selection_copy.begin() + s );
+				gallery_view_scroll_to_cursor();
+				break;
+			}
 		}
 	}
 #endif
 
-	gallery_view_clear_selection();
+	gallery_view_scroll_to_cursor();
 
 	gallery_view_reset_text_size();
-
-	//if ( g_do_search )
-	//	g_do_search = false;
 
 	update_window_title();
 }
@@ -640,7 +678,7 @@ void gallery_view_context_menu()
 void gallery_view_reset_text_size()
 {
 	gallery::item_size_changed = true;
-	gallery_view_scroll_to_cursor();
+	// gallery_view_scroll_to_cursor();
 
 	gallery::item_text_size.clear();
 	gallery::item_text_size.resize( gallery::sorted_media.size() );
@@ -691,7 +729,7 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 im
 
 
 // called when file is double clicked or enter is pressed on it
-void gallery_selected_item_action( const media_entry_t& media )
+void gallery_selected_item_action( const media_entry_t& media, u32 index )
 {
 	if ( media.type == e_media_type_directory )
 	{
@@ -699,6 +737,7 @@ void gallery_selected_item_action( const media_entry_t& media )
 	}
 	else
 	{
+		g_image_data.index = index;
 		set_view_type_media();
 	}
 }
@@ -745,7 +784,7 @@ void gallery_view_draw_content()
 		return;
 	}
 
-	bool   content_area_hovered = false;
+	bool content_area_hovered = false;
 
 	{
 		ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
@@ -782,9 +821,16 @@ void gallery_view_draw_content()
 
 	// ScrollToBringRectIntoView
 
-	int region_x       = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
+	int        region_x       = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
 
-	gallery::row_count = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
+	static u32 last_row_count = 0;
+	last_row_count = gallery::row_count;
+
+	gallery::row_count        = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
+
+	if ( last_row_count != gallery::row_count )
+		gallery_view_scroll_to_cursor();
+		//printf( "row count change\n" );
 
 	// float item_size_x  = gallery::item_size - style.ItemSpacing.x;
 	float item_size_x  = gallery::item_size;
@@ -832,13 +878,15 @@ void gallery_view_draw_content()
 			set_frame_draw( 2 );
 		}
 
-		if ( app::window_resized )
-		{
-			float scroll_diff = fmod( scroll, scroll_amount );
-
-			if ( scroll_diff > 0 )
-				scroll -= scroll_diff;
-		}
+		// what did this code even do?
+		// if we're resizing the window, this is NEVER triggered unless we shrink from the sides, causing the mouse to be in the window
+		//if ( app::window_resized )
+		//{
+		//	float scroll_diff = fmod( scroll, scroll_amount );
+		//
+		//	if ( scroll_diff > 0 )
+		//		scroll -= scroll_diff;
+		//}
 
 		ImGui::SetScrollY( scroll );
 	}
@@ -871,6 +919,13 @@ void gallery_view_draw_content()
 	static h_thumbnail icons_scaled[ e_icon_count ]{};
 
 	gallery::drawn_image_count = 0;
+	u32 first_visible_item     = gallery::first_visible_item;
+
+	if ( !app::window_resized )
+		gallery::first_visible_item = UINT32_MAX;
+
+	static bool cache_do_multi_select         = false;
+	static bool click_cache_was_item_selected = false;
 
 	// ----------------------------------------------------------------------------------------------------------
 
@@ -951,9 +1006,32 @@ void gallery_view_draw_content()
 		// If we need to scroll to the selected item this frame
 		// adjust the scroll position as needed to keep it on screen
 
-		u32 last_selected = gallery_view_get_last_selected();
+		u32  last_selected       = gallery_view_get_last_selected_index();
+		// bool selection_empty = gallery_view_selection_cleared();
 
-		if ( last_selected == i && gallery::scroll_to_cursor )
+		u32  cache_last_selected = gallery::last_selection.index;
+		u32  scroll_to_index     = UINT32_MAX;
+		bool row_count_changed   = last_row_count != gallery::row_count;
+
+		if ( gallery::selection.size() )
+		{
+			scroll_to_index = last_selected;
+		}
+		else if ( app::window_resized && row_count_changed )
+		{
+			scroll_to_index = first_visible_item;
+		}
+		else if ( gallery::scroll_to_cursor )
+		{
+			// scroll to top
+			ImGui::SetScrollY( 0 );
+			gallery::scroll_to_cursor = false;
+			set_frame_draw( 2 );
+		}
+
+		// if ( gallery::selection.size() && last_selected == i && gallery::scroll_to_cursor )
+		if ( scroll_to_index == i && gallery::scroll_to_cursor )
+		// if ( gallery::last_selection.entry.type != e_media_type_none && cache_last_selected == i && gallery::scroll_to_cursor )
 		{
 			bool   scroll_needed  = false;
 			bool   scroll_up      = false;
@@ -987,6 +1065,7 @@ void gallery_view_draw_content()
 				ImGui::SetScrollY( ImGui::GetScrollY() + scroll_offset );
 			}
 
+			gallery::scroll_to_cursor = false;
 			set_frame_draw( 2 );
 		}
 
@@ -1005,6 +1084,10 @@ void gallery_view_draw_content()
 
 		// ----------------------------------------------------------------------------------------------------------
 		// Item is Visible on screen, draw selection/hover background if needed
+
+		// if ( gallery::first_visible_item == UINT32_MAX || last_row_count > gallery::row_count )
+		if ( gallery::first_visible_item == UINT32_MAX )
+			gallery::first_visible_item = i;
 
 		ImVec2 window_pos = ImGui::GetWindowPos();
 
@@ -1049,21 +1132,27 @@ void gallery_view_draw_content()
 		if ( selected_item || item_hovered )
 		{
 			// why is this not using Active color?
-			ImColor main_bg_color     = item_hovered ? style.Colors[ ImGuiCol_FrameBgHovered ] : style.Colors[ ImGuiCol_FrameBg ];
-			ImColor main_border_color = style.Colors[ ImGuiCol_Border ];
+			ImColor color_base   = style.Colors[ ImGuiCol_FrameBg ];
+			ImColor color_hover  = style.Colors[ ImGuiCol_FrameBgHovered ];
+			ImColor color_active = style.Colors[ ImGuiCol_FrameBgActive ];
+			ImColor color_border = style.Colors[ ImGuiCol_Border ];
 
-			draw_list->AddRectFilled( window_cursor_pos, global_item_size, main_bg_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
+			ImColor color        = color_base;
+
+			if ( item_hovered )
+				color = selected_item ? color_active : color_hover;
+
+			draw_list->AddRectFilled( window_cursor_pos, global_item_size, color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
 
 			// if ( style.FrameBorderSize )
-				draw_list->AddRect( window_cursor_pos, global_item_size, main_border_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
+			draw_list->AddRect( window_cursor_pos, global_item_size, color_border, style.ChildRounding, ImDrawFlags_RoundCornersAll );
 		}
 
-		if ( gallery::last_selection.entry.type != e_media_type_none && gallery::last_selection.index == i )
+		if ( !selected_item && gallery::last_selection.entry.type != e_media_type_none && gallery::last_selection.index == i )
 		{
 			// why is this not using Active color?
-			ImColor main_bg_color     = item_hovered ? style.Colors[ ImGuiCol_FrameBgHovered ] : style.Colors[ ImGuiCol_FrameBg ];
-			ImColor main_border_color = style.Colors[ ImGuiCol_Border ];
-
+			// ImColor main_bg_color     = item_hovered ? style.Colors[ ImGuiCol_FrameBgHovered ] : style.Colors[ ImGuiCol_FrameBg ];
+			ImColor main_bg_color     = style.Colors[ ImGuiCol_FrameBg ];
 			draw_list->AddRect( window_cursor_pos, global_item_size, main_bg_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
 		}
 
@@ -1080,6 +1169,7 @@ void gallery_view_draw_content()
 		// Draw Thumbnail or Icon
 
 		ImVec2 scaled_image_size{};
+		bool   drew_base_icon = false;
 
 		if ( media.type == e_media_type_directory )
 		{
@@ -1093,6 +1183,15 @@ void gallery_view_draw_content()
 		else
 		{
 			thumbnail_t* thumbnail = thumbnail_get_data( directory::thumbnail_list[ gallery_index ] );
+
+			e_icon       base_icon = e_icon_none;
+
+			if ( media.type == e_media_type_directory )
+				base_icon = e_icon_folder;
+			else if ( media.type == e_media_type_image )
+				base_icon = e_icon_image;
+			else if ( media.type == e_media_type_video )
+				base_icon = e_icon_video;
 
 			if ( thumbnail )
 			{
@@ -1119,12 +1218,14 @@ void gallery_view_draw_content()
 						thumbnail_requests.emplace_back( media, gallery_index );
 
 					// ImGui::Dummy( image_bounds );
-					gallery_view_draw_image( icon_get_image( e_icon_image ), icon_get_imtexture( e_icon_image ), image_bounds, true, scaled_image_size );
+					gallery_view_draw_image( icon_get_image( base_icon ), icon_get_imtexture( base_icon ), image_bounds, true, scaled_image_size );
+					drew_base_icon = true;
 				}
 				else  // if ( thumbnail->status == e_thumbnail_status_free )
 				{
 					//ImGui::Dummy( image_bounds );
-					gallery_view_draw_image( icon_get_image( e_icon_image ), icon_get_imtexture( e_icon_image ), image_bounds, true, scaled_image_size );
+					gallery_view_draw_image( icon_get_image( base_icon ), icon_get_imtexture( base_icon ), image_bounds, true, scaled_image_size );
+					drew_base_icon = true;
 				}
 			}
 			else
@@ -1134,14 +1235,15 @@ void gallery_view_draw_content()
 				// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 				//ImGui::Dummy( image_bounds );
-				gallery_view_draw_image( icon_get_image( e_icon_image ), icon_get_imtexture( e_icon_image ), image_bounds, true, scaled_image_size );
+				gallery_view_draw_image( icon_get_image( base_icon ), icon_get_imtexture( base_icon ), image_bounds, true, scaled_image_size );
+				drew_base_icon = true;
 			}
 		}
 
 		// ----------------------------------------------------------------------------------------------------------
 		// Draw icon on top of it in the bottom right corner
 
-		if ( media.type == e_media_type_video )
+		if ( media.type == e_media_type_video && !drew_base_icon )
 		{
 			// Fit image in window size, scaling up if needed
 			float    factor[ 2 ] = { 1.f, 1.f };
@@ -1279,29 +1381,45 @@ void gallery_view_draw_content()
 
 		if ( item_hovered )
 		{
-			if ( mouse_release && gallery::selection.size() > 1 )
+			// if ( mouse_release && gallery::selection.size() > 1 )
+			if ( mouse_release )
 			{
-				gallery_view_input_check_clear_multi_select();
-
-				if ( !gallery_view_input_do_multi_select() )
-					gallery_view_input_update_multi_select( i, false );
-			}
-
-			if ( mouse_press )
-			{
-				if ( !gallery_view_input_do_multi_select() )
-					gallery::selection.clear();
-
-				gallery_view_input_update_multi_select( i, false );
-
 				// the item may be a bit out of frame, scroll a little to have it fully in view
 				scroll_queued = true;
+
+				if ( gallery_view_input_do_multi_select() )
+				{
+					// if we want multi select, remove or add the item from selection list
+					gallery_view_input_update_multi_select( i, false );
+				}
+				else if ( selected_item )
+				{
+					// if the item is already selected, but we DONT want multi select, clear the selection list, add readd that the selected item
+					gallery::selection.clear();
+					gallery_view_input_update_multi_select( i, false );
+				}
+			}
+
+			if ( mouse_press && !selected_item )
+			{
+				if ( !gallery_view_input_do_multi_select() )
+				{
+					gallery::selection.clear();
+					gallery_view_input_update_multi_select( i, false );
+
+					// the item may be a bit out of frame, scroll a little to have it fully in view
+					scroll_queued = true;
+				}
 			}
 
 			if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
 			{
-				gallery_selected_item_action( media );
+				gallery_selected_item_action( media, i );
 			}
+		}
+		else
+		{
+			// click_cache_was_item_selected = false;
 		}
 
 		grid_pos_x++;
@@ -1321,8 +1439,8 @@ void gallery_view_draw_content()
 
 	// ----------------------------------------------------------------------------------------------------------
 
-	// if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, ImGui::GetWindowHeight() } ) && !any_item_hovered )
-	if ( ImGui::IsMouseHoveringRect( end_window_pos, end_window_size_pos ) && !any_item_hovered )
+	// if ( ImGui::IsMouseHoveringRect( end_window_pos, end_window_size_pos ) && !any_item_hovered && content_area_hovered )
+	if ( !any_item_hovered && content_area_hovered )
 	// if ( ImGui::IsWindowHovered() && !any_item_hovered )
 	{
 		if ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
@@ -1337,9 +1455,17 @@ void gallery_view_draw_content()
 		gallery_view_clear_selection();
 	}
 
-	if ( !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) )
+	if ( !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) && gallery::sorted_media.size() )
 	{
-		gallery_selected_item_action( gallery_view_get_last_selected_entry() );
+		if ( gallery::last_selection.entry.type != e_media_type_none )
+		{
+			gallery_selected_item_action( gallery::last_selection.entry, gallery::last_selection.index );
+		}
+		else
+		{
+			const media_entry_t& entry = gallery_item_get_media_entry( 0 );
+			gallery_selected_item_action( entry, 0 );
+		}
 	}
 	
 	// printf( "IMAGE COUNT: %d\n", image_visible_count );
@@ -1347,7 +1473,7 @@ void gallery_view_draw_content()
 	for ( size_t i = 0; i < thumbnail_requests.size(); i++ )
 		directory::thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_loader_queue_push( thumbnail_requests[ i ].media );
 
-	gallery::scroll_to_cursor  = false | scroll_queued;
+	gallery::scroll_to_cursor  = scroll_queued;
 	gallery::item_size_changed = false;
 
 	// ImGui::PopStyleColor();
