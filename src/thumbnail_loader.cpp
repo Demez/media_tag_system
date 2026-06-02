@@ -877,6 +877,12 @@ void thumbnail_loader_shutdown()
 	g_thumbnail_thread_data = nullptr;
 	g_thumbnail_save_worker = nullptr;
 	g_thumbnail_worker      = nullptr;
+
+	// Free thumbnails
+	for ( u32 i = 0; i < MAX_THUMBNAILS; i++ )
+	{
+		thumbnail_loader_free_data( i );
+	}
 }
 
 

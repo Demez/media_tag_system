@@ -890,16 +890,36 @@ bool sys_recycle_file( const char* path )
 }
 
 
-void sys_open_file_properties( const char* file )
+void sys_open_file_properties( const std::vector< fs::path >& files )
 {
-	wchar_t* path_w = sys_to_wchar( file );
+	if ( files.empty() )
+		return;
 
-	if ( !SHObjectProperties( 0, SHOP_FILEPATH, path_w, NULL ) )
+	if ( files.size() == 1 )
 	{
-		wprintf( L"Failed to open File Properties for file: %s\n", path_w );
+		if ( !SHObjectProperties( 0, SHOP_FILEPATH, files[ 0 ].c_str(), NULL ) )
+		{
+			wprintf( L"Failed to open File Properties for file: %s\n", files[ 0 ].c_str() );
+			sys_print_last_error();
+		}
 	}
+	else
+	{
+		IDataObject* data_obj = nullptr;
+		if ( !sys_get_data_obj_for_files( files, data_obj ) )
+		{
+			wprintf( L"Failed to open File Properties for files\n" );
+			sys_print_last_error();
+			return;
+		}
 
-	ch_free_str( path_w );
+		if ( FAILED( SHMultiFileProperties( data_obj, 0 ) ) )
+		{
+			wprintf( L"Failed to open File Properties for files\n" );
+			sys_print_last_error();
+			return;
+		}
+	}
 }
 
 
@@ -934,6 +954,79 @@ void sys_browse_to_file( const char* path )
 	}
 
 	ch_free_str( path_w );
+}
+
+
+void sys_browse_to_path( const fs::path& path )
+{
+	if ( path.empty() )
+		return;
+
+	PIDLIST_ABSOLUTE root_folder_pidl{};
+
+	// NOTE: windows documentation says this function should be called in a background thread, oops lol
+	HRESULT          hr = SHParseDisplayName( path.c_str(), nullptr, &root_folder_pidl, 0, nullptr );
+
+	if ( FAILED( hr ) )
+		return;
+
+	SHOpenFolderAndSelectItems( root_folder_pidl, 0, 0, 0 );
+	CoTaskMemFree( root_folder_pidl );
+}
+
+
+void sys_browse_to_files( const fs::path& root, const std::vector< fs::path > paths )
+{
+	if ( paths.empty() )
+		return;
+
+	// NOTE: App should only submit ones in the same folder, it does a check before hand
+
+	//std::vector< PIDLIST_ABSOLUTE > absolute_pidls{};
+	std::vector< PCUITEMID_CHILD > child_pidls{};
+
+	//absolute_pidls.reserve( paths.size() );
+	child_pidls.reserve( paths.size() );
+
+	PIDLIST_ABSOLUTE root_folder_pidl{};
+
+	// NOTE: windows documentation says this function should be called in a background thread, oops lol
+	HRESULT          hr = SHParseDisplayName( root.c_str(), nullptr, &root_folder_pidl, 0, nullptr );
+
+	if ( FAILED( hr ) )
+		goto end;
+
+	for ( const auto& path : paths )
+	{
+		PIDLIST_ABSOLUTE pidl = nullptr;
+		HRESULT          hr   = SHParseDisplayName( path.c_str(), nullptr, &pidl, 0, nullptr );
+
+		if ( SUCCEEDED( hr ) && pidl )
+		{
+			// store this to free it later
+			//absolute_pidls.push_back( pidl );
+
+			// same as absolute since desktop is root here
+			child_pidls.push_back( reinterpret_cast< PCUITEMID_CHILD >( pidl ) );
+		}
+		else
+		{
+			goto end;
+		}
+	}
+
+	if ( !child_pidls.empty() )
+	{
+		hr = SHOpenFolderAndSelectItems( root_folder_pidl, static_cast< UINT >( child_pidls.size() ), (PCUITEMID_CHILD_ARRAY)child_pidls.data(), 0 );
+	}
+
+end:
+	for ( auto pidl : child_pidls )
+		CoTaskMemFree( (PIDLIST_ABSOLUTE)pidl );
+
+	// absolute_pidls.clear();
+	child_pidls.clear();
+	CoTaskMemFree( root_folder_pidl );
 }
 
 

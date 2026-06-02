@@ -424,7 +424,7 @@ bool sys_recycle_file( const char* path )
 }
 
 
-void sys_open_file_properties( const char* file )
+void sys_open_file_properties( const std::vector< fs::path >& files )
 {
 	// not possible to implement on linux
 	// dolphin doesn't expose a way to open file properties
@@ -447,6 +447,7 @@ bool sys_copy_to_clipboard( const std::vector< fs::path >& files )
 	if ( files.empty() )
 		return false;
 
+	// TODO: Copy all files, not just the first one
 	std::string path      = files[ 0 ].string();
 
 	const char* mime_type = "text/uri-list";
@@ -463,9 +464,10 @@ bool sys_copy_to_clipboard( const std::vector< fs::path >& files )
 }
 
 
-void sys_browse_to_file( const char* path )
+// simpiler version of sys_browse_to_files, one file or folder
+void sys_browse_to_path( const fs::path& path )
 {
-	if ( !path )
+	if ( path.empty() )
 		return;
 
 	// Check if we have xdg-open
@@ -474,7 +476,7 @@ void sys_browse_to_file( const char* path )
 	if ( xdg_check == 0 )
 	{
 		char buffer[ 1024 ]{};
-		snprintf( buffer, 1024, "xdg-open %s", path );
+		snprintf( buffer, 1024, "xdg-open %s", path.c_str() );
 		sys_execute( buffer );
 		return;
 	}
@@ -485,12 +487,17 @@ void sys_browse_to_file( const char* path )
 	if ( gio_check == 0 )
 	{
 		char buffer[ 1024 ]{};
-		snprintf( buffer, 1024, "gio open %s", path );
+		snprintf( buffer, 1024, "gio open %s", path.c_str() );
 		sys_execute( buffer );
 		return;
 	}
 
 	printf( "Failed to browse to file, could not find terminal tools xdg-open or gio!\n" );
+}
+
+
+void sys_browse_to_files( const fs::path& root, const std::vector< fs::path > paths )
+{
 }
 
 

@@ -399,7 +399,7 @@ namespace app
 	extern ImVec2       mouse_delta;
 	extern ImVec2       mouse_pos;
 	extern int          mouse_scroll;
-	extern bool         mouse_middle_press;
+	extern bool         mouse_in_window;
 
 	// extern ImVec4       clear_color;
 
@@ -437,6 +437,7 @@ namespace directory
 	extern size_t                        folder_history_pos;
 
 	extern bool                          folder_reload;
+	extern bool                          folder_changed;
 	extern bool                          recursive;
 }
 
@@ -460,6 +461,7 @@ namespace gallery
 	extern u32                           item_size_min;
 	extern u32                           item_size_max;
 	extern bool                          item_size_changed;
+	extern bool                          item_size_changing;
 	extern std::vector< ImVec2 >         item_text_size;
 
 	extern u32                           image_size;
@@ -531,6 +533,7 @@ void                                 media_view_fit_in_view( bool adjust_zoom = 
 void                                 media_view_zoom_reset();
 void                                 media_view_scale_reset_timer();
 
+// media_entry_t                        gallery_item_get_media_entry( size_t index );
 const media_entry_t&                 gallery_item_get_media_entry( size_t index );
 const file_t&                        gallery_item_get_file( size_t index );
 const fs::path&                      gallery_item_get_path( size_t index );
@@ -546,7 +549,7 @@ void                                 gallery_view_reset_text_size();
 void                                 gallery_view_set_selection( size_t gallery_item_index );
 void                                 gallery_view_clear_selection();
 selection_t                          gallery_view_get_last_selected();
-u32                                  gallery_view_get_last_selected_index();
+u32                                  gallery_view_get_last_selected_index( u32 empty_return = 0 );  // returns empty_return if selection is empty
 media_entry_t                        gallery_view_get_last_selected_entry();
 
 void                                 media_history_add( const std::string& entry );

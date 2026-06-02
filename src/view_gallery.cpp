@@ -16,11 +16,12 @@ namespace gallery
 	e_gallery_sort_mode           sort_mode         = e_gallery_sort_mode_date_mod_new_to_old;
 	bool                          sort_mode_update  = false;
 
-	u32                           row_count         = 0;
-	u32                           item_size         = 150;
-	u32                           item_size_min     = 70;
-	u32                           item_size_max     = 600;
-	bool                          item_size_changed = true;
+	u32                           row_count          = 0;
+	u32                           item_size          = 150;
+	u32                           item_size_min      = 70;
+	u32                           item_size_max      = 600;
+	bool                          item_size_changed  = true;
+	bool                          item_size_changing = false;
 	std::vector< ImVec2 >         item_text_size;
 
 	u32                           image_size         = item_size;
@@ -70,10 +71,13 @@ void                 sidebar_draw_filesystem();
 // =============================================================================================
 
 
+static const media_entry_t __media_entry_empty{};
+
+
 const media_entry_t& gallery_item_get_media_entry( size_t index )
 {
 	if ( index >= gallery::sorted_media.size() )
-		return {};
+		return __media_entry_empty;
 
 	return directory::media_list[ gallery::sorted_media[ index ] ];
 }
@@ -81,19 +85,22 @@ const media_entry_t& gallery_item_get_media_entry( size_t index )
 
 const file_t& gallery_item_get_file( size_t index )
 {
-	return gallery_item_get_media_entry( index ).file;
+	const media_entry_t& entry = gallery_item_get_media_entry( index );
+	return entry.file;
 }
 
 
 const fs::path& gallery_item_get_path( size_t index )
 {
-	return gallery_item_get_media_entry( index ).file.path;
+	const media_entry_t& entry = gallery_item_get_media_entry( index );
+	return entry.file.path;
 }
 
 
 std::string gallery_item_get_path_string( size_t index )
 {
-	return gallery_item_get_media_entry( index ).file.path.string();
+	const media_entry_t& entry = gallery_item_get_media_entry( index );
+	return sys_path_to_string( entry.file.path );
 }
 
 
@@ -143,11 +150,6 @@ void gallery_view_input_update_multi_select( u32 index, bool readd = true )
 
 	gallery::selection.push_back( selection );
 	gallery::last_selection = selection;
-
-	// if ( ImGui::IsKeyDown( ImGuiKey_LeftShift ) )
-	// {
-	// 	gallery::selection.push_back( gallery::cursor );
-	// }
 }
 
 
@@ -160,10 +162,10 @@ selection_t gallery_view_get_last_selected()
 }
 
 
-u32 gallery_view_get_last_selected_index()
+u32 gallery_view_get_last_selected_index( u32 empty_return )
 {
 	if ( gallery::selection.empty() )
-		return 0;
+		return empty_return;
 
 	return gallery::selection.back().index;
 }
@@ -564,6 +566,21 @@ void gallery_view_sort_dir()
 // =============================================================================================
 
 
+// called when file is double clicked or enter is pressed on it
+void gallery_selected_item_action( const media_entry_t& media, u32 index )
+{
+	if ( media.type == e_media_type_directory )
+	{
+		directory::queued = media.file.path;
+	}
+	else
+	{
+		g_image_data.index = index;
+		set_view_type_media();
+	}
+}
+
+
 void gallery_view_dir_change( bool keep_selection )
 {
 	gallery_view_update_header_directory();
@@ -602,16 +619,74 @@ void gallery_view_context_menu()
 	// if ( !ImGui::BeginPopup( "##gallery ctx menu" ) )
 	// 	return;
 
-	if ( !ImGui::BeginPopupContextVoid( "##gallery ctx menu", ImGuiPopupFlags_AnyPopup ) )
+	if ( !ImGui::BeginPopupContextWindow( "##gallery ctx menu", ImGuiPopupFlags_AnyPopup | ImGuiPopupFlags_MouseButtonRight ) )
 	 	return;
 
-	ImGuiStyle& style        = ImGui::GetStyle();
-	ImVec2      region_avail = ImGui::GetContentRegionAvail();
+	ImGuiStyle&   style               = ImGui::GetStyle();
+	ImVec2        region_avail        = ImGui::GetContentRegionAvail();
 
-	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
+	u32           last_selected       = gallery_view_get_last_selected_index( UINT32_MAX );
+	media_entry_t media_entry         = gallery_view_get_last_selected_entry();
+
+	bool          folder              = last_selected == UINT32_MAX;
+
+	// make sure we have at least ONE image here, or this gets stuck and hangs forever lol
+	bool          valid               = false;
+	for ( size_t i : gallery::sorted_media )
 	{
-		//sys_browse_to_file( gallery_item_get_path_string( gallery::cursor ).c_str() );
-		//ctx_open = false;
+		const media_entry_t& entry = directory::media_list[ i ];
+
+		if ( entry.type == e_media_type_image || entry.type == e_media_type_video )
+		{
+			valid = true;
+			break;
+		}
+	}
+
+	if ( ImGui::MenuItem( "View", nullptr, false, valid ) )
+	{
+
+		if ( valid )
+			gallery_selected_item_action( media_entry, folder ? 0 : last_selected );
+	}
+
+	ImGui::Separator();
+
+	if ( ImGui::MenuItem( folder ? "Open Folder" : "Open File Location", nullptr, false, true ) )
+	{
+		if ( folder )
+		{
+			// Open folder
+			sys_browse_to_path( directory::path );
+		}
+		else
+		{
+			// Open folder and select files
+			std::vector< fs::path > paths;
+			fs::path                base_path = directory::path;
+
+			if ( directory::recursive )
+				base_path = media_entry.file.path.parent_path();
+
+			for ( selection_t& selection : gallery::selection )
+			{
+				if ( directory::recursive )
+				{
+					fs::path::string_type base_path_str   = base_path.native();
+					fs::path::string_type path_str        = selection.entry.file.path.native();
+					fs::path::string_type path_parent_str = selection.entry.file.path.parent_path().native();
+
+					if ( base_path == path_parent_str )
+						paths.push_back( selection.entry.file.path );
+				}
+				else
+				{
+					paths.push_back( selection.entry.file.path );
+				}
+			}
+
+			sys_browse_to_files( base_path, paths );
+		}
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -649,14 +724,24 @@ void gallery_view_context_menu()
 		//ImageView_DeleteImage();
 	}
 
-	if ( ImGui::MenuItem( "File Info", nullptr, false, false ) )
-	{
-	}
-
-	if ( ImGui::MenuItem( "File Properties", nullptr, false, 0 ) )
+	if ( ImGui::MenuItem( folder ? "Folder Properties" : "File Properties" ) )
 	{
 		// TODO: create our own imgui file properties for more info
-		// Plat_OpenFileProperties( ImageView_GetImagePath() );
+		if ( folder )
+		{
+			sys_open_file_properties( { directory::path } );
+		}
+		else
+		{
+			std::vector< fs::path > paths;
+
+			for ( selection_t& selection : gallery::selection )
+			{
+				paths.push_back( selection.entry.file.path );
+			}
+
+			sys_open_file_properties( paths );
+		}
 	}
 
 	if ( ImGui::MenuItem( "Reload Folder", nullptr, false ) )
@@ -677,7 +762,7 @@ void gallery_view_context_menu()
 
 void gallery_view_reset_text_size()
 {
-	gallery::item_size_changed = true;
+	gallery::item_size_changed  = true;
 	// gallery_view_scroll_to_cursor();
 
 	gallery::item_text_size.clear();
@@ -725,21 +810,6 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, ImVec2 im
 	}
 
 	ImGui::Image( im_texture, image_size );
-}
-
-
-// called when file is double clicked or enter is pressed on it
-void gallery_selected_item_action( const media_entry_t& media, u32 index )
-{
-	if ( media.type == e_media_type_directory )
-	{
-		directory::queued = media.file.path;
-	}
-	else
-	{
-		g_image_data.index = index;
-		set_view_type_media();
-	}
 }
 
 
@@ -878,16 +948,6 @@ void gallery_view_draw_content()
 			set_frame_draw( 2 );
 		}
 
-		// what did this code even do?
-		// if we're resizing the window, this is NEVER triggered unless we shrink from the sides, causing the mouse to be in the window
-		//if ( app::window_resized )
-		//{
-		//	float scroll_diff = fmod( scroll, scroll_amount );
-		//
-		//	if ( scroll_diff > 0 )
-		//		scroll -= scroll_diff;
-		//}
-
 		ImGui::SetScrollY( scroll );
 	}
 
@@ -905,8 +965,6 @@ void gallery_view_draw_content()
 
 	float         last_max_item_height  = item_size_y;
 
-	ImVec2        controlled_cursor_pos = ImGui::GetCursorPos();
-
 	static size_t last_hovered          = SIZE_MAX;
 	static size_t last_selected         = SIZE_MAX;
 	bool          any_item_hovered      = false;
@@ -914,18 +972,19 @@ void gallery_view_draw_content()
 	if ( gallery::row_count <= 2 )
 		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + item_spacing_x );
 
-	bool scroll_queued = false;
+	bool               scroll_queued        = false;
+	bool               row_count_changed    = last_row_count != gallery::row_count;
+	static bool        filenames_shown_last = app::config.gallery_show_filenames;
 
 	static h_thumbnail icons_scaled[ e_icon_count ]{};
 
 	gallery::drawn_image_count = 0;
 	u32 first_visible_item     = gallery::first_visible_item;
 
-	if ( !app::window_resized )
-		gallery::first_visible_item = UINT32_MAX;
+	bool keep_scroll_pos        = gallery::item_size_changing || ( filenames_shown_last != app::config.gallery_show_filenames );
+	bool lock_visible_item      = keep_scroll_pos || app::window_resized;
 
-	static bool cache_do_multi_select         = false;
-	static bool click_cache_was_item_selected = false;
+	keep_scroll_pos |= ( app::window_resized && row_count_changed );
 
 	// ----------------------------------------------------------------------------------------------------------
 
@@ -1006,26 +1065,24 @@ void gallery_view_draw_content()
 		// If we need to scroll to the selected item this frame
 		// adjust the scroll position as needed to keep it on screen
 
-		u32  last_selected       = gallery_view_get_last_selected_index();
+		u32  last_selected     = gallery_view_get_last_selected_index();
 		// bool selection_empty = gallery_view_selection_cleared();
 
-		u32  cache_last_selected = gallery::last_selection.index;
-		u32  scroll_to_index     = UINT32_MAX;
-		bool row_count_changed   = last_row_count != gallery::row_count;
+		u32  scroll_to_index   = UINT32_MAX;
 
 		if ( gallery::selection.size() )
 		{
 			scroll_to_index = last_selected;
 		}
-		else if ( app::window_resized && row_count_changed )
+		else if ( keep_scroll_pos )
 		{
 			scroll_to_index = first_visible_item;
 		}
-		else if ( gallery::scroll_to_cursor )
+		else if ( directory::folder_changed )
 		{
 			// scroll to top
 			ImGui::SetScrollY( 0 );
-			gallery::scroll_to_cursor = false;
+			//gallery::scroll_to_cursor = false;
 			set_frame_draw( 2 );
 		}
 
@@ -1086,7 +1143,8 @@ void gallery_view_draw_content()
 		// Item is Visible on screen, draw selection/hover background if needed
 
 		// if ( gallery::first_visible_item == UINT32_MAX || last_row_count > gallery::row_count )
-		if ( gallery::first_visible_item == UINT32_MAX )
+		// if ( gallery::first_visible_item == UINT32_MAX )
+		if ( !lock_visible_item )
 			gallery::first_visible_item = i;
 
 		ImVec2 window_pos = ImGui::GetWindowPos();
@@ -1175,11 +1233,6 @@ void gallery_view_draw_content()
 		{
 			gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), image_bounds, true, scaled_image_size );
 		}
-		// videos don't have thumbnail generation yet
-		// else if ( media.type == e_media_type_video )
-		// {
-		// 	gallery_view_draw_image( icon_get_image( e_icon_video ), icon_get_imtexture( e_icon_video ), image_bounds, false );
-		// }
 		else
 		{
 			thumbnail_t* thumbnail = thumbnail_get_data( directory::thumbnail_list[ gallery_index ] );
@@ -1417,10 +1470,6 @@ void gallery_view_draw_content()
 				gallery_selected_item_action( media, i );
 			}
 		}
-		else
-		{
-			// click_cache_was_item_selected = false;
-		}
 
 		grid_pos_x++;
 	}
@@ -1428,6 +1477,8 @@ void gallery_view_draw_content()
 	ImVec2 end_window_pos      = ImGui::GetWindowPos();
 	ImVec2 end_window_size     = ImGui::GetWindowSize();
 	ImVec2 end_window_size_pos = { end_window_pos.x + end_window_size.x, end_window_pos.y + end_window_size.y };
+
+	gallery_view_context_menu();
 
 	ImGui::EndChild();
 
@@ -1468,15 +1519,12 @@ void gallery_view_draw_content()
 		}
 	}
 	
-	// printf( "IMAGE COUNT: %d\n", image_visible_count );
-
 	for ( size_t i = 0; i < thumbnail_requests.size(); i++ )
 		directory::thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_loader_queue_push( thumbnail_requests[ i ].media );
 
 	gallery::scroll_to_cursor  = scroll_queued;
 	gallery::item_size_changed = false;
-
-	// ImGui::PopStyleColor();
+	filenames_shown_last       = app::config.gallery_show_filenames;
 }
 
 
@@ -1539,8 +1587,6 @@ void gallery_view_draw()
 
 	if ( app::config.use_custom_colors )
 		ImGui::PopStyleColor();
-
-	gallery_view_context_menu();
 
 	ImGui::End();
 

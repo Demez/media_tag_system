@@ -30,7 +30,7 @@ namespace app
 	ImVec2       mouse_delta;
 	ImVec2       mouse_pos;
 	int          mouse_scroll       = 0;
-	bool         mouse_middle_press = false;
+	bool         mouse_in_window    = false;
 
 	u32          draw_frame_count   = 0;
 	bool         in_window_drag     = false;
@@ -68,9 +68,11 @@ namespace directory
 	std::vector< fs::path >      folder_history;
 	size_t                       folder_history_pos;
 
-	bool                         folder_reload = false;
-	bool                         recursive     = false;
+	bool                         folder_reload  = false;
+	bool                         folder_changed = false;
+	bool                         recursive      = false;
 }
+
 
 // =================================================================================
 
@@ -444,7 +446,7 @@ void notification_draw( float frame_time )
 }
 
 
-void imgui_draw( float frame_time )
+void imgui_draw( float frame_time, bool render )
 {
 	if ( gallery::sort_mode_update )
 	{
@@ -464,7 +466,7 @@ void imgui_draw( float frame_time )
 
 	notification_draw( frame_time );
 
-	if ( app::draw_frame_count )
+	if ( render )
 		ImGui::Render();
 	else
 		ImGui::EndFrame();
@@ -492,7 +494,7 @@ void set_view_type_gallery()
 	if ( g_gallery_view )
 		return;
 
-	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
+	const media_entry_t& entry = gallery_item_get_media_entry( g_image_data.index );
 
 	// clear mpv
 	// mpv_cmd_loadfile( "" );
@@ -719,7 +721,7 @@ void window_quick_draw()
 
 	frame_draw_start();
 
-	imgui_draw( app::frame_time );
+	imgui_draw( app::frame_time, true );
 
 	media_view_update( app::frame_time );
 
@@ -841,18 +843,25 @@ bool handle_events()
 				break;
 
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
-				app::mouse_middle_press = true;
-				set_frame_draw( 2 );
+				if ( event.button.button == SDL_BUTTON_X1 )
+				{
+					folder_history_nav_prev();
+				}
+				else if ( event.button.button == SDL_BUTTON_X2 )
+				{
+					folder_history_nav_next();
+				}
+
+				set_frame_draw( 1 );
 				break;
 
 			case SDL_EVENT_MOUSE_BUTTON_UP:
-				app::mouse_middle_press = false;
-				set_frame_draw( 2 );
+				set_frame_draw( 1 );
 				break;
 
 			case SDL_EVENT_KEY_DOWN:
 			case SDL_EVENT_KEY_UP:
-				set_frame_draw( 2 );
+				set_frame_draw( 1 );
 				break;
 
 			case SDL_EVENT_MOUSE_WHEEL:
@@ -868,6 +877,14 @@ bool handle_events()
 				app::mouse_delta[ 0 ] += event.motion.xrel;
 				app::mouse_delta[ 1 ] += event.motion.yrel;
 				// set_frame_draw();
+				break;
+
+			case SDL_EVENT_WINDOW_MOUSE_ENTER:
+				app::mouse_in_window = true;
+				break;
+
+			case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+				app::mouse_in_window = false;
 				break;
 
 			#if __unix__
@@ -1067,6 +1084,8 @@ void main_loop()
 			directory::folder_reload = true;
 		}
 
+		directory::folder_changed = false;
+
 		if ( !directory::queued.empty() )
 		{
 			bool is_file = fs_is_file( directory::queued.string().c_str() );
@@ -1079,6 +1098,7 @@ void main_loop()
 
 				if ( path != directory::path || directory::folder_reload )
 				{
+					directory::folder_changed = true;
 					directory::path = path;
 					folder_load_media_list();
 				}
@@ -1088,7 +1108,6 @@ void main_loop()
 					if ( gallery_item_get_path( i ) == directory::queued )
 					{
 						gallery_view_set_selection( i );
-						directory::queued.clear();
 						//media_view_load();
 						set_view_type_media();
 						break;
@@ -1099,6 +1118,7 @@ void main_loop()
 			{
 				if ( directory::queued != directory::path )
 				{
+					directory::folder_changed = true;
 					// gallery_view_clear_selection();
 					directory::path = directory::queued;
 					folder_load_media_list();
@@ -1109,12 +1129,12 @@ void main_loop()
 					folder_load_media_list();
 				}
 
-				directory::queued.clear();
 				// gallery_view_scroll_to_cursor();
 				set_view_type_gallery();
 			}
 
 			directory::folder_reload = false;
+			directory::queued.clear();
 			update_window_title();
 		}
 
@@ -1151,13 +1171,18 @@ void main_loop()
 
 		// -----------------------------------------------------------------------------------
 
+		u32 draw_frame_count = app::draw_frame_count;
+
+		if ( app::draw_frame_count > 0 )
+			app::draw_frame_count--;
+
 		frame_draw_start();
 
-		imgui_draw( time );
+		imgui_draw( time, draw_frame_count );
 
 		media_view_update( time );
 
-		if ( app::draw_frame_count )
+		if ( draw_frame_count )
 		{
 			frame_draw_end();
 
@@ -1171,9 +1196,6 @@ void main_loop()
 
 			g_in_draw = false;
 		}
-
-		if ( app::draw_frame_count > 0 )
-			app::draw_frame_count--;
 
 		if ( app::in_window_drag )
 			sys_do_window_drag( last_mouse_pos, mouse_pos );

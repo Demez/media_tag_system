@@ -150,12 +150,14 @@ bool                    sys_get_drives( std::vector< std::string >& drives );
 bool                    sys_recycle_file( const char* path );
 
 // on windows, this opens the file properties dialog
-void                    sys_open_file_properties( const char* path );
+void                    sys_open_file_properties( const std::vector< fs::path >& files );
 
 bool                    sys_copy_to_clipboard( const std::vector< fs::path >& files );
 
-// NOTE: path cannot be over MAX_PATH (260 characters), thanks windows shell
-void                    sys_browse_to_file( const char* path );
+// simpiler version of sys_browse_to_files, one file or folder
+void                    sys_browse_to_path( const fs::path& path );
+
+void                    sys_browse_to_files( const fs::path& root, const std::vector< fs::path > paths );
 
 // print color with \aFFF escape codes for color values
 //void        sys_print_color( const char* string );

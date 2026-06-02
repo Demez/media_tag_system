@@ -267,6 +267,8 @@ void media_view_shutdown()
 	g_scale_thread->join();
 
 	delete g_scale_thread;
+
+	image_free( g_scale_src );
 }
 
 
@@ -750,7 +752,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
 	{
-		sys_browse_to_file( gallery_item_get_path_string( g_image_data.index ).c_str() );
+		sys_browse_to_path( gallery_item_get_path( g_image_data.index ) );
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -813,7 +815,7 @@ void media_view_context_menu()
 		// TODO: create our own imgui file properties for more info
 		// Plat_OpenFileProperties( ImageView_GetImagePath() );
 
-		sys_open_file_properties( gallery_item_get_path_string( g_image_data.index ).c_str() );
+		sys_open_file_properties( { gallery_item_get_path( g_image_data.index ) } );
 	}
 
 	// TODO: side menu to show information on the image or video overlayed next to the image in a window
@@ -913,6 +915,11 @@ void media_view_input()
 		else if ( ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
 		{
 			media_view_advance( true );
+		}
+
+		if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
+		{
+			set_view_type_gallery();
 		}
 	}
 
@@ -1144,15 +1151,13 @@ advance:
 }
 
 
-void media_view_draw_video_controls()
+void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 {
 	if ( !g_mpv )
 		return;
 
 	//if ( !g_mpv_video_ready )
 	//	return;
-
-	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
 
 	if ( ImGui::IsKeyPressed( ImGuiKey_Space, false ) || ( !mouse_hover_imgui_window && ImGui::IsKeyPressed( ImGuiKey_MouseLeft, false ) ) )
 	{
@@ -1372,10 +1377,8 @@ void media_view_draw_video_controls()
 }
 
 
-void media_view_draw_animated_image_controls()
+void media_view_draw_animated_image_controls( bool mouse_hover_imgui_window )
 {
-	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
-
 	// Seeking
 	if ( !mouse_hover_imgui_window )
 	{
@@ -1515,9 +1518,77 @@ void media_view_draw_animated_image_controls()
 }
 
 
+void media_view_draw_close_button()
+{
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	ImGui::PushFont( font::normal, app::config.font_size * 1.5 );
+
+	// ImVec2 button_pos{
+	// 	width - ( ImGui::GetFrameHeight() + style.WindowPadding.x * 4 ),
+	// 	( style.WindowPadding.x * 4 )
+	// };
+
+	ImVec2 button_pos{
+		width - ( style.WindowPadding.x * 2 ),
+		( style.WindowPadding.y * 2 )
+	};
+
+	// check if mouse in rectangle
+
+	static bool was_drawing_controls = false;
+	ImVec2      play_btn_size        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
+
+	if ( !mouse_in_rect( { button_pos.x - ( ( style.WindowPadding.x * 4 ) + play_btn_size.x ), 0.f }, { (float)width, ( ( style.WindowPadding.y * 6 ) + play_btn_size.y ) } ) )
+	{
+		if ( was_drawing_controls )
+			set_frame_draw();
+	
+		was_drawing_controls = false;
+		ImGui::PopFont();
+		return;
+	}
+	
+	if ( !was_drawing_controls )
+		set_frame_draw();
+	
+	was_drawing_controls = true;
+
+	// ----------------------------------------
+
+	// ImGui::SetNextWindowPos( button_pos, 0, ImVec2( 0.0f, 1.0f ) );
+	ImGui::SetNextWindowPos( button_pos, 0, ImVec2( 1.0f, 0.0f ) );
+	// ImGui::SetNextWindowPos( button_pos );
+
+	//ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, { 0, 0 } );
+	//ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0.f );
+	//ImGui::SetNextWindowBgAlpha( 0.f );
+
+	if ( ImGui::Begin( "##view_close_btn", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBackground ) )
+	{
+		if ( ImGui::Button( "X", play_btn_size ) )
+		{
+			set_view_type_gallery();
+		}
+	}
+
+	//ImGui::PopStyleVar();
+
+	ImGui::End();
+	ImGui::PopFont();
+}
+
+
 void media_view_draw_imgui()
 {
 	media_view_input();
+
+	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
+
+	media_view_draw_close_button();
 
 	if ( g_draw_media_info )
 		media_view_draw_media_info();
@@ -1535,13 +1606,13 @@ void media_view_draw_imgui()
 
 	if ( get_media_type() == e_media_type_video )
 	{
-		media_view_draw_video_controls();
+		media_view_draw_video_controls( mouse_hover_imgui_window );
 	}
 	else
 	{
 		if ( get_media_type() == e_media_type_image && g_image_data.image.frame.size() > 1 )
 		{
-			media_view_draw_animated_image_controls();
+			media_view_draw_animated_image_controls( mouse_hover_imgui_window );
 		}
 
 		if ( g_draw_zoom_level )

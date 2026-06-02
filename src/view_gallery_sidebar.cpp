@@ -101,24 +101,25 @@ static void draw_vertical_separator( ImDrawList* draw_list, ImGuiStyle& style )
 {
 	ImVec2 cursor_pos = ImGui::GetCursorPos();
 
-	if ( style.WindowBorderSize > 0 )
-	{
-		ImColor border_col   = style.Colors[ ImGuiCol_Border ];
-		ImVec2  region_avail = ImGui::GetContentRegionAvail();
-		float  window_height = ImGui::GetWindowHeight();
-
-		ImVec2  line_start   = { cursor_pos.x, 0 };
-		ImVec2  line_end     = cursor_pos;
-
-		// line_start.y -= style.FramePadding.y;
-		line_end.y += window_height + style.FramePadding.y;
-
-		draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
-
-		// ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
-		ImGui::SetCursorPosX( cursor_pos.x + style.WindowBorderSize + style.ItemSpacing.x );
-	}
-	else
+	// TEMP DISABLE
+	//if ( style.WindowBorderSize > 0 )
+	//{
+	//	ImColor border_col   = style.Colors[ ImGuiCol_Border ];
+	//	ImVec2  region_avail = ImGui::GetContentRegionAvail();
+	//	float  window_height = ImGui::GetWindowHeight();
+	//
+	//	ImVec2  line_start   = { cursor_pos.x, 0 };
+	//	ImVec2  line_end     = cursor_pos;
+	//
+	//	// line_start.y -= style.FramePadding.y;
+	//	line_end.y += window_height + style.FramePadding.y;
+	//
+	//	draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
+	//
+	//	// ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
+	//	ImGui::SetCursorPosX( cursor_pos.x + style.WindowBorderSize + style.ItemSpacing.x );
+	//}
+	//else
 	{
 		ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
 	}
@@ -368,7 +369,7 @@ int gallery_view_draw_header()
 			if ( rect_hovered && !item_hovered )
 			{
 				path_edit_hover = true;
-				set_frame_draw( 2 );
+				set_frame_draw( 1 );
 
 				if ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
 					directory::path_edit = true;
@@ -378,7 +379,7 @@ int gallery_view_draw_header()
 				if ( path_edit_hover )
 				{
 					path_edit_hover = false;
-					set_frame_draw( 2 );
+					set_frame_draw( 1 );
 				}
 			}
 
@@ -571,15 +572,29 @@ int gallery_view_draw_header()
 
 	ImGui::SetNextItemWidth( 100 );
 
+	SDL_MouseButtonFlags mouse_state     = SDL_GetMouseState( 0, 0 );
+	static bool          check_left_mouse = false;
+
 	// if ( ImGui::SliderInt( "Zoom", &gallery::item_size, gallery::item_size_min, gallery::item_size_max ) )
 	// if ( ImGui::DragInt( "##zoom", &gallery::item_size, 10, gallery::item_size_min, gallery::item_size_max, "Zoom - %d px" ) )
 	if ( ImGui::SliderScalar( "##zoom", ImGuiDataType_U32, &gallery::item_size, &gallery::item_size_min, &gallery::item_size_max, "%d px" ) )
 	{
 		gallery_view_reset_text_size();
 		gallery_view_scroll_to_cursor();
+		check_left_mouse            = true;
+		gallery::item_size_changing = true;
 
 		if ( !app::config.thumbnail_use_fixed_size )
 			thumbnail_clear_cache();
+	}
+
+	if ( check_left_mouse && gallery::item_size_changing )
+	{
+		if ( !( mouse_state & SDL_BUTTON_LMASK ) )
+		{
+			gallery::item_size_changing = false;
+			check_left_mouse            = false;
+		}
 	}
 
 	ImGui::SameLine();
