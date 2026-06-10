@@ -201,6 +201,10 @@ void pipe_read_worker()
 
 e_sys_init sys_init( int argc, char* argv[] )
 {
+	// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/setlocale-wsetlocale?view=msvc-170#utf-8-support
+	// Allows using utf8 in the C runtime in windows 10 1803 or newer
+	setlocale( LC_ALL, ".utf8" );
+
 	if ( app::config.single_instance )
 	{
 		// NOTE: Using pipes here since WM_COPYDATA didn't want to work at all for me
