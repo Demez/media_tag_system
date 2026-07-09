@@ -917,10 +917,10 @@ void media_view_input()
 			media_view_advance( true );
 		}
 
-		if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
-		{
-			set_view_type_gallery();
-		}
+		//if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
+		//{
+		//	set_view_type_gallery();
+		//}
 	}
 
 	// TODO: Test ImGui::Shortcut()
@@ -1304,7 +1304,7 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 	snprintf( str_time, TIME_BUFFER + TIME_BUFFER + 4, "%s / %s", str_time_pos, str_duration );
 
 	const ImVec2 time_size       = ImGui::CalcTextSize( str_time, NULL, true );
-	const ImVec2 other_text_size       = ImGui::CalcTextSize( "M", NULL, true );
+	const ImVec2 other_text_size       = ImGui::CalcTextSize( "Mute", NULL, true );
 
 	float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 2 );
 	// float        avaliable_width = 500.f - ( style.ItemSpacing.x * 2 );
@@ -1341,7 +1341,7 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 		ImGui::PushStyleColor( ImGuiCol_Button, ImGui::GetStyleColorVec4( ImGuiCol_ButtonActive ) );
 	}
 
-	if ( ImGui::Button( "M" ) )
+	if ( ImGui::Button( "Mute" ) )
 	{
 		const char* cmd[]   = { "cycle", "mute", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
@@ -1541,15 +1541,19 @@ void media_view_draw_close_button()
 
 	static bool was_drawing_controls = false;
 	ImVec2      play_btn_size        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
+	bool        area_focused         = true;
 
-	if ( !mouse_in_rect( { button_pos.x - ( ( style.WindowPadding.x * 4 ) + play_btn_size.x ), 0.f }, { (float)width, ( ( style.WindowPadding.y * 6 ) + play_btn_size.y ) } ) )
+	//if ( !mouse_in_rect( { button_pos.x - ( ( style.WindowPadding.x * 4 ) + play_btn_size.x ), 0.f }, { (float)width, ( ( style.WindowPadding.y * 6 ) + play_btn_size.y ) } ) )
+	if ( !mouse_in_rect( { button_pos.x - ( ( style.WindowPadding.x * 10 ) + play_btn_size.x ), 0.f }, { (float)width, ( ( style.WindowPadding.y * 12 ) + play_btn_size.y ) } ) )
 	{
+		area_focused = false;
+
 		if ( was_drawing_controls )
 			set_frame_draw();
 	
-		was_drawing_controls = false;
-		ImGui::PopFont();
-		return;
+		//was_drawing_controls = false;
+		//ImGui::PopFont();
+		//return;
 	}
 	
 	if ( !was_drawing_controls )
@@ -1565,7 +1569,18 @@ void media_view_draw_close_button()
 
 	//ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, { 0, 0 } );
 	//ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0.f );
-	//ImGui::SetNextWindowBgAlpha( 0.f );
+	 
+	if ( !area_focused )
+	{
+		ImVec4 btn_color  = ImGui::GetStyleColorVec4( ImGuiCol_Button );
+		ImVec4 text_color = ImGui::GetStyleColorVec4( ImGuiCol_Text );
+		btn_color.w       = 0.25f;
+		text_color.w      = 0.25f;
+
+		ImGui::PushStyleColor( ImGuiCol_Button, btn_color );
+		ImGui::PushStyleColor( ImGuiCol_Text, text_color );
+	}
+		//ImGui::SetNextWindowBgAlpha( 0.25f );
 
 	if ( ImGui::Begin( "##view_close_btn", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBackground ) )
 	{
@@ -1573,6 +1588,11 @@ void media_view_draw_close_button()
 		{
 			set_view_type_gallery();
 		}
+	}
+
+	if ( !area_focused )
+	{
+		ImGui::PopStyleColor( 2 );
 	}
 
 	//ImGui::PopStyleVar();
