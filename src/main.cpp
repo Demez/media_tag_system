@@ -843,13 +843,23 @@ bool handle_events()
 				break;
 
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
-				if ( event.button.button == SDL_BUTTON_X1 )
+				if ( !g_gallery_view )
 				{
-					folder_history_nav_prev();
+					if ( event.button.button == SDL_BUTTON_X1 )
+					{
+						set_view_type_gallery();
+					}
 				}
-				else if ( event.button.button == SDL_BUTTON_X2 )
+				else
 				{
-					folder_history_nav_next();
+					if ( event.button.button == SDL_BUTTON_X1 )
+					{
+						folder_history_nav_prev();
+					}
+					else if ( event.button.button == SDL_BUTTON_X2 )
+					{
+						folder_history_nav_next();
+					}
 				}
 
 				set_frame_draw( 1 );
@@ -1428,7 +1438,8 @@ int main( int argc, char* argv[] )
 	// take the first path here
 	for ( int i = 1; i < argc; i++ )
 	{
-		if ( on_new_file( argv[ i ] ) )
+		fs::path path = sys_string_to_path( argv[ i ] );
+		if ( on_new_file( path ) )
 			break;
 	}
 
