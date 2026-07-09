@@ -220,6 +220,14 @@ int gallery_view_draw_header()
 
 	ImGui::SameLine();
 
+	if ( ImGui::Button( "Refresh" ) )
+	{
+		directory::queued        = directory::path;
+		directory::folder_reload = true;
+	}
+
+	ImGui::SameLine();
+
 	static bool  was_in_path_edit = false;
 	static bool  path_edit_hover  = false;
 	static float bar_width        = 0.f;
