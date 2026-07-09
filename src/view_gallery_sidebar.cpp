@@ -578,7 +578,7 @@ int gallery_view_draw_header()
 	ImGui::TextUnformatted( "Zoom" );
 	ImGui::SameLine();
 
-	ImGui::SetNextItemWidth( 100 );
+	ImGui::SetNextItemWidth( 190 );
 
 	SDL_MouseButtonFlags mouse_state     = SDL_GetMouseState( 0, 0 );
 	static bool          check_left_mouse = false;
