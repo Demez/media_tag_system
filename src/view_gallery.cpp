@@ -951,6 +951,13 @@ void gallery_view_draw_content()
 		ImGui::SetScrollY( scroll );
 	}
 
+	ImGuiWindow* window                       = ImGui::GetCurrentWindow();
+	ImGuiID      active_id                    = ImGui::GetActiveID();
+	// bool         scrollbar_active             = active_id && ( active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_X ) || active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y ) );
+	bool         scrollbar_active             = active_id && active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y );
+
+	static bool  scrollbar_active_last_frame  = scrollbar_active;
+
 	// ----------------------------------------------------------------------------------------------------------
 
 	ImVec2 image_bounds                 = { item_size_x - ( style.WindowPadding.x * 2 ), item_size_x - ( style.WindowPadding.x * 2 ) };
@@ -1087,7 +1094,7 @@ void gallery_view_draw_content()
 		}
 
 		// if ( gallery::selection.size() && last_selected == i && gallery::scroll_to_cursor )
-		if ( scroll_to_index == i && gallery::scroll_to_cursor )
+		if ( !scrollbar_active_last_frame && scroll_to_index == i && gallery::scroll_to_cursor )
 		// if ( gallery::last_selection.entry.type != e_media_type_none && cache_last_selected == i && gallery::scroll_to_cursor )
 		{
 			bool   scroll_needed  = false;
@@ -1432,7 +1439,7 @@ void gallery_view_draw_content()
 		bool mouse_release = ( ImGui::IsMouseReleased( ImGuiMouseButton_Left ) || ImGui::IsMouseReleased( ImGuiMouseButton_Middle ) );
 		bool mouse_press   = ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) || ImGui::IsMouseClicked( ImGuiMouseButton_Middle ) );
 
-		if ( item_hovered )
+		if ( !(scrollbar_active || scrollbar_active_last_frame) && item_hovered )
 		{
 			// if ( mouse_release && gallery::selection.size() > 1 )
 			if ( mouse_release )
@@ -1522,9 +1529,10 @@ void gallery_view_draw_content()
 	for ( size_t i = 0; i < thumbnail_requests.size(); i++ )
 		directory::thumbnail_list[ thumbnail_requests[ i ].index ] = thumbnail_loader_queue_push( thumbnail_requests[ i ].media );
 
-	gallery::scroll_to_cursor  = scroll_queued;
-	gallery::item_size_changed = false;
-	filenames_shown_last       = app::config.gallery_show_filenames;
+	gallery::scroll_to_cursor   = scroll_queued;
+	gallery::item_size_changed  = false;
+	filenames_shown_last        = app::config.gallery_show_filenames;
+	scrollbar_active_last_frame = scrollbar_active;
 }
 
 
