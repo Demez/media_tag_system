@@ -4,6 +4,7 @@ import sys
 import argparse
 import shutil
 import subprocess
+import json
 from enum import Enum, auto
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
@@ -481,6 +482,31 @@ def libjxl_run():
 
 # =================================================================================================
 
+def get_latest_mpv_release():
+    api_url = "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
+    # GitHub requires a User-Agent header
+    req = Request(api_url, headers={'User-Agent': 'Mozilla/5.0'})
+    
+    try:
+        response = urlopen(req, timeout=30)
+        # Decode and parse the JSON response
+        data = json.loads(response.read().decode('utf-8'))
+        
+        # Look through all assets attached to the latest release
+        for asset in data.get('assets', []):
+            name = asset.get('name', '')
+            # Match the specific x86_64-v3-dev archive
+            if name.startswith('mpv-dev-x86_64-v3-'):
+                return asset.get('browser_download_url'), name
+                
+    except Exception as e:
+        print(f"Error fetching latest mpv release from GitHub API: {e}")
+        
+    return None, None
+# Fetch the dynamic url and filename
+mpv_url, mpv_file = get_latest_mpv_release()
+
+# =================================================================================================
 
 '''
 Basic Structure for a task here:
@@ -577,8 +603,9 @@ TASK_LIST = {
         },
         {
             "name": "mpv",
-            "url":  "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20260307/mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
-            "file": "mpv-dev-x86_64-v3-20260307-git-f9190e5.7z",
+            "url":  mpv_url,
+            "file": mpv_file,
+            "extracted_folder": "mpv",
             "user_extract": True,
         },
     ],
@@ -629,7 +656,7 @@ def extract_file_user(file: str, folder: str) -> bool:
     # play bell/error sound
     print("\007")
 
-    print(f"Please extract the file \"{file}\" yourself, current libraries don't support extracting it")
+    print(f"Please extract the file \"{file}\" into a folder named \"{folder}\" yourself, current libraries don't support extracting it")
     input("Press Enter when finished")
 
     if not os.path.exists(folder):
