@@ -104,6 +104,48 @@ std::vector< notification_t > g_notification_queue;
 // =================================================================================
 
 
+bool delete_file_window( u32 count )
+{
+	SDL_MessageBoxButtonData buttons[ 2 ]{};
+	buttons[ 1 ].buttonID = 1;
+	buttons[ 1 ].text     = "Delete";
+	buttons[ 1 ].flags    = SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
+
+	buttons[ 0 ].buttonID = 2;
+	buttons[ 0 ].text     = "Cancel";
+	buttons[ 0 ].flags    = SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
+
+	char message[ 512 ]{};
+
+	if ( count > 1 )
+	{
+		snprintf( message, 512, "Delete %d Files?", count );
+	}
+	else
+	{
+		snprintf( message, 512, "Delete 1 File?" );
+	}
+	
+	SDL_MessageBoxData data{};
+	data.flags      = SDL_MESSAGEBOX_WARNING;
+	data.buttons    = buttons;
+	data.numbuttons = 2;
+	data.message    = message;
+	data.title      = "Delete Files";
+	data.window     = app::window;
+
+	int  buttonid   = 0;
+	bool ret        = SDL_ShowMessageBox( &data, &buttonid );
+
+	// Keep them
+	if ( !ret || buttonid != 1 )
+		return false;
+
+	// Delete the files!
+	return true;
+}
+
+
 void set_frame_draw( u32 count )
 {
 	if ( count > app::draw_frame_count )

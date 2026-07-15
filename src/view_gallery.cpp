@@ -329,6 +329,18 @@ void gallery_view_input()
 		gallery_view_scroll_to_cursor();
 		gallery_view_input_update_multi_select( selection );
 	}
+	else if ( ImGui::IsKeyPressed( ImGuiKey_Delete ) )
+	{
+		if ( delete_file_window( gallery::selection.size() ) )
+		{
+			for ( selection_t& selection : gallery::selection )
+			{
+				// TODO: undo history
+				std::string path = sys_path_to_string( selection.entry.file.path );
+				sys_recycle_file( path.c_str() );
+			}
+		}
+	}
 }
 
 
@@ -719,10 +731,25 @@ void gallery_view_context_menu()
 		//UndoSys_Redo();
 	}
 
+	ImGui::BeginDisabled( folder );
+
 	if ( ImGui::MenuItem( "Delete", nullptr, false, 0 ) )
 	{
-		//ImageView_DeleteImage();
+		if ( !folder )
+		{
+			if ( delete_file_window( gallery::selection.size() ) )
+			{
+				for ( selection_t& selection : gallery::selection )
+				{
+					// TODO: undo history
+					std::string path = sys_path_to_string( selection.entry.file.path );
+					sys_recycle_file( path.c_str() );
+				}
+			}
+		}
 	}
+
+	ImGui::EndDisabled();
 
 	if ( ImGui::MenuItem( folder ? "Folder Properties" : "File Properties" ) )
 	{

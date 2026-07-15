@@ -568,6 +568,9 @@ void                                 folder_load_media_list();
 
 void                                 push_notification( const char* msg );
 
+// if returned true, delete files
+bool                                 delete_file_window( u32 count );
+
 bool                                 icon_preload();
 void                                 icon_free();
 image_t*                             icon_get_image( e_icon icon_type );

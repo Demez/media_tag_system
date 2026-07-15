@@ -833,9 +833,14 @@ void media_view_context_menu()
 		//UndoSys_Redo();
 	}
 
-	if ( ImGui::MenuItem( "Delete", nullptr, false, 0 ) )
+	if ( ImGui::MenuItem( "Delete" ) )
 	{
-		//ImageView_DeleteImage();
+		if ( delete_file_window( 1 ) )
+		{
+			// TODO: undo history
+			std::string path = gallery_item_get_path_string( g_image_data.index );
+			sys_recycle_file( path.c_str() );
+		}
 	}
 
 	ImGui::Separator();
@@ -955,6 +960,16 @@ void media_view_input()
 	{
 		if ( !g_gallery_view )
 			set_view_type_gallery();
+	}
+
+	if ( ImGui::IsKeyPressed( ImGuiKey_Delete ) )
+	{
+		if ( delete_file_window( 1 ) )
+		{
+			// TODO: undo history
+			std::string path = gallery_item_get_path_string( g_image_data.index );
+			sys_recycle_file( path.c_str() );
+		}
 	}
 
 	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
