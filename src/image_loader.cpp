@@ -585,7 +585,7 @@ void icon_free()
 image_t* icon_get_image( e_icon icon_type )
 {
 	if ( icon_type >= e_icon_count )
-		return {};
+		return &g_icon_image[ e_icon_invalid ];
 
 	return &g_icon_image[ icon_type ];
 }
@@ -594,7 +594,7 @@ image_t* icon_get_image( e_icon icon_type )
 ImTextureRef icon_get_imtexture( e_icon icon_type )
 {
 	if ( icon_type >= e_icon_count )
-		return {};
+		return static_cast< ImTextureRef >( g_icon_texture[ e_icon_invalid ] );
 
 	return static_cast< ImTextureRef >( g_icon_texture[ icon_type ] );
 }
