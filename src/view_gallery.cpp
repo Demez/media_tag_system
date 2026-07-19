@@ -830,6 +830,7 @@ struct gallery_item_draw_t
 	u32                  grid_pos_y;
 
 	// current gallery index
+	size_t               i             = 0;
 	size_t               gallery_index = 0;
 
 	// current media entry
@@ -1354,57 +1355,17 @@ void gallery_view_item_size_calc( size_t i, gallery_item_draw_t& item_draw )
 }
 
 
-// ----------------------------------------------------------------------------------------------------------
-// Gallery Item
-// ----------------------------------------------------------------------------------------------------------
-void gallery_view_item( size_t i, u32& grid_pos_x )
+void gallery_view_item_handle_scroll( gallery_item_draw_t& item_draw, ImVec2& cursor_pos )
 {
-	ImGuiStyle&          style = ImGui::GetStyle();
-
-	gallery_item_draw_t  item_draw{
-		.gallery_index = gallery::sorted_media[ i ],
-		.media = directory::media_list[ item_draw.gallery_index ]
-	};
-
-	gallery_view_item_size_calc( i, item_draw );
-
-	// Calculate Current Item Height, and store tallest height for current row
-	if ( item_draw.item_size_y > gallery_draw::last_max_item_height )
-		gallery_draw::last_max_item_height = item_draw.item_size_y;
-
-	// Set cursor pos for drawing
-	if ( grid_pos_x == gallery::row_count )
-	// if ( item_draw.grid_pos_x == 0 )
-	{
-		if ( gallery::row_count <= 2 )
-			ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
-		else
-			ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
-
-		ImGui::SetCursorPosY( gallery_draw::last_grid_row_y + gallery_draw::last_max_item_height + style.ItemSpacing.y );
-
-		gallery_draw::last_max_item_height = gallery_draw::item_size_y;
-		grid_pos_x                         = 0;
-	}
-	else if( grid_pos_x > 0 )
-	{
-		ImGui::SameLine( 0.f, 0.f );
-		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
-	}
-
-	item_draw.grid_pos_x            = grid_pos_x;
-
-	ImVec2 cursor_pos               = ImGui::GetCursorPos();
-	gallery_draw::last_cursor_pos   = cursor_pos;
-	gallery_draw::last_grid_row_y   = cursor_pos.y;
+	ImGuiStyle& style          = ImGui::GetStyle();
 
 	// ----------------------------------------------------------------------------------------------------------
 	// Calculate Distance the Item is from visible scroll area
 
 	//float scroll                    = ImGui::GetScrollY();
-	float visible_top               = ImGui::GetScrollY();
-	float visible_bottom            = visible_top + ImGui::GetWindowHeight();
-	u32   distance                  = 0;
+	float       visible_top    = ImGui::GetScrollY();
+	float       visible_bottom = visible_top + ImGui::GetWindowHeight();
+	u32         distance       = 0;
 
 	// check if the bottom of the item is still visible at the top of the content window
 	if ( cursor_pos.y + item_draw.item_size_y < visible_top )
@@ -1443,11 +1404,11 @@ void gallery_view_item( size_t i, u32& grid_pos_x )
 	}
 
 	// if ( gallery::selection.size() && last_selected == i && gallery::scroll_to_cursor )
-	if ( !gallery_draw::scrollbar_active_last_frame && scroll_to_index == i && gallery::scroll_to_cursor )
+	if ( !gallery_draw::scrollbar_active_last_frame && scroll_to_index == item_draw.i && gallery::scroll_to_cursor )
 	// if ( gallery::last_selection.entry.type != e_media_type_none && cache_last_selected == i && gallery::scroll_to_cursor )
 	{
-		bool  scroll_needed  = false;
-		bool  scroll_up      = false;
+		bool scroll_needed = false;
+		bool scroll_up     = false;
 		//float visible_top    = scroll;
 		//float visible_bottom = visible_top + ImGui::GetWindowHeight();
 
@@ -1481,6 +1442,56 @@ void gallery_view_item( size_t i, u32& grid_pos_x )
 		gallery::scroll_to_cursor = false;
 		set_frame_draw( 2 );
 	}
+}
+
+
+// ----------------------------------------------------------------------------------------------------------
+// Gallery Item
+// ----------------------------------------------------------------------------------------------------------
+void gallery_view_item( size_t i, u32& grid_pos_x )
+{
+	gallery_item_draw_t item_draw
+	{
+		.i             = i,
+		.gallery_index = gallery::sorted_media[ i ],
+		.media = directory::media_list[ item_draw.gallery_index ]
+	};
+
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	gallery_view_item_size_calc( i, item_draw );
+
+	// Calculate Current Item Height, and store tallest height for current row
+	if ( item_draw.item_size_y > gallery_draw::last_max_item_height )
+		gallery_draw::last_max_item_height = item_draw.item_size_y;
+
+	// Set cursor pos for drawing
+	if ( grid_pos_x == gallery::row_count )
+	// if ( item_draw.grid_pos_x == 0 )
+	{
+		if ( gallery::row_count <= 2 )
+			ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
+		else
+			ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
+
+		ImGui::SetCursorPosY( gallery_draw::last_grid_row_y + gallery_draw::last_max_item_height + style.ItemSpacing.y );
+
+		gallery_draw::last_max_item_height = gallery_draw::item_size_y;
+		grid_pos_x                         = 0;
+	}
+	else if( grid_pos_x > 0 )
+	{
+		ImGui::SameLine( 0.f, 0.f );
+		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
+	}
+
+	item_draw.grid_pos_x            = grid_pos_x;
+
+	ImVec2 cursor_pos               = ImGui::GetCursorPos();
+	gallery_draw::last_cursor_pos   = cursor_pos;
+	gallery_draw::last_grid_row_y   = cursor_pos.y;
+
+	gallery_view_item_handle_scroll( item_draw, cursor_pos );
 
 	// ----------------------------------------------------------------------------------------------------------
 	// is this item even visible?
