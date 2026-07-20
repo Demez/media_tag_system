@@ -819,6 +819,7 @@ namespace gallery_draw
 	bool                          content_area_hovered;
 	bool                          any_item_hovered;
 	bool                          scroll_queued;
+	bool                          scroll_changed;
 }
 
 
@@ -1040,6 +1041,114 @@ void gallery_view_draw_icon_overlay()
 #endif
 
 
+void TextExFast( const char* text, const char* text_end, ImGuiTextFlags flags, const ImVec2& text_size )
+{
+	ImGuiWindow* window = ImGui::GetCurrentWindow();
+	if ( window->SkipItems )
+		return;
+	ImGuiContext& g = *GImGui;
+
+	// Accept null ranges
+	if ( text == text_end )
+		text = text_end = "";
+
+	// Calculate length
+	const char* text_begin = text;
+	if ( text_end == NULL )
+		text_end = text + ImStrlen( text );  // FIXME-OPT
+
+	const ImVec2 text_pos( window->DC.CursorPos.x, window->DC.CursorPos.y + window->DC.CurrLineTextBaseOffset );
+	const float  wrap_pos_x   = window->DC.TextWrapPos;
+	const bool   wrap_enabled = ( wrap_pos_x >= 0.0f );
+	if ( text_end - text <= 2000 || wrap_enabled )
+	{
+		// Common case
+		const float  wrap_width = wrap_enabled ? ImGui::CalcWrapWidthForPos( window->DC.CursorPos, wrap_pos_x ) : 0.0f;
+
+		ImRect       bb( text_pos, text_pos + text_size );
+		ImGui::ItemSize( text_size, 0.0f );
+		if ( !ImGui::ItemAdd( bb, 0 ) )
+			return;
+
+		// Render (we don't hide text after ## in this end-user function)
+		ImGui::RenderTextWrapped( bb.Min, text_begin, text_end, wrap_width );
+	}
+	else
+	{
+		// Long text!
+		// Perform manual coarse clipping to optimize for long multi-line text
+		// - From this point we will only compute the width of lines that are visible. Optimization only available when word-wrapping is disabled.
+		// - We also don't vertically center the text within the line full height, which is unlikely to matter because we are likely the biggest and only item on the line.
+		// - We use memchr(), pay attention that well optimized versions of those str/mem functions are much faster than a casually written loop.
+		const char* line        = text;
+		const float line_height = ImGui::GetTextLineHeight();
+		ImVec2      text_size( 0, 0 );
+
+		// Lines to skip (can't skip when logging text)
+		ImVec2      pos = text_pos;
+		if ( !g.LogEnabled )
+		{
+			int lines_skippable = (int)( ( window->ClipRect.Min.y - text_pos.y ) / line_height );
+			if ( lines_skippable > 0 )
+			{
+				int lines_skipped = 0;
+				while ( line < text_end && lines_skipped < lines_skippable )
+				{
+					const char* line_end = (const char*)ImMemchr( line, '\n', text_end - line );
+					if ( !line_end )
+						line_end = text_end;
+					if ( ( flags & ImGuiTextFlags_NoWidthForLargeClippedText ) == 0 )
+						text_size.x = ImMax( text_size.x, ImGui::CalcTextSize( line, line_end ).x );
+					line = line_end + 1;
+					lines_skipped++;
+				}
+				pos.y += lines_skipped * line_height;
+			}
+		}
+
+		// Lines to render
+		if ( line < text_end )
+		{
+			ImRect line_rect( pos, pos + ImVec2( FLT_MAX, line_height ) );
+			while ( line < text_end )
+			{
+				if ( ImGui::IsClippedEx( line_rect, 0 ) )
+					break;
+
+				const char* line_end = (const char*)ImMemchr( line, '\n', text_end - line );
+				if ( !line_end )
+					line_end = text_end;
+				text_size.x = ImMax( text_size.x, ImGui::CalcTextSize( line, line_end ).x );
+				ImGui::RenderText( pos, line, line_end, false );
+				line = line_end + 1;
+				line_rect.Min.y += line_height;
+				line_rect.Max.y += line_height;
+				pos.y += line_height;
+			}
+
+			// Count remaining lines
+			int lines_skipped = 0;
+			while ( line < text_end )
+			{
+				const char* line_end = (const char*)ImMemchr( line, '\n', text_end - line );
+				if ( !line_end )
+					line_end = text_end;
+				if ( ( flags & ImGuiTextFlags_NoWidthForLargeClippedText ) == 0 )
+					text_size.x = ImMax( text_size.x, ImGui::CalcTextSize( line, line_end ).x );
+				line = line_end + 1;
+				lines_skipped++;
+			}
+			pos.y += lines_skipped * line_height;
+		}
+		text_size.y = ( pos - text_pos ).y;
+
+		ImRect bb( text_pos, text_pos + text_size );
+		ImGui::ItemSize( text_size, 0.0f );
+		ImGui::ItemAdd( bb, 0 );
+	}
+}
+
+
 void gallery_view_draw_item_text( size_t i, gallery_item_draw_t& item_draw, ImVec2 current_pos, ImVec2 saved_pos )
 {
 	ImGuiStyle& style           = ImGui::GetStyle();
@@ -1078,7 +1187,8 @@ void gallery_view_draw_item_text( size_t i, gallery_item_draw_t& item_draw, ImVe
 	//ImColor clip_color = style.Colors[ ImGuiCol_Border ];
 	//draw_list->AddRect( text_clip_min, text_clip_max, clip_color, 0, ImDrawFlags_None, 2.f );
 
-	ImGui::TextUnformatted( item_draw.media.filename.c_str() );
+	//ImGui::TextUnformatted( item_draw.media.filename.c_str() );
+	TextExFast( item_draw.media.filename.c_str(), nullptr, ImGuiTextFlags_NoWidthForLargeClippedText, media_text_size );
 
 	ImGui::PopTextWrapPos();
 	ImGui::PopClipRect();
@@ -1358,6 +1468,9 @@ void gallery_view_item_size_calc( size_t i, gallery_item_draw_t& item_draw )
 
 void gallery_view_item_handle_scroll( gallery_item_draw_t& item_draw, ImVec2& cursor_pos )
 {
+	if ( !gallery_draw::scroll_changed )
+		return;
+
 	ImGuiStyle& style          = ImGui::GetStyle();
 
 	// ----------------------------------------------------------------------------------------------------------
@@ -1478,8 +1591,9 @@ void gallery_view_item( size_t i, u32& grid_pos_x )
 	}
 	else if( grid_pos_x > 0 )
 	{
-		ImGui::SameLine( 0.f, 0.f );
-		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
+		ImGui::SameLine( 0.f, gallery_draw::item_spacing_x );
+		//ImGui::SameLine( 0.f, 0.f );
+		//ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
 	}
 
 	// Calculate Current Item Height, and store tallest height for current row
@@ -1560,6 +1674,7 @@ void gallery_view_draw_content()
 
 	gallery_draw::any_item_hovered     = false;
 	gallery_draw::scroll_queued        = false;
+	gallery_draw::scroll_changed       = gallery::scroll_to_cursor;
 	gallery_draw::content_area_hovered = is_content_area_hovered( region_avail.x, window_height );
 
 	static u32 last_row_count      = 0;
@@ -1598,6 +1713,7 @@ void gallery_view_draw_content()
 		
 		if ( app::mouse_scroll != 0 )
 		{
+			gallery_draw::scroll_changed = true;
 			scroll -= scroll_amount * app::mouse_scroll;
 			set_frame_draw( 2 );
 		}
@@ -1610,13 +1726,15 @@ void gallery_view_draw_content()
 	// bool         scrollbar_active             = active_id && ( active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_X ) || active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y ) );
 	gallery_draw::scrollbar_active = active_id && active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y );
 
+	gallery_draw::scroll_changed |= gallery_draw::scrollbar_active;
+
 	// ----------------------------------------------------------------------------------------------------------
 
-	gallery_draw::image_bounds     = { gallery::item_size - ( style.WindowPadding.x * 2 ), gallery::item_size - ( style.WindowPadding.x * 2 ) };
-	gallery::image_size            = gallery_draw::image_bounds.x;
+	gallery_draw::image_bounds         = { gallery::item_size - ( style.WindowPadding.x * 2 ), gallery::item_size - ( style.WindowPadding.x * 2 ) };
+	gallery::image_size                = gallery_draw::image_bounds.x;
 
-	gallery_draw::last_cursor_pos  = ImGui::GetCursorPos();
-	gallery_draw::last_grid_row_y  = ImGui::GetCursorPos().y;
+	gallery_draw::last_cursor_pos      = ImGui::GetCursorPos();
+	gallery_draw::last_grid_row_y      = ImGui::GetCursorPos().y;
 
 	gallery_draw::last_max_item_height = gallery_draw::item_size_y;
 
@@ -1635,6 +1753,7 @@ void gallery_view_draw_content()
 	gallery_draw::lock_visible_item  = gallery_draw::keep_scroll_pos || app::window_resized;
 
 	gallery_draw::keep_scroll_pos |= ( app::window_resized && row_count_changed );
+	gallery_draw::scroll_changed |= gallery_draw::keep_scroll_pos;
 
 	// ----------------------------------------------------------------------------------------------------------
 
