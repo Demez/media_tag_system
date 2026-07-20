@@ -3,44 +3,55 @@
 #include "imgui_internal.h"
 
 
+// layout for each gallery item
+struct gallery_item_layout_t
+{
+	ImVec2 text_size{};
+	ImVec2 item_rect_min{};
+	ImVec2 item_rect_max{};
+	float  item_size_y = 0.f;
+};
+
+
 namespace gallery
 {
 	// a sorted list of media entries, each item is an index to an entry in directory::media_list
-	std::vector< size_t >         sorted_media{};
+	std::vector< size_t >                sorted_media{};
 
-	char                          search[ 512 ];
+	char                                 search[ 512 ];
 
 	// cursor position/index in items
 	// size_t                        cursor            = 0;
 
-	e_gallery_sort_mode           sort_mode         = e_gallery_sort_mode_date_mod_new_to_old;
-	bool                          sort_mode_update  = false;
+	e_gallery_sort_mode                  sort_mode          = e_gallery_sort_mode_date_mod_new_to_old;
+	bool                                 sort_mode_update   = false;
 
-	u32                           row_count          = 0;
-	u32                           item_size          = 150;
-	u32                           item_size_min      = 70;
-	u32                           item_size_max      = 600;
-	bool                          item_size_changed  = true;
-	bool                          item_size_changing = false;
-	std::vector< ImVec2 >         item_text_size;
+	u32                                  row_count          = 0;
+	u32                                  item_size          = 150;
+	u32                                  item_size_min      = 70;
+	u32                                  item_size_max      = 600;
+	bool                                 item_size_changed  = true;
+	bool                                 item_size_changing = false;
+	std::vector< ImVec2 >                item_text_size;
+	std::vector< gallery_item_layout_t > item_layout;
 
-	u32                           image_size         = item_size;
+	u32                                  image_size         = item_size;
 
-	bool                          sidebar_draw       = true;
+	bool                                 sidebar_draw       = true;
 
-	bool                          scroll_to_cursor   = false;
+	bool                                 scroll_to_cursor   = false;
 
-	u32                           drawn_image_count  = 0;
-	u32                           first_visible_item = 0;
+	u32                                  drawn_image_count  = 0;
+	u32                                  first_visible_item = 0;
 
 	// Quick Filter
-	e_gallery_filter              filter{};
+	e_gallery_filter                     filter{};
 
 	// Files selected in the gallery view
-	std::vector< selection_t >    selection{};
+	std::vector< selection_t >           selection{};
 
 	// used for memory with media advancing with arrow keys
-	selection_t                   last_selection{};
+	selection_t                          last_selection{};
 }
 
 
@@ -774,6 +785,9 @@ void gallery_view_reset_text_size()
 
 	gallery::item_text_size.clear();
 	gallery::item_text_size.resize( gallery::sorted_media.size() );
+
+	gallery::item_layout.clear();
+	gallery::item_layout.resize( gallery::sorted_media.size() );
 }
 
 
@@ -835,7 +849,7 @@ struct gallery_item_draw_t
 	size_t               gallery_index = 0;
 
 	// current media entry
-	const media_entry_t& media;
+	media_entry_t* media = nullptr;
 
 	ImVec2               text_size{};
 
@@ -929,7 +943,7 @@ void gallery_view_draw_item_select_bg( size_t i )
 
 void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw, ImVec2& scaled_image_size, bool& drew_base_icon )
 {
-	if ( item_draw.media.type == e_media_type_directory )
+	if ( item_draw.media->type == e_media_type_directory )
 	{
 		gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), true, scaled_image_size );
 		return;
@@ -938,17 +952,17 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 	thumbnail_t* thumbnail = thumbnail_get_data( directory::thumbnail_list[ item_draw.gallery_index ] );
 	e_icon       base_icon = e_icon_none;
 
-	if ( item_draw.media.type == e_media_type_directory )
+	if ( item_draw.media->type == e_media_type_directory )
 		base_icon = e_icon_folder;
-	else if ( item_draw.media.type == e_media_type_image )
+	else if ( item_draw.media->type == e_media_type_image )
 		base_icon = e_icon_image;
-	else if ( item_draw.media.type == e_media_type_video )
+	else if ( item_draw.media->type == e_media_type_video )
 		base_icon = e_icon_video;
 
 	if ( !thumbnail )
 	{
-		if ( !thumbnail && item_draw.media.type != e_media_type_directory )
-			gallery_draw::thumbnail_requests.emplace_back( item_draw.media, item_draw.gallery_index );
+		if ( !thumbnail && item_draw.media->type != e_media_type_directory )
+			gallery_draw::thumbnail_requests.emplace_back( *item_draw.media, item_draw.gallery_index );
 		// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 		//ImGui::Dummy( image_bounds );
@@ -976,8 +990,8 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 	}
 	else if ( thumbnail->status == e_thumbnail_status_free )
 	{
-		if ( item_draw.media.type != e_media_type_directory )
-			gallery_draw::thumbnail_requests.emplace_back( item_draw.media, item_draw.gallery_index );
+		if ( item_draw.media->type != e_media_type_directory )
+			gallery_draw::thumbnail_requests.emplace_back( *item_draw.media, item_draw.gallery_index );
 
 		// ImGui::Dummy( image_bounds );
 		gallery_view_draw_image( icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, scaled_image_size );
@@ -1149,9 +1163,8 @@ void TextExFast( const char* text, const char* text_end, ImGuiTextFlags flags, c
 }
 
 
-void gallery_view_draw_item_text( size_t i, gallery_item_draw_t& item_draw, ImVec2 current_pos, ImVec2 saved_pos )
+void gallery_view_draw_item_text( ImGuiStyle& style, size_t i, gallery_item_draw_t& item_draw, ImVec2 current_pos, ImVec2 saved_pos )
 {
-	ImGuiStyle& style           = ImGui::GetStyle();
 	ImVec2      media_text_size = gallery::item_text_size[ i ];
 
 	// center align text
@@ -1188,16 +1201,15 @@ void gallery_view_draw_item_text( size_t i, gallery_item_draw_t& item_draw, ImVe
 	//draw_list->AddRect( text_clip_min, text_clip_max, clip_color, 0, ImDrawFlags_None, 2.f );
 
 	//ImGui::TextUnformatted( item_draw.media.filename.c_str() );
-	TextExFast( item_draw.media.filename.c_str(), nullptr, ImGuiTextFlags_NoWidthForLargeClippedText, media_text_size );
+	TextExFast( item_draw.media->filename.c_str(), nullptr, ImGuiTextFlags_NoWidthForLargeClippedText, media_text_size );
 
 	ImGui::PopTextWrapPos();
 	ImGui::PopClipRect();
 }
 
 
-void gallery_view_draw_item_content( size_t i, gallery_item_draw_t& item_draw )
+void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_draw_t& item_draw )
 {
-	ImGuiStyle& style      = ImGui::GetStyle();
 	ImDrawList* draw_list  = ImGui::GetWindowDrawList();
 	ImVec2      window_pos = ImGui::GetWindowPos();
 
@@ -1289,7 +1301,7 @@ void gallery_view_draw_item_content( size_t i, gallery_item_draw_t& item_draw )
 	// Draw icon on top of it in the bottom right corner
 
 	// if we drew the media icon, no need to draw the icon overlay to indicate it's a video
-	if ( item_draw.media.type == e_media_type_video && !drew_icon )
+	if ( item_draw.media->type == e_media_type_video && !drew_icon )
 	{
 		// Fit image in window size, scaling up if needed
 		float    factor[ 2 ]       = { 1.f, 1.f };
@@ -1341,7 +1353,7 @@ void gallery_view_draw_item_content( size_t i, gallery_item_draw_t& item_draw )
 	// ----------------------------------------------------------------------------------------------------------
 	// Draw Text
 
-	gallery_view_draw_item_text( i, item_draw, current_pos, saved_pos );
+	gallery_view_draw_item_text( style, i, item_draw, current_pos, saved_pos );
 
 	// Add Dummy Window
 	//ImGui::SetCursorPos( post_dummy_pos );
@@ -1432,28 +1444,26 @@ void gallery_view_item_actions( size_t i, gallery_item_draw_t& item_draw )
 
 		if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
 		{
-			gallery_selected_item_action( item_draw.media, i );
+			gallery_selected_item_action( *item_draw.media, i );
 		}
 	}
 }
 
 
-void gallery_view_item_size_calc( size_t i, gallery_item_draw_t& item_draw )
+void gallery_view_item_size_calc( ImGuiStyle& style, size_t i, gallery_item_draw_t& item_draw )
 {
-	ImGuiStyle& style = ImGui::GetStyle();
-
 	if ( app::config.gallery_show_filenames )
 	{
-		// if size changed, recalculate the text sizes
-		if ( gallery::item_size_changed )
-		{
-			item_draw.text_size          = ImGui::CalcTextSize( item_draw.media.filename.c_str(), 0, false, gallery::item_size - ( style.WindowPadding.x * 2 ) );
-			gallery::item_text_size[ i ] = item_draw.text_size;
-		}
-		else
-		{
+		//// if size changed, recalculate the text sizes
+		//if ( gallery::item_size_changed )
+		//{
+		//	item_draw.text_size          = ImGui::CalcTextSize( item_draw.media->filename.c_str(), 0, false, gallery::item_size - ( style.WindowPadding.x * 2 ) );
+		//	gallery::item_text_size[ i ] = item_draw.text_size;
+		//}
+		//else
+		//{
 			item_draw.text_size = gallery::item_text_size[ i ];
-		}
+		//}
 	}
 
 	// Calculate Current Item Height, and store tallest height for current row
@@ -1466,12 +1476,35 @@ void gallery_view_item_size_calc( size_t i, gallery_item_draw_t& item_draw )
 }
 
 
-void gallery_view_item_handle_scroll( gallery_item_draw_t& item_draw, ImVec2& cursor_pos )
+void gallery_view_item_size_calc_new( ImGuiStyle& style )
+{
+	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
+	{
+		gallery_item_layout_t& layout        = gallery::item_layout[ i ];
+		size_t                 gallery_index = gallery::sorted_media[ i ];
+		const media_entry_t&   media         = directory::media_list[ gallery_index ];
+		gallery::item_text_size[ i ]         = ImGui::CalcTextSize( media.filename.c_str(), 0, false, gallery::item_size - ( style.WindowPadding.x * 2 ) );
+
+		if ( app::config.gallery_show_filenames )
+		{
+			layout.text_size = gallery::item_text_size[ i ];
+		}
+
+		// Calculate Current Item Height, and store tallest height for current row
+		layout.item_size_y = gallery_draw::image_bounds.y + ( style.WindowPadding.y * 2 );
+
+		if ( app::config.gallery_show_filenames )
+			layout.item_size_y += layout.text_size.y + style.ItemSpacing.y;
+
+		layout.item_size_y = std::min( layout.item_size_y, gallery_draw::item_size_y * 1.75f );
+	}
+}
+
+
+void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t & item_draw, ImVec2& cursor_pos )
 {
 	if ( !gallery_draw::scroll_changed )
 		return;
-
-	ImGuiStyle& style          = ImGui::GetStyle();
 
 	// ----------------------------------------------------------------------------------------------------------
 	// Calculate Distance the Item is from visible scroll area
@@ -1562,18 +1595,20 @@ void gallery_view_item_handle_scroll( gallery_item_draw_t& item_draw, ImVec2& cu
 // ----------------------------------------------------------------------------------------------------------
 // Gallery Item
 // ----------------------------------------------------------------------------------------------------------
-void gallery_view_item( size_t i, u32& grid_pos_x )
+void gallery_view_item( ImGuiStyle& style, size_t i, u32& grid_pos_x )
 {
 	gallery_item_draw_t item_draw
 	{
 		.i             = i,
 		.gallery_index = gallery::sorted_media[ i ],
-		.media = directory::media_list[ item_draw.gallery_index ]
+		.media = &directory::media_list[ item_draw.gallery_index ]
 	};
 
-	ImGuiStyle& style = ImGui::GetStyle();
+	gallery_item_layout_t& layout = gallery::item_layout[ i ];
+	item_draw.text_size           = layout.text_size;
+	item_draw.item_size_y         = layout.item_size_y;
 
-	gallery_view_item_size_calc( i, item_draw );
+	// gallery_view_item_size_calc( style, i, item_draw );
 
 	// Set cursor pos for drawing
 	if ( grid_pos_x == gallery::row_count )
@@ -1592,8 +1627,6 @@ void gallery_view_item( size_t i, u32& grid_pos_x )
 	else if( grid_pos_x > 0 )
 	{
 		ImGui::SameLine( 0.f, gallery_draw::item_spacing_x );
-		//ImGui::SameLine( 0.f, 0.f );
-		//ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
 	}
 
 	// Calculate Current Item Height, and store tallest height for current row
@@ -1606,7 +1639,7 @@ void gallery_view_item( size_t i, u32& grid_pos_x )
 	gallery_draw::last_cursor_pos   = cursor_pos;
 	gallery_draw::last_grid_row_y   = cursor_pos.y;
 
-	gallery_view_item_handle_scroll( item_draw, cursor_pos );
+	gallery_view_item_handle_scroll( style, item_draw, cursor_pos );
 
 	// ----------------------------------------------------------------------------------------------------------
 	// is this item even visible?
@@ -1631,7 +1664,7 @@ void gallery_view_item( size_t i, u32& grid_pos_x )
 	if ( gallery_draw::content_area_hovered )
 		item_draw.item_hovered = ImGui::IsMouseHoveringRect( item_draw.item_rect_min, item_draw.item_rect_max );
 
-	gallery_view_draw_item_content( i, item_draw );
+	gallery_view_draw_item_content( style, i, item_draw );
 	gallery_view_item_actions( i, item_draw );
 }
 
@@ -1677,11 +1710,11 @@ void gallery_view_draw_content()
 	gallery_draw::scroll_changed       = gallery::scroll_to_cursor;
 	gallery_draw::content_area_hovered = is_content_area_hovered( region_avail.x, window_height );
 
-	static u32 last_row_count      = 0;
-	last_row_count                 = gallery::row_count;
+	static u32 last_row_count          = 0;
+	last_row_count                     = gallery::row_count;
 
-	int        region_x            = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
-	gallery::row_count             = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
+	int region_x                       = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
+	gallery::row_count                 = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
 
 	if ( last_row_count != gallery::row_count )
 		gallery_view_scroll_to_cursor();
@@ -1704,13 +1737,13 @@ void gallery_view_draw_content()
 
 	// ----------------------------------------------------------------------------------------------------------
 	// Do Scrolling
-	
+
 	// TODO: Factor in the different text sizes for each row
 	if ( gallery_draw::content_area_hovered )
 	{
 		float scroll        = ImGui::GetScrollY();
 		float scroll_amount = gallery_draw::item_size_y + style.ItemSpacing.y;
-		
+
 		if ( app::mouse_scroll != 0 )
 		{
 			gallery_draw::scroll_changed = true;
@@ -1760,10 +1793,30 @@ void gallery_view_draw_content()
 	// TODO: for groups, change how sorted media is handled ?
 	// maybe make gallery::grouped_media ? or just have inserts into groups here
 
+	//static std::vector< gallery_item_draw_t > gallery_draw_list{};
+	//gallery_draw_list.clear();
+	//gallery_draw_list.resize( gallery::sorted_media.size() );
+
+	// if size changed, recalculate the text sizes
+	if ( gallery::item_size_changed )
+	{
+		gallery_view_item_size_calc_new( style );
+	}
+
+	//for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
+	//{
+	//	gallery_item_draw_t& item_draw = gallery_draw_list[ i ];
+	//	item_draw.i                    = i;
+	//	item_draw.gallery_index        = gallery::sorted_media[ i ];
+	//	item_draw.media                = &directory::media_list[ item_draw.gallery_index ];
+	//
+	//	gallery_view_item_size_calc( style, i, item_draw );
+	//}
+
 	u32 grid_pos_x = 0;
 	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
 	{
-		gallery_view_item( i, grid_pos_x );
+		gallery_view_item( style, i, grid_pos_x );
 		grid_pos_x++;
 	}
 
