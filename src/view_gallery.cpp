@@ -1461,10 +1461,6 @@ void gallery_view_item( size_t i, u32& grid_pos_x )
 
 	gallery_view_item_size_calc( i, item_draw );
 
-	// Calculate Current Item Height, and store tallest height for current row
-	if ( item_draw.item_size_y > gallery_draw::last_max_item_height )
-		gallery_draw::last_max_item_height = item_draw.item_size_y;
-
 	// Set cursor pos for drawing
 	if ( grid_pos_x == gallery::row_count )
 	// if ( item_draw.grid_pos_x == 0 )
@@ -1484,6 +1480,10 @@ void gallery_view_item( size_t i, u32& grid_pos_x )
 		ImGui::SameLine( 0.f, 0.f );
 		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
 	}
+
+	// Calculate Current Item Height, and store tallest height for current row
+	if ( item_draw.item_size_y > gallery_draw::last_max_item_height )
+		gallery_draw::last_max_item_height = item_draw.item_size_y;
 
 	item_draw.grid_pos_x            = grid_pos_x;
 
