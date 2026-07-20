@@ -686,6 +686,25 @@ int gallery_view_draw_header()
 
 	//ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 
+	if ( gallery::selection.size() )
+	{
+		ImGui::SameLine( 0, 0 );
+		ImVec2 region_avail = ImGui::GetContentRegionAvail();
+
+		char   buf[ 256 ]{};
+		snprintf( buf, 256, "%zu File%s Selected", gallery::selection.size(), gallery::selection.size() == 1 ? "" : "s" );
+
+		ImVec2 text_size = ImGui::CalcTextSize( buf );
+
+		ImVec2 spacing_size( region_avail.x - ( text_size.x + style.ItemSpacing.x ), text_size.y );
+		spacing_size.x = std::max( spacing_size.x, style.ItemSpacing.x );
+
+		ImGui::Dummy( spacing_size );
+		ImGui::SameLine( 0, 0 );
+
+		ImGui::TextUnformatted( buf );
+	}
+
 	int im_window_height = ImGui::GetWindowHeight();
 
 	if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, (float)im_window_height } ) && !ImGui::IsAnyItemHovered() )
