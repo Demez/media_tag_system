@@ -1065,17 +1065,18 @@ void gallery_view_draw_item_text( size_t i, gallery_item_draw_t& item_draw, ImVe
 	float  text_height   = text_clip_max.y - text_clip_min.y;
 	float  font_height   = ImGui::GetFontSize();
 
-	// float   result        = fmod( text_height, font_height );
+	// clip off extra text getting cut off half way
+	float   result        = fmod( text_height, font_height );
 	//float  result        = floor( text_height / font_height );
 	//text_clip_max.y      = text_clip_min.y + ( result * font_height );
-	//text_clip_max.y -= style.ItemSpacing.y;
+	text_clip_max.y            = text_clip_max.y - result;
 
 	ImGui::PushClipRect( text_clip_min, text_clip_max, true );
 
 	// draw clipping box for debug if needed
 	//ImDrawList* draw_list  = ImGui::GetWindowDrawList();
 	//ImColor clip_color = style.Colors[ ImGuiCol_Border ];
-	//draw_list->AddRect( text_clip_min, text_clip_max, clip_color, 0, ImDrawFlags_None );
+	//draw_list->AddRect( text_clip_min, text_clip_max, clip_color, 0, ImDrawFlags_None, 2.f );
 
 	ImGui::TextUnformatted( item_draw.media.filename.c_str() );
 
