@@ -3,13 +3,31 @@
 #include "imgui_internal.h"
 
 
-// layout for each gallery item
-struct gallery_item_layout_t
+// internal draw info for gallery for each item
+struct gallery_item_draw_t
 {
-	ImVec2 text_size{};
-	ImVec2 item_rect_min{};
-	ImVec2 item_rect_max{};
-	float  item_size_y = 0.f;
+	// position in grid
+	u32            grid_pos_x;
+	u32            grid_pos_y;
+
+	// current gallery index
+	size_t         i             = 0;
+	size_t         gallery_index = 0;
+
+	// current media entry
+	media_entry_t* media         = nullptr;
+
+	ImVec2         text_size{};
+
+	float          item_size_y   = 0.f;
+
+	ImVec2         cursor_screen_pos{};
+	ImVec2         item_rect_min{};
+	ImVec2         item_rect_max{};
+
+	bool           selected_item = false;
+	bool           item_hovered  = false;
+	bool           visible       = false;
 };
 
 
@@ -33,7 +51,7 @@ namespace gallery
 	bool                                 item_size_changed  = true;
 	bool                                 item_size_changing = false;
 	std::vector< ImVec2 >                item_text_size;
-	std::vector< gallery_item_layout_t > item_layout;
+	std::vector< gallery_item_draw_t >   item_layout;
 
 	u32                                  image_size         = item_size;
 
@@ -829,39 +847,16 @@ namespace gallery_draw
 	// Store the tallest item in the current row, so we know the next offset for the next row
 	float                         last_max_item_height;
 
+	// Dummy areas
+	ImVec2                        dummy_area_top;
+	ImVec2                        dummy_area_bottom;
+
 	// Input states
 	bool                          content_area_hovered;
 	bool                          any_item_hovered;
 	bool                          scroll_queued;
 	bool                          scroll_changed;
 }
-
-
-// internal draw info for gallery for each item
-struct gallery_item_draw_t
-{
-	// position in grid
-	u32                  grid_pos_x;
-	u32                  grid_pos_y;
-
-	// current gallery index
-	size_t               i             = 0;
-	size_t               gallery_index = 0;
-
-	// current media entry
-	media_entry_t* media = nullptr;
-
-	ImVec2               text_size{};
-
-	float                item_size_y   = 0.f;
-
-	bool                 selected_item = false;
-
-	ImVec2               item_rect_min{};
-	ImVec2               item_rect_max{};
-
-	bool                 item_hovered = false;
-};
 
 
 void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, bool upscale, ImVec2& out_image_size )
@@ -1210,8 +1205,10 @@ void gallery_view_draw_item_text( ImGuiStyle& style, size_t i, gallery_item_draw
 
 void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_draw_t& item_draw )
 {
-	ImDrawList* draw_list  = ImGui::GetWindowDrawList();
-	ImVec2      window_pos = ImGui::GetWindowPos();
+	ImDrawList* draw_list   = ImGui::GetWindowDrawList();
+	ImVec2      window_pos  = ImGui::GetWindowPos();
+
+	item_draw.selected_item = false;
 
 	for ( selection_t& selection : gallery::selection )
 	{
@@ -1221,8 +1218,6 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 		item_draw.selected_item = true;
 		break;
 	}
-
-	gallery_draw::any_item_hovered |= item_draw.item_hovered;
 
 	if ( item_draw.selected_item && !item_draw.item_hovered && i == gallery_draw::last_hovered )
 	{
@@ -1450,40 +1445,18 @@ void gallery_view_item_actions( size_t i, gallery_item_draw_t& item_draw )
 }
 
 
-void gallery_view_item_size_calc( ImGuiStyle& style, size_t i, gallery_item_draw_t& item_draw )
+void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 {
-	if ( app::config.gallery_show_filenames )
+	for ( size_t i = 0; i < count; i++ )
 	{
-		//// if size changed, recalculate the text sizes
-		//if ( gallery::item_size_changed )
-		//{
-		//	item_draw.text_size          = ImGui::CalcTextSize( item_draw.media->filename.c_str(), 0, false, gallery::item_size - ( style.WindowPadding.x * 2 ) );
-		//	gallery::item_text_size[ i ] = item_draw.text_size;
-		//}
-		//else
-		//{
-			item_draw.text_size = gallery::item_text_size[ i ];
-		//}
-	}
+		gallery_item_draw_t& layout        = gallery::item_layout[ i ];
+		size_t               gallery_index = gallery::sorted_media[ i ];
+		const media_entry_t& media         = directory::media_list[ gallery_index ];
+		gallery::item_text_size[ i ]       = ImGui::CalcTextSize( media.filename.c_str(), 0, false, gallery::item_size - ( style.WindowPadding.x * 2 ) );
 
-	// Calculate Current Item Height, and store tallest height for current row
-	item_draw.item_size_y = gallery_draw::image_bounds.y + ( style.WindowPadding.y * 2 );
-
-	if ( app::config.gallery_show_filenames )
-		item_draw.item_size_y += item_draw.text_size.y + style.ItemSpacing.y;
-
-	item_draw.item_size_y = std::min( item_draw.item_size_y, gallery_draw::item_size_y * 1.75f );
-}
-
-
-void gallery_view_item_size_calc_new( ImGuiStyle& style )
-{
-	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
-	{
-		gallery_item_layout_t& layout        = gallery::item_layout[ i ];
-		size_t                 gallery_index = gallery::sorted_media[ i ];
-		const media_entry_t&   media         = directory::media_list[ gallery_index ];
-		gallery::item_text_size[ i ]         = ImGui::CalcTextSize( media.filename.c_str(), 0, false, gallery::item_size - ( style.WindowPadding.x * 2 ) );
+		layout.i                           = i;
+		layout.gallery_index               = gallery::sorted_media[ i ],
+		layout.media                       = &directory::media_list[ layout.gallery_index ];
 
 		if ( app::config.gallery_show_filenames )
 		{
@@ -1501,13 +1474,64 @@ void gallery_view_item_size_calc_new( ImGuiStyle& style )
 }
 
 
-void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t & item_draw, ImVec2& cursor_pos )
+void gallery_view_item_rect_calc( ImGuiStyle& style, size_t count )
 {
-	if ( !gallery_draw::scroll_changed )
-		return;
+	u32    row_x                   = 0;
+	u32    row_y                   = 0;
 
+	u32    last_visible_top_row    = UINT32_MAX;
+	u32    last_visible_bottom_row = 0;
+	float  row_max_item_height     = 0.f;
+	//float  last_grid_row_y         = 0.f;
+
+	//ImVec2 fake_cursor_pos{};
+	ImVec2 fake_cursor_pos         = ImGui::GetCursorScreenPos();
+	ImVec2 start_cursor_pos        = fake_cursor_pos;
+	//ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
+
+	gallery_draw::dummy_area_bottom.y = 0;
+
+	for ( size_t i = 0; i < count; i++ )
+	{
+		gallery_item_draw_t& layout = gallery::item_layout[ i ];
+
+		if ( row_x == gallery::row_count )
+		{
+			row_x = 0;
+			row_y++;
+
+			fake_cursor_pos.x = start_cursor_pos.x;
+			fake_cursor_pos.y   += row_max_item_height + style.ItemSpacing.y;
+
+			gallery_draw::dummy_area_bottom.y += row_max_item_height + style.ItemSpacing.y;
+
+			row_max_item_height = gallery_draw::item_size_y;
+		}
+		else if ( row_x > 0 )
+		{
+			fake_cursor_pos.x += gallery_draw::item_spacing_x + gallery::item_size;
+		}
+
+		row_x++;
+
+		layout.cursor_screen_pos = fake_cursor_pos;
+		layout.item_rect_min     = fake_cursor_pos;
+		layout.item_rect_max     = { fake_cursor_pos.x + gallery::item_size, fake_cursor_pos.y + layout.item_size_y };
+
+		if ( row_max_item_height < layout.item_size_y )
+			row_max_item_height = layout.item_size_y;
+
+		layout.visible = ImGui::IsRectVisible( layout.item_rect_min, layout.item_rect_max );
+	}
+}
+
+
+void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t & item_draw )
+{
 	// ----------------------------------------------------------------------------------------------------------
 	// Calculate Distance the Item is from visible scroll area
+
+	ImVec2      cursor_pos     = ImGui::GetCursorPos();
 
 	//float scroll                    = ImGui::GetScrollY();
 	float       visible_top    = ImGui::GetScrollY();
@@ -1595,77 +1619,53 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t & i
 // ----------------------------------------------------------------------------------------------------------
 // Gallery Item
 // ----------------------------------------------------------------------------------------------------------
-void gallery_view_item( ImGuiStyle& style, size_t i, u32& grid_pos_x )
+void gallery_view_item( ImGuiStyle& style, size_t i, u32& grid_pos_x, gallery_item_draw_t& item_draw )
 {
-	gallery_item_draw_t item_draw
-	{
-		.i             = i,
-		.gallery_index = gallery::sorted_media[ i ],
-		.media = &directory::media_list[ item_draw.gallery_index ]
-	};
-
-	gallery_item_layout_t& layout = gallery::item_layout[ i ];
-	item_draw.text_size           = layout.text_size;
-	item_draw.item_size_y         = layout.item_size_y;
-
-	// gallery_view_item_size_calc( style, i, item_draw );
-
-	// Set cursor pos for drawing
-	if ( grid_pos_x == gallery::row_count )
-	// if ( item_draw.grid_pos_x == 0 )
-	{
-		if ( gallery::row_count <= 2 )
-			ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
-		else
-			ImGui::SetCursorPosX( ImGui::GetCursorPosX() );
-
-		ImGui::SetCursorPosY( gallery_draw::last_grid_row_y + gallery_draw::last_max_item_height + style.ItemSpacing.y );
-
-		gallery_draw::last_max_item_height = gallery_draw::item_size_y;
-		grid_pos_x                         = 0;
-	}
-	else if( grid_pos_x > 0 )
-	{
-		ImGui::SameLine( 0.f, gallery_draw::item_spacing_x );
-	}
-
-	// Calculate Current Item Height, and store tallest height for current row
-	if ( item_draw.item_size_y > gallery_draw::last_max_item_height )
-		gallery_draw::last_max_item_height = item_draw.item_size_y;
-
-	item_draw.grid_pos_x            = grid_pos_x;
-
-	ImVec2 cursor_pos               = ImGui::GetCursorPos();
-	gallery_draw::last_cursor_pos   = cursor_pos;
-	gallery_draw::last_grid_row_y   = cursor_pos.y;
-
-	gallery_view_item_handle_scroll( style, item_draw, cursor_pos );
-
-	// ----------------------------------------------------------------------------------------------------------
-	// is this item even visible?
-
-	ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
-
-	item_draw.item_rect_min  = cursor_screen_pos;
-	item_draw.item_rect_max  = { cursor_screen_pos.x + gallery::item_size, cursor_screen_pos.y + item_draw.item_size_y };
-
-	if ( !ImGui::IsRectVisible( item_draw.item_rect_min, item_draw.item_rect_max ) )
-	{
-		// use a dummy instead of a full child window, cheaper
-		ImGui::Dummy( { (float)gallery::item_size, item_draw.item_size_y } );
-		return;
-	}
-
 	// if ( gallery::first_visible_item == UINT32_MAX || last_row_count > gallery::row_count )
 	// if ( gallery::first_visible_item == UINT32_MAX )
 	if ( !gallery_draw::lock_visible_item )
 		gallery::first_visible_item = i;
 
 	if ( gallery_draw::content_area_hovered )
+	{
 		item_draw.item_hovered = ImGui::IsMouseHoveringRect( item_draw.item_rect_min, item_draw.item_rect_max );
+		gallery_draw::any_item_hovered |= item_draw.item_hovered;
+	}
+	else
+	{
+		item_draw.item_hovered = false;
+	}
 
 	gallery_view_draw_item_content( style, i, item_draw );
 	gallery_view_item_actions( i, item_draw );
+}
+
+
+void gallery_view_draw_items( ImGuiWindow* window, ImGuiStyle& style, size_t count )
+{
+	u32 grid_pos_x = 0;
+	size_t i               = 0;
+	for ( ; i < count; i++ )
+	//for ( gallery_item_draw_t& item_draw : gallery::item_layout )
+	{
+		gallery_item_draw_t& item_draw = gallery::item_layout.at( i );
+
+		window->DC.CursorPos           = item_draw.cursor_screen_pos;
+		//window->DC.CursorPos.x           = item_draw.cursor_screen_pos.x;
+		//window->DC.CursorPos.y           = item_draw.cursor_screen_pos.y;
+
+		window->DC.IsSetPos            = true;
+
+		if ( gallery_draw::scroll_changed )
+			gallery_view_item_handle_scroll( style, item_draw );
+
+		if ( !item_draw.visible )
+			continue;
+
+		gallery_view_item( style, i, grid_pos_x, item_draw );
+		grid_pos_x++;
+		//i++;
+	}
 }
 
 
@@ -1707,7 +1707,7 @@ void gallery_view_draw_content()
 
 	gallery_draw::any_item_hovered     = false;
 	gallery_draw::scroll_queued        = false;
-	gallery_draw::scroll_changed       = gallery::scroll_to_cursor;
+	gallery_draw::scroll_changed       = gallery::scroll_to_cursor || gallery_draw::scrollbar_active || gallery_draw::scrollbar_active_last_frame;
 	gallery_draw::content_area_hovered = is_content_area_hovered( region_avail.x, window_height );
 
 	static u32 last_row_count          = 0;
@@ -1715,6 +1715,8 @@ void gallery_view_draw_content()
 
 	int region_x                       = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
 	gallery::row_count                 = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
+
+	gallery_draw::dummy_area_bottom.x  = region_x;
 
 	if ( last_row_count != gallery::row_count )
 		gallery_view_scroll_to_cursor();
@@ -1747,6 +1749,7 @@ void gallery_view_draw_content()
 		if ( app::mouse_scroll != 0 )
 		{
 			gallery_draw::scroll_changed = true;
+			gallery_draw::scroll_queued  = true; // do another update next frame for rect layout
 			scroll -= scroll_amount * app::mouse_scroll;
 			set_frame_draw( 2 );
 		}
@@ -1776,6 +1779,7 @@ void gallery_view_draw_content()
 
 	bool               row_count_changed    = last_row_count != gallery::row_count;
 	static bool        filenames_shown_last = app::config.gallery_show_filenames;
+	static ImVec2      last_region_avail    = region_avail;
 
 	static h_thumbnail icons_scaled[ e_icon_count ]{};
 
@@ -1797,28 +1801,28 @@ void gallery_view_draw_content()
 	//gallery_draw_list.clear();
 	//gallery_draw_list.resize( gallery::sorted_media.size() );
 
+	size_t count = gallery::sorted_media.size();
+
 	// if size changed, recalculate the text sizes
-	if ( gallery::item_size_changed )
+	//if ( gallery::item_size_changed || app::window_resized || region_avail != last_region_avail || gallery_draw::scroll_changed )
+	if ( gallery::item_size_changed || directory::folder_changed )
 	{
-		gallery_view_item_size_calc_new( style );
+		gallery_view_item_size_calc( style, count );
 	}
 
-	//for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
-	//{
-	//	gallery_item_draw_t& item_draw = gallery_draw_list[ i ];
-	//	item_draw.i                    = i;
-	//	item_draw.gallery_index        = gallery::sorted_media[ i ];
-	//	item_draw.media                = &directory::media_list[ item_draw.gallery_index ];
-	//
-	//	gallery_view_item_size_calc( style, i, item_draw );
-	//}
-
-	u32 grid_pos_x = 0;
-	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
+	if ( gallery::item_size_changed || app::window_resized || region_avail != last_region_avail || gallery_draw::scroll_changed || directory::folder_changed )
+	// if ( app::draw_frame_count > 0 )
 	{
-		gallery_view_item( style, i, grid_pos_x );
-		grid_pos_x++;
+		gallery_view_item_rect_calc( style, count );
 	}
+
+	ImVec2 dummy_start_pos = ImGui::GetCursorPos();
+
+	gallery_view_draw_items( window, style, count );
+
+	// Dummy Widget to fill the entire content area
+	ImGui::SetCursorPos( dummy_start_pos );
+	ImGui::Dummy( gallery_draw::dummy_area_bottom );
 
 	ImVec2 end_window_pos      = ImGui::GetWindowPos();
 	ImVec2 end_window_size     = ImGui::GetWindowSize();
@@ -1874,6 +1878,7 @@ void gallery_view_draw_content()
 	gallery::item_size_changed                = false;
 	filenames_shown_last                      = app::config.gallery_show_filenames;
 	gallery_draw::scrollbar_active_last_frame = gallery_draw::scrollbar_active;
+	last_region_avail                         = region_avail;
 }
 
 
