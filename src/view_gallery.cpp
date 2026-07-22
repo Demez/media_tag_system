@@ -1729,14 +1729,14 @@ void gallery_view_draw_items( ImGuiWindow* window, ImGuiStyle& style, size_t cou
 	size_t               i          = 0;
 	gallery_item_draw_t* item_draw  = gallery::visible_item[ 0 ];
 
-	while ( i < gallery::visible_item_count )
+	for ( ; i < gallery::visible_item_count; i++ )
 	{
+		item_draw            = gallery::visible_item[ i ];
 		window->DC.CursorPos = item_draw->cursor_screen_pos;
 		window->DC.IsSetPos  = true;
 
 		gallery_view_item( style, item_draw->i, grid_pos_x, *item_draw );
 		grid_pos_x++;
-		item_draw = gallery::visible_item[ i++ ];
 	}
 }
 
@@ -1923,7 +1923,8 @@ void gallery_view_draw_content()
 	ImVec2 dummy_start_pos        = ImGui::GetCursorPos();
 	ImVec2 dummy_start_pos_screen = ImGui::GetCursorScreenPos();
 
-	gallery_view_draw_items( window, style, count );
+	if ( gallery::visible_item_count > 0 )
+		gallery_view_draw_items( window, style, count );
 
 	// Dummy Widget to fill the entire content area
 	ImGui::SetCursorPos( dummy_start_pos );
