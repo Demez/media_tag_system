@@ -1042,7 +1042,7 @@ void media_view_input()
 
 	if ( g_image_pan )
 	{
-		set_frame_draw();
+		//set_frame_draw();
 		image_draw::pos.x += app::mouse_delta[ 0 ];
 		image_draw::pos.y += app::mouse_delta[ 1 ];
 
