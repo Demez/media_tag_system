@@ -1108,11 +1108,14 @@ void gallery_view_draw_sidebar()
 
 			ImGui::Separator();
 
+			ImGui::PushItemWidth( 128 );
+
 			int idle_sleep_time = app::config.sleep_time_idle;
 			if ( ImGui::InputInt( "Idle Sleep Time", &idle_sleep_time, 1, 1 ) )
 			{
 				app::config.sleep_time_idle = CLAMP( idle_sleep_time, 0, 1000 );
 			}
+			set_frame_draw( ImGui::IsItemHovered() );
 
 			ImGui::SetItemTooltip( "Sleep time when app is not actively drawing, but focused" );
 
@@ -1122,6 +1125,7 @@ void gallery_view_draw_sidebar()
 				app::config.sleep_time_focus = CLAMP( focus_sleep_time, 0, 1000 );
 			}
 
+			set_frame_draw( ImGui::IsItemHovered() );
 			ImGui::SetItemTooltip( "Sleep time when app is focused, and always draw is enabled" );
 
 			int unfocus_sleep_time = app::config.sleep_time_no_focus;
@@ -1129,6 +1133,7 @@ void gallery_view_draw_sidebar()
 			{
 				app::config.sleep_time_no_focus = CLAMP( unfocus_sleep_time, 0, 1000 );
 			}
+			set_frame_draw( ImGui::IsItemHovered() );
 
 			ImGui::SetItemTooltip( "Sleep time when app is not focused" );
 
@@ -1140,6 +1145,8 @@ void gallery_view_draw_sidebar()
 			{
 				update_dpi( dpi_scale );
 			}
+
+			ImGui::PopItemWidth();
 
 			ImGui::EndTabItem();
 		}
