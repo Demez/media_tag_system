@@ -821,6 +821,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			}
 		}
 
+		send_frame_draw_event();
 		thumbnail->status.store( e_thumbnail_status_uploading, std::memory_order_release );
 	}
 }

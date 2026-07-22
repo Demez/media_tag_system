@@ -25,7 +25,7 @@ namespace app
 	// ImVec4       clear_color    = ImVec4( 1.f, 1.f, 0.f, 0.f );
 
 	u64          total_time     = 0;
-	float        frame_time     = 0.f;
+	double       frame_time     = 0.f;
 
 	ImVec2       mouse_delta;
 	ImVec2       mouse_pos;
@@ -150,6 +150,22 @@ void set_frame_draw( u32 count )
 {
 	if ( count > app::draw_frame_count )
 		app::draw_frame_count = count;
+}
+
+
+static bool      g_pushed_draw_event = false;
+static SDL_Event g_draw_event{};
+
+
+void send_frame_draw_event()
+{
+	if ( g_pushed_draw_event )
+		return;
+
+	if ( !SDL_PushEvent( &g_draw_event ) )
+		printf( "FAILED TO PUSH DRAW EVENT\n" );
+
+	set_frame_draw();
 }
 
 
@@ -359,9 +375,9 @@ void push_notification( const char* msg )
 }
 
 
-void notification_draw( float frame_time )
+void notification_draw( double frame_time )
 {
-	static float time_drawn = 0.f;
+	static double time_drawn = 0.f;
 	static bool  fade_in    = true;
 
 	if ( g_notification_queue.empty() )
@@ -396,6 +412,7 @@ void notification_draw( float frame_time )
 	}
 
 	// draw last few notifications
+	set_frame_draw();
 
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
@@ -439,8 +456,6 @@ void notification_draw( float frame_time )
 
 		//border_color.w = max_notif_time * border_color.w;
 		//bg_color.w     = max_notif_time;
-
-		set_frame_draw();
 	}
 	//else // if ( max_notif_time > NOTIFICATION_DURATION - NOTIFICATION_FADE_IN_TIME )
 	{
@@ -488,7 +503,7 @@ void notification_draw( float frame_time )
 }
 
 
-void imgui_draw( float frame_time, bool render )
+void imgui_draw( double frame_time, bool render )
 {
 	if ( gallery::sort_mode_update )
 	{
@@ -556,6 +571,7 @@ void set_view_type_gallery()
 	g_gallery_view = true;
 
 	update_window_title();
+	set_frame_draw( 3 );
 }
 
 
@@ -583,6 +599,8 @@ void set_view_type_media()
 	g_gallery_view = false;
 
 	update_window_title();
+	set_frame_draw( 3 );
+	
 }
 
 
@@ -862,6 +880,147 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 }
 
 
+
+bool handle_event( SDL_Event& event )
+{
+	ImGui_ImplSDL3_ProcessEvent( &event );
+
+	switch ( event.type )
+	{
+		default:
+			break;
+
+		case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			if ( !g_gallery_view )
+			{
+				if ( event.button.button == SDL_BUTTON_X1 )
+				{
+					set_view_type_gallery();
+				}
+			}
+			else
+			{
+				if ( event.button.button == SDL_BUTTON_X1 )
+				{
+					folder_history_nav_prev();
+				}
+				else if ( event.button.button == SDL_BUTTON_X2 )
+				{
+					folder_history_nav_next();
+				}
+			}
+
+			set_frame_draw( 1 );
+			break;
+
+		case SDL_EVENT_MOUSE_BUTTON_UP:
+			set_frame_draw( 1 );
+			break;
+
+		case SDL_EVENT_KEY_DOWN:
+		case SDL_EVENT_KEY_UP:
+			set_frame_draw( 1 );
+			break;
+
+		case SDL_EVENT_MOUSE_WHEEL:
+			set_frame_draw( 2 );
+			app::mouse_scroll += event.wheel.integer_y;
+
+			media_view_scroll_zoom( event.wheel.integer_y );
+			gallery_view_handle_scroll_event( event.wheel.y );
+			break;
+
+		case SDL_EVENT_MOUSE_MOTION:
+			app::mouse_pos[ 0 ] = event.motion.x;
+			app::mouse_pos[ 1 ] = event.motion.y;
+			app::mouse_delta[ 0 ] += event.motion.xrel;
+			app::mouse_delta[ 1 ] += event.motion.yrel;
+			// set_frame_draw();
+			break;
+
+		case SDL_EVENT_WINDOW_MOUSE_ENTER:
+			app::mouse_in_window = true;
+			break;
+
+		case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+			app::mouse_in_window = false;
+			break;
+
+#if __unix__
+		case SDL_EVENT_WINDOW_EXPOSED:
+#endif
+		case SDL_EVENT_WINDOW_RESIZED:
+			int width, height;
+			SDL_GetWindowSize( app::window, &width, &height );
+			ImGui::GetIO().DisplaySize.x = width;
+			ImGui::GetIO().DisplaySize.y = height;
+
+			// clear focusing of any windows
+			ImGui::SetNextFrameWantCaptureKeyboard( false );
+			ImGui::SetWindowFocus( nullptr );
+
+			app::window_resized = true;
+			set_frame_draw();
+			media_view_window_resize();
+			gallery_view_scroll_to_cursor();
+			mpv_window_resize();
+			break;
+
+		case SDL_EVENT_WINDOW_FOCUS_GAINED:
+			app::window_focused = true;
+			set_frame_draw();
+			break;
+
+		case SDL_EVENT_WINDOW_FOCUS_LOST:
+			app::window_focused = false;
+
+			// clear focusing of any windows
+			ImGui::SetNextFrameWantCaptureKeyboard( false );
+			ImGui::SetWindowFocus( nullptr );
+			break;
+
+		// The system requests a file open
+		case SDL_EVENT_DROP_FILE:
+		{
+			g_drag_drop_files.push_back( event.drop.data );
+			break;
+		}
+
+		// text/plain drag-and-drop event
+		case SDL_EVENT_DROP_TEXT:
+			break;
+
+		// Current set of drops is now complete (NULL filename)
+		case SDL_EVENT_DROP_COMPLETE:
+		{
+			if ( app::in_drag_drop )
+				break;
+
+			set_frame_draw();
+			if ( drag_drop_recieve_func( g_drag_drop_files ) )
+				SDL_RaiseWindow( app::window );
+
+			break;
+		}
+
+		// Position while moving over the window
+		case SDL_EVENT_DROP_POSITION:
+			set_frame_draw();
+			break;
+
+		case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+			update_dpi();
+			break;
+
+		case SDL_EVENT_QUIT:
+		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+			set_frame_draw();
+			app::running = false;
+			return true;
+	}
+}
+
+
 // return true to exit main loop
 // Handle SDL3 Events
 bool handle_events()
@@ -875,143 +1034,25 @@ bool handle_events()
 	g_drag_drop_files.clear();
 
 	SDL_Event event;
+
+	SDL_PumpEvents();
+
+	int max_events = SDL_PeepEvents( nullptr, 0, SDL_PEEKEVENT, 0, 0 );
+
+	// if there is NOTHING to do, then wait forever until we have a new event, uses basically nothing for cpu usage this way
+	if ( max_events == 0 && !app::config.always_draw && app::draw_frame_count == 0 )
+	{
+		//printf( "WAITING %zu\n", app::total_time );
+		if ( SDL_WaitEvent( &event ) )
+		{
+			//printf( "END WAITING %zu\n", app::total_time );
+			handle_event( event );
+		}
+	}
+
 	while ( SDL_PollEvent( &event ) )
 	{
-		ImGui_ImplSDL3_ProcessEvent( &event );
-
-		switch ( event.type )
-		{
-			default:
-				break;
-
-			case SDL_EVENT_MOUSE_BUTTON_DOWN:
-				if ( !g_gallery_view )
-				{
-					if ( event.button.button == SDL_BUTTON_X1 )
-					{
-						set_view_type_gallery();
-					}
-				}
-				else
-				{
-					if ( event.button.button == SDL_BUTTON_X1 )
-					{
-						folder_history_nav_prev();
-					}
-					else if ( event.button.button == SDL_BUTTON_X2 )
-					{
-						folder_history_nav_next();
-					}
-				}
-
-				set_frame_draw( 1 );
-				break;
-
-			case SDL_EVENT_MOUSE_BUTTON_UP:
-				set_frame_draw( 1 );
-				break;
-
-			case SDL_EVENT_KEY_DOWN:
-			case SDL_EVENT_KEY_UP:
-				set_frame_draw( 1 );
-				break;
-
-			case SDL_EVENT_MOUSE_WHEEL:
-				set_frame_draw( 2 );
-				app::mouse_scroll += event.wheel.integer_y;
-
-				media_view_scroll_zoom( event.wheel.integer_y );
-				gallery_view_handle_scroll_event( event.wheel.y );
-				break;
-
-			case SDL_EVENT_MOUSE_MOTION:
-				app::mouse_pos[ 0 ] = event.motion.x;
-				app::mouse_pos[ 1 ] = event.motion.y;
-				app::mouse_delta[ 0 ] += event.motion.xrel;
-				app::mouse_delta[ 1 ] += event.motion.yrel;
-				// set_frame_draw();
-				break;
-
-			case SDL_EVENT_WINDOW_MOUSE_ENTER:
-				app::mouse_in_window = true;
-				break;
-
-			case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-				app::mouse_in_window = false;
-				break;
-
-			#if __unix__
-			case SDL_EVENT_WINDOW_EXPOSED:
-			#endif
-			case SDL_EVENT_WINDOW_RESIZED:
-				int width, height;
-				SDL_GetWindowSize( app::window, &width, &height );
-				ImGui::GetIO().DisplaySize.x = width;
-				ImGui::GetIO().DisplaySize.y = height;
-
-				// clear focusing of any windows
-				ImGui::SetNextFrameWantCaptureKeyboard( false );
-				ImGui::SetWindowFocus( nullptr );
-
-				app::window_resized = true;
-				set_frame_draw();
-				media_view_window_resize();
-				gallery_view_scroll_to_cursor();
-				mpv_window_resize();
-				break;
-
-			case SDL_EVENT_WINDOW_FOCUS_GAINED:
-				app::window_focused = true;
-				set_frame_draw();
-				break;
-
-			case SDL_EVENT_WINDOW_FOCUS_LOST:
-				app::window_focused = false;
-
-				// clear focusing of any windows
-				ImGui::SetNextFrameWantCaptureKeyboard( false );
-				ImGui::SetWindowFocus( nullptr );
-				break;
-
-			// The system requests a file open
-			case SDL_EVENT_DROP_FILE:
-			{
-				g_drag_drop_files.push_back( event.drop.data );
-				break;
-			}
-
-			// text/plain drag-and-drop event
-			case SDL_EVENT_DROP_TEXT:
-				break;
-
-			// Current set of drops is now complete (NULL filename)
-			case SDL_EVENT_DROP_COMPLETE:
-			{
-				if ( app::in_drag_drop )
-					break;
-
-				set_frame_draw();
-				if ( drag_drop_recieve_func( g_drag_drop_files ) )
-					SDL_RaiseWindow( app::window );
-
-				break;
-			}
-
-			// Position while moving over the window
-			case SDL_EVENT_DROP_POSITION:
-				set_frame_draw();
-				break;
-
-			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-				update_dpi();
-				break;
-
-			case SDL_EVENT_QUIT:
-			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-				set_frame_draw();
-				app::running = false;
-				return true;
-		}
+		handle_event( event );
 	}
 
 	app::in_drag_drop = false;
@@ -1057,7 +1098,8 @@ void check_need_draw( bool playing_back_video )
 	//if ( io.WantCaptureMouse != ( ctx->WantCaptureMouseNextFrame == -1 ) )
 	//	set_frame_draw();
 
-	if ( io.WantTextInput || io.WantCaptureKeyboard /*|| io.WantCaptureMouse || !io.WantCaptureMouseUnlessPopupClose*/ || io.WantSetMousePos )
+	//if ( io.WantTextInput || io.WantCaptureKeyboard /*|| io.WantCaptureMouse || !io.WantCaptureMouseUnlessPopupClose*/ || io.WantSetMousePos )
+	if ( io.WantTextInput /*|| io.WantCaptureKeyboard || io.WantCaptureMouse || !io.WantCaptureMouseUnlessPopupClose*/ || io.WantSetMousePos )
 		set_frame_draw();
 
 	// Always draw on video playback
@@ -1072,7 +1114,7 @@ void main_loop()
 
 	u64    start_time                = sys_get_time_ms();
 	u64    current_time              = start_time;
-	float  time                      = 0.f;
+	double time                      = 0.0;
 
 	ImVec2 mouse_pos                 = ImGui::GetMousePos();
 	ImVec2 last_mouse_pos            = ImGui::GetMousePos();
@@ -1103,7 +1145,7 @@ void main_loop()
 		// Update Frame Time
 
 		current_time  = sys_get_time_ms();
-		time          = ( current_time / 1000.f ) - ( start_time / 1000.f );
+		time          = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
 
 		// don't let the time go too crazy, usually happens when in a breakpoint
 		// time                 = std::min( real_time, 0.1f );
@@ -1124,7 +1166,7 @@ void main_loop()
 	//	}
 
 		app::frame_time = time;
-		app::total_time += ( time * 1000.f );
+		app::total_time += ( time * 1000.0 );
 
 		sys_update();
 
@@ -1196,6 +1238,8 @@ void main_loop()
 		// -----------------------------------------------------------------------------------
 		// Window Events
 
+		check_need_draw( playing_back_video );
+
 		if ( handle_events() )
 			break;
 
@@ -1206,8 +1250,6 @@ void main_loop()
 			start_time = current_time;
 			continue;
 		}
-
-		check_need_draw( playing_back_video );
 
 		if ( !app::window_focused && !playing_back_video )
 		{
@@ -1235,19 +1277,27 @@ void main_loop()
 
 		media_view_update( time );
 
+		bool want_text_input = ImGui::GetIO().WantTextInput || ImGui::GetCurrentContext()->WantTextInputNextFrame;
+
 		if ( draw_frame_count )
 		{
 			frame_draw_end();
 
-			if ( app::config.sleep_time_focus && app::config.always_draw )
-				SDL_Delay( app::config.sleep_time_focus );
 		}
 		else
 		{
-			if ( app::config.sleep_time_idle )
-				SDL_Delay( app::config.sleep_time_idle );
+			// if ( app::config.sleep_time_idle )
+			// 	SDL_Delay( app::config.sleep_time_idle );
 
 			g_in_draw = false;
+		}
+
+		if ( app::config.vsync == 0 && app::config.sleep_time_focus && app::frame_time < 0.003 )
+		{
+			if ( want_text_input || app::config.always_draw )
+			{
+				SDL_Delay( app::config.sleep_time_focus );
+			}
 		}
 
 		if ( app::in_window_drag )
@@ -1492,6 +1542,8 @@ int main( int argc, char* argv[] )
 	{
 		printf( "Failed to add SDL Event Watch\n" );
 	}
+	
+	g_draw_event.type = SDL_RegisterEvents( 1 );
 
 	window_quick_draw();
 

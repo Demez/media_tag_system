@@ -17,6 +17,7 @@
 
 
 HANDLE_GEN_32( h_thumbnail );
+HANDLE_GEN_32( h_job );
 
 
 // ---------------------------------------------------------
@@ -129,6 +130,7 @@ struct app_config_t
 	u32                       sleep_time_no_focus    = 5;
 	u32                       sleep_time_focus       = 1;
 	u32                       sleep_time_idle        = 15;
+	double                    apply_sleep_time_threshold = 0.005;
 
 	u32                       font_size              = 17;
 
@@ -394,7 +396,7 @@ namespace app
 	extern float        dpi;
 
 	extern u64          total_time;
-	extern float        frame_time;
+	extern double       frame_time;
 
 	extern ImVec2       mouse_delta;
 	extern ImVec2       mouse_pos;
@@ -493,7 +495,7 @@ namespace image_draw
 	// Animated image playback information
 	extern double next_frame_timer;
 	extern size_t frame;
-	extern float  playback_speed;
+	extern double playback_speed;
 	extern bool   pause;
 
 	// index into gallery::sorted_media
@@ -510,6 +512,7 @@ extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
 
 void                                 set_frame_draw( u32 count = 1 );
+void                                 send_frame_draw_event();
 void                                 update_dpi( float dpi_override = 0.f );
 
 // Handle new file or path from external source
@@ -521,7 +524,7 @@ bool                                 image_copy_frame_data( image_t& src, image_
 
 void                                 media_view_init();
 void                                 media_view_shutdown();
-void                                 media_view_update( float frame_time );
+void                                 media_view_update( double frame_time );
 e_media_type                         get_media_type();
 
 // Load currently selected file, does not change view type though
@@ -587,6 +590,33 @@ void                                 gl_free_textures( uploaded_textures_t& text
 
 void                                 config_reset();
 bool                                 config_load();
+
+
+// -------------------------------------------------------------------------------------------
+// Job System
+
+
+// current progress of a job
+enum e_job_state
+{
+	e_job_state_idle,
+	e_job_state_working,
+	// e_job_state_paused,
+	e_job_state_finished,
+	e_job_state_error,
+};
+
+
+typedef void( *f_job_func )( void* user_data );
+
+
+bool        job_init();
+void        job_shutdown();
+
+h_job       job_push( f_job_func job_func );
+e_job_state job_get_status( h_job job );
+void        job_cancel( h_job job );
+void        job_cancel_wait( h_job job );
 
 
 // -------------------------------------------------------------------------------------------

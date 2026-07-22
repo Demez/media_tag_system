@@ -22,7 +22,7 @@ namespace image_draw
 	// Animated image playback information
 	double      next_frame_timer = 0.0;
 	size_t      frame            = 0;
-	float       playback_speed   = 1.f;
+	double      playback_speed   = 1.0;
 	bool        pause            = false;
 
 	// index into gallery::sorted_media
@@ -110,7 +110,10 @@ void media_view_scale_thread_run()
 		if ( image_draw::size.x <= ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 		{
 			if ( image_scale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
+			{
 				g_scale_state = e_scale_state_upload;
+				send_frame_draw_event();
+			}
 
 			// if ( g_scale_src.width != g_image_data.image.width )
 			// 	printf( "scale source is different from currently displayed image!\n" );
@@ -153,7 +156,7 @@ void media_view_frame_set( size_t frame )
 }
 
 
-void media_view_scale_check_timer( float frame_time )
+void media_view_scale_check_timer( double frame_time )
 {
 	// Don't handle animated images for now
 	if ( g_image_data.image.frame.size() > 1 )
@@ -219,7 +222,7 @@ void media_view_scale_check_timer( float frame_time )
 }
 
 
-void media_view_update( float frame_time )
+void media_view_update( double frame_time )
 {
 	media_view_scale_check_timer( frame_time );
 

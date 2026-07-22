@@ -1080,6 +1080,7 @@ void gallery_view_draw_sidebar()
 		if ( ImGui::BeginTabItem( "Settings" ) )
 		{
 			ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
+			ImGui::Text( "%.8lf Frametime", app::frame_time );
 
 			// ImGui::Text( "App Time: %.3f Sec", app::total_time );
 			ImGui::Text( "App Time: %.3f Sec", app::total_time / 1000.f );
@@ -1110,14 +1111,14 @@ void gallery_view_draw_sidebar()
 
 			ImGui::PushItemWidth( 128 );
 
-			int idle_sleep_time = app::config.sleep_time_idle;
-			if ( ImGui::InputInt( "Idle Sleep Time", &idle_sleep_time, 1, 1 ) )
-			{
-				app::config.sleep_time_idle = CLAMP( idle_sleep_time, 0, 1000 );
-			}
-			set_frame_draw( ImGui::IsItemHovered() );
-
-			ImGui::SetItemTooltip( "Sleep time when app is not actively drawing, but focused" );
+			//int idle_sleep_time = app::config.sleep_time_idle;
+			//if ( ImGui::InputInt( "Idle Sleep Time", &idle_sleep_time, 1, 1 ) )
+			//{
+			//	app::config.sleep_time_idle = CLAMP( idle_sleep_time, 0, 1000 );
+			//}
+			//set_frame_draw( ImGui::IsItemHovered() );
+			//
+			//ImGui::SetItemTooltip( "Sleep time when app is not actively drawing, but focused" );
 
 			int focus_sleep_time = app::config.sleep_time_focus;
 			if ( ImGui::InputInt( "Focused Sleep Time", &focus_sleep_time, 1, 1 ) )
@@ -1126,7 +1127,7 @@ void gallery_view_draw_sidebar()
 			}
 
 			set_frame_draw( ImGui::IsItemHovered() );
-			ImGui::SetItemTooltip( "Sleep time when app is focused, and always draw is enabled" );
+			ImGui::SetItemTooltip( "Sleep time when app is focused, and running really fast, and vsync is off" );
 
 			int unfocus_sleep_time = app::config.sleep_time_no_focus;
 			if ( ImGui::InputInt( "Unfocused Sleep Time", &unfocus_sleep_time, 1, 1 ) )

@@ -728,7 +728,7 @@ void mpv_handle_wait_event( mpv_handle* mpv, double timeout, const char* prefix 
 		if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
 		{
 			// Video Loaded
-			set_frame_draw();
+			send_frame_draw_event();
 			g_mpv_video_ready = true;
 		}
 
