@@ -481,6 +481,9 @@ namespace gallery
 
 	// used for memory with media advancing with arrow keys
 	extern selection_t                   last_selection;
+
+	extern bool                          always_recalc_item_sizes;
+	extern bool                          always_recalc_layout;
 }
 
 
@@ -540,6 +543,7 @@ const fs::path&                      gallery_item_get_path( size_t index );
 std::string                          gallery_item_get_path_string( size_t index );
 
 void                                 gallery_view_scroll_to_cursor();
+void                                 gallery_view_handle_scroll_event( float mouse_y );
 void                                 gallery_view_input();
 void                                 gallery_view_draw();
 void                                 gallery_view_dir_change( bool keep_selection );

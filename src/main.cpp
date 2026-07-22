@@ -921,6 +921,7 @@ bool handle_events()
 				app::mouse_scroll += event.wheel.integer_y;
 
 				media_view_scroll_zoom( event.wheel.integer_y );
+				gallery_view_handle_scroll_event( event.wheel.y );
 				break;
 
 			case SDL_EVENT_MOUSE_MOTION:

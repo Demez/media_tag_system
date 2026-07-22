@@ -1091,6 +1091,15 @@ void gallery_view_draw_sidebar()
 			}
 
 			ImGui::Checkbox( "Always Draw", &app::config.always_draw );
+			// ImGui::Checkbox( "DWM Extend", &app::config.dwm_extend );
+			ImGui::Checkbox( "Use Custom Colors", &app::config.use_custom_colors );
+
+			ImGui::Separator();
+
+			ImGui::Checkbox( "Always Recalc Gallery Item Sizes", &gallery::always_recalc_item_sizes );
+			ImGui::Checkbox( "Always Recalc Gallery Item Layout", &gallery::always_recalc_layout );
+
+			ImGui::Separator();
 
 			static float dpi_scale = 0.f;
 			dpi_scale              = app::dpi;
