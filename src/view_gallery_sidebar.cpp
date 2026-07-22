@@ -1079,6 +1079,13 @@ void gallery_view_draw_sidebar()
 
 		if ( ImGui::BeginTabItem( "Settings" ) )
 		{
+			ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
+
+			// ImGui::Text( "App Time: %.3f Sec", app::total_time );
+			ImGui::Text( "App Time: %.3f Sec", app::total_time / 1000.f );
+
+			ImGui::Separator();
+
 			if ( ImGui::Checkbox( "Gallery - Fixed Thumbnail Sizes", &app::config.thumbnail_use_fixed_size ) )
 			{
 				thumbnail_clear_cache();
@@ -1098,6 +1105,32 @@ void gallery_view_draw_sidebar()
 
 			ImGui::Checkbox( "Always Recalc Gallery Item Sizes", &gallery::always_recalc_item_sizes );
 			ImGui::Checkbox( "Always Recalc Gallery Item Layout", &gallery::always_recalc_layout );
+
+			ImGui::Separator();
+
+			int idle_sleep_time = app::config.sleep_time_idle;
+			if ( ImGui::InputInt( "Idle Sleep Time", &idle_sleep_time, 1, 1 ) )
+			{
+				app::config.sleep_time_idle = CLAMP( idle_sleep_time, 0, 1000 );
+			}
+
+			ImGui::SetItemTooltip( "Sleep time when app is not actively drawing, but focused" );
+
+			int focus_sleep_time = app::config.sleep_time_focus;
+			if ( ImGui::InputInt( "Focused Sleep Time", &focus_sleep_time, 1, 1 ) )
+			{
+				app::config.sleep_time_focus = CLAMP( focus_sleep_time, 0, 1000 );
+			}
+
+			ImGui::SetItemTooltip( "Sleep time when app is focused, and always draw is enabled" );
+
+			int unfocus_sleep_time = app::config.sleep_time_no_focus;
+			if ( ImGui::InputInt( "Unfocused Sleep Time", &unfocus_sleep_time, 1, 1 ) )
+			{
+				app::config.sleep_time_no_focus = CLAMP( unfocus_sleep_time, 0, 1000 );
+			}
+
+			ImGui::SetItemTooltip( "Sleep time when app is not focused" );
 
 			ImGui::Separator();
 
