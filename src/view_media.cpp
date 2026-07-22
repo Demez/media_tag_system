@@ -1563,18 +1563,19 @@ void media_view_draw_close_button()
 	{
 		area_focused = false;
 
-		if ( was_drawing_controls )
-			set_frame_draw();
+		//if ( was_drawing_controls )
+		//	set_frame_draw();
 	
 		//was_drawing_controls = false;
 		//ImGui::PopFont();
 		//return;
 	}
 	
-	if ( !was_drawing_controls )
+	//if ( !was_drawing_controls )
+	if ( was_drawing_controls != area_focused )
 		set_frame_draw();
 	
-	was_drawing_controls = true;
+	was_drawing_controls = area_focused;
 
 	// ----------------------------------------
 
