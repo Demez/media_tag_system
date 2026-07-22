@@ -1072,6 +1072,12 @@ void check_need_draw( bool playing_back_video )
 	ImGuiContext* ctx = ImGui::GetCurrentContext();
 	ImGuiIO&      io  = ImGui::GetIO();
 
+	if ( io.MouseDown[ 0 ] > 0 || io.MouseDown[ 1 ] > 0 )
+	{
+		if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
+			set_frame_draw();
+	}
+
 	// Check if a popup was opened or closed
 	static bool popup_open_last = false;
 	bool        popup_open      = ImGui::IsPopupOpen( "", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel );
