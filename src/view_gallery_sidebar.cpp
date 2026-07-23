@@ -1104,8 +1104,13 @@ void gallery_view_draw_sidebar()
 
 			ImGui::Separator();
 
+			// DEBUG
 			ImGui::Checkbox( "Always Recalc Gallery Item Sizes", &gallery::always_recalc_item_sizes );
 			ImGui::Checkbox( "Always Recalc Gallery Item Layout", &gallery::always_recalc_layout );
+
+			ImGui::Separator();
+
+			ImGui::Checkbox( "Enable JPEG XL Thumbnails", &app::config.thumbnail_jxl_enable );
 
 			ImGui::Separator();
 

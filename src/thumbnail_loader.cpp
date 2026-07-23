@@ -411,6 +411,9 @@ void thumbnail_save_worker( int thread )
 
 		//printf( "[THUMBNAIL %d] SAVED %s\n", entry.thumbnail.index, thumbnail->path );
 		thumbnail->save_status = e_thumbnail_save_finished;
+
+		// this is only useful when in stats view lol
+		send_frame_draw_event();
 	}
 }
 
@@ -610,15 +613,6 @@ void thumbnail_loader_worker( u32 thread_id )
 		if ( thread_data.state == e_thumbnail_thread_exit )
 			break;
 
-		// if (  == e_thumbnail_thread_idle )
-		// {
-		// 	if ( local_mpv )
-		// 		thumbnail_mpv_ctx_free( local_mpv );
-		// 
-		// 	SDL_Delay( 250 );
-		// 	continue;
-		// }
-
 		thumbnail_t* thumbnail = &g_thumbnail_cache.buffer[ thread_data.thumbnail.index ];
 
 		if ( !thumbnail )
@@ -635,8 +629,8 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		u32               thumbnail_size = gallery::image_size;
 
-		//if ( app::config.thumbnail_use_fixed_size || app::config.thumbnail_jxl_enable )
-		//	thumbnail_size = app::config.thumbnail_size;
+		if ( app::config.thumbnail_use_fixed_size )
+			thumbnail_size = app::config.thumbnail_size;
 
 		bool              thumbnail_found_on_disk = false;
 		image_load_info_t jxl_thumbnail{};
