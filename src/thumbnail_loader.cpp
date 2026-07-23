@@ -13,6 +13,9 @@ std::atomic< bool > g_thumbnails_running;
 std::thread**       g_thumbnail_worker;
 std::thread**       g_thumbnail_save_worker;
 
+// thumbnail save threads sleep, and wait on this signal before doing any work
+std::atomic< bool > g_thumbnail_save_wait = false;
+
 extern void*        g_mpv_module;
 
 constexpr bool      THUMBNAIL_DEBUG_PRINT = false;
@@ -206,7 +209,8 @@ search:
 
 	try
 	{
-		g_thumbnail_cache.buffer[ cache_pos ].path        = util_strdup( media_entry.file.path.string().c_str() );
+		std::string path_str                              = sys_path_to_string( media_entry.file.path );
+		g_thumbnail_cache.buffer[ cache_pos ].path        = util_strdup( path_str.c_str() );
 		g_thumbnail_cache.buffer[ cache_pos ].status      = e_thumbnail_status_queued;
 		g_thumbnail_cache.buffer[ cache_pos ].save_status = e_thumbnail_save_idle;
 		g_thumbnail_cache.buffer[ cache_pos ].type        = media_entry.type;
@@ -357,14 +361,16 @@ size_t thumbnail_generate_hash( file_t& file )
 }
 
 
-void thumbnail_save_worker()
+void thumbnail_save_worker( int thread )
 {
 	while ( g_thumbnails_running.load( std::memory_order_acquire ) )
 	{
 		if ( g_thumbnail_save.queue.empty() )
 		{
-			SDL_Delay( 250 );
-			continue;
+			g_thumbnail_save.mutex.lock();
+			g_thumbnail_save_wait.store( false );
+			g_thumbnail_save.mutex.unlock();
+			g_thumbnail_save_wait.wait( false );
 		}
 
 		g_thumbnail_save.mutex.lock();
@@ -401,39 +407,7 @@ void thumbnail_save_worker()
 		thumbnail_path += std::to_string( entry.file_hash );
 		thumbnail_path += ".jxl";
 
-		float image_size = std::max( thumbnail->image->width, thumbnail->image->height );
-
-		// Downscale first if needed
-		if ( image_size > app::config.thumbnail_size )
-		{
-			float factor[ 2 ]  = { 1.f, 1.f };
-
-			factor[ 0 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->width;
-			factor[ 1 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->height;
-
-			float   scale      = std::min( factor[ 0 ], factor[ 1 ] );
-
-			float   new_width  = thumbnail->image->width * scale;
-			float   new_height = thumbnail->image->height * scale;
-
-			image_t new_image{};
-
-			//printf( "[THUMBNAIL %d] SAVING %s\n", entry.thumbnail.index, thumbnail->path );
-
-			if ( image_scale( thumbnail->image, &new_image, new_width, new_height ) )
-			{
-				thumbnail_save( new_image, thumbnail_path );
-				image_free( new_image );
-			}
-			else
-			{
-				printf( "Failed to downscale image for thumbnail cache!\n" );
-			}
-		}
-		else
-		{
-			thumbnail_save( *thumbnail->image, thumbnail_path );
-		}
+		thumbnail_save( *thumbnail->image, thumbnail_path );
 
 		//printf( "[THUMBNAIL %d] SAVED %s\n", entry.thumbnail.index, thumbnail->path );
 		thumbnail->save_status = e_thumbnail_save_finished;
@@ -452,6 +426,10 @@ void thumbnail_save_push( h_thumbnail thumbnail_handle, thumbnail_t* thumbnail, 
 
 	g_thumbnail_save.queue.emplace_front( entry );
 	g_thumbnail_save.count++;
+
+	// wake up one thread
+	g_thumbnail_save_wait.store( true );
+	g_thumbnail_save_wait.notify_one();
 }
 
 
@@ -746,50 +724,40 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			if ( !cleaned_path.starts_with( app::config.thumbnail_cache_path ) )
 			{
-				//printf( "SAVING JXL THUMBNAIL FOR %s\n", thumbnail->path );
-				thumbnail->save_status = e_thumbnail_save_queued;
-				thumbnail_save_push( thread_data.thumbnail, thumbnail, file_hash );
+				// prescale the image instead, that way the save thread doesn't need to hold onto images nearly as long
+				if ( max_image_size > app::config.thumbnail_size )
+				{
+					float factor[ 2 ]  = { 1.f, 1.f };
 
-				// Downscale first
-			//	if ( max_image_size > app::config.thumbnail_size )
-			//	{
-			//		float factor[ 2 ]  = { 1.f, 1.f };
-			//
-			//		factor[ 0 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->width;
-			//		factor[ 1 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->height;
-			//
-			//		float   scale      = std::min( factor[ 0 ], factor[ 1 ] );
-			//
-			//		float   new_width  = thumbnail->image->width * scale;
-			//		float   new_height = thumbnail->image->height * scale;
-			//
-			//		image_t new_image{};
-			//
-			//		if ( image_scale( thumbnail->image, &new_image, new_width, new_height ) )
-			//		{
-			//			std::string thumbnail_path = app::config.thumbnail_cache_path;
-			//			thumbnail_path += SEP_S;
-			//			thumbnail_path += std::to_string( file_hash );
-			//			thumbnail_path += ".jxl";
-			//
-			//			thumbnail_save( new_image, thumbnail_path );
-			//
-			//			// ch_free( e_mem_category_image_data, new_image.frame[ 0 ].data );
-			//		}
-			//		else
-			//		{
-			//			printf( "Failed to downscale image for thumbnail cache!\n" );
-			//		}
-			//	}
-			//	else
-			//	{
-			//		std::string thumbnail_path = app::config.thumbnail_cache_path;
-			//		thumbnail_path += SEP_S;
-			//		thumbnail_path += std::to_string( file_hash );
-			//		thumbnail_path += ".jxl";
-			//
-			//		thumbnail_save( *thumbnail->image, thumbnail_path );
-			//	}
+					factor[ 0 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->width;
+					factor[ 1 ]        = (float)app::config.thumbnail_size / (float)thumbnail->image->height;
+
+					float   scale      = std::min( factor[ 0 ], factor[ 1 ] );
+
+					float   new_width  = thumbnail->image->width * scale;
+					float   new_height = thumbnail->image->height * scale;
+
+					u8*     old_frame  = thumbnail->image->frame[ 0 ].data;
+
+					if ( image_scale( thumbnail->image, thumbnail->image, new_width, new_height ) )
+					{
+						ch_free( e_mem_category_image_data, old_frame );
+						
+						//printf( "SAVING JXL THUMBNAIL FOR %s\n", thumbnail->path );
+						thumbnail->save_status = e_thumbnail_save_queued;
+						thumbnail_save_push( thread_data.thumbnail, thumbnail, file_hash );
+					}
+					else
+					{
+						printf( "Failed to downscale image!\n" );
+					}
+				}
+				else
+				{
+					//printf( "SAVING JXL THUMBNAIL FOR %s\n", thumbnail->path );
+					thumbnail->save_status = e_thumbnail_save_queued;
+					thumbnail_save_push( thread_data.thumbnail, thumbnail, file_hash );
+				}
 			}
 		}
 
@@ -837,7 +805,7 @@ bool thumbnail_loader_init()
 
 	for ( int i = 0; i < app::config.thumbnail_save_threads; i++ )
 	{
-		g_thumbnail_save_worker[ i ] = new std::thread( thumbnail_save_worker );
+		g_thumbnail_save_worker[ i ] = new std::thread( thumbnail_save_worker, i );
 	}
 
 	for ( int i = 0; i < app::config.thumbnail_threads; i++ )

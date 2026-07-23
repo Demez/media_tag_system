@@ -1100,7 +1100,7 @@ void gallery_view_draw_sidebar()
 
 			ImGui::Checkbox( "Always Draw", &app::config.always_draw );
 			// ImGui::Checkbox( "DWM Extend", &app::config.dwm_extend );
-			ImGui::Checkbox( "Use Custom Colors", &app::config.use_custom_colors );
+			// ImGui::Checkbox( "Use Custom Colors", &app::config.use_custom_colors );
 
 			ImGui::Separator();
 
@@ -1137,6 +1137,17 @@ void gallery_view_draw_sidebar()
 			set_frame_draw( ImGui::IsItemHovered() );
 
 			ImGui::SetItemTooltip( "Sleep time when app is not focused" );
+
+			ImGui::Separator();
+
+			int uploads_per_frame = app::config.thumbnail_uploads_per_frame;
+			if ( ImGui::InputInt( "Thumbnail Uploads Per Frame", &uploads_per_frame, 1, 1 ) )
+			{
+				app::config.thumbnail_uploads_per_frame = CLAMP( uploads_per_frame, 1, 32 );
+			}
+			set_frame_draw( ImGui::IsItemHovered() );
+
+			ImGui::SetItemTooltip( "Amount of thumbnails allowed to upload to the GPU per frame on the main thread\nThis Blocks the main thread to upload, so don't set this number too high" );
 
 			ImGui::Separator();
 
