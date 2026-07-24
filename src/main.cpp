@@ -256,6 +256,7 @@ void folder_load_media_list()
 	if ( !sys_scandir( root.c_str(), nullptr, files, scan_flags ) )
 	{
 		printf( "Failed to scan directory\n" );
+		gallery_view_dir_change( false );
 		return;
 	}
 

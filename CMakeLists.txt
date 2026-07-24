@@ -139,7 +139,7 @@ if ( MSVC )
 		# "/INCREMENTAL"
 	)
 
-	link_libraries( Dwmapi )
+	link_libraries( Dwmapi ntdll )
 	
 	message( "Copying SDL3" )
 	configure_file( "thirdparty/SDL3/lib/x64/SDL3.dll" "${PROJ_OUT}/SDL3.dll" COPYONLY )

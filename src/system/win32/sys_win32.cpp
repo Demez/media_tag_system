@@ -33,6 +33,165 @@
 
 // ----------------------------------------------------------------------------------------
 
+#define NT_SCANDIR_TEST 1
+
+#if NT_SCANDIR_TEST
+
+typedef _Return_type_success_( return >= 0 ) LONG NTSTATUS;
+typedef NTSTATUS* PNTSTATUS;
+
+typedef enum _FILE_INFORMATION_CLASS
+{
+	FileDirectoryInformation                     = 1,
+	FileFullDirectoryInformation                 = 2,
+	FileBothDirectoryInformation                 = 3,
+	FileBasicInformation                         = 4,
+	FileStandardInformation                      = 5,
+	FileInternalInformation                      = 6,
+	FileEaInformation                            = 7,
+	FileAccessInformation                        = 8,
+	FileNameInformation                          = 9,
+	FileRenameInformation                        = 10,
+	FileLinkInformation                          = 11,
+	FileNamesInformation                         = 12,
+	FileDispositionInformation                   = 13,
+	FilePositionInformation                      = 14,
+	FileFullEaInformation                        = 15,
+	FileModeInformation                          = 16,
+	FileAlignmentInformation                     = 17,
+	FileAllInformation                           = 18,
+	FileAllocationInformation                    = 19,
+	FileEndOfFileInformation                     = 20,
+	FileAlternateNameInformation                 = 21,
+	FileStreamInformation                        = 22,
+	FilePipeInformation                          = 23,
+	FilePipeLocalInformation                     = 24,
+	FilePipeRemoteInformation                    = 25,
+	FileMailslotQueryInformation                 = 26,
+	FileMailslotSetInformation                   = 27,
+	FileCompressionInformation                   = 28,
+	FileObjectIdInformation                      = 29,
+	FileCompletionInformation                    = 30,
+	FileMoveClusterInformation                   = 31,
+	FileQuotaInformation                         = 32,
+	FileReparsePointInformation                  = 33,
+	FileNetworkOpenInformation                   = 34,
+	FileAttributeTagInformation                  = 35,
+	FileTrackingInformation                      = 36,
+	FileIdBothDirectoryInformation               = 37,
+	FileIdFullDirectoryInformation               = 38,
+	FileValidDataLengthInformation               = 39,
+	FileShortNameInformation                     = 40,
+	FileIoCompletionNotificationInformation      = 41,
+	FileIoStatusBlockRangeInformation            = 42,
+	FileIoPriorityHintInformation                = 43,
+	FileSfioReserveInformation                   = 44,
+	FileSfioVolumeInformation                    = 45,
+	FileHardLinkInformation                      = 46,
+	FileProcessIdsUsingFileInformation           = 47,
+	FileNormalizedNameInformation                = 48,
+	FileNetworkPhysicalNameInformation           = 49,
+	FileIdGlobalTxDirectoryInformation           = 50,
+	FileIsRemoteDeviceInformation                = 51,
+	FileUnusedInformation                        = 52,
+	FileNumaNodeInformation                      = 53,
+	FileStandardLinkInformation                  = 54,
+	FileRemoteProtocolInformation                = 55,
+	FileRenameInformationBypassAccessCheck       = 56,
+	FileLinkInformationBypassAccessCheck         = 57,
+	FileVolumeNameInformation                    = 58,
+	FileIdInformation                            = 59,
+	FileIdExtdDirectoryInformation               = 60,
+	FileReplaceCompletionInformation             = 61,
+	FileHardLinkFullIdInformation                = 62,
+	FileIdExtdBothDirectoryInformation           = 63,
+	FileDispositionInformationEx                 = 64,
+	FileRenameInformationEx                      = 65,
+	FileRenameInformationExBypassAccessCheck     = 66,
+	FileDesiredStorageClassInformation           = 67,
+	FileStatInformation                          = 68,
+	FileMemoryPartitionInformation               = 69,
+	FileStatLxInformation                        = 70,
+	FileCaseSensitiveInformation                 = 71,
+	FileLinkInformationEx                        = 72,
+	FileLinkInformationExBypassAccessCheck       = 73,
+	FileStorageReserveIdInformation              = 74,
+	FileCaseSensitiveInformationForceAccessCheck = 75,
+	FileKnownFolderInformation                   = 76,
+	FileStatBasicInformation                     = 77,
+	FileId64ExtdDirectoryInformation             = 78,
+	FileId64ExtdBothDirectoryInformation         = 79,
+	FileIdAllExtdDirectoryInformation            = 80,
+	FileIdAllExtdBothDirectoryInformation        = 81,
+	FileStreamReservationInformation,
+	FileMupProviderInfo,
+	FileMaximumInformation
+} FILE_INFORMATION_CLASS, *PFILE_INFORMATION_CLASS;
+
+// https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_io_status_block?redirectedfrom=MSDN
+typedef struct _IO_STATUS_BLOCK
+{
+	union
+	{
+		NTSTATUS Status;
+		PVOID    Pointer;
+	};
+	ULONG_PTR Information;
+} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+
+// https://learn.microsoft.com/en-us/windows/win32/api/ntdef/ns-ntdef-_unicode_string
+typedef struct _UNICODE_STRING
+{
+	USHORT Length;
+	USHORT MaximumLength;
+	PWSTR  Buffer;
+} UNICODE_STRING, *PUNICODE_STRING;
+
+// See the handy table linked on the page below to learn where these values comes from.
+// https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/using-ntstatus-values
+constexpr NTSTATUS STATUS_NO_MORE_FILES = 0x80000006;
+constexpr NTSTATUS STATUS_NO_SUCH_FILE  = 0xC000000F;
+
+typedef struct _FILE_DIRECTORY_INFORMATION
+{
+	ULONG         NextEntryOffset;
+	ULONG         FileIndex;
+	LARGE_INTEGER CreationTime;
+	LARGE_INTEGER LastAccessTime;
+	LARGE_INTEGER LastWriteTime;
+	LARGE_INTEGER ChangeTime;
+	LARGE_INTEGER EndOfFile;
+	LARGE_INTEGER AllocationSize;
+	ULONG         FileAttributes;
+	ULONG         FileNameLength;
+	WCHAR         FileName[ 1 ];
+} FILE_DIRECTORY_INFORMATION;
+
+// useful if i want to backport to XP?
+// https://stackoverflow.com/questions/10075514/calling-nt-function-from-ntdll-dll-in-win32-environment-c
+
+extern "C"
+{
+	NTSYSCALLAPI NTSTATUS NtQueryDirectoryFile(
+	  HANDLE                 FileHandle,
+	  HANDLE                 Event,
+	  // This here is PIO_APC_ROUTINE, but we don't use APCs and just set it to null.
+	  PVOID                  ApcRoutine,
+	  PVOID                  ApcContext,
+	  PIO_STATUS_BLOCK       IoStatusBlock,
+	  PVOID                  FileInformation,
+	  ULONG                  Length,
+	  FILE_INFORMATION_CLASS FileInformationClass,
+	  BOOLEAN                ReturnSingleEntry,
+	  PUNICODE_STRING        FileName,
+	  BOOLEAN                RestartScan );
+}
+
+#endif
+
+
+// ----------------------------------------------------------------------------------------
+
 
 static HANDLE                  g_singleton_pipe  = INVALID_HANDLE_VALUE;
 static std::thread*            g_pipe_thread     = nullptr;
@@ -736,6 +895,255 @@ bool sys_get_drives( std::vector< std::string >& drives )
 	return true;
 }
 
+// faster directory scanning
+#if NT_SCANDIR_TEST && 1
+
+struct _recursive_depth_t
+{
+	std::wstring name;
+	std::wstring root;
+};
+
+// https://blog.s-schoener.com/2024-06-24-find-files-internals/
+
+static bool _open_dir( std::wstring& path, HANDLE& dir_handle, IO_STATUS_BLOCK& statusBlock, void* buffer, size_t buffer_size, std::vector< file_t >& files )
+{
+	dir_handle = CreateFileW( path.c_str(),
+	                          FILE_LIST_DIRECTORY,
+	                          FILE_SHARE_READ,
+	                          nullptr,
+	                          OPEN_EXISTING,
+	                          FILE_FLAG_BACKUP_SEMANTICS,
+	                          0 );
+
+	if ( dir_handle == INVALID_HANDLE_VALUE )
+		return false;
+
+	NTSTATUS status = NtQueryDirectoryFile(
+	  dir_handle, 0, nullptr, nullptr,
+	  &statusBlock, buffer, buffer_size,
+	  FileDirectoryInformation,
+	  FALSE,
+	  nullptr,
+	  TRUE );
+
+	const size_t bytesWritten = (size_t)statusBlock.Information;
+
+	if ( bytesWritten == 0 || status == STATUS_NO_SUCH_FILE )
+	{
+		// No file entries found -- this is impossible in this case because we did not
+		// specifiy a search string, so we'll find '.' and '..' at the very least.
+		CloseHandle( dir_handle );
+		return false;
+	}
+
+	FILE_DIRECTORY_INFORMATION* file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
+	size_t                      files_scanned = 0;
+	
+	while ( file_dir_info->NextEntryOffset != 0 )
+	{
+		file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)file_dir_info ) + file_dir_info->NextEntryOffset );
+		files_scanned++;
+	}
+
+	files.resize( files.size() + files_scanned );
+
+	return true;
+}
+
+
+static bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std::vector< file_t >& files, e_scandir_flags flags )
+{
+	std::wstring scan_dir = root, scan_dir_wildcard{};
+	scan_dir += L"\\";
+
+	if ( path )
+	{
+		scan_dir += path;
+		scan_dir += '\\';
+	}
+
+	scan_dir_wildcard += L"\\\\?\\";
+	scan_dir_wildcard += scan_dir;
+
+	size_t                                  recursive_path_count = 0;
+	std::forward_list< _recursive_depth_t > recursive_paths{};
+	std::wstring                            current_depth{};
+
+	constexpr u64               buffer_count = 4096;
+	constexpr u64               buffer_size  = sizeof( FILE_DIRECTORY_INFORMATION ) * buffer_count;
+	FILE_DIRECTORY_INFORMATION* buffer       = ch_calloc< FILE_DIRECTORY_INFORMATION >( buffer_count, e_mem_category_general );
+
+	IO_STATUS_BLOCK statusBlock;
+	ZeroMemory( &statusBlock, sizeof( statusBlock ) );
+
+	HANDLE dirHandle{};
+
+	size_t file_index = 0;
+
+	if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size, files ) )
+	{
+		wprintf( L"Failed to search directory: %s\n", scan_dir.c_str() );
+		ch_free( e_mem_category_general, buffer );
+		return false;
+	}
+
+	FILE_DIRECTORY_INFORMATION* file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
+	while ( true )
+	{
+		if ( file_dir_info->NextEntryOffset == 0 )
+		{
+			// The state of the search is implictly tied
+			// to the handle we are using for the directory.
+			NTSTATUS status = NtQueryDirectoryFile(
+			  dirHandle, 0, nullptr, nullptr,
+			  &statusBlock, buffer, buffer_size,
+			  FileDirectoryInformation,
+			  FALSE,
+			  nullptr,
+			  FALSE );
+
+			if ( status == STATUS_NO_MORE_FILES )
+			{
+				CloseHandle( dirHandle );
+
+				if ( !(flags & e_scandir_recursive) )
+					break;
+
+				if ( recursive_path_count == 0 )
+					break;
+
+				recursive_path_count--;
+				_recursive_depth_t new_path = recursive_paths.front();
+				recursive_paths.pop_front();
+
+				scan_dir_wildcard = L"\\\\?\\";
+				scan_dir_wildcard += scan_dir;
+
+				if ( new_path.root.size() )
+				{
+					scan_dir_wildcard += new_path.root;
+					scan_dir_wildcard += '\\';
+
+					current_depth = new_path.root;
+					current_depth +='\\';
+					current_depth += new_path.name;
+				}
+				else
+				{
+					current_depth = new_path.name;
+				}
+
+				scan_dir_wildcard += new_path.name;
+
+				if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size, files ) )
+				{
+					wprintf( L"Failed to search directory: %s\n", scan_dir.c_str() );
+					ch_free( e_mem_category_general, buffer );
+					return false;
+				}
+			}
+
+			// ASSERT( status >= 0, "NtQueryDirectoryFileEx failed while getting more files" );
+			file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
+			FILE_DIRECTORY_INFORMATION* tmp_file_dir_info = file_dir_info;
+			size_t files_scanned = 0;
+
+			// allocate more memory
+			while ( tmp_file_dir_info->NextEntryOffset != 0 )
+			{
+				tmp_file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)tmp_file_dir_info ) + tmp_file_dir_info->NextEntryOffset );
+				files_scanned++;
+			}
+
+			files.resize( files.size() + files_scanned );
+		}
+
+		// Do something with the file here!
+		file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)file_dir_info ) + file_dir_info->NextEntryOffset );
+
+		bool is_dir   = file_dir_info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+
+		size_t character_count = file_dir_info->FileNameLength / sizeof( wchar_t );
+
+		if ( is_dir && character_count == 2 && wcsncmp( file_dir_info->FileName, L"..", 2 ) == 0 )
+			continue;
+
+		std::wstring relative_path( file_dir_info->FileName, character_count );
+
+		if ( ( flags & e_scandir_recursive ) && is_dir )
+		{
+			// sys_scandir_internal( root, relative_path.c_str(), files, flags );
+			_recursive_depth_t depth{
+				.name = relative_path,
+				.root = current_depth
+			};
+
+			recursive_paths.push_front( depth );
+			recursive_path_count++;
+		}
+
+		if ( ( flags & e_scandir_no_dirs ) && is_dir )
+			continue;
+
+		// if ( ( flags & e_scandir_no_files ) && fs_is_file( relative_path.data() ) )
+		if ( ( flags & e_scandir_no_files ) && !is_dir )
+			continue;
+
+		// https://stackoverflow.com/a/46024468
+		constexpr s64 UNIX_TIME_START  = 0x019DB1DED53E8000;  //January 1, 1970 (start of Unix epoch) in "ticks"
+		constexpr s64 TICKS_PER_SECOND = 10000000;            //a tick is 100ns
+
+		if ( file_index == files.size() )
+		{
+			// ???
+			files.resize( files.size() + 1024 );
+		}
+
+		file_t&       file             = files[ file_index++ ];
+		file.date_created = ( file_dir_info->CreationTime.QuadPart - UNIX_TIME_START ) / TICKS_PER_SECOND;
+		file.date_mod     = ( file_dir_info->LastWriteTime.QuadPart - UNIX_TIME_START ) / TICKS_PER_SECOND;
+
+		std::wstring path;
+
+		if ( flags & e_scandir_abs_paths )
+		{
+			path = scan_dir;
+
+			if ( current_depth.size() )
+			{
+				path += current_depth;
+				path += '\\';
+			}
+
+			path.append( file_dir_info->FileName, character_count );
+		}
+		else
+		{
+			path = relative_path;
+		}
+
+		file.path = path;
+
+		if ( is_dir )
+		{
+			file.type |= e_file_type_directory;
+			file.size = 0;
+		}
+		else
+		{
+			file.type |= e_file_type_file;
+			file.size = file_dir_info->EndOfFile.QuadPart;
+		}
+	}
+
+	files.resize( file_index );
+
+	ch_free( e_mem_category_general, buffer );
+	return true;
+}
+
+#else
 
 bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std::vector< file_t >& files, e_scandir_flags flags )
 {
@@ -833,13 +1241,19 @@ bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std::vector
 	return true;
 }
 
+#endif
 
 bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
 {
-	wchar_t* root_w = sys_to_wchar( root );
-	wchar_t* path_w = sys_to_wchar( path );
+	wchar_t* root_w     = sys_to_wchar( root );
+	wchar_t* path_w     = sys_to_wchar( path );
 
-	bool     ret    = sys_scandir_internal( root_w, path_w, files, flags );
+	u64      start_time = sys_get_time_ms();
+
+	bool     ret        = sys_scandir_internal( root_w, path_w, files, flags );
+
+	u64      end_time   = sys_get_time_ms();
+	printf( "SCANDIR TIME: %.4f\n", (float)( end_time - start_time ) / 1000.f );
 
 	ch_free_str( root_w );
 	ch_free_str( path_w );
