@@ -455,6 +455,9 @@ void media_view_zoom_reset()
 
 void media_view_scroll_zoom( float scroll )
 {
+	if ( directory::delayed_folder_load )
+		return;
+
 	if ( !g_image_data.textures.count || scroll == 0 )
 		return;
 

@@ -629,7 +629,6 @@ void gallery_selected_item_action( const media_entry_t& media, u32 index )
 	}
 	else
 	{
-		g_image_data.index = index;
 		set_view_type_media();
 	}
 }

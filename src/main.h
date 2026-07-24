@@ -441,6 +441,7 @@ namespace directory
 	extern bool                          folder_reload;
 	extern bool                          folder_changed;
 	extern bool                          recursive;
+	extern bool                          delayed_folder_load;
 }
 
 
@@ -567,7 +568,7 @@ bool                                 folder_history_nav_prev();
 bool                                 folder_history_nav_next();
 
 void                                 set_view_type_gallery();
-void                                 set_view_type_media();
+void                                 set_view_type_media( bool force_load_media = false );
 void                                 view_type_toggle();
 
 void                                 update_window_title();

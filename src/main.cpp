@@ -68,9 +68,10 @@ namespace directory
 	std::vector< fs::path >      folder_history;
 	size_t                       folder_history_pos;
 
-	bool                         folder_reload  = false;
-	bool                         folder_changed = false;
-	bool                         recursive      = false;
+	bool                         folder_reload          = false;
+	bool                         folder_changed         = false;
+	bool                         recursive              = false;
+	bool                         delayed_folder_load = false;
 }
 
 
@@ -572,14 +573,21 @@ void set_view_type_gallery()
 }
 
 
-void set_view_type_media()
+void set_view_type_media( bool force_load_media )
 {
 	//if ( !g_gallery_view )
 	//	return;
 
 	u32 selected = gallery_view_get_last_selected_index();
 
-	// if ( g_image_data.index != selected )
+	if ( directory::delayed_folder_load )
+		g_image_data.index = selected;
+
+	bool reload_image = force_load_media;
+	reload_image |= g_image_data.index != selected;
+	reload_image |= directory::folder_reload;
+
+	if ( reload_image )
 	{
 		g_image_data.index = selected;
 		media_view_load();
@@ -591,13 +599,10 @@ void set_view_type_media()
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 	}
 
-	media_view_fit_in_view();
-
 	g_gallery_view = false;
 
 	update_window_title();
 	set_frame_draw( 3 );
-	
 }
 
 
@@ -1130,6 +1135,20 @@ static bool check_mpv_playback()
 }
 
 
+static void select_image_in_folder( bool force_load_media )
+{
+	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
+	{
+		if ( gallery_item_get_path( i ) != directory::queued )
+			continue;
+
+		gallery_view_set_selection( i );
+		set_view_type_media( force_load_media );
+		break;
+	}
+}
+
+
 static void check_queued_path()
 {
 	bool is_file = fs_is_file( directory::queued.string().c_str() );
@@ -1143,20 +1162,46 @@ static void check_queued_path()
 		if ( path != directory::path || directory::folder_reload )
 		{
 			directory::folder_changed = true;
-			directory::path           = path;
+
+			if ( !directory::folder_reload )
+				gallery_view_clear_selection();
+
+			// create a temporary media entry for showing the image first
+			// then, we can scan the directory next frame
+			media_entry_t entry{};
+			entry.file.path = directory::queued;
+			entry.filename  = sys_path_to_string( entry.file.path.filename() );
+			std::string ext = fs_get_extension( entry.filename );
+
+			if ( media_check_extension( ext, entry.type ) )
+			{
+				//directory::folder_changed      = true;
+				//folder_load_media_list();
+
+				directory::media_list.clear();
+				directory::media_list.push_back( entry );
+
+				gallery::sorted_media.clear();
+				gallery::sorted_media.push_back( 0 );
+
+				g_image_data.index        = 0;
+				g_image_scaled_data.index = 0;
+
+				set_view_type_media( true );
+
+				directory::delayed_folder_load = true;
+
+				// draw the window to show the image NOW
+				window_quick_draw();
+			}
+
+			// now we can load the files in the directory
+			directory::path = path;
 			folder_load_media_list();
 		}
 
-		for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
-		{
-			if ( gallery_item_get_path( i ) == directory::queued )
-			{
-				gallery_view_set_selection( i );
-				//media_view_load();
-				set_view_type_media();
-				break;
-			}
-		}
+		select_image_in_folder( false );
+		directory::delayed_folder_load = false;
 	}
 	else
 	{
