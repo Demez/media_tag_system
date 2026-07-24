@@ -758,28 +758,26 @@ void thumbnail_loader_worker( u32 thread_id )
 		// ---------------------------------------------------------------------------------------------------------
 		// Scale image to give a nicer thumbnail preview
 
+		float factor[ 2 ] = {
+			(float)thumbnail_size / (float)thumbnail->image->width,
+			(float)thumbnail_size / (float)thumbnail->image->height
+		};
+
+		float scale_amount = std::min( factor[ 0 ], factor[ 1 ] );
+
+		if ( scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f )
 		{
-			float factor[ 2 ] = {
-				(float)thumbnail_size / (float)thumbnail->image->width,
-				(float)thumbnail_size / (float)thumbnail->image->height
-			};
+			float new_width         = thumbnail->image->width * scale_amount;
+			float new_height        = thumbnail->image->height * scale_amount;
 
-			float scale_amount = std::min( factor[ 0 ], factor[ 1 ] );
+			u8*   old_frame         = thumbnail->image->frame[ 0 ].data;
 
-			if ( scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f )
+			thumbnail->image_scaled = ch_calloc< image_t >( 1, e_mem_category_image );
+
+			if ( image_scale( thumbnail->image, thumbnail->image_scaled, new_width, new_height ) )
 			{
-				float new_width         = thumbnail->image->width * scale_amount;
-				float new_height        = thumbnail->image->height * scale_amount;
-
-				u8*   old_frame         = thumbnail->image->frame[ 0 ].data;
-
-				thumbnail->image_scaled = ch_calloc< image_t >( 1, e_mem_category_image );
-
-				if ( image_scale( thumbnail->image, thumbnail->image_scaled, new_width, new_height ) )
-				{
-					// thumbnail->scaled = true;
-					// ch_free( e_mem_category_image_data, old_frame );
-				}
+				// thumbnail->scaled = true;
+				// ch_free( e_mem_category_image_data, old_frame );
 			}
 		}
 
@@ -811,7 +809,7 @@ bool thumbnail_loader_init()
 }
 
 
-void thumbnail_loader_shutdown()
+void thumbnail_loader_shutdown( bool free_thumbnails )
 {
 	if ( !g_thumbnails_running )
 		return;
@@ -821,6 +819,8 @@ void thumbnail_loader_shutdown()
 	// wait for threads to shutdown
 	for ( int i = 0; i < app::config.thumbnail_save_threads; i++ )
 	{
+		g_thumbnail_save_wait.store( true );
+		g_thumbnail_save_wait.notify_all();
 		g_thumbnail_save_worker[ i ]->join();
 		delete g_thumbnail_save_worker[ i ];
 	}
@@ -828,11 +828,12 @@ void thumbnail_loader_shutdown()
 	for ( int i = 0; i < app::config.thumbnail_threads; i++ )
 	{
 		g_thumbnail_thread_data[ i ].state = e_thumbnail_thread_exit;
-		g_thumbnail_thread_data[ i ].state.notify_one();
+		g_thumbnail_thread_data[ i ].state.notify_all();
 		g_thumbnail_worker[ i ]->join();
 		delete g_thumbnail_worker[ i ];
 	}
 
+	ch_free( e_mem_category_general, g_thumbnail_save_worker );
 	ch_free( e_mem_category_general, g_thumbnail_worker );
 
 	delete[] g_thumbnail_thread_data;
@@ -840,6 +841,9 @@ void thumbnail_loader_shutdown()
 	g_thumbnail_thread_data = nullptr;
 	g_thumbnail_save_worker = nullptr;
 	g_thumbnail_worker      = nullptr;
+
+	if ( !free_thumbnails )
+		return;
 
 	// Free thumbnails
 	for ( u32 i = 0; i < MAX_THUMBNAILS; i++ )

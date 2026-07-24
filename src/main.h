@@ -732,7 +732,7 @@ bool          image_scale( image_t* old_image, image_t* new_image, int new_width
 
 
 bool         thumbnail_loader_init();
-void         thumbnail_loader_shutdown();
+void         thumbnail_loader_shutdown( bool free_thumbnails = true );
 void         thumbnail_loader_update();
 
 h_thumbnail  thumbnail_loader_queue_push( const media_entry_t& media_entry );

@@ -759,7 +759,7 @@ void frame_draw_end()
 	ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 	SDL_GL_SwapWindow( app::window );
 
-	if ( g_mpv )
+	if ( g_mpv && g_mpv_gl )
 		p_mpv_render_context_report_swap( g_mpv_gl );
 
 	g_in_draw = false;
@@ -1111,6 +1111,78 @@ void check_need_draw( bool playing_back_video )
 }
 
 
+static bool check_mpv_playback()
+{
+	if ( g_gallery_view || gallery::sorted_media.empty() )
+		return false;
+
+	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
+
+	// if ( entry.type == e_media_type_video /*&& g_mpv_video_ready*/ )
+	if ( entry.type != e_media_type_video )
+		return false;
+
+	// check mpv state (SHOULD PROBABLY TRY USING OBSERVE PROPERTY)
+	s32 paused = 0;
+	p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
+
+	return !paused;
+}
+
+
+static void check_queued_path()
+{
+	bool is_file = fs_is_file( directory::queued.string().c_str() );
+
+	memset( gallery::search, 0, 512 * sizeof( char ) );
+
+	if ( is_file )
+	{
+		fs::path path = directory::queued.parent_path();
+
+		if ( path != directory::path || directory::folder_reload )
+		{
+			directory::folder_changed = true;
+			directory::path           = path;
+			folder_load_media_list();
+		}
+
+		for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
+		{
+			if ( gallery_item_get_path( i ) == directory::queued )
+			{
+				gallery_view_set_selection( i );
+				//media_view_load();
+				set_view_type_media();
+				break;
+			}
+		}
+	}
+	else
+	{
+		if ( directory::queued != directory::path )
+		{
+			directory::folder_changed = true;
+			// gallery_view_clear_selection();
+			directory::path           = directory::queued;
+			folder_load_media_list();
+		}
+		else if ( directory::folder_reload )
+		{
+			gallery_view_scroll_to_cursor();
+			folder_load_media_list();
+		}
+
+		// gallery_view_scroll_to_cursor();
+		set_view_type_gallery();
+	}
+
+	directory::folder_reload = false;
+	directory::queued.clear();
+	update_window_title();
+}
+
+
 void main_loop()
 {
 	bool   run_after_first_loop_hack = true;
@@ -1124,25 +1196,7 @@ void main_loop()
 
 	while ( app::running )
 	{
-		// -----------------------------------------------------------------------------------
-		// Check MPV Playback
-
-		bool playing_back_video = false;
-
-		if ( !g_gallery_view && gallery::sorted_media.size() )
-		{
-			media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
-
-			if ( entry.type == e_media_type_video /*&& g_mpv_video_ready*/ )
-			{
-				// check mpv state (SHOULD PROBABLY TRY USING OBSERVE PROPERTY)
-				s32 paused = 0;
-				p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
-
-				if ( !paused )
-					playing_back_video = true;
-			}
-		}
+		bool playing_back_video = check_mpv_playback();
 
 		// -----------------------------------------------------------------------------------
 		// Update Frame Time
@@ -1185,56 +1239,7 @@ void main_loop()
 		directory::folder_changed = false;
 
 		if ( !directory::queued.empty() )
-		{
-			bool is_file = fs_is_file( directory::queued.string().c_str() );
-
-			memset( gallery::search, 0, 512 * sizeof( char ) );
-
-			if ( is_file )
-			{
-				fs::path path = directory::queued.parent_path();
-
-				if ( path != directory::path || directory::folder_reload )
-				{
-					directory::folder_changed = true;
-					directory::path = path;
-					folder_load_media_list();
-				}
-
-				for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
-				{
-					if ( gallery_item_get_path( i ) == directory::queued )
-					{
-						gallery_view_set_selection( i );
-						//media_view_load();
-						set_view_type_media();
-						break;
-					}
-				}
-			}
-			else
-			{
-				if ( directory::queued != directory::path )
-				{
-					directory::folder_changed = true;
-					// gallery_view_clear_selection();
-					directory::path = directory::queued;
-					folder_load_media_list();
-				}
-				else if ( directory::folder_reload )
-				{
-					gallery_view_scroll_to_cursor();
-					folder_load_media_list();
-				}
-
-				// gallery_view_scroll_to_cursor();
-				set_view_type_gallery();
-			}
-
-			directory::folder_reload = false;
-			directory::queued.clear();
-			update_window_title();
-		}
+			check_queued_path();
 
 		thumbnail_loader_update();
 
@@ -1283,18 +1288,11 @@ void main_loop()
 		bool want_text_input = ImGui::GetIO().WantTextInput || ImGui::GetCurrentContext()->WantTextInputNextFrame;
 
 		if ( draw_frame_count )
-		{
 			frame_draw_end();
 
-		}
-		else
-		{
-			// if ( app::config.sleep_time_idle )
-			// 	SDL_Delay( app::config.sleep_time_idle );
+		g_in_draw = false;
 
-			g_in_draw = false;
-		}
-
+		// slow down the app if running really fast, don't need to use all this cpu for rendering
 		if ( app::config.vsync == 0 && app::config.sleep_time_focus && app::frame_time < 0.003 )
 		{
 			if ( want_text_input || app::config.always_draw )
@@ -1358,7 +1356,28 @@ void shutdown()
 }
 
 
-int main( int argc, char* argv[] )
+bool startup_set_gl_attributes()
+{
+	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY ) )
+		return false;
+
+	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 ) )
+		return false;
+
+	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 ) )
+		return false;
+
+	// 10-bit testing...
+	//SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 10 );
+	//SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 10 );
+	//SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 10 );
+	//SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 2 );
+
+	return true;
+}
+
+
+int startup( int argc, char* argv[] )
 {
 	args_init( argc, argv );
 
@@ -1372,13 +1391,11 @@ int main( int argc, char* argv[] )
 	if ( sys_init_ret == e_sys_init_fail )
 	{
 		printf( "Failed to init system backend!\n" );
-		shutdown();
 		return 1;
 	}
 
 	if ( sys_init_ret == e_sys_init_single_instance )
 	{
-		shutdown();
 		return 0;
 	}
 
@@ -1389,7 +1406,12 @@ int main( int argc, char* argv[] )
 	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
 	{
 		printf( "Failed to init SDL\n" );
-		shutdown();
+		return 1;
+	}
+
+	if ( !startup_set_gl_attributes() )
+	{
+		printf( "Failed to set OpenGL attributes\n" );
 		return 1;
 	}
 
@@ -1398,7 +1420,6 @@ int main( int argc, char* argv[] )
 	if ( !app::window )
 	{
 		printf( "Failed to create SDL window\n" );
-		shutdown();
 		return 1;
 	}
 
@@ -1412,7 +1433,7 @@ int main( int argc, char* argv[] )
 
 	if ( !sys_set_window( app::window ) )
 	{
-		shutdown();
+		printf( "Failed to set window data on platform backend\n" );
 		return 1;
 	}
 
@@ -1423,16 +1444,22 @@ int main( int argc, char* argv[] )
 	if ( !g_gl_context )
 	{
 		printf( "Failed to create GL Context\n" );
-		shutdown();
 		return 1;
 	}
+
+	int r, g, b, a, d, h;
+	SDL_GL_GetAttribute( SDL_GL_RED_SIZE, &r );
+	SDL_GL_GetAttribute( SDL_GL_GREEN_SIZE, &g );
+	SDL_GL_GetAttribute( SDL_GL_BLUE_SIZE, &b );
+	SDL_GL_GetAttribute( SDL_GL_ALPHA_SIZE, &a );
+	SDL_GL_GetAttribute( SDL_GL_DEPTH_SIZE, &d );
+	SDL_GL_GetAttribute( SDL_GL_ACCELERATED_VISUAL, &h );
 
 	SDL_GL_MakeCurrent( app::window, g_gl_context );
 
 	if ( !gladLoadGL() )
 	{
 		printf( "Failed to load GL\n" );
-		shutdown();
 		return 1;
 	}
 
@@ -1445,14 +1472,12 @@ int main( int argc, char* argv[] )
 	if ( !ImGui_ImplSDL3_InitForOpenGL( app::window, g_gl_context ) )
 	{
 		printf( "Failed to init ImGui\n" );
-		shutdown();
 		return 1;
 	}
 
 	if ( !ImGui_ImplOpenGL3_Init() )
 	{
 		printf( "Failed to init ImGui OpenGL\n" );
-		shutdown();
 		return 1;
 	}
 
@@ -1486,8 +1511,6 @@ int main( int argc, char* argv[] )
 
 		//free( exe_path );
 	}
-
-	// SDL_GL_GetSwapInterval( &app::config.vsync );
 
 	SDL_GL_SetSwapInterval( app::config.vsync );
 
@@ -1527,7 +1550,6 @@ int main( int argc, char* argv[] )
 	if ( !thumbnail_loader_init() )
 	{
 		printf( "Failed to init thumbnail loader\n" );
-		shutdown();
 		return 1;
 	}
 
@@ -1562,13 +1584,21 @@ int main( int argc, char* argv[] )
 
 	printf( "%.3f STARTUP TIME\n", time );
 
-	// -----------------------------------------------------------------------------------
+	return 0;
+}
+
+
+int main( int argc, char* argv[] )
+{
+	int ret = startup( argc, argv );
+
+	if ( ret != 0 )
+	{
+		shutdown();
+		return ret;
+	}
 
 	main_loop();
-
-	// -----------------------------------------------------------------------------------
-
 	shutdown();
-	return 0;
 }
 

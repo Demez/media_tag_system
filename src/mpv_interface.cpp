@@ -105,6 +105,12 @@ FUNC_PTR( mpv_render_context_free );
 	}
 
 
+static void* mpv_get_proc( void* ctx, const char* name )
+{
+	return (void*)SDL_GL_GetProcAddress( name );
+}
+
+
 bool load_mpv_dll()
 {
 	if ( app::config.no_video )
@@ -187,6 +193,90 @@ bool load_mpv_dll()
 }
 
 
+void mpv_create_texture();
+
+
+bool mpv_init_render_context()
+{
+	// create render context
+	mpv_opengl_init_params gl_init = {
+		.get_proc_address = mpv_get_proc,  // e.g. SDL_GL_GetProcAddress
+	};
+
+	int              enabled  = 1;
+
+	mpv_render_param params[] = {
+		{ MPV_RENDER_PARAM_API_TYPE, (void*)MPV_RENDER_API_TYPE_OPENGL },
+		{ MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl_init },
+		{ MPV_RENDER_PARAM_INVALID, NULL },
+	};
+
+	//	 * @return error code, including but not limited to:
+	//*      MPV_ERROR_UNSUPPORTED: the OpenGL version is not supported
+	//*                             (or required extensions are missing)
+	//*      MPV_ERROR_NOT_IMPLEMENTED: an unknown API type was provided, or
+	//*                                 support for the requested API was not
+	//*                                 built in the used libmpv binary.
+	//*      MPV_ERROR_INVALID_PARAMETER: at least one of the provided parameters was
+	//*                                   not valid.
+
+	mpv_error ret = (mpv_error)p_mpv_render_context_create( &g_mpv_gl, g_mpv, params );
+
+	if ( ret != MPV_ERROR_SUCCESS )
+	{
+		if ( ret == MPV_ERROR_UNSUPPORTED )
+			printf( "Failed to Create MPV Render Context: MPV_ERROR_UNSUPPORTED" );
+		else if ( ret == MPV_ERROR_NOT_IMPLEMENTED )
+			printf( "Failed to Create MPV Render Context: MPV_ERROR_NOT_IMPLEMENTED" );
+		else if ( ret == MPV_ERROR_INVALID_PARAMETER )
+			printf( "Failed to Create MPV Render Context: MPV_ERROR_INVALID_PARAMETER" );
+
+		return false;
+	}
+
+	// We use events for thread-safe notification of the SDL main loop.
+	// Generally, the wakeup callbacks (set further below) should do as least
+	// work as possible, and merely wake up another thread to do actual work.
+	// On SDL, waking up the mainloop is the ideal course of action. SDL's
+	// SDL_PushEvent() is thread-safe, so we use that.
+	//g_wakeup_on_mpv_render_update = SDL_RegisterEvents(1);
+	//g_wakeup_on_mpv_events = SDL_RegisterEvents(1);
+	//
+	//if (g_wakeup_on_mpv_render_update == (u32)-1 || g_wakeup_on_mpv_events == (u32)-1)
+	//{
+	//	printf( "Failed to Regsiter SDL Events for Video Player!\n" );
+	//	return false;
+	//}
+
+	// When normal mpv events are available.
+	//p_mpv_set_wakeup_callback( g_mpv, on_mpv_events, nullptr );
+
+	// When there is a need to call mpv_render_context_update(), which can
+	// request a new frame to be rendered.
+	// (Separate from the normal event handling mechanism for the sake of
+	//  users which run OpenGL on a different thread.)
+	//p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, nullptr );
+
+	//int64_t wid = (s64)g_mpv_window;
+	//bool    yes = true;
+	//
+	//// attach to main window
+	//p_mpv_set_property( g_mpv, "wid", MPV_FORMAT_INT64, &wid );
+	//p_mpv_set_property( g_mpv, "keep-open", MPV_FORMAT_FLAG, &yes );
+
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	// Create Framebuffer to draw on
+	glGenFramebuffers( 1, &g_mpv_fbo );
+	glBindFramebuffer( GL_FRAMEBUFFER, g_mpv_fbo );
+
+	mpv_create_texture();
+	return true;
+}
+
+
+
 void unload_mpv_dll()
 {
 	if ( !g_mpv )
@@ -231,7 +321,6 @@ void mpv_update_frame()
 	u64 end_time = sys_get_time_ms();
 	//printf( "UPDATE TIME: %.4f\n", (float)(end_time - start_time) / 1000.f );
 }
-
 
 
 // IDEA: maybe for watching a video, you want to zoom into a video as if it was an image
@@ -407,6 +496,12 @@ void mpv_update_texture()
 	if ( !g_mpv )
 		return;
 
+	if ( !g_mpv_gl )
+	{
+		mpv_init_render_context();
+		return;
+	}
+
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
@@ -529,12 +624,6 @@ void mpv_sdl_event( SDL_Event& event )
 }
 
 
-static void* mpv_get_proc( void* ctx, const char* name )
-{
-	return ( void* )SDL_GL_GetProcAddress( name );
-}
-
-
 bool start_mpv()
 {
 	if ( !g_mpv_module )
@@ -557,6 +646,7 @@ bool start_mpv()
 	//p_mpv_set_option_string( g_mpv, "vo", "null" );
 
 	p_mpv_set_option_string( g_mpv, "demuxer-max-bytes", "10M" );
+	p_mpv_set_option_string( g_mpv, "dither-depth", "no" );
 
 	// Stops the main thread from being blocked somehow
 	// https://github.com/celluloid-player/celluloid/pull/982
@@ -571,60 +661,6 @@ bool start_mpv()
 	// p_mpv_request_log_messages( g_mpv, "debug" );
 	//p_mpv_request_log_messages( g_mpv, "warn" );
 	p_mpv_request_log_messages( g_mpv, "info" );
-
-	// create render context
-	mpv_opengl_init_params gl_init = {
-		.get_proc_address = mpv_get_proc,  // e.g. SDL_GL_GetProcAddress
-	};
-
-	int enabled = 1;
-
-	mpv_render_param params[] = {
-		{ MPV_RENDER_PARAM_API_TYPE, (void*)MPV_RENDER_API_TYPE_OPENGL },
-		{ MPV_RENDER_PARAM_OPENGL_INIT_PARAMS, &gl_init },
-		{ MPV_RENDER_PARAM_INVALID, NULL },
-	};
-
-	p_mpv_render_context_create( &g_mpv_gl, g_mpv, params );
-
-	// We use events for thread-safe notification of the SDL main loop.
-	// Generally, the wakeup callbacks (set further below) should do as least
-	// work as possible, and merely wake up another thread to do actual work.
-	// On SDL, waking up the mainloop is the ideal course of action. SDL's
-	// SDL_PushEvent() is thread-safe, so we use that.
-	//g_wakeup_on_mpv_render_update = SDL_RegisterEvents(1);
-	//g_wakeup_on_mpv_events = SDL_RegisterEvents(1);
-//
-	//if (g_wakeup_on_mpv_render_update == (u32)-1 || g_wakeup_on_mpv_events == (u32)-1)
-	//{
-	//	printf( "Failed to Regsiter SDL Events for Video Player!\n" );
-	//	return false;
-	//}
-
-	// When normal mpv events are available.
-	p_mpv_set_wakeup_callback( g_mpv, on_mpv_events, nullptr );
-
-	// When there is a need to call mpv_render_context_update(), which can
-	// request a new frame to be rendered.
-	// (Separate from the normal event handling mechanism for the sake of
-	//  users which run OpenGL on a different thread.)
-	//p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, nullptr );
-
-	//int64_t wid = (s64)g_mpv_window;
-	//bool    yes = true;
-	//
-	//// attach to main window
-	//p_mpv_set_property( g_mpv, "wid", MPV_FORMAT_INT64, &wid );
-	//p_mpv_set_property( g_mpv, "keep-open", MPV_FORMAT_FLAG, &yes );
-
-	int width, height;
-	SDL_GetWindowSize( app::window, &width, &height );
-
-	// Create Framebuffer to draw on
-	glGenFramebuffers( 1, &g_mpv_fbo );
-	glBindFramebuffer( GL_FRAMEBUFFER, g_mpv_fbo );
-
-	mpv_create_texture();
 
 	p_mpv_set_property_string( g_mpv, "keep-open", "always" );
 	p_mpv_set_property_string( g_mpv, "loop", "inf" );
