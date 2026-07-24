@@ -71,21 +71,24 @@ bool thumbnail_save( image_t& image, const std::string& output )
 		return false;
 	}
 
-	JxlExtraChannelInfo extra_info{};
-	JxlEncoderInitExtraChannelInfo( JXL_CHANNEL_ALPHA, &extra_info );
-	extra_info.bits_per_sample = 4;
+	if ( image.channels == 4 )
+	{
+		JxlExtraChannelInfo extra_info{};
+		JxlEncoderInitExtraChannelInfo( JXL_CHANNEL_ALPHA, &extra_info );
+		extra_info.bits_per_sample = 4;
 
-	// status = JxlEncoderSetExtraChannelInfo( enc.get(), 3, &extra_info );
-	// 
-	// if ( status != JXL_ENC_SUCCESS )
-	// {
-	// 	JxlEncoderError error = JxlEncoderGetError( enc.get() );
-	// 	fprintf( stderr, "JxlEncoderSetExtraChannelInfo failed\n" );
-	// 	return false;
-	// }
+		status = JxlEncoderSetExtraChannelInfo( enc.get(), 0, &extra_info );
+	
+		if ( status != JXL_ENC_SUCCESS )
+		{
+			JxlEncoderError error = JxlEncoderGetError( enc.get() );
+			fprintf( stderr, "JxlEncoderSetExtraChannelInfo failed\n" );
+			return false;
+		}
+	}
 
 	JxlColorEncoding color_encoding = {};
-	JXL_BOOL         is_gray        = TO_JXL_BOOL( pixel_format.num_channels < 3 );
+	JXL_BOOL         is_gray        = TO_JXL_BOOL( pixel_format.num_channels == 1 );
 	JxlColorEncodingSetToSRGB( &color_encoding, is_gray );
 	
 	if ( JXL_ENC_SUCCESS != JxlEncoderSetColorEncoding( enc.get(), &color_encoding ) )
