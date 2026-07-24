@@ -1329,6 +1329,12 @@ void main_loop()
 
 void shutdown()
 {
+	ImGui::GetIO().Fonts->Clear();
+
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplSDL3_Shutdown();
+	ImGui::DestroyContext();
+
 	if ( app::window )
 		SDL_DestroyWindow( app::window );
 
