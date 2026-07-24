@@ -552,12 +552,8 @@ void set_view_type_gallery()
 	if ( g_gallery_view )
 		return;
 
-	const media_entry_t& entry = gallery_item_get_media_entry( g_image_data.index );
-
-	// clear mpv
-	// mpv_cmd_loadfile( "" );
-
-	if ( entry.type == e_media_type_video )
+	// pause video if playing one back
+	if ( mpv_get_current_video() )
 	{
 		s32 paused = 0;
 		p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
