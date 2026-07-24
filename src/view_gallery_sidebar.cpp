@@ -1156,6 +1156,40 @@ void gallery_view_draw_sidebar()
 
 			ImGui::Separator();
 
+			SDL_GL_GetSwapInterval( &app::config.vsync );
+
+			ImGui::PushItemWidth( 128 );
+
+			if ( ImGui::Selectable( "VSync OFF", app::config.vsync == 0, 0, { 64.f, ImGui::GetFontSize() } ) )
+			{
+				if ( app::config.vsync != 0 )
+					SDL_GL_SetSwapInterval( 0 );
+			}
+
+			ImGui::SameLine();
+			ImGui::Spacing();
+			ImGui::SameLine();
+
+			if ( ImGui::Selectable( "VSync ON", app::config.vsync == 1, 0, { 64.f, ImGui::GetFontSize() } ) )
+			{
+				if ( app::config.vsync != 1 )
+					SDL_GL_SetSwapInterval( 1 );
+			}
+
+			ImGui::SameLine();
+			ImGui::Spacing();
+			ImGui::SameLine();
+
+			if ( ImGui::Selectable( "VSync Adaptive", app::config.vsync == -1, 0, { 96.f, ImGui::GetFontSize() } ) )
+			{
+				if ( app::config.vsync != -1 )
+					SDL_GL_SetSwapInterval( -1 );
+			}
+
+			ImGui::PopItemWidth();
+
+			ImGui::Separator();
+
 			static float dpi_scale = 0.f;
 			dpi_scale              = app::dpi;
 			if ( ImGui::InputFloat( "DPI Override", &dpi_scale, 0.25, 0.5, "%.3f" ) )
