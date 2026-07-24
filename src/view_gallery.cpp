@@ -1743,6 +1743,9 @@ void gallery_view_draw_items( ImGuiWindow* window, ImGuiStyle& style, size_t cou
 
 void gallery_view_handle_scroll_event( float mouse_y )
 {
+	if ( !g_gallery_view )
+		return;
+
 	if ( !gallery_draw::content_area_hovered )
 		return;
 
