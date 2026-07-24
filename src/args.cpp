@@ -47,6 +47,8 @@ void args_free()
 {
 	if ( g_registered_args )
 		free( g_registered_args );
+
+	g_registered_args = nullptr;
 }
 
 
