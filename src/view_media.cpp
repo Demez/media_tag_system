@@ -158,6 +158,11 @@ void media_view_frame_set( size_t frame )
 
 void media_view_scale_check_timer( double frame_time )
 {
+	const media_entry_t& entry = gallery_item_get_media_entry( g_image_data.index );
+
+	if ( entry.type == e_media_type_video )
+		return;
+
 	// Don't handle animated images for now
 	if ( g_image_data.image.frame.size() > 1 )
 		return;
@@ -1078,56 +1083,53 @@ void media_view_load()
 	if ( g_image_data.index >= gallery::sorted_media.size() )
 		return;
 
-	float             load_time    = 0.f;
+	double            load_time = 0.0;
 	media_entry_t     entry     = gallery_item_get_media_entry( g_image_data.index );
+	std::string       path_str  = sys_path_to_string( entry.file.path );
 
 	image_load_info_t image_load_info{};
 	image_load_info.image = &g_image_data.image;
 
+	u64 start_time = sys_get_time_ms();
+
+	if ( entry.type == e_media_type_image )
 	{
-		auto startTime = std::chrono::high_resolution_clock::now();
+		mpv_cmd_close_video();
+		image_load( entry.file.path, image_load_info );
+	}
+	else
+	{
+		image_free( g_image_data.image );
+		mpv_cmd_loadfile( path_str.c_str() );
+	}
+		
+	media_history_add( path_str );
 
-		if ( entry.type == e_media_type_image )
+	auto current_time = sys_get_time_ms();
+	load_time         = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
+
+	// auto startTime       = std::chrono::high_resolution_clock::now();
+
+	if ( entry.type == e_media_type_image )
+	{
+		if ( image_load_info.image->frame.size() > 0 && image_load_info.image->bytes_per_pixel > 0 )
 		{
-			if ( image_load( entry.file.path, image_load_info ) )
-			{
-				media_history_add( entry.file.path.string() );
-			}
+			gl_update_textures( g_image_data.textures, &g_image_data.image, g_image_data.image.frame.size() );
+			media_view_fit_in_view();
 
-			mpv_cmd_close_video();
+			image_draw::frame            = 0;
+			image_draw::next_frame_timer = g_image_data.image.frame[ image_draw::frame ].time;
 		}
 		else
 		{
-			mpv_cmd_loadfile( entry.file.path.string().c_str() );
+			printf( "%f FAILED Load - %s\n", load_time, path_str.c_str() );
 		}
-
-		auto currentTime = std::chrono::high_resolution_clock::now();
-
-		load_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-
-		// auto startTime       = std::chrono::high_resolution_clock::now();
-
-		if ( entry.type == e_media_type_image )
-		{
-			if ( image_load_info.image->frame.size() > 0 && image_load_info.image->bytes_per_pixel > 0 )
-			{
-				gl_update_textures( g_image_data.textures, &g_image_data.image, g_image_data.image.frame.size() );
-				media_view_fit_in_view();
-
-				image_draw::frame            = 0;
-				image_draw::next_frame_timer = g_image_data.image.frame[ image_draw::frame ].time;
-			}
-			else
-			{
-				printf( "%f FAILED Load - %s\n", load_time, entry.file.path.string().c_str() );
-			}
-		}
-
-		// auto  currentTime    = std::chrono::high_resolution_clock::now();
-		// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-		//printf( "%f Load - %f Up - %s\n", load_time, up_time, directory::media_list[ g_folder_index ].string().c_str() );
-		printf( "%f Load - %s\n", load_time, entry.file.path.string().c_str() );
 	}
+
+	// auto  currentTime    = std::chrono::high_resolution_clock::now();
+	// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
+	//printf( "%f Load - %f Up - %s\n", load_time, up_time, directory::media_list[ g_folder_index ].string().c_str() );
+	printf( "%f Load - %s\n", load_time, path_str.c_str() );
 
 	// g_image_data.index = image_draw::media_index;
 
