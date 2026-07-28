@@ -298,6 +298,9 @@ void mpv_update_frame()
 	if ( !g_mpv )
 		return;
 
+	if ( !g_mpv_gl )
+		mpv_init_render_context();
+
 	u64 start_time = sys_get_time_ms();
 
 	mpv_opengl_fbo fbo{ g_mpv_fbo, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGB };
@@ -351,8 +354,14 @@ void mpv_draw_frame()
 	// width  = g_mpv_framebuffer_size[ 0 ];
 	// height = g_mpv_framebuffer_size[ 1 ];
 
-	p_mpv_get_property( g_mpv, "dwidth", MPV_FORMAT_INT64, &g_video_width );
-	p_mpv_get_property( g_mpv, "dheight", MPV_FORMAT_INT64, &g_video_height );
+	// p_mpv_get_property( g_mpv, "dwidth", MPV_FORMAT_INT64, &g_video_width );
+	// p_mpv_get_property( g_mpv, "dheight", MPV_FORMAT_INT64, &g_video_height );
+
+	p_mpv_get_property( g_mpv, "width", MPV_FORMAT_INT64, &g_video_width );
+	p_mpv_get_property( g_mpv, "height", MPV_FORMAT_INT64, &g_video_height );
+
+	if ( g_video_width == 0 || g_video_height == 0 )
+		return;
 
 	// Fit image in window size
 	float factor[ 2 ] = { 1.f, 1.f };
@@ -441,7 +450,7 @@ void mpv_draw_frame()
 		glViewport( -viewport_offset_x, -viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
 	else
 		// glViewport( 0, 0, width, height );
-		// glViewport( -viewport_offset_x, 0, clamped_width, clamped_height );
+		// glViewport( -viewport_offset_x, 0, width, height );
 		glViewport( -viewport_offset_x, -viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
 
 	glEnable( GL_SCISSOR_TEST );
@@ -646,7 +655,12 @@ bool start_mpv()
 	//p_mpv_set_option_string( g_mpv, "vo", "null" );
 
 	p_mpv_set_option_string( g_mpv, "demuxer-max-bytes", "10M" );
-	p_mpv_set_option_string( g_mpv, "dither-depth", "no" );
+
+	// disabled for 10-bit testing
+	// p_mpv_set_option_string( g_mpv, "dither-depth", "no" );
+
+	//p_mpv_set_option_string( g_mpv, "cache-secs", "60" );
+	//p_mpv_set_option_string( g_mpv, "cache-pause-initial", "no" );
 
 	// Stops the main thread from being blocked somehow
 	// https://github.com/celluloid-player/celluloid/pull/982
@@ -839,6 +853,9 @@ void mpv_cmd_loadfile( const char* file )
 {
 	if ( !g_mpv )
 		return;
+
+	if ( !g_mpv_gl )
+		mpv_init_render_context();
 
 	printf( "loading file: %s\n", file );
 
