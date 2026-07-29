@@ -535,12 +535,10 @@ int gallery_view_draw_header()
 
 	ImGui::Separator();
 
-	gallery::sidebar_toggled = false;
-
 	if ( ImGui::Button( "Sidebar" ) )
 	{
 		gallery::sidebar_draw = !gallery::sidebar_draw;
-		gallery::sidebar_toggled = true;
+		gallery::content_area_resized = true;
 		gallery_view_scroll_to_cursor();
 	}
 

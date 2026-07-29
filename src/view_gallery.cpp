@@ -58,8 +58,8 @@ namespace gallery
 
 	u32                                  image_size         = item_size;
 
-	bool                                 sidebar_draw       = true;
-	bool                                 sidebar_toggled    = false;
+	bool                                 sidebar_draw         = true;
+	bool                                 content_area_resized = false;
 
 	bool                                 scroll_to_cursor   = false;
 
@@ -1556,7 +1556,7 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 				//scroll_offset = ( item_draw.item_rect_max.y ) - visible_bottom;
 
 			// try to keep at the top of the window?
-			if ( ( app::window_resized || gallery::sidebar_toggled ) && !scroll_up )
+			if ( ( app::window_resized || gallery::content_area_resized ) && !scroll_up )
 				scroll_offset = ( item_draw.item_rect_min.y - style.ItemSpacing.y ) - visible_top;
 
 			gallery_draw::scroll += scroll_offset;
@@ -1886,9 +1886,11 @@ void gallery_view_draw_content()
 	gallery_draw::keep_scroll_pos |= filenames_shown_last != app::config.gallery_show_filenames;
 	gallery_draw::keep_scroll_pos |= gallery::scroll_to_cursor;
 
-	gallery_draw::lock_visible_item = gallery_draw::keep_scroll_pos || app::window_resized;
+	gallery::content_area_resized |= app::window_resized || row_count_changed;
 
-	gallery_draw::keep_scroll_pos |= ( app::window_resized && row_count_changed );
+	gallery_draw::lock_visible_item = gallery_draw::keep_scroll_pos || gallery::content_area_resized;
+
+	gallery_draw::keep_scroll_pos |= gallery::content_area_resized;
 	gallery_draw::scroll_changed |= gallery_draw::keep_scroll_pos;
 
 	bool   no_extra_refresh   = gallery_draw::extra_refresh == 0;
@@ -1992,6 +1994,7 @@ void gallery_view_draw_content()
 		directory::thumbnail_list[ gallery_draw::thumbnail_requests[ i ].index ] = thumbnail_loader_queue_push( gallery_draw::thumbnail_requests[ i ].media );
 
 	// adjust saved vars
+	gallery::content_area_resized             = false;
 	gallery_draw::scroll_changed              = false;
 	gallery::item_size_changed                = false;
 	filenames_shown_last                      = app::config.gallery_show_filenames;
