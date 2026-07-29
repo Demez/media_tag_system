@@ -470,6 +470,7 @@ namespace gallery
 	extern u32                           image_size;
 
 	extern bool                          sidebar_draw;
+	extern bool                          sidebar_toggled;
 
 	extern bool                          scroll_to_cursor;
 

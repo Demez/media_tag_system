@@ -59,6 +59,7 @@ namespace gallery
 	u32                                  image_size         = item_size;
 
 	bool                                 sidebar_draw       = true;
+	bool                                 sidebar_toggled    = false;
 
 	bool                                 scroll_to_cursor   = false;
 
@@ -836,7 +837,8 @@ struct delayed_load_t
 // internal persistent draw info across frames
 namespace gallery_draw
 {
-	float                         scroll = 0.f;
+	float                         scroll      = 0.f;
+	float                         scroll_prev = 0.f;
 
 	// area the image can fit within the item
 	ImVec2                        image_bounds;
@@ -1373,11 +1375,6 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 	// Draw Text
 
 	gallery_view_draw_item_text( style, i, item_draw, current_pos, saved_pos );
-
-	// Add Dummy Window
-	//ImGui::SetCursorPos( post_dummy_pos );
-	ImGui::SetCursorPos( saved_pos );
-	ImGui::Dummy( { (float)gallery::item_size, item_draw.item_size_y } );
 }
 
 
@@ -1501,7 +1498,8 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 	{
 		// scroll to top
 		ImGui::SetScrollY( 0 );
-		gallery_draw::scroll = 0;
+		gallery_draw::scroll      = 0;
+		gallery_draw::scroll_prev = 0;
 		gallery_draw_extra_refresh();
 		return;
 	}
@@ -1531,14 +1529,14 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 		bool scroll_up     = false;
 
 		// check if the bottom of the item is off-screen at the bottom of the content window
-		if ( item_draw.item_rect_max.y > visible_bottom )
+		if ( ( item_draw.item_rect_max.y + style.ItemSpacing.y ) > visible_bottom )
 		{
 			scroll_up     = false;
 			scroll_needed = true;
 		}
 
 		// check if the top of the item is off-screen at the top of the content window
-		else if ( item_draw.item_rect_min.y < visible_top )
+		else if ( ( item_draw.item_rect_min.y - style.ItemSpacing.y ) < visible_top )
 		{
 			scroll_up     = true;
 			scroll_needed = true;
@@ -1548,11 +1546,18 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 		{
 			// calculate how much to scroll up or down
 			float scroll_offset = 0;
+			float scroll_diff   = gallery_draw::scroll - gallery_draw::scroll_prev;
 
 			if ( scroll_up )
 				scroll_offset = ( item_draw.item_rect_min.y - style.ItemSpacing.y ) - visible_top;
+				//scroll_offset = ( item_draw.item_rect_min.y ) - visible_top;
 			else
 				scroll_offset = ( item_draw.item_rect_max.y + style.ItemSpacing.y ) - visible_bottom;
+				//scroll_offset = ( item_draw.item_rect_max.y ) - visible_bottom;
+
+			// try to keep at the top of the window?
+			if ( ( app::window_resized || gallery::sidebar_toggled ) && !scroll_up )
+				scroll_offset = ( item_draw.item_rect_min.y - style.ItemSpacing.y ) - visible_top;
 
 			gallery_draw::scroll += scroll_offset;
 			ImGui::SetScrollY( gallery_draw::scroll );
@@ -1702,11 +1707,6 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 // ----------------------------------------------------------------------------------------------------------
 void gallery_view_item( ImGuiStyle& style, size_t i, u32& grid_pos_x, gallery_item_draw_t& item_draw )
 {
-	// if ( gallery::first_visible_item == UINT32_MAX || last_row_count > gallery::row_count )
-	// if ( gallery::first_visible_item == UINT32_MAX )
-	if ( !gallery_draw::lock_visible_item )
-		gallery::first_visible_item = i;
-
 	if ( gallery_draw::content_area_hovered )
 	{
 		item_draw.item_hovered = ImGui::IsMouseHoveringRect( item_draw.item_rect_min, item_draw.item_rect_max );
@@ -1727,6 +1727,12 @@ void gallery_view_draw_items( ImGuiWindow* window, ImGuiStyle& style, size_t cou
 	u32                  grid_pos_x = 0;
 	size_t               i          = 0;
 	gallery_item_draw_t* item_draw  = gallery::visible_item[ 0 ];
+
+	if ( !gallery_draw::lock_visible_item )
+		gallery::first_visible_item = item_draw->i;
+
+	//if ( !gallery_draw::lock_visible_item || gallery::first_visible_item == UINT32_MAX )
+	//	gallery::first_visible_item = i;
 
 	for ( ; i < gallery::visible_item_count; i++ )
 	{
@@ -1809,7 +1815,8 @@ void gallery_view_draw_content()
 		return;
 	}
 
-	gallery_draw::scroll = ImGui::GetScrollY();
+	gallery_draw::scroll_prev = gallery_draw::scroll;
+	gallery_draw::scroll      = ImGui::GetScrollY();
 
 	// ScrollToBringRectIntoView
 
@@ -1818,8 +1825,6 @@ void gallery_view_draw_content()
 
 	// Store the tallest item in the current row, so we know the next offset for the next row
 	gallery_draw::last_max_item_height = 0.f;
-
-
 	gallery_draw::any_item_hovered     = false;
 
 	static u32 last_row_count          = 0;
@@ -1877,13 +1882,16 @@ void gallery_view_draw_content()
 	gallery::drawn_image_count       = 0;
 	gallery_draw::first_visible_item = gallery::first_visible_item;
 
-	gallery_draw::keep_scroll_pos    = gallery::item_size_changing || ( filenames_shown_last != app::config.gallery_show_filenames );
-	gallery_draw::lock_visible_item  = gallery_draw::keep_scroll_pos || app::window_resized;
+	gallery_draw::keep_scroll_pos    = gallery::item_size_changing;
+	gallery_draw::keep_scroll_pos |= filenames_shown_last != app::config.gallery_show_filenames;
+	gallery_draw::keep_scroll_pos |= gallery::scroll_to_cursor;
+
+	gallery_draw::lock_visible_item = gallery_draw::keep_scroll_pos || app::window_resized;
 
 	gallery_draw::keep_scroll_pos |= ( app::window_resized && row_count_changed );
 	gallery_draw::scroll_changed |= gallery_draw::keep_scroll_pos;
 
-	bool   no_extra_refresh = gallery_draw::extra_refresh == 0;
+	bool   no_extra_refresh   = gallery_draw::extra_refresh == 0;
 	bool   no_delayed_refresh = gallery_draw::delayed_refresh;
 
 	// ----------------------------------------------------------------------------------------------------------
