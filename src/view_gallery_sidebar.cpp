@@ -169,6 +169,9 @@ void gallery_header_draw_path_bar( bool& was_in_path_edit, float& bar_width, ImV
 	// ImGuiChildFlags_AutoResizeX
 	if ( ImGui::BeginChild( "##breadcrumb_bar", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove ) )
 	{
+		int window_width = 0;
+		SDL_GetWindowSize( app::window, &window_width, nullptr );
+
 		bool   item_hovered = false;
 
 		size_t id           = 1;
@@ -225,12 +228,17 @@ void gallery_header_draw_path_bar( bool& was_in_path_edit, float& bar_width, ImV
 		ImVec2  cursor_screen_pos = ImGui::GetCursorScreenPos();
 		float   bar_size_min      = 100.f * style.FontScaleDpi;
 		float   padding_extra     = ( ImGui::GetFontSize() * 2.f );
+		float   nav_enter_width   = ImGui::GetFrameHeight();
 		float   space_avail       = ( cursor_pos.x + style.FramePadding.x );
 
 		float   free_space        = region_avail.x - cursor_screen_pos.x;
+		float   space_avail2      = window_width - cursor_screen_pos.x;
 
 		// float       bar_size                      = std::max( std::min( cursor_pos.x + padding_extra, bar_size_min + padding_extra ), free_space - space_needed );
 		float   bar_size          = std::max( padding_extra, free_space - right_side_space_needed );
+
+		if ( right_side_space_needed == 0.f )
+			bar_size = space_avail2 - ( nav_enter_width + style.ItemSpacing.y * 2.f + style.WindowPadding.x );
 
 		ImVec2  window_pos        = ImGui::GetWindowPos();
 
@@ -433,6 +441,9 @@ int gallery_view_draw_header()
 	// ??
 	// space_needed += 60.f;
 	//space_needed += style.ItemSpacing.x;
+
+	if ( region_avail.x < 600 )
+		space_needed = 0;
 	
 	// ---------------------------------------------------------------------------------
 
@@ -448,58 +459,73 @@ int gallery_view_draw_header()
 		directory::path_edit     = false;
 	}
 
-	ImGui::SameLine();
-	draw_vertical_separator( draw_list, style, false );
-
-	ImVec2 region_avail_2 = ImGui::GetContentRegionAvail();
-
-	ImVec2 spacing_size( region_avail_2.x - space_needed, ImGui::GetFrameHeight() );
-	spacing_size.x = std::max( spacing_size.x, 0.f );
-
-	ImGui::Dummy( spacing_size );
-	ImGui::SameLine( 0, 0 );
-	draw_vertical_separator( draw_list, style );
-
-	ImGui::TextUnformatted( "Search" );
-
-	ImGui::SameLine();
-
-	// Press Ctrl+F to focus the search text input
-	if ( !ImGui::GetIO().WantTextInput )
+	if ( space_needed > 0 )
 	{
-		if ( ImGui::IsKeyChordPressed( ImGuiMod_Ctrl | ImGuiKey_F ) )
-			ImGui::SetKeyboardFocusHere();
-	}
+		ImGui::SameLine();
+		//draw_vertical_separator( draw_list, style, false );
+		draw_vertical_separator( draw_list, style, true );
 
-	if ( strlen( gallery::search ) == 0 )
-	{
-		// gallery_view_set_selection( gallery::cursor );
-	}
+		ImVec2 region_avail_2 = ImGui::GetContentRegionAvail();
 
-	ImGui::SetNextItemWidth( search_box_size );
+		ImVec2 spacing_size( region_avail_2.x - space_needed, ImGui::GetFrameHeight() );
+		spacing_size.x           = std::max( spacing_size.x, 0.f );
 
-	// if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
-	if ( ImGui::InputText( "##search", gallery::search, 512 ) )
-	{
-		g_do_search = true;
-		gallery_view_dir_change( true );
-	}
+		float search_space_avail = region_avail_2.x - ( space_needed - search_box_size );
 
-	ImGui::SameLine();
-	draw_vertical_separator( draw_list, style );
-
-	if ( ImGui::Checkbox( "Recursive", &directory::recursive ) )
-	{
-		directory::queued        = g_folder_buf;
-		directory::folder_reload = true;
-
-		if ( !directory::recursive )
+		if ( search_space_avail < 17 )
 		{
-			gallery::sorted_media.clear();
-			gallery_view_clear_selection();
-			//gallery::cursor = 0;
+			ImGui::Dummy( spacing_size );
+		}
+		else
+		{
+			ImGui::TextUnformatted( "Search" );
+
+			ImGui::SameLine();
+
+			// Press Ctrl+F to focus the search text input
+			if ( !ImGui::GetIO().WantTextInput )
+			{
+				if ( ImGui::IsKeyChordPressed( ImGuiMod_Ctrl | ImGuiKey_F ) )
+					ImGui::SetKeyboardFocusHere();
+			}
+
+			if ( strlen( gallery::search ) == 0 )
+			{
+				// gallery_view_set_selection( gallery::cursor );
+			}
+
+			ImGui::SetNextItemWidth( search_space_avail );
+
+			// if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
+			if ( ImGui::InputText( "##search", gallery::search, 512 ) )
+			{
+				g_do_search = true;
+				gallery_view_dir_change( true );
+			}
+
+			ImGui::SameLine();
+			draw_vertical_separator( draw_list, style );
+
+			if ( ImGui::Checkbox( "Recursive", &directory::recursive ) )
+			{
+				directory::queued        = g_folder_buf;
+				directory::folder_reload = true;
+
+				if ( !directory::recursive )
+				{
+					gallery::sorted_media.clear();
+					gallery_view_clear_selection();
+					//gallery::cursor = 0;
+				}
+			}
 		}
 	}
+
+	//ImGui::Dummy( spacing_size );
+	//ImGui::SameLine( 0, 0 );
+	//draw_vertical_separator( draw_list, style );
+
+	
 
 	//ImGui::SameLine();
 	//draw_vertical_separator( draw_list, style );
