@@ -97,29 +97,31 @@ bool        SliderStepInt( const char* label, int* value, const int step_size, c
 #endif
 
 
-static void draw_vertical_separator( ImDrawList* draw_list, ImGuiStyle& style )
+static void draw_vertical_separator( ImDrawList* draw_list, ImGuiStyle& style, bool add_spacing = true )
 {
 	ImVec2 cursor_pos = ImGui::GetCursorPos();
 
 	// TEMP DISABLE
-	//if ( style.WindowBorderSize > 0 )
-	//{
-	//	ImColor border_col   = style.Colors[ ImGuiCol_Border ];
-	//	ImVec2  region_avail = ImGui::GetContentRegionAvail();
-	//	float  window_height = ImGui::GetWindowHeight();
-	//
-	//	ImVec2  line_start   = { cursor_pos.x, 0 };
-	//	ImVec2  line_end     = cursor_pos;
-	//
-	//	// line_start.y -= style.FramePadding.y;
-	//	line_end.y += window_height + style.FramePadding.y;
-	//
-	//	draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
-	//
-	//	// ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
-	//	ImGui::SetCursorPosX( cursor_pos.x + style.WindowBorderSize + style.ItemSpacing.x );
-	//}
-	//else
+	if ( style.WindowBorderSize > 0 )
+	{
+		ImColor border_col   = style.Colors[ ImGuiCol_Border ];
+		ImVec2  region_avail = ImGui::GetContentRegionAvail();
+		// float  window_height = ImGui::GetWindowHeight();
+		float  window_height = ImGui::GetFrameHeight();
+	
+		ImVec2  line_start   = { cursor_pos.x, cursor_pos.y - style.WindowPadding.y };
+		ImVec2  line_end     = cursor_pos;
+	
+		// line_start.y -= style.FramePadding.y;
+		line_end.y += window_height + style.FramePadding.y;
+	
+		draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
+	
+		// ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
+		if ( add_spacing )
+			ImGui::SetCursorPosX( cursor_pos.x + style.WindowBorderSize + style.ItemSpacing.x );
+	}
+	else if ( add_spacing )
 	{
 		ImGui::SetCursorPosX( cursor_pos.x + style.ItemSpacing.x );
 	}
@@ -182,18 +184,6 @@ int gallery_view_draw_header()
 
 	ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-	if ( ImGui::Button( "Sidebar" ) )
-	{
-		gallery::sidebar_draw = !gallery::sidebar_draw;
-	}
-
-	// ImGui::Selectable( "Sidebar", &gallery::sidebar_draw );
-	ImGui::SameLine();
-	//ImGui::Spacing();
-	//ImGui::SameLine();
-
-	draw_vertical_separator( draw_list, style );
-
 	ImGui::BeginDisabled( !(directory::folder_history.size() && directory::folder_history_pos > 1) );
 	if ( ImGui::ArrowButton( "##nav_history_back", ImGuiDir_Left ) )
 	{
@@ -227,6 +217,8 @@ int gallery_view_draw_header()
 	}
 
 	ImGui::SameLine();
+
+	draw_vertical_separator( draw_list, style );
 
 	static bool  was_in_path_edit = false;
 	static bool  path_edit_hover  = false;
@@ -440,14 +432,22 @@ int gallery_view_draw_header()
 	}
 
 	ImGui::SameLine();
-	draw_vertical_separator( draw_list, style );
-	
-	// 
+	draw_vertical_separator( draw_list, style, false );
+
 	ImVec2 region_avail_2 = ImGui::GetContentRegionAvail();
 
-	if ( ( space_needed + sep_space_needed ) < region_avail_2.x )
-	{
-		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + ( region_avail_2.x - space_needed ) );
+	ImVec2 spacing_size( region_avail_2.x - ( space_needed ), ImGui::GetFrameHeight() );
+	spacing_size.x = std::max( spacing_size.x, 0.f );
+
+	ImGui::Dummy( spacing_size );
+	ImGui::SameLine( 0, 0 );
+	
+	// 
+	//ImVec2 region_avail_2 = ImGui::GetContentRegionAvail();
+
+	//if ( ( space_needed + sep_space_needed ) < region_avail_2.x )
+	//{
+	//	ImGui::SetCursorPosX( ImGui::GetCursorPosX() + ( region_avail_2.x - space_needed ) );
 
 		draw_vertical_separator( draw_list, style );
 
@@ -464,7 +464,7 @@ int gallery_view_draw_header()
 		// line_end.y += region_avail.y + style.FramePadding.y;
 		//
 		// draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
-	}
+	//}
 
 	ImGui::TextUnformatted( "Search" );
 
@@ -512,6 +512,20 @@ int gallery_view_draw_header()
 
 	// ---------------------------------------------------------------------------------
 	// Center Spacing, rest is aligned to the right
+
+	ImGui::Separator();
+
+	if ( ImGui::Button( "Sidebar" ) )
+	{
+		gallery::sidebar_draw = !gallery::sidebar_draw;
+	}
+
+	// ImGui::Selectable( "Sidebar", &gallery::sidebar_draw );
+	ImGui::SameLine();
+	draw_vertical_separator( draw_list, style );
+
+	//ImGui::Spacing();
+	//ImGui::SameLine();
 
 	ImVec2 filter_size       = ImGui::CalcTextSize( "Quick Filter" );
 	ImVec2 sort_size         = ImGui::CalcTextSize( "Sort By" );
@@ -686,13 +700,21 @@ int gallery_view_draw_header()
 
 	//ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 
-	if ( gallery::selection.size() )
+	// if ( gallery::selection.size() )
 	{
 		ImGui::SameLine( 0, 0 );
 		ImVec2 region_avail = ImGui::GetContentRegionAvail();
 
 		char   buf[ 256 ]{};
-		snprintf( buf, 256, "%zu File%s Selected", gallery::selection.size(), gallery::selection.size() == 1 ? "" : "s" );
+		// snprintf( buf, 256, "%zu File%s Selected", gallery::selection.size(), gallery::selection.size() == 1 ? "" : "s" );
+		if ( gallery::selection.size() )
+		{
+			snprintf( buf, 256, "%zu Selected | %zu File%s", gallery::selection.size(), gallery::sorted_media.size(), gallery::sorted_media.size() == 1 ? "" : "s" );
+		}
+		else
+		{
+			snprintf( buf, 256, "%zu File%s", gallery::sorted_media.size(), gallery::sorted_media.size() == 1 ? "" : "s" );
+		}
 
 		ImVec2 text_size = ImGui::CalcTextSize( buf );
 
@@ -703,6 +725,7 @@ int gallery_view_draw_header()
 		ImGui::SameLine( 0, 0 );
 
 		ImGui::TextUnformatted( buf );
+		ImGui::SameLine( 0, 0 );
 	}
 
 	int im_window_height = ImGui::GetWindowHeight();
@@ -1111,6 +1134,32 @@ void gallery_view_draw_sidebar()
 			ImGui::Separator();
 
 			ImGui::Checkbox( "Enable JPEG XL Thumbnails", &app::config.thumbnail_jxl_enable );
+
+			#if 0
+			ImGui::Separator();
+
+			ImGui::PushItemWidth( 128 );
+
+			int thumbnail_threads = app::config.thumbnail_threads;
+			if ( ImGui::InputInt( "Thumbnail Threads", &thumbnail_threads, 1, 1 ) )
+			{
+				app::config.thumbnail_threads = CLAMP( thumbnail_threads, 1, 32 );
+			}
+
+			int thumbnail_save_threads = app::config.thumbnail_save_threads;
+			if ( ImGui::InputInt( "Thumbnail Cache Threads", &thumbnail_save_threads, 1, 1 ) )
+			{
+				app::config.thumbnail_save_threads = CLAMP( thumbnail_save_threads, 1, 32 );
+			}
+
+			ImGui::PopItemWidth();
+
+			if ( ImGui::Button( "Restart Threads" ) )
+			{
+				thumbnail_loader_shutdown( false );
+				thumbnail_loader_init();
+			}
+			#endif
 
 			ImGui::Separator();
 
