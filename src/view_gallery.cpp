@@ -3,34 +3,6 @@
 #include "imgui_internal.h"
 
 
-// internal draw info for gallery for each item
-struct gallery_item_draw_t
-{
-	// position in grid
-	u32            grid_pos_x;
-	u32            grid_pos_y;
-
-	// current gallery index
-	size_t         i             = 0;
-	size_t         gallery_index = 0;
-
-	// current media entry
-	media_entry_t* media         = nullptr;
-
-	ImVec2         text_size{};
-
-	float          item_size_y   = 0.f;
-
-	ImVec2         cursor_screen_pos{};
-	ImVec2         item_rect_min{};
-	ImVec2         item_rect_max{};
-
-	bool           selected_item = false;
-	bool           item_hovered  = false;
-	bool           visible       = false;
-};
-
-
 namespace gallery
 {
 	// a sorted list of media entries, each item is an index to an entry in directory::media_list
@@ -1247,19 +1219,19 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 
 	if ( item_draw.selected_item && !item_draw.item_hovered && i == gallery_draw::last_hovered )
 	{
-		set_frame_draw();
+		set_frame_draw( 2 );
 	}
 
 	if ( item_draw.item_hovered && i != gallery_draw::last_hovered )
 	{
 		gallery_draw::last_hovered = i;
-		set_frame_draw();
+		set_frame_draw( 2 );
 	}
 
 	if ( item_draw.selected_item && i != gallery_draw::last_selected )
 	{
 		gallery_draw::last_selected = i;
-		set_frame_draw();
+		set_frame_draw( 2 );
 	}
 
 	// Draw a background if needed

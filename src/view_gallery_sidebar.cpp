@@ -1326,22 +1326,49 @@ void sidebar_draw_bookmarks( ImGuiStyle& style )
 void sidebar_draw_file_information( ImGuiStyle& style )
 {
 	// if ( gallery::sorted_media.size() && gallery::last_selection.entry.type != e_media_type_none )
-	if ( gallery::sorted_media.empty() && gallery::selection.empty() )
+	if ( gallery::sorted_media.empty() )
 		return;
 
 	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
 	ImGui::TextUnformatted( "File Information\n" );
 	ImGui::Separator();
 	ImGui::PopFont();
+
+	// const media_entry_t& entry = gallery_item_get_media_entry( gallery_view_get_last_selected() );
+	media_entry_t entry{};
+
+	if ( gallery::selection.size() )
+	{
+		entry = gallery::selection.back().entry;
+	}
+	else
+	{
+		// find a hovered item
+		for ( size_t i = 0; i < gallery::visible_item_count; i++ )
+		{
+			gallery_item_draw_t* item_draw = gallery::visible_item[ i ];
+
+			if ( item_draw->item_hovered )
+			{
+				entry = directory::media_list[ item_draw->gallery_index ];
+				break;
+			}
+		}
+	}
+
+	// none found, try last item that was selected?
+	if ( entry.type == e_media_type_none )
+		entry = gallery::last_selection.entry;
+
+	// none found
+	if ( entry.type == e_media_type_none )
+		return;
 	
 	if ( !ImGui::BeginChild( "##file_info", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY, 0 ) )
 	{
 		ImGui::EndChild();
 		return;
 	}
-
-	// const media_entry_t& entry = gallery_item_get_media_entry( gallery_view_get_last_selected() );
-	const media_entry_t& entry = gallery::last_selection.entry;
 
 	ImGui::PushTextWrapPos();
 

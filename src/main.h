@@ -394,6 +394,34 @@ struct thumbnail_t
 };
 
 
+// internal draw info for gallery for each item
+struct gallery_item_draw_t
+{
+	// position in grid
+	u32            grid_pos_x;
+	u32            grid_pos_y;
+
+	// current gallery index
+	size_t         i             = 0;
+	size_t         gallery_index = 0;
+
+	// current media entry
+	media_entry_t* media         = nullptr;
+
+	ImVec2         text_size{};
+
+	float          item_size_y = 0.f;
+
+	ImVec2         cursor_screen_pos{};
+	ImVec2         item_rect_min{};
+	ImVec2         item_rect_max{};
+
+	bool           selected_item = false;
+	bool           item_hovered  = false;
+	bool           visible       = false;
+};
+
+
 // -------------------------------------------------------------------------------------------
 
 
@@ -461,45 +489,49 @@ namespace directory
 namespace gallery
 {
 	// a sorted list of media entries, each item is an index to an entry in directory::media_list
-	extern std::vector< size_t >         sorted_media;
+	extern std::vector< size_t >              sorted_media;
 
-	extern char                          search[ 512 ];
+	extern char                               search[ 512 ];
 
 	// cursor position/index in items
 	// extern size_t                        cursor;
 
-	extern e_gallery_sort_mode           sort_mode;
-	extern bool                          sort_mode_update;
+	extern e_gallery_sort_mode                sort_mode;
+	extern bool                               sort_mode_update;
 
-	extern u32                           row_count;
-	extern u32                           item_size;
-	extern u32                           item_size_min;
-	extern u32                           item_size_max;
-	extern bool                          item_size_changed;
-	extern bool                          item_size_changing;
-	extern std::vector< ImVec2 >         item_text_size;
+	extern u32                                row_count;
+	extern u32                                item_size;
+	extern u32                                item_size_min;
+	extern u32                                item_size_max;
+	extern bool                               item_size_changed;
+	extern bool                               item_size_changing;
+	extern std::vector< ImVec2 >              item_text_size;
 
-	extern u32                           image_size;
+	extern std::vector< gallery_item_draw_t > item_layout;
+	extern gallery_item_draw_t**              visible_item;
+	extern size_t                             visible_item_count;
 
-	extern bool                          sidebar_draw;
-	extern bool                          content_area_resized;
+	extern u32                                image_size;
 
-	extern bool                          scroll_to_cursor;
+	extern bool                               sidebar_draw;
+	extern bool                               content_area_resized;
 
-	extern u32                           drawn_image_count;
-	extern u32                           first_visible_item;
+	extern bool                               scroll_to_cursor;
+
+	extern u32                                drawn_image_count;
+	extern u32                                first_visible_item;
 
 	// Quick Filter
-	extern e_gallery_filter              filter;
+	extern e_gallery_filter                   filter;
 
 	// Files selected in the gallery view
-	extern std::vector< selection_t >    selection;
+	extern std::vector< selection_t >         selection;
 
 	// used for memory with media advancing with arrow keys
-	extern selection_t                   last_selection;
+	extern selection_t                        last_selection;
 
-	extern bool                          always_recalc_item_sizes;
-	extern bool                          always_recalc_layout;
+	extern bool                               always_recalc_item_sizes;
+	extern bool                               always_recalc_layout;
 }
 
 
