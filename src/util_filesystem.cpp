@@ -144,7 +144,7 @@ char* fs_get_filename( const char* path, size_t path_len )
 	size_t i = path_len - 1;
 	for ( ; i > 0; i-- )
 	{
-		if ( path[ i ] == '/' || path[ i ] == '\\' )
+		if  ( ( path[ i ] == '/' || path[ i ] == '\\' ) && i != path_len - 1 )
 			break;
 	}
 
@@ -153,6 +153,9 @@ char* fs_get_filename( const char* path, size_t path_len )
 		return {};
 
 	size_t start_index = i + 1;
+
+	if ( i == 0 )
+		start_index = 0;
 
 	if ( start_index == path_len )
 		return {};

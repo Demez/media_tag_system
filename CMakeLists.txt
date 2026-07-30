@@ -212,9 +212,11 @@ set(
     src/image_loader.cpp
     src/memory.cpp
     src/config.cpp
+	src/directory_tree.cpp
 
     src/view_gallery.cpp
     src/view_gallery_sidebar.cpp
+    src/view_gallery_item.cpp
 
     src/view_media.cpp
 	

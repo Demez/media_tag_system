@@ -58,6 +58,9 @@ gallery-show-filenames: 1
 # Always draw new frames no matter what
 always-draw: 0
 
+# Auto expand the directory tree on entering folders
+auto-expand-directory-tree: 1
+
 # Only one instance open at a time
 single-instance: 0
 

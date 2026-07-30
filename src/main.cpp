@@ -293,6 +293,8 @@ void folder_load_media_list()
 	gallery_view_dir_change( false );
 	
 	gallery::item_text_size.resize( directory::media_list.size() );
+
+	dir_tree_add_folder( directory::path );
 }
 
 constexpr int MAX_HISTORY = 32;

@@ -94,6 +94,17 @@ using e_gallery_filter = u8;
 extern const char* g_gallery_sort_mode_str[];
 
 
+struct directory_entry_t
+{
+	fs::path              path;
+	std::vector< file_t > folders;
+
+	// hmmmm
+	bool                  used_this_frame = false;
+	bool                  valid           = false;
+};
+
+
 struct bookmark_t
 {
 	std::string name{};
@@ -125,22 +136,23 @@ struct app_config_t
 	std::string               thumbnail_cache_path{};
 	std::string               thumbnail_video_cache_path{};
 
-	int                       vsync                  = 1;
+	int                       vsync                      = 1;
 
-	u32                       sleep_time_no_focus    = 5;
-	u32                       sleep_time_focus       = 1;
-	u32                       sleep_time_idle        = 15;
+	u32                       sleep_time_no_focus        = 5;
+	u32                       sleep_time_focus           = 1;
+	u32                       sleep_time_idle            = 15;
 	double                    apply_sleep_time_threshold = 0.005;
 
-	u32                       font_size              = 17;
+	u32                       font_size                  = 17;
 
-	u32                       gallery_zoom_default   = 200;
-	float                     media_zoom_scale       = 0.1;
+	u32                       gallery_zoom_default       = 200;
+	float                     media_zoom_scale           = 0.1;
 
-	bool                      no_video               = false;
-	bool                      gallery_show_filenames = false;
-	bool                      always_draw            = false;
-	bool                      single_instance        = false;
+	bool                      no_video                   = false;
+	bool                      gallery_show_filenames     = false;
+	bool                      always_draw                = false;
+	bool                      single_instance            = false;
+	bool                      auto_expand_directory_tree = true;
 	
 	// Theming
 	bool                      dwm_extend             = true;
@@ -470,7 +482,7 @@ namespace gallery
 	extern u32                           image_size;
 
 	extern bool                          sidebar_draw;
-	extern bool                          sidebar_toggled;
+	extern bool                          content_area_resized;
 
 	extern bool                          scroll_to_cursor;
 
@@ -592,6 +604,17 @@ void                                 gl_free_textures( uploaded_textures_t& text
 
 void                                 config_reset();
 bool                                 config_load();
+
+void                                 dir_tree_watch_changes();
+void                                 dir_tree_init();
+void                                 dir_tree_shutdown();
+
+void                                 dir_tree_add_folder( fs::path& path );
+directory_entry_t*                   dir_tree_get( fs::path& path );
+
+// returns an index
+//size_t                               dir_tree_add_folder( fs::path& path );
+//directory_entry_t*                   dir_tree_get( size_t index, fs::path& path );
 
 
 // -------------------------------------------------------------------------------------------

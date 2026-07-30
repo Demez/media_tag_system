@@ -888,7 +888,7 @@ bool sys_get_drives( std::vector< std::string >& drives )
 		if ( drive_str[ i ] == L'\0' )
 			break;
 
-		std::string drive( &drive_str[ i ], &drive_str[ i + 4 ] );
+		std::string drive( &drive_str[ i ], &drive_str[ i + 2 ] );
 		drives.push_back( drive );
 	}
 
@@ -955,7 +955,9 @@ static bool _open_dir( std::wstring& path, HANDLE& dir_handle, IO_STATUS_BLOCK& 
 static bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std::vector< file_t >& files, e_scandir_flags flags )
 {
 	std::wstring scan_dir = root, scan_dir_wildcard{};
-	scan_dir += L"\\";
+
+	if ( !scan_dir.ends_with( L"\\" ) )
+		scan_dir += L"\\";
 
 	if ( path )
 	{
@@ -979,7 +981,7 @@ static bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std:
 
 	HANDLE dirHandle{};
 
-	size_t file_index = 0;
+	size_t file_index = files.size();
 
 	if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size, files ) )
 	{
@@ -1010,6 +1012,7 @@ static bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std:
 				if ( !(flags & e_scandir_recursive) )
 					break;
 
+open_dir_recurse_fail:
 				if ( recursive_path_count == 0 )
 					break;
 
@@ -1036,11 +1039,15 @@ static bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std:
 
 				scan_dir_wildcard += new_path.name;
 
+				//_putws( L"Scanning Directory: \n", scan_dir_wildcard.c_str() );
+				//fputws( L"Scanning Directory: ", stdout );
+				//fputws( scan_dir_wildcard.c_str(), stdout );
+				//fputws( L"\n", stdout );
+
 				if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size, files ) )
 				{
-					wprintf( L"Failed to search directory: %s\n", scan_dir.c_str() );
-					ch_free( e_mem_category_general, buffer );
-					return false;
+					wprintf( L"Failed to search directory: %s\n", scan_dir_wildcard.c_str() );
+					goto open_dir_recurse_fail;
 				}
 			}
 
