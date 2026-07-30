@@ -294,16 +294,25 @@ void gallery_header_draw_path_text_edit( bool& was_in_path_edit, float bar_width
 	if ( ImGui::InputText( "##directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 	{
 		if ( fs_is_dir( g_folder_buf ) )
-			directory::queued = g_folder_buf;
+		{
+			directory::queued = sys_string_to_path( g_folder_buf );
+		}
 		else
-			snprintf( g_folder_buf, 512, directory::path.string().c_str() );
+		{
+			std::string path_str = sys_path_to_string( directory::path );
+			snprintf( g_folder_buf, 512, path_str.c_str() );
+		}
 
 		directory::path_edit = false;
 	}
 
-	if ( was_in_path_edit && !ImGui::IsItemFocused() )
+	if ( was_in_path_edit && !ImGui::IsItemActive() )
 	{
 		directory::path_edit = false;
+
+		// reset on focus loss
+		std::string path_str = sys_path_to_string( directory::path );
+		snprintf( g_folder_buf, 512, path_str.c_str() );
 	}
 
 	if ( !was_in_path_edit )
@@ -1104,6 +1113,9 @@ bool is_path_part_of_current_dir( u32 depth, const std::string& current_path, ch
 }
 
 
+static std::vector< std::string > g_filesystem_browser_path_chunks{};
+
+
 // this is shit
 void sidebar_draw_directory_recursive( u32 depth, const std::string& current_path )
 {
@@ -1163,11 +1175,22 @@ void sidebar_draw_directory_recursive( u32 depth, const std::string& current_pat
 }
 
 
+void sidebar_draw_filesystem_folder_item( const std::string& folder_name )
+{
+
+
+	if ( ImGui::Selectable( folder_name.c_str() ) )
+	{
+		g_filesystem_browser_path_chunks.push_back( folder_name );
+	}
+}
+
+
 void sidebar_draw_filesystem( ImGuiStyle& style )
 {
 	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
 
-	if ( !ImGui::CollapsingHeader( "Files", ImGuiTreeNodeFlags_DefaultOpen ) )
+	if ( !ImGui::CollapsingHeader( "Folders", ImGuiTreeNodeFlags_DefaultOpen ) )
 	{
 		ImGui::PopFont();
 		return;
@@ -1199,9 +1222,93 @@ void sidebar_draw_filesystem( ImGuiStyle& style )
 
 	bool reset_dir_change_state = g_dir_change_from_dir_tree;
 
-	for ( const std::string& drive : drives )
+	if ( app::config.directory_tree_simple )
 	{
-		sidebar_draw_directory_recursive( 0, drive );
+		//std::string built_path;
+		//
+		//for ( size_t i = 0; i < g_filesystem_browser_path_chunks.size(); i++ )
+		//{
+		//	built_path += g_filesystem_browser_path_chunks[ i ];
+		//	built_path += SEP;
+		//}
+
+		//fs::path           evil  = sys_string_to_path( built_path );
+		fs::path evil = directory::path;
+		evil += SEP_S;
+		directory_entry_t* entry         = dir_tree_get( evil );
+
+		g_filesystem_browser_path_chunks = directory::path_chunks;
+
+		//ImGui::BeginDisabled( g_filesystem_browser_path_chunks.empty() );
+		//
+		//if ( ImGui::Selectable( "Back" ) )
+		//{
+		//	g_filesystem_browser_path_chunks.pop_back();
+		//
+		//	std::string new_path{};
+		//
+		//	for ( size_t i = 0; i < g_filesystem_browser_path_chunks.size(); i++ )
+		//	{
+		//		new_path += g_filesystem_browser_path_chunks[ i ];
+		//		new_path += SEP;
+		//	}
+		//
+		//	directory::queued = new_path;
+		//}
+		//
+		//ImGui::EndDisabled();
+		//
+		//ImGui::Separator();
+		ImGui::PushID( "##folders" );
+
+		bool navigtate = false;
+
+		if ( g_filesystem_browser_path_chunks.empty() )
+		{
+			for ( const std::string& drive : drives )
+			{
+				if ( ImGui::Selectable( drive.c_str() ) )
+				{
+					g_filesystem_browser_path_chunks.push_back( drive );
+					navigtate = true;
+				}
+			}
+		}
+		else if ( entry )
+		{
+			for ( const file_t& folder : entry->folders )
+			{
+				std::string folder_name = sys_path_to_string( folder.path );
+				if ( ImGui::Selectable( folder_name.c_str() ) )
+				{
+					g_filesystem_browser_path_chunks.push_back( folder_name );
+					navigtate = true;
+				}
+				//sidebar_draw_filesystem_folder_item( folder.path );
+			}
+		}
+		ImGui::PopID();
+		// else - background scanning folder ?
+
+		if ( navigtate )
+		{
+			std::string built_path;
+
+			for ( size_t i = 0; i < g_filesystem_browser_path_chunks.size(); i++ )
+			{
+				built_path += g_filesystem_browser_path_chunks[ i ];
+				built_path += SEP;
+			}
+
+			directory::queued = fs_path_clean( built_path.c_str(), built_path.size() );
+		}
+	}
+	else
+	{
+		for ( const std::string& drive : drives )
+		{
+			sidebar_draw_directory_recursive( 0, drive );
+		}
 	}
 
 	ImGui::EndChild();
@@ -1213,6 +1320,23 @@ void sidebar_draw_filesystem( ImGuiStyle& style )
 
 void sidebar_draw_bookmarks( ImGuiStyle& style )
 {
+	//ImGui::PushItemWidth( 40.f );
+	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
+	//ImGui::PushStyleColor( ImGuiCol_Header, header_bg );
+
+	bool opened = ImGui::CollapsingHeader( "Bookmarks", ImGuiTreeNodeFlags_DefaultOpen );
+
+	ImGui::PopFont();
+	//ImGui::PopStyleColor();
+	//ImGui::PopItemWidth();
+
+	if ( !opened )
+	{
+		//ImGui::EndChild();
+		//ImGui::PopStyleVar();
+		return;
+	}
+
 	ImDrawList* draw_list     = ImGui::GetWindowDrawList();
 
 	//ImGui::PushStyleVar( ImGuiStyleVar_FramePadding, { 0.f, 0.f } );
@@ -1242,23 +1366,6 @@ void sidebar_draw_bookmarks( ImGuiStyle& style )
 
 
 	//ImGui::SetCursorPos( { 0.f, 0.f } );
-
-	//ImGui::PushItemWidth( 40.f );
-	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
-	//ImGui::PushStyleColor( ImGuiCol_Header, header_bg );
-
-	bool opened = ImGui::CollapsingHeader( "Bookmarks", ImGuiTreeNodeFlags_DefaultOpen );
-
-	ImGui::PopFont();
-	//ImGui::PopStyleColor();
-	//ImGui::PopItemWidth();
-
-	if ( !opened )
-	{
-		ImGui::EndChild();
-		//ImGui::PopStyleVar();
-		return;
-	}
 
 	//if ( !opened )
 	//{

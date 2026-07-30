@@ -426,6 +426,7 @@ bool config_load()
 	config_get_bool_value( fyd, "/use-custom-colors %u", app::config.use_custom_colors );
 	config_get_bool_value( fyd, "/single-instance %u", app::config.single_instance );
 	config_get_bool_value( fyd, "/auto-expand-directory-tree %u", app::config.auto_expand_directory_tree );
+	config_get_bool_value( fyd, "/directory-tree-simple %u", app::config.directory_tree_simple );
 
 	config_get_doc_value( fyd, "/sleep-time-no-focus %u", app::config.sleep_time_no_focus );
 	config_get_doc_value( fyd, "/sleep-time-focus %u", app::config.sleep_time_focus );

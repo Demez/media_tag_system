@@ -153,6 +153,7 @@ struct app_config_t
 	bool                      always_draw                = false;
 	bool                      single_instance            = false;
 	bool                      auto_expand_directory_tree = true;
+	bool                      directory_tree_simple      = false;
 	
 	// Theming
 	bool                      dwm_extend             = true;

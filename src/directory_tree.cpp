@@ -121,7 +121,6 @@ directory_entry_t* dir_tree_get( fs::path& path )
 {
 	auto dir_it = g_directory_entries.find( path );
 
-	// TODO: keep failed folders
 	if ( dir_it == g_directory_entries.end() )
 	{
 		auto fail_it = g_failed_directories.find( path );

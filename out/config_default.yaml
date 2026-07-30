@@ -61,6 +61,9 @@ always-draw: 0
 # Auto expand the directory tree on entering folders
 auto-expand-directory-tree: 1
 
+# Simple Directory Tree list, only shows folders in the current folder you're in
+directory-tree-simple: 0
+
 # Only one instance open at a time
 single-instance: 0
 
