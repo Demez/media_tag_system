@@ -375,6 +375,7 @@ bool util_array_extend( e_mem_category category, T*& data, size_t count, size_t 
 
 bool        point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size );
 bool        mouse_in_rect( ImVec2 min_size, ImVec2 max_size );
+bool        mouse_moving();
 
 #if _WIN32
 char*       strcasestr( const char* s, const char* find );

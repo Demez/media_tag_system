@@ -280,6 +280,109 @@ static bool config_get_color( fy_node* node, const char* path, ImVec4& output )
 //}
 
 
+void config_read_bookmarks( fy_document* fyd )
+{
+	app::config.bookmark.clear();
+
+	fy_node* bookmark_node_list = fy_node_by_path( fy_document_root( fyd ), "/bookmarks", FY_NT, FYNWF_PTR_DEFAULT );
+
+	if ( !bookmark_node_list )
+		return;
+
+	int item_count = fy_node_sequence_item_count( bookmark_node_list );
+
+	for ( int item_i = 0; item_i < item_count; item_i++ )
+	{
+		fy_node*    bookmark_node = fy_node_sequence_get_by_index( bookmark_node_list, item_i );
+
+		size_t      len           = 0;
+		const char* string        = fy_node_get_scalar( bookmark_node, &len );
+
+		if ( string )
+		{
+			bookmark_t bookmark{};
+			bookmark.path.assign( string, len );
+
+			if ( fs_is_file( bookmark.path.c_str() ) )
+			{
+				printf( "config: bookmark points to file, not a directory: \"%s\"\n", string );
+				continue;
+			}
+
+			bookmark.valid = fs_is_dir( bookmark.path.c_str() );
+
+			if ( !bookmark.valid )
+				printf( "config: bookmark does not exist! \"%s\"\n", string );
+
+			char* folder_name = fs_get_filename( string, len );
+			bookmark.name.assign( folder_name );
+			free( folder_name );
+
+			app::config.bookmark.push_back( bookmark );
+		}
+		else
+		{
+			printf( "config: bookmark not a string?\n" );
+		}
+	}
+}
+
+
+void config_read_thumbnail_settings( char* app_dir, fy_document* fyd )
+{
+	fy_node* thumbnail = fy_node_by_path( fy_document_root( fyd ), "/thumbnail", FY_NT, FYNWF_PTR_DEFAULT );
+
+	if ( !thumbnail )
+		return;
+
+	char cache_dir[ 256 ]{};
+	char cache_video_dir[ 256 ]{};
+
+	if ( config_get_node_string( thumbnail, "/cache-path %255s", cache_dir ) )
+		config_parse_path( app_dir, cache_dir, app::config.thumbnail_cache_path );
+
+	if ( config_get_node_string( thumbnail, "/cache-path-video %255s", cache_video_dir ) )
+		config_parse_path( app_dir, cache_video_dir, app::config.thumbnail_video_cache_path );
+
+	config_get_node_u32( thumbnail, "/threads", app::config.thumbnail_threads );
+	config_get_node_u32( thumbnail, "/threads-save", app::config.thumbnail_save_threads );
+
+	//config_get_node_value( thumbnail, "/threads %u", app::config.thumbnail_threads );
+	config_get_node_value( thumbnail, "/uploads-per-frame %u", app::config.thumbnail_uploads_per_frame );
+	config_get_node_value( thumbnail, "/memory-cache-size %u", app::config.thumbnail_mem_cache_size );
+	config_get_node_value( thumbnail, "/use-fixed-size %u", app::config.thumbnail_use_fixed_size );
+	config_get_node_value( thumbnail, "/jxl-enable %u", app::config.thumbnail_jxl_enable );
+	config_get_node_value( thumbnail, "/jxl-effort %u", app::config.thumbnail_jxl_effort );
+	config_get_node_value( thumbnail, "/jxl-distance %f", app::config.thumbnail_jxl_distance );
+	config_get_node_value( thumbnail, "/size %u", app::config.thumbnail_size );
+
+	if ( app::config.thumbnail_threads == 0 )
+	{
+		printf( "config: Can't have 0 thumbnail threads!\n" );
+		app::config.thumbnail_threads = 1;
+	}
+	else if ( app::config.thumbnail_threads > 32 )
+	{
+		printf( "config: Not allowing over 32 thumbnail threads! Only 64 thumbnails can be waiting to be loaded in the queue!\n" );
+		app::config.thumbnail_threads = 32;
+	}
+
+	if ( app::config.thumbnail_uploads_per_frame == 0 )
+	{
+		printf( "Cconfig: an't have 0 thumbnail uploads per frame!\n" );
+		app::config.thumbnail_uploads_per_frame = 1;
+	}
+	else if ( app::config.thumbnail_uploads_per_frame > 64 )
+	{
+		printf( "config: Not allowing over 64 thumbnail uploads per frame, it can really lock up the program a lot!\n" );
+		app::config.thumbnail_threads = 64;
+	}
+
+	app::config.thumbnail_jxl_distance = std::clamp( app::config.thumbnail_jxl_distance, -1.f, 25.f );
+	app::config.thumbnail_jxl_effort   = std::clamp( app::config.thumbnail_jxl_effort, 0U, 11U );
+}
+
+
 void config_reset()
 {
 	char* app_dir = sys_get_exe_folder();
@@ -314,108 +417,11 @@ bool config_load()
 
 	printf( "Reading config\n" );
 
-	// =====================================================================================================================
-	// Bookmarks
-
-	app::config.bookmark.clear();
-
-	fy_node* bookmark_node_list = fy_node_by_path( fy_document_root( fyd ), "/bookmarks", FY_NT, FYNWF_PTR_DEFAULT );
-
-	if ( bookmark_node_list )
-	{
-		int item_count = fy_node_sequence_item_count( bookmark_node_list );
-
-		for ( int item_i = 0; item_i < item_count; item_i++ )
-		{
-			fy_node*    bookmark_node = fy_node_sequence_get_by_index( bookmark_node_list, item_i );
-
-			size_t      len           = 0;
-			const char* string        = fy_node_get_scalar( bookmark_node, &len );
-
-			if ( string )
-			{
-				bookmark_t bookmark{};
-				bookmark.path.assign( string, len );
-
-				if ( fs_is_file( bookmark.path.c_str() ) )
-				{
-					printf( "config: bookmark points to file, not a directory: \"%s\"\n", string );
-					continue;
-				}
-
-				bookmark.valid = fs_is_dir( bookmark.path.c_str() );
-
-				if ( !bookmark.valid )
-					printf( "config: bookmark does not exist! \"%s\"\n", string );
-
-				char* folder_name = fs_get_filename( string, len );
-				bookmark.name.assign( folder_name );
-				free( folder_name );
-
-				app::config.bookmark.push_back( bookmark );
-			}
-			else
-			{
-				printf( "config: bookmark not a string?\n" );
-			}
-		}
-	}
+	config_read_bookmarks( fyd );
+	config_read_thumbnail_settings( app_dir, fyd );
 
 	// =====================================================================================================================
-	// Thumbnail Settings
-
-	fy_node* thumbnail = fy_node_by_path( fy_document_root( fyd ), "/thumbnail", FY_NT, FYNWF_PTR_DEFAULT );
-
-	if ( thumbnail )
-	{
-		char cache_dir[ 256 ]{};
-		char cache_video_dir[ 256 ]{};
-
-		if ( config_get_node_string( thumbnail, "/cache-path %255s", cache_dir ) )
-			config_parse_path( app_dir, cache_dir, app::config.thumbnail_cache_path );
-
-		if ( config_get_node_string( thumbnail, "/cache-path-video %255s", cache_video_dir ) )
-			config_parse_path( app_dir, cache_video_dir, app::config.thumbnail_video_cache_path );
-
-		config_get_node_u32( thumbnail, "/threads", app::config.thumbnail_threads );
-		config_get_node_u32( thumbnail, "/threads-save", app::config.thumbnail_save_threads );
-
-		//config_get_node_value( thumbnail, "/threads %u", app::config.thumbnail_threads );
-		config_get_node_value( thumbnail, "/uploads-per-frame %u", app::config.thumbnail_uploads_per_frame );
-		config_get_node_value( thumbnail, "/memory-cache-size %u", app::config.thumbnail_mem_cache_size );
-		config_get_node_value( thumbnail, "/use-fixed-size %u", app::config.thumbnail_use_fixed_size );
-		config_get_node_value( thumbnail, "/jxl-enable %u", app::config.thumbnail_jxl_enable );
-		config_get_node_value( thumbnail, "/jxl-effort %u", app::config.thumbnail_jxl_effort );
-		config_get_node_value( thumbnail, "/jxl-distance %f", app::config.thumbnail_jxl_distance );
-		config_get_node_value( thumbnail, "/size %u", app::config.thumbnail_size );
-
-		if ( app::config.thumbnail_threads == 0 )
-		{
-			printf( "config: Can't have 0 thumbnail threads!\n" );
-			app::config.thumbnail_threads = 1;
-		}
-		else if ( app::config.thumbnail_threads > 32 )
-		{
-			printf( "config: Not allowing over 32 thumbnail threads! Only 64 thumbnails can be waiting to be loaded in the queue!\n" );
-			app::config.thumbnail_threads = 32;
-		}
-
-		if ( app::config.thumbnail_uploads_per_frame == 0 )
-		{
-			printf( "Cconfig: an't have 0 thumbnail uploads per frame!\n" );
-			app::config.thumbnail_uploads_per_frame = 1;
-		}
-		else if ( app::config.thumbnail_uploads_per_frame > 64 )
-		{
-			printf( "config: Not allowing over 64 thumbnail uploads per frame, it can really lock up the program a lot!\n" );
-			app::config.thumbnail_threads = 64;
-		}
-
-		app::config.thumbnail_jxl_distance = std::clamp( app::config.thumbnail_jxl_distance, -1.f, 25.f );
-		app::config.thumbnail_jxl_effort   = std::clamp( app::config.thumbnail_jxl_effort, 0U, 11U );
-	}
-
-	// =====================================================================================================================
+	// General Settings
 
 	config_get_doc_value( fyd, "/vsync %d", app::config.vsync );
 
@@ -425,7 +431,9 @@ bool config_load()
 	config_get_bool_value( fyd, "/dwm-extend %u", app::config.dwm_extend );
 	config_get_bool_value( fyd, "/use-custom-colors %u", app::config.use_custom_colors );
 	config_get_bool_value( fyd, "/single-instance %u", app::config.single_instance );
-	config_get_bool_value( fyd, "/auto-expand-directory-tree %u", app::config.auto_expand_directory_tree );
+
+	config_get_bool_value( fyd, "/directory-tree-auto-expand %u", app::config.directory_tree_auto_expand );
+	config_get_bool_value( fyd, "/directory-tree-expand-on-click %u", app::config.directory_tree_expand_on_click );
 	config_get_bool_value( fyd, "/directory-tree-simple %u", app::config.directory_tree_simple );
 
 	config_get_doc_value( fyd, "/sleep-time-no-focus %u", app::config.sleep_time_no_focus );
@@ -474,8 +482,7 @@ bool config_load()
 }
 
 
-bool config_save()
+void config_save()
 {
-	return false;
 }
 

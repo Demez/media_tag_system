@@ -59,7 +59,10 @@ gallery-show-filenames: 1
 always-draw: 0
 
 # Auto expand the directory tree on entering folders
-auto-expand-directory-tree: 1
+directory-tree-auto-expand: 1
+
+# Auto expand the directory tree on clicking on folders in the tree
+directory-tree-expand-on-click: 0
 
 # Simple Directory Tree list, only shows folders in the current folder you're in
 directory-tree-simple: 0

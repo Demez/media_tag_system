@@ -213,6 +213,7 @@ set(
     src/memory.cpp
     src/config.cpp
 	src/directory_tree.cpp
+	src/settings_menu.cpp
 
     src/view_gallery.cpp
     src/view_gallery_sidebar.cpp

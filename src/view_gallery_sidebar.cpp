@@ -140,7 +140,7 @@ void gallery_update_filter( e_gallery_filter filter )
 }
 
 
-void gallery_header_draw_path_bar( bool& was_in_path_edit, float& bar_width, ImVec2 region_avail, float right_side_space_needed )
+void gallery_header_draw_path_bar( bool& was_in_path_edit, float& bar_width, ImVec2 region_avail, float& right_side_space_needed )
 {
 	was_in_path_edit            = false;
 	static bool path_edit_hover = false;
@@ -237,8 +237,15 @@ void gallery_header_draw_path_bar( bool& was_in_path_edit, float& bar_width, ImV
 		// float       bar_size                      = std::max( std::min( cursor_pos.x + padding_extra, bar_size_min + padding_extra ), free_space - space_needed );
 		float   bar_size          = std::max( padding_extra, free_space - right_side_space_needed );
 
-		if ( right_side_space_needed == 0.f )
+		//if ( right_side_space_needed == 0.f )
+		//	bar_size = space_avail2 - ( nav_enter_width + style.ItemSpacing.y * 2.f + style.WindowPadding.x );
+
+		// if ( bar_size == padding_extra )
+		if ( free_space < right_side_space_needed / 2.f )
+		{
+			right_side_space_needed = 0.f;
 			bar_size = space_avail2 - ( nav_enter_width + style.ItemSpacing.y * 2.f + style.WindowPadding.x );
+		}
 
 		ImVec2  window_pos        = ImGui::GetWindowPos();
 
@@ -322,7 +329,7 @@ void gallery_header_draw_path_text_edit( bool& was_in_path_edit, float bar_width
 }
 
 
-void gallery_header_draw_path( ImVec2 region_avail, float right_side_space_needed )
+void gallery_header_draw_path( ImVec2 region_avail, float& right_side_space_needed )
 {
 	static bool  was_in_path_edit = false;
 	static float bar_width        = 0.f;
@@ -426,7 +433,7 @@ int gallery_view_draw_header()
 
 	ImVec2       region_avail     = ImGui::GetContentRegionAvail();
 
-	int          space_needed     = 0;
+	float        space_needed     = 0;
 	int          search_box_size  = 150;
 
 	ImVec2       search_size      = ImGui::CalcTextSize( "Search" );
@@ -450,9 +457,6 @@ int gallery_view_draw_header()
 	// ??
 	// space_needed += 60.f;
 	//space_needed += style.ItemSpacing.x;
-
-	if ( region_avail.x < 600 )
-		space_needed = 0;
 	
 	// ---------------------------------------------------------------------------------
 
@@ -974,7 +978,10 @@ bool TreeNodeBehaviorStupid( ImGuiID id, ImGuiTreeNodeFlags flags, const char* l
 		if ( pressed && g.DragDropHoldJustPressedId != id )
 		{
 			if ( ( flags & ImGuiTreeNodeFlags_OpenOnMask_ ) == 0 || ( g.NavActivateId == id && !is_multi_select ) )
-				toggled = true;  // Single click
+			{
+				toggled       = true;  // Single click
+				label_pressed = toggled;
+			}
 			if ( flags & ImGuiTreeNodeFlags_OpenOnArrow )
 			{
 				toggled |= is_mouse_x_over_arrow && !g.NavHighlightItemUnderNav;  // Lightweight equivalent of IsMouseHoveringRect() since ButtonBehavior() already did the job
@@ -1119,14 +1126,17 @@ static std::vector< std::string > g_filesystem_browser_path_chunks{};
 // this is shit
 void sidebar_draw_directory_recursive( u32 depth, const std::string& current_path )
 {
-	ImGuiTreeNodeFlags node_flags  = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+	ImGuiTreeNodeFlags node_flags  = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DrawLinesFull;
 	char*              folder_name = fs_get_filename( current_path.c_str(), current_path.size() );
+
+	if ( !app::config.directory_tree_expand_on_click )
+		node_flags |= ImGuiTreeNodeFlags_OpenOnArrow;
 
 	if ( is_path_part_of_current_dir( depth, current_path, folder_name ) )
 	{
 		node_flags |= ImGuiTreeNodeFlags_Selected;
 
-		if ( directory::folder_changed && app::config.auto_expand_directory_tree && !g_dir_change_from_dir_tree )
+		if ( directory::folder_changed && app::config.directory_tree_auto_expand && !g_dir_change_from_dir_tree )
 		{
 			ImGui::SetScrollHereY();
 			ImGui::SetNextItemOpen( true );
@@ -1695,152 +1705,7 @@ void gallery_view_draw_sidebar()
 
 		if ( ImGui::BeginTabItem( "Settings" ) )
 		{
-			ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-			ImGui::Text( "%.8lf Frametime", app::frame_time );
-
-			// ImGui::Text( "App Time: %.3f Sec", app::total_time );
-			ImGui::Text( "App Time: %.3f Sec", app::total_time / 1000.f );
-
-			ImGui::Separator();
-
-			if ( ImGui::Checkbox( "Gallery - Fixed Thumbnail Sizes", &app::config.thumbnail_use_fixed_size ) )
-			{
-				thumbnail_clear_cache();
-			}
-
-			if ( ImGui::Checkbox( "Gallery - Show Filenames", &app::config.gallery_show_filenames ) )
-			{
-				gallery_view_reset_text_size();
-				gallery_view_scroll_to_cursor();
-			}
-
-			ImGui::Checkbox( "Always Draw", &app::config.always_draw );
-			// ImGui::Checkbox( "DWM Extend", &app::config.dwm_extend );
-			// ImGui::Checkbox( "Use Custom Colors", &app::config.use_custom_colors );
-
-			ImGui::Separator();
-
-			// DEBUG
-			ImGui::Checkbox( "Always Recalc Gallery Item Sizes", &gallery::always_recalc_item_sizes );
-			ImGui::Checkbox( "Always Recalc Gallery Item Layout", &gallery::always_recalc_layout );
-
-			ImGui::Separator();
-
-			ImGui::Checkbox( "Enable JPEG XL Thumbnails", &app::config.thumbnail_jxl_enable );
-
-			#if 0
-			ImGui::Separator();
-
-			ImGui::PushItemWidth( 128 );
-
-			int thumbnail_threads = app::config.thumbnail_threads;
-			if ( ImGui::InputInt( "Thumbnail Threads", &thumbnail_threads, 1, 1 ) )
-			{
-				app::config.thumbnail_threads = CLAMP( thumbnail_threads, 1, 32 );
-			}
-
-			int thumbnail_save_threads = app::config.thumbnail_save_threads;
-			if ( ImGui::InputInt( "Thumbnail Cache Threads", &thumbnail_save_threads, 1, 1 ) )
-			{
-				app::config.thumbnail_save_threads = CLAMP( thumbnail_save_threads, 1, 32 );
-			}
-
-			ImGui::PopItemWidth();
-
-			if ( ImGui::Button( "Restart Threads" ) )
-			{
-				thumbnail_loader_shutdown( false );
-				thumbnail_loader_init();
-			}
-			#endif
-
-			ImGui::Separator();
-
-			ImGui::PushItemWidth( 128 );
-
-			//int idle_sleep_time = app::config.sleep_time_idle;
-			//if ( ImGui::InputInt( "Idle Sleep Time", &idle_sleep_time, 1, 1 ) )
-			//{
-			//	app::config.sleep_time_idle = CLAMP( idle_sleep_time, 0, 1000 );
-			//}
-			//set_frame_draw( ImGui::IsItemHovered() );
-			//
-			//ImGui::SetItemTooltip( "Sleep time when app is not actively drawing, but focused" );
-
-			int focus_sleep_time = app::config.sleep_time_focus;
-			if ( ImGui::InputInt( "Focused Sleep Time", &focus_sleep_time, 1, 1 ) )
-			{
-				app::config.sleep_time_focus = CLAMP( focus_sleep_time, 0, 1000 );
-			}
-
-			set_frame_draw( ImGui::IsItemHovered() );
-			ImGui::SetItemTooltip( "Sleep time when app is focused, and running really fast, and vsync is off" );
-
-			int unfocus_sleep_time = app::config.sleep_time_no_focus;
-			if ( ImGui::InputInt( "Unfocused Sleep Time", &unfocus_sleep_time, 1, 1 ) )
-			{
-				app::config.sleep_time_no_focus = CLAMP( unfocus_sleep_time, 0, 1000 );
-			}
-			set_frame_draw( ImGui::IsItemHovered() );
-
-			ImGui::SetItemTooltip( "Sleep time when app is not focused" );
-
-			ImGui::Separator();
-
-			int uploads_per_frame = app::config.thumbnail_uploads_per_frame;
-			if ( ImGui::InputInt( "Thumbnail Uploads Per Frame", &uploads_per_frame, 1, 1 ) )
-			{
-				app::config.thumbnail_uploads_per_frame = CLAMP( uploads_per_frame, 1, 32 );
-			}
-			set_frame_draw( ImGui::IsItemHovered() );
-
-			ImGui::SetItemTooltip( "Amount of thumbnails allowed to upload to the GPU per frame on the main thread\nThis Blocks the main thread to upload, so don't set this number too high" );
-
-			ImGui::Separator();
-
-			SDL_GL_GetSwapInterval( &app::config.vsync );
-
-			ImGui::PushItemWidth( 128 );
-
-			if ( ImGui::Selectable( "VSync OFF", app::config.vsync == 0, 0, { 64.f, ImGui::GetFontSize() } ) )
-			{
-				if ( app::config.vsync != 0 )
-					SDL_GL_SetSwapInterval( 0 );
-			}
-
-			ImGui::SameLine();
-			ImGui::Spacing();
-			ImGui::SameLine();
-
-			if ( ImGui::Selectable( "VSync ON", app::config.vsync == 1, 0, { 64.f, ImGui::GetFontSize() } ) )
-			{
-				if ( app::config.vsync != 1 )
-					SDL_GL_SetSwapInterval( 1 );
-			}
-
-			ImGui::SameLine();
-			ImGui::Spacing();
-			ImGui::SameLine();
-
-			if ( ImGui::Selectable( "VSync Adaptive", app::config.vsync == -1, 0, { 96.f, ImGui::GetFontSize() } ) )
-			{
-				if ( app::config.vsync != -1 )
-					SDL_GL_SetSwapInterval( -1 );
-			}
-
-			ImGui::PopItemWidth();
-
-			ImGui::Separator();
-
-			static float dpi_scale = 0.f;
-			dpi_scale              = app::dpi;
-			if ( ImGui::InputFloat( "DPI Override", &dpi_scale, 0.25, 0.5, "%.3f" ) )
-			{
-				update_dpi( dpi_scale );
-			}
-
-			ImGui::PopItemWidth();
-
+			settings_draw();
 			ImGui::EndTabItem();
 		}
 
