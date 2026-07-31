@@ -279,11 +279,11 @@ def post_mozjpeg_extract():
         return
 
     print("Building MozJPEG - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
         return
 
     print("Building MozJPEG - Debug\n")
-    if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
+    if not syscmd(f"cmake --build ./build --config Debug --parallel", "Failed to build in Debug"):
         return
 
 
@@ -304,11 +304,11 @@ def post_zlib_extract():
         return
 
     print("Building zlib-ng - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
         return
 
     print("Building zlib-ng - Debug\n")
-    if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
+    if not syscmd(f"cmake --build ./build --config Debug --parallel", "Failed to build in Debug"):
         return
 
 
@@ -339,7 +339,7 @@ def post_libspng_extract():
         return
 
     print("Building libspng - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
         return
 
     #print("Building libspng - Debug\n")
@@ -377,15 +377,15 @@ def compile_nativefiledialog():
         return
 
     print("Building nativefiledialog - RelWithDebInfo\n")
-    if not syscmd(f"cmake --build ./build --config RelWithDebInfo", "Failed to build in RelWithDebInfo"):
+    if not syscmd(f"cmake --build ./build --config RelWithDebInfo --parallel", "Failed to build in RelWithDebInfo"):
         return
 
     print("Building nativefiledialog - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
         return
 
     print("Building nativefiledialog - Debug\n")
-    if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
+    if not syscmd(f"cmake --build ./build --config Debug --parallel", "Failed to build in Debug"):
         return
 
 
@@ -400,16 +400,15 @@ def compile_libfyaml():
         return
 
     print("Building libfyaml - RelWithDebInfo\n")
-    if not syscmd(f"cmake --build ./build --config RelWithDebInfo", "Failed to build in RelWithDebInfo"):
+    if not syscmd(f"cmake --build ./build --config RelWithDebInfo --parallel", "Failed to build in RelWithDebInfo"):
         return
 
     print("Building libfyaml - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
         return
 
     print("Building libfyaml - Debug\n")
-    if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
-        return
+    if not syscmd(f"cmake --build ./build --config Debug --parallel", "Failed to build in Debug"):
         return
 
 
@@ -420,7 +419,7 @@ def libjxl_run():
     set_project("jxl")
 
     # Stable version of libjxl to use
-    branch = "v0.11.x"
+    branch = "v0.12.x"
 
     # TODO: implement a global basic version check system for tasks
     # check version
@@ -445,11 +444,11 @@ def libjxl_run():
     if not os.path.isdir("libjxl"):
         # NOTE: should we only clone some submodules?
         # if not syscmd(f"git clone --branch {branch} https://github.com/libjxl/libjxl.git --recursive --shallow-submodules", "Failed to clone libjxl with git"):
-        if not syscmd(f"git clone --branch {branch} --single-branch https://github.com/libjxl/libjxl.git", "Failed to clone libjxl with git"):
+        if not syscmd(f"git clone --branch {branch} --single-branch https://github.com/libjxl/libjxl.git --depth 1", "Failed to clone libjxl with git"):
             return
 
         # init some submodules
-        if not syscmd(f"git -C libjxl/third_party submodule update --init highway brotli skcms libpng zlib", "Failed to init libjxl submodules"):
+        if not syscmd(f"git -C libjxl/third_party submodule update --init highway brotli skcms libpng zlib --depth 1", "Failed to init libjxl submodules"):
             return
 
         with open("libjxl/IMAGE_VIEW_VERSION", "w") as version_io:
@@ -460,7 +459,7 @@ def libjxl_run():
 
     os.chdir("libjxl")
 
-    defines = "-DBUILD_SHARED_LIBS=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DCXX_FUZZERS_SUPPORTED=OFF -DJPEGXL_ENABLE_DOXYGEN=ON -DJPEGXL_ENABLE_MANPAGES=ON -DJPEGXL_ENABLE_EXAMPLES=ON -DJPEGXL_ENABLE_JNI=OFF -DJPEGXL_ENABLE_OPENEXR=OFF -DJPEGXL_ENABLE_SJPEG=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_JPEGLI=OFF -DJPEGXL_ENABLE_JPEGLI_LIBJPEG=OFF -DJPEGXL_ENABLE_TOOLS=OFF"
+    defines = "-DBUILD_SHARED_LIBS=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DCXX_FUZZERS_SUPPORTED=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_EXAMPLES=OFF -DJPEGXL_ENABLE_JNI=OFF -DJPEGXL_ENABLE_OPENEXR=OFF -DJPEGXL_ENABLE_SJPEG=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_TOOLS=OFF"
 
     # if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=0.", "Failed to run cmake"):
     # if not syscmd(f"cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DJPEGXL_STATIC=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF", "Failed to run cmake"):
@@ -472,7 +471,7 @@ def libjxl_run():
     #    return
 
     print("Building jxl - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release", "Failed to build in Release"):
+    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
         return
 
     #print("Building jxl - Debug\n")
