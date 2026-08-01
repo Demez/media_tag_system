@@ -444,11 +444,11 @@ def libjxl_run():
     if not os.path.isdir("libjxl"):
         # NOTE: should we only clone some submodules?
         # if not syscmd(f"git clone --branch {branch} https://github.com/libjxl/libjxl.git --recursive --shallow-submodules", "Failed to clone libjxl with git"):
-        if not syscmd(f"git clone --branch {branch} --single-branch https://github.com/libjxl/libjxl.git --depth 1", "Failed to clone libjxl with git"):
+        if not syscmd(f"git clone --branch {branch} --single-branch --depth 1 https://github.com/libjxl/libjxl.git", "Failed to clone libjxl with git"):
             return
 
         # init some submodules
-        if not syscmd(f"git -C libjxl/third_party submodule update --init highway brotli skcms libpng zlib --depth 1", "Failed to init libjxl submodules"):
+        if not syscmd(f"git -C libjxl/third_party submodule update --depth 1 --init highway brotli skcms libpng zlib", "Failed to init libjxl submodules"):
             return
 
         with open("libjxl/IMAGE_VIEW_VERSION", "w") as version_io:
@@ -569,8 +569,8 @@ TASK_LIST = {
         },
         {
             "name": "libfyaml",
-            "url":  "https://github.com/pantoniou/libfyaml/releases/download/v0.9.5/libfyaml-0.9.5.tar.gz",
-            "file": "libfyaml-0.9.5.tar.gz",
+            "url":  "https://github.com/pantoniou/libfyaml/releases/download/v1.0.0-alpha8/libfyaml-1.0.0-alpha8.tar.gz",
+            "file": "libfyaml-1.0.0-alpha8.tar.gz",
             "func": compile_libfyaml,
         },
         {
