@@ -304,10 +304,13 @@ static bool handle_rename( const char* path, const char* new_path )
 	if ( code == 0 )
 		return true;
 
-	printf( "failed to rename old saved file \"%s\" - ", path );
+	printf( "failed to rename old saved file \"%s\" - \"%s\"\n", path, new_path );
 
 	switch ( code )
 	{
+		default:
+			printf( "Unknown Error Code: %d\n", code );
+			break;
 		case EACCES:
 			printf( "Permission denied\n" );
 			break;
@@ -326,6 +329,7 @@ static bool handle_rename( const char* path, const char* new_path )
 }
 
 
+// TODO: look into atomic file operations?
 // TODO: THIS CURRENTLY IGNORES THE READ ONLY ATTRIBUTE, FIX THAT !!!!!!
 bool fs_save_file( const char* path, const char* data, size_t size )
 {
@@ -334,6 +338,9 @@ bool fs_save_file( const char* path, const char* data, size_t size )
 	// then remove .temp from new file, and remove .bak file (or keep it until next save)
 	// also check if a .temp file already exists just in case if a crash happened midway through this
 	// basically this is all so if there is a crashe at any point during this, we dont lose any data
+
+	// TODO: new idea - make a copy of the file on disk, then try to overwrite it
+	// this should respect read only, and other attributes
 
 	char temp_path[ 4096 ] = { 0 };
 	strcat( temp_path, path );
@@ -357,7 +364,7 @@ bool fs_save_file( const char* path, const char* data, size_t size )
 
 	if ( fp == nullptr )
 	{
-		printf( "failed to open file handle to write file to\n - \"%s\"", temp_path );
+		printf( "failed to open file handle to write file to\n - \"%s\"\n", temp_path );
 		return false;
 	}
 
@@ -399,13 +406,112 @@ bool fs_save_file( const char* path, const char* data, size_t size )
 }
 
 
+void fs_save_file_free( save_file_t& save )
+{
+	ch_free_str( save.temp_path );
+	ch_free_str( save.bak_path );
+}
+
+
+// stupid
+save_file_t fs_save_file_open( const char* path )
+{
+	// write to a temp file,
+	// then rename to old saved file to name.bak,
+	// then remove .temp from new file, and remove .bak file (or keep it until next save)
+	// also check if a .temp file already exists just in case if a crash happened midway through this
+	// basically this is all so if there is a crashe at any point during this, we dont lose any data
+
+	save_file_t save{};
+	size_t      path_len = strlen( path );
+	FILE*       fp       = nullptr;
+
+	save.temp_path       = ch_calloc< char >( path_len + 6, e_mem_category_string );
+	save.bak_path        = ch_calloc< char >( path_len + 5, e_mem_category_string );
+
+	strcat( save.temp_path, path );
+	strcat( save.temp_path, ".temp" );
+
+	strcat( save.bak_path, path );
+	strcat( save.bak_path, ".bak" );
+
+	// check if a .temp file exists already
+	if ( access( save.temp_path, 0 ) != -1 )
+	{
+		if ( !sys_recycle_file( save.temp_path ) )
+		{
+			printf( "failed to delete old temp file for saving! - \"%s\"\n", save.temp_path );
+			goto save_file_open_fail;
+		}
+	}
+
+	fp = fopen( save.temp_path, "wb" );
+
+	if ( fp == nullptr )
+	{
+		printf( "failed to open file handle to write file to\n - \"%s\"\n", save.temp_path );
+		goto save_file_open_fail;
+	}
+
+	save.file = fp;
+	return save;
+
+save_file_open_fail:
+	fs_save_file_free( save );
+	return {};
+}
+
+
+void fs_save_file_close( save_file_t& save, const char* path )
+{
+	FILE* fp = (FILE*)save.file;
+	fclose( fp );
+
+	// check if a saved file exists already
+	bool old_save_exists = access( path, 0 ) != -1;
+
+	if ( old_save_exists )
+	{
+		// check if a .bak file exists already
+		if ( access( save.bak_path, 0 ) != -1 )
+		{
+			if ( !sys_recycle_file( save.bak_path ) )
+			{
+				printf( "failed to delete old backup file for saving! - \"%s\"\n", save.bak_path );
+				return;
+			}
+		}
+
+		if ( !handle_rename( path, save.bak_path ) )
+		{
+			fs_save_file_free( save );
+			return;
+		}
+	}
+
+	if ( !handle_rename( save.temp_path, path ) )
+	{
+		fs_save_file_free( save );
+		return;
+	}
+
+	// copy file creation date
+	u64 create_date = 0;
+
+	if ( old_save_exists && sys_get_file_times_and_size( save.bak_path, &create_date, nullptr, nullptr, nullptr ) )
+	{
+		sys_set_file_times( path, &create_date, nullptr, nullptr );
+	}
+}
+
+
 bool fs_write_file( const char* path, const char* data, size_t size )
 {
 	FILE* fp = fopen( path, "wb" );
 
 	if ( fp == nullptr )
 	{
-		printf( "failed to open file handle to write file to\n - \"%s\"", path );
+		printf( "failed to open file handle to write file to\n - \"%s\"\n", path );
 		return false;
 	}
 
@@ -415,3 +521,4 @@ bool fs_write_file( const char* path, const char* data, size_t size )
 
 	return true;
 }
+

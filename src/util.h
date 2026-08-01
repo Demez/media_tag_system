@@ -438,6 +438,16 @@ char*       fs_read_file( const char* path, size_t* len = nullptr );
 // ensures no data loss happens and backs up the old file
 bool        fs_save_file( const char* path, const char* data, size_t size );
 
+struct save_file_t
+{
+	void* file;
+	char* temp_path;
+	char* bak_path;
+};
+
+save_file_t fs_save_file_open( const char* path );
+void        fs_save_file_close( save_file_t& save, const char* path );
+
 // overrwites any existing file
 bool        fs_write_file( const char* path, const char* data, size_t size );
 

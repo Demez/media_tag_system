@@ -1,14 +1,5 @@
-# bookmarks list
-# thumbnail threads
-# thumbnail cache dir
-# video thumbnail dir
-# default sort mode
-# saved sort mode per folder (store in a different file?)
-# imgui themes
-
 bookmarks:
  - D:\projects\media_tag_system\out
-
 
 # new layout for thumbnail options
 thumbnail:

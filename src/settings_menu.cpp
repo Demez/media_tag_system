@@ -1,6 +1,15 @@
 #include "main.h"
 
 
+// ---------------------------------------------------
+// Settings TODO:
+// 
+// - Reset to default button next to each setting
+// - Preview what the default value is
+// - Something to keep clamped values in sync, and descriptions
+// 
+
+
 constexpr int SCALAR_OPTION_WIDTH = 192;
 
 
@@ -154,16 +163,16 @@ void settings_draw_thumbnails()
 	ImGui::PushItemWidth( SCALAR_OPTION_WIDTH );
 
 	setting_float_option(
-	  "JXL: Distance",
+	  "JPEG XL Distance",
 	  "How far away the thumbnail is from the original quality with values closer to 0 being larger but high quality (0 itself equals lossless)",
 	  app::config.thumbnail_jxl_distance,
-	  0, 1000, 1 );
+	  -1.f, 25.f, 0.5f );
 
 	setting_u32_option(
-	  "JXL: Effort",
+	  "JPEG XL Effort",
 	  "Amount of processing power to dedicate towards creating thumbnails",
 	  app::config.thumbnail_jxl_effort,
-	  0, 1000, 1 );
+	  0, 11, 1 );
 
 	setting_u32_option(
 	  "Max Thumbnail Size",
@@ -206,7 +215,7 @@ void settings_draw_thumbnails()
 	  "Uploads Per Frame",
 	  "Amount of thumbnails allowed to upload to the GPU per frame on the main thread\nThis Blocks the main thread to upload, so don't set this number too high",
 	  app::config.thumbnail_uploads_per_frame,
-	  1, 128, 1 );
+	  1, 64, 1 );
 
 	ImGui::PopItemWidth();
 }
@@ -252,14 +261,14 @@ void settings_draw()
 
 	ImGui::Separator();
 
-	ImGui::BeginDisabled();
+	//ImGui::BeginDisabled();
 
 	if ( ImGui::Button( "Save" ) )
 	{
 		config_save();
 	}
 
-	ImGui::EndDisabled();
+	//ImGui::EndDisabled();
 
 	ImGui::SameLine();
 

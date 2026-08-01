@@ -1185,17 +1185,6 @@ void sidebar_draw_directory_recursive( u32 depth, const std::string& current_pat
 }
 
 
-void sidebar_draw_filesystem_folder_item( const std::string& folder_name )
-{
-
-
-	if ( ImGui::Selectable( folder_name.c_str() ) )
-	{
-		g_filesystem_browser_path_chunks.push_back( folder_name );
-	}
-}
-
-
 void sidebar_draw_filesystem( ImGuiStyle& style )
 {
 	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );

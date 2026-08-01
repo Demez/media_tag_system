@@ -118,7 +118,7 @@ struct app_config_t
 	std::vector< bookmark_t > bookmark{};
 
 	u32                       thumbnail_threads           = 8;
-	u32                       thumbnail_save_threads      = 4;
+	u32                       thumbnail_save_threads      = 2;
 	u32                       thumbnail_uploads_per_frame = 4;
 
 	// size in kilobytes
@@ -149,7 +149,7 @@ struct app_config_t
 	float                     media_zoom_scale               = 0.1;
 
 	bool                      no_video                       = false;
-	bool                      gallery_show_filenames         = false;
+	bool                      gallery_show_filenames         = true;
 	bool                      always_draw                    = false;
 	bool                      single_instance                = false;
 
@@ -158,8 +158,8 @@ struct app_config_t
 	bool                      directory_tree_simple          = false;
 
 	// Theming
-	bool                      dwm_extend                     = true;
-	bool                      use_custom_colors              = true;
+	bool                      dwm_extend                     = false;
+	bool                      use_custom_colors              = false;
 
 	ImVec2                    gallery_header_padding{};
 	ImVec4                    header_bg_color{};
