@@ -89,6 +89,58 @@ struct file_t
 	{
 		return !operator!=( other );
 	}
+
+	file_t()
+	{
+	};
+
+	~file_t()
+	{
+	};
+
+	// copying
+	void assign( const file_t& other ) noexcept
+	{
+		path         = other.path;
+		date_mod     = other.date_mod;
+		date_created = other.date_created;
+		size         = other.size;
+		type         = other.type;
+	}
+
+	// moving
+	void assign( file_t&& other ) noexcept
+	{
+		path         = std::move( other.path );
+		date_mod     = other.date_mod;
+		date_created = other.date_created;
+		size         = other.size;
+		type         = other.type;
+	}
+
+	file_t& operator=( const file_t& other ) noexcept
+	{
+		assign( other );
+		return *this;
+	}
+
+	file_t& operator=( file_t&& other ) noexcept
+	{
+		assign( other );
+		return *this;
+	}
+
+	// copying
+	file_t( const file_t& other ) noexcept
+	{
+		assign( other );
+	}
+
+	// moving
+	file_t( file_t&& other ) noexcept
+	{
+		assign( std::move( other ) );
+	}
 };
 
 
@@ -162,7 +214,7 @@ void                    sys_browse_to_files( const fs::path& root, const std::ve
 // print color with \aFFF escape codes for color values
 //void        sys_print_color( const char* string );
 
-bool                    sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags );
+bool                    sys_scandir( const char* root, std::vector< file_t >& files, e_scandir_flags flags );
 
 // --------------------------------------------------------------------------------------------------------
 // Terminal

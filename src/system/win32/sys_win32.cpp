@@ -900,8 +900,11 @@ bool sys_get_drives( std::vector< std::string >& drives )
 
 struct _recursive_depth_t
 {
-	std::wstring name;
-	std::wstring root;
+	wchar_t* name;
+	size_t   name_len;
+
+	wchar_t* root;
+	size_t   root_len;
 };
 
 // https://blog.s-schoener.com/2024-06-24-find-files-internals/
@@ -937,33 +940,77 @@ static bool _open_dir( std::wstring& path, HANDLE& dir_handle, IO_STATUS_BLOCK& 
 		return false;
 	}
 
+	//FILE_DIRECTORY_INFORMATION* file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
+	//size_t                      files_scanned = 0;
+	//
+	//while ( file_dir_info->NextEntryOffset != 0 )
+	//{
+	//	file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)file_dir_info ) + file_dir_info->NextEntryOffset );
+	//	files_scanned++;
+	//}
+	//
+	//files.resize( files.size() + files_scanned );
+
+	return true;
+}
+
+
+constexpr size_t BUFFER_CHUNK_SIZE = 1024 * 6;
+
+
+void expand_buffer_list( m_array< m_array< file_t > >& file_buffers, size_t files_scanned, size_t& file_index )
+{
+  #if 1
+	if ( file_buffers.back().aCapacity > file_buffers.back().aSize + files_scanned )
+		return;
+
+	file_buffers.back().reserve( file_buffers.back().size() + BUFFER_CHUNK_SIZE );
+  #else
+	if ( file_buffers.back().size() + files_scanned < BUFFER_CHUNK_SIZE )
+		return;
+
+	file_index = 0;
+	file_buffers.resize( file_buffers.size() + 1 );
+	file_buffers.back().reserve( BUFFER_CHUNK_SIZE );
+  #endif
+}
+
+
+void expand_file_list( std::vector< file_t >& file_buffers, size_t files_scanned, size_t file_index )
+{
+	//if ( file_buffers.capacity() > files_scanned + file_buffers.size() )
+	//	return;
+	//
+	//file_buffers.reserve( file_buffers.size() + BUFFER_CHUNK_SIZE );
+
+	if ( file_buffers.capacity() >= file_index )
+		return;
+
+	file_buffers.reserve( file_buffers.size() + BUFFER_CHUNK_SIZE );
+}
+
+
+void expand_buffer_list_from_files( FILE_DIRECTORY_INFORMATION* buffer, m_array< m_array< file_t > >& file_buffers, size_t& file_index )
+{
 	FILE_DIRECTORY_INFORMATION* file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
 	size_t                      files_scanned = 0;
-	
+
 	while ( file_dir_info->NextEntryOffset != 0 )
 	{
 		file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)file_dir_info ) + file_dir_info->NextEntryOffset );
 		files_scanned++;
 	}
 
-	files.resize( files.size() + files_scanned );
-
-	return true;
+	expand_buffer_list( file_buffers, files_scanned, file_index );
 }
 
 
-static bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std::vector< file_t >& files, e_scandir_flags flags )
+static bool sys_scandir_internal( const wchar_t* root, std::vector< file_t >& files, e_scandir_flags flags )
 {
 	std::wstring scan_dir = root, scan_dir_wildcard{};
 
 	if ( !scan_dir.ends_with( L"\\" ) )
 		scan_dir += L"\\";
-
-	if ( path )
-	{
-		scan_dir += path;
-		scan_dir += '\\';
-	}
 
 	scan_dir_wildcard += L"\\\\?\\";
 	scan_dir_wildcard += scan_dir;
@@ -981,7 +1028,13 @@ static bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std:
 
 	HANDLE dirHandle{};
 
+	wchar_t                      temp_path_buffer[ 1024 ]{};
+	size_t                       file_count = 0;
+	//size_t                       file_index = 0;
 	size_t file_index = files.size();
+
+	m_array< m_array< file_t > > file_buffers( 1 );
+	file_buffers.back().reserve( BUFFER_CHUNK_SIZE );
 
 	if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size, files ) )
 	{
@@ -989,6 +1042,22 @@ static bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std:
 		ch_free( e_mem_category_general, buffer );
 		return false;
 	}
+
+	FILE_DIRECTORY_INFORMATION* tmp_file_dir_info = buffer;
+	size_t                      files_scanned     = 0;
+
+	// allocate more memory
+	while ( tmp_file_dir_info->NextEntryOffset != 0 )
+	{
+		tmp_file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)tmp_file_dir_info ) + tmp_file_dir_info->NextEntryOffset );
+		files_scanned++;
+	}
+
+	//files.resize( files.size() + files_scanned );
+	//files.reserve( files.size() + files_scanned );
+
+	if ( files.size() < file_index + files_scanned )
+		files.resize( files.size() + std::max( files_scanned, BUFFER_CHUNK_SIZE ) );
 
 	FILE_DIRECTORY_INFORMATION* file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
 	while ( true )
@@ -1023,21 +1092,24 @@ open_dir_recurse_fail:
 				scan_dir_wildcard = L"\\\\?\\";
 				scan_dir_wildcard += scan_dir;
 
-				if ( new_path.root.size() )
+				if ( new_path.root )
 				{
-					scan_dir_wildcard += new_path.root;
+					scan_dir_wildcard.append( new_path.root, new_path.root_len );
 					scan_dir_wildcard += '\\';
 
-					current_depth = new_path.root;
-					current_depth +='\\';
-					current_depth += new_path.name;
+					current_depth.assign( new_path.root, new_path.root_len );
+					current_depth += '\\';
+					current_depth.append( new_path.name, new_path.name_len );
 				}
 				else
 				{
-					current_depth = new_path.name;
+					current_depth.assign( new_path.name, new_path.name_len );
 				}
 
-				scan_dir_wildcard += new_path.name;
+				scan_dir_wildcard.append( new_path.name, new_path.name_len );
+
+				ch_free_str( new_path.name );
+				ch_free_str( new_path.root );
 
 				//_putws( L"Scanning Directory: \n", scan_dir_wildcard.c_str() );
 				//fputws( L"Scanning Directory: ", stdout );
@@ -1055,7 +1127,7 @@ open_dir_recurse_fail:
 			file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
 			FILE_DIRECTORY_INFORMATION* tmp_file_dir_info = file_dir_info;
 			size_t files_scanned = 0;
-
+			
 			// allocate more memory
 			while ( tmp_file_dir_info->NextEntryOffset != 0 )
 			{
@@ -1063,7 +1135,16 @@ open_dir_recurse_fail:
 				files_scanned++;
 			}
 
-			files.resize( files.size() + files_scanned );
+			if ( files.size() < file_index + files_scanned )
+				files.resize( files.size() + std::max( files_scanned, BUFFER_CHUNK_SIZE ) );
+
+			// file_buffers.reserve( file_buffers.size() + std::max( files_scanned, BUFFER_CHUNK_SIZE ) );
+			//expand_file_list( files, files_scanned );
+			//files.resize( files.size() + files_scanned );
+			//files.reserve( files.size() + files_scanned );
+			//expand_file_list( files, files_scanned, file_index );
+
+			//expand_buffer_list_from_files( buffer, file_buffers, file_index );
 		}
 
 		// Do something with the file here!
@@ -1076,14 +1157,14 @@ open_dir_recurse_fail:
 		if ( is_dir && character_count == 2 && wcsncmp( file_dir_info->FileName, L"..", 2 ) == 0 )
 			continue;
 
-		std::wstring relative_path( file_dir_info->FileName, character_count );
-
 		if ( ( flags & e_scandir_recursive ) && is_dir )
 		{
 			// sys_scandir_internal( root, relative_path.c_str(), files, flags );
 			_recursive_depth_t depth{
-				.name = relative_path,
-				.root = current_depth
+				.name     = util_strxndup_r< wchar_t >( nullptr, file_dir_info->FileName, character_count ),
+				.name_len = character_count,
+				.root     = util_strxndup_r< wchar_t >( nullptr, current_depth.data(), current_depth.size() ),
+				.root_len = current_depth.size(),
 			};
 
 			recursive_paths.push_front( depth );
@@ -1101,36 +1182,63 @@ open_dir_recurse_fail:
 		constexpr s64 UNIX_TIME_START  = 0x019DB1DED53E8000;  //January 1, 1970 (start of Unix epoch) in "ticks"
 		constexpr s64 TICKS_PER_SECOND = 10000000;            //a tick is 100ns
 
-		if ( file_index == files.size() )
+		//expand_file_list( files, 1 );
+
+		if ( file_index == files.capacity() )
 		{
 			// ???
-			files.resize( files.size() + 1024 );
+			files.reserve( files.size() + 1024 );
 		}
 
-		file_t&       file             = files[ file_index++ ];
+		//expand_buffer_list( file_buffers, 1, file_index );
+		//file_buffers.back().resize( file_buffers.back().size() + 1 );
+		
+		//expand_file_list( files, 1 );
+		//files.resize( files.size() + 1 );
+
+		file_count++;
+		//file_t& file      = file_buffers.back()[ file_index++ ];
+		file_t& file      = files[ file_index++ ];
 		file.date_created = ( file_dir_info->CreationTime.QuadPart - UNIX_TIME_START ) / TICKS_PER_SECOND;
 		file.date_mod     = ( file_dir_info->LastWriteTime.QuadPart - UNIX_TIME_START ) / TICKS_PER_SECOND;
 
-		std::wstring path;
-
 		if ( flags & e_scandir_abs_paths )
 		{
-			path = scan_dir;
+			size_t path_len = scan_dir.size() + character_count + 1;
+
+			if ( current_depth.size() )
+				path_len += current_depth.size() + 1;  // add path sep size
+
+			//wchar_t* temp_path_buffer = ch_calloc< wchar_t >( path_len, e_mem_category_string );
+			memset( temp_path_buffer, 0, sizeof( temp_path_buffer ) );
+
+			size_t   offset = 0;
+			memcpy( temp_path_buffer, scan_dir.c_str(), sizeof( wchar_t ) * ( scan_dir.size() ) );
+			offset += ( scan_dir.size() );
+			//wcscat( temp_path_buffer, scan_dir.c_str() );
 
 			if ( current_depth.size() )
 			{
-				path += current_depth;
-				path += '\\';
+				memcpy( temp_path_buffer + offset, current_depth.c_str(), sizeof( wchar_t ) * ( current_depth.size() ) );
+				offset += ( current_depth.size() );
+
+				memcpy( temp_path_buffer + offset++, L"\\", sizeof( wchar_t ) * 1 );
+				//wcscat( temp_path_buffer, current_depth.c_str() );
+				//wcscat( temp_path_buffer, L"\\" );
 			}
 
-			path.append( file_dir_info->FileName, character_count );
+			memcpy( temp_path_buffer + offset, file_dir_info->FileName, sizeof( wchar_t ) * character_count );
+
+			//std::wstring_view temp( temp_path_buffer, path_len );
+
+			file.path.assign( temp_path_buffer, temp_path_buffer + path_len );
+
+			//ch_free_str( temp_path_buffer );
 		}
 		else
 		{
-			path = relative_path;
+			file.path.assign( file_dir_info->FileName, file_dir_info->FileName + character_count );
 		}
-
-		file.path = path;
 
 		if ( is_dir )
 		{
@@ -1144,7 +1252,24 @@ open_dir_recurse_fail:
 		}
 	}
 
-	files.resize( file_index );
+	files.resize( file_count );
+
+	// now, batch them all together
+	//files.reserve( file_count + 1 );
+	//
+	//for ( m_array< file_t >& file_buf : file_buffers )
+	//{
+	//	files.insert( files.end(), file_buf.begin(), file_buf.end() );
+	//	//out_files.reserve( out_files.size() + file_buf.size() );
+	//	// memcpy( out_files.end(), file_buf.begin(), sizeof( file_t ) * file_buf.size() );
+	//	//memmove( out_files.end(), file_buf.begin(), sizeof( file_t ) * file_buf.size() );
+	//	//out_files.aSize += file_buf.size();
+	//	//( out_files.end(), file_buf.begin(), file_buf.end() );
+	//
+	//	file_buf.clear();
+	//}
+
+	files.shrink_to_fit();
 
 	ch_free( e_mem_category_general, buffer );
 	return true;
@@ -1250,21 +1375,17 @@ bool sys_scandir_internal( const wchar_t* root, const wchar_t* path, std::vector
 
 #endif
 
-bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
+bool sys_scandir( const char* root, std::vector< file_t >& files, e_scandir_flags flags )
 {
 	wchar_t* root_w     = sys_to_wchar( root );
-	wchar_t* path_w     = sys_to_wchar( path );
-
 	u64      start_time = sys_get_time_ms();
 
-	bool     ret        = sys_scandir_internal( root_w, path_w, files, flags );
+	bool     ret        = sys_scandir_internal( root_w, files, flags );
 
 	u64      end_time   = sys_get_time_ms();
 	printf( "SCANDIR TIME: %.4f\n", (float)( end_time - start_time ) / 1000.f );
 
 	ch_free_str( root_w );
-	ch_free_str( path_w );
-
 	return ret;
 }
 
@@ -1728,19 +1849,23 @@ u64 sys_get_time_ms()
 std::string sys_path_to_string( const fs::path& path )
 {
 	std::wstring wstring = path.native();
-	char*        utf8    = sys_to_utf8( wstring.c_str() );
-	std::string  ret     = utf8;
-
-	ch_free_str( utf8 );
+	int          size    = WideCharToMultiByte( CP_UTF8, 0, wstring.c_str(), -1, NULL, 0, NULL, NULL );
+	std::string  ret( size - 1, 0 );
+	WideCharToMultiByte( CP_UTF8, 0, wstring.data(), -1, ret.data(), size - 1, NULL, NULL );
 	return ret;
 }
 
 
 fs::path sys_string_to_path( const std::string& path_str )
 {
-	wchar_t*     path_w = sys_to_wchar( path_str.c_str() );
-	fs::path     path( path_w );
-	ch_free_str( path_w );
+	int          size = MultiByteToWideChar( CP_UTF8, 0, path_str.c_str(), -1, NULL, 0 );
+	std::wstring ret( size - 1, 0 );
+	MultiByteToWideChar( CP_UTF8, 0, path_str.c_str(), -1, ret.data(), size - 1 );
+	fs::path path( ret );
+
+	//wchar_t*     path_w = sys_to_wchar( path_str.c_str() );
+	//fs::path     path( path_w );
+	//ch_free_str( path_w );
 
 	return path;
 }

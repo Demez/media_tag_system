@@ -224,6 +224,7 @@ set(
     src/util.h
     src/util.cpp
     src/util_filesystem.cpp
+    src/array.hpp
 
     src/args.cpp
     src/args.h

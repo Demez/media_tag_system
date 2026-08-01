@@ -254,7 +254,7 @@ void folder_load_media_list()
 		scan_flags |= e_scandir_recursive | e_scandir_no_dirs;
 
 	// TODO: make this a background task, especially for large folders/recursive mode
-	if ( !sys_scandir( root.c_str(), nullptr, files, scan_flags ) )
+	if ( !sys_scandir( root.c_str(), files, scan_flags ) )
 	{
 		printf( "Failed to scan directory\n" );
 		gallery_view_dir_change( false );

@@ -51,7 +51,7 @@ void dir_tree_add_folder( fs::path& path )
 		// scan for a new folder
 		directory_entry_t directory_entry{};
 
-		if ( sys_scandir( current_scan.c_str(), nullptr, directory_entry.folders, e_scandir_no_files ) )
+		if ( sys_scandir( current_scan.c_str(), directory_entry.folders, e_scandir_no_files ) )
 		{
 			g_directory_entries[ current_scan ] = directory_entry;
 		}
@@ -101,7 +101,7 @@ void dir_tree_add_folder( fs::path& path )
 //		// scan for a new folder
 //		directory_entry_t directory_entry{};
 //
-//		if ( sys_scandir( current_scan.c_str(), nullptr, directory_entry.folders, e_scandir_no_files ) )
+//		if ( sys_scandir( current_scan.c_str(), directory_entry.folders, e_scandir_no_files ) )
 //		{
 //			size_t index = g_directory_entries.size();
 //			g_directory_entries.push_back( directory_entry );

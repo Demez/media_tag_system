@@ -1,5 +1,6 @@
 #pragma once
 
+#include "array.hpp"
 
 #include <unordered_map>
 #include <stacktrace>
@@ -401,6 +402,27 @@ void        util_format_time( char* buffer, size_t buffer_size, double time );
 void        util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool apply_time_zone = true );
 
 bool        util_mouse_hovering_imgui_window();
+
+
+template< typename CHAR >
+CHAR* util_strxndup_r( CHAR* data, const CHAR* string, size_t len )
+{
+	if ( !string )
+		return nullptr;
+
+	if ( len == 0 )
+		return nullptr;
+
+	CHAR* new_data = ch_realloc( data, len + 1, e_mem_category_string );
+
+	if ( !new_data )
+		return nullptr;
+
+	memcpy( new_data, string, len * sizeof( CHAR ) );
+	new_data[ len ] = '\0';
+	return new_data;
+}
+
 
 // --------------------------------------------------------------------------------------------------------
 // file system functions
