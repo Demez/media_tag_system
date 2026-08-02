@@ -141,6 +141,9 @@ if ( MSVC )
 
 	link_libraries( Dwmapi ntdll )
 	
+	# TODO: move all these copying of files to the thirdparty.py script, and have a check to make sure it was run before cmake was run
+	# do a version compare, store a version number here and in thirdparty, if out of sync, fail until they build it
+	# or build it in here?
 	message( "Copying SDL3" )
 	configure_file( "thirdparty/SDL3/lib/x64/SDL3.dll" "${PROJ_OUT}/SDL3.dll" COPYONLY )
 	
@@ -212,14 +215,13 @@ set(
     src/image_loader.cpp
     src/memory.cpp
     src/config.cpp
-	src/directory_tree.cpp
-	src/settings_menu.cpp
-
-    src/view_gallery.cpp
-    src/view_gallery_sidebar.cpp
-    src/view_gallery_item.cpp
-
-    src/view_media.cpp
+    
+	src/ui_directory_tree.cpp
+	src/ui_settings_menu.cpp
+    src/ui_view_gallery.cpp
+    src/ui_view_gallery_sidebar.cpp
+    src/ui_view_gallery_item.cpp
+    src/ui_view_media.cpp
 	
     src/util.h
     src/util.cpp
