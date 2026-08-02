@@ -66,14 +66,10 @@ const char* g_gallery_sort_mode_str[] = {
 static_assert( ARR_SIZE( g_gallery_sort_mode_str ) == e_gallery_sort_mode_count );
 
 
-extern bool          g_do_search;
-
-
 int                  gallery_view_draw_header();
 void                 gallery_view_update_header_directory();
 
 void                 gallery_view_draw_sidebar();
-void                 sidebar_draw_filesystem();
 
 
 // =============================================================================================
@@ -548,7 +544,6 @@ void gallery_view_sort_dir()
 				continue;
 		}
 
-		//if ( g_do_search )
 		if ( search_len )
 		{
 			media_entry_t& entry = directory::media_list[ i ];

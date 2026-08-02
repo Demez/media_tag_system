@@ -650,6 +650,8 @@ void                                 dir_tree_shutdown();
 void                                 dir_tree_add_folder( fs::path& path );
 directory_entry_t*                   dir_tree_get( fs::path& path );
 
+void                                 dir_tree_draw( ImGuiStyle& style );
+
 // returns an index
 //size_t                               dir_tree_add_folder( fs::path& path );
 //directory_entry_t*                   dir_tree_get( size_t index, fs::path& path );
