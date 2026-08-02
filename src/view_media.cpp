@@ -74,26 +74,57 @@ const char* g_scale_state_str[] =
 static_assert( ARR_SIZE( g_scale_state_str ) == e_scale_state_count );
 
 
-constexpr float      SCALE_WAIT_TIME = 0.1f;
-constexpr float      UPSCALE_LIMIT = 2.f;
+// TODO: put these in the config
+// constexpr float                     SCALE_WAIT_TIME = 0.1f;
+constexpr u64              SCALE_WAIT_TIME = 100;  // in ms
+constexpr float            UPSCALE_LIMIT   = 2.f;
 
-static std::thread*  g_scale_thread;
-static e_scale_state g_scale_state  = e_scale_state_idle;
-static float         g_scale_timer  = -1.f;
-static image_t       g_scale_src{};
+static std::thread*        g_scale_thread;
+static e_scale_state       g_scale_state  = e_scale_state_idle;
+static std::atomic< bool > g_scale_signal = false;
+static u64                 g_scale_time   = UINT64_MAX;
+static image_t             g_scale_src{};
 
-std::mutex           g_scale_lock;
+std::mutex                 g_scale_lock;
+
+
+// wait X amount of time before scaling the image, the user may be in the middle of changing zoom level quickly, like currently scrolling the mouse wheel
+// so it's wasteful to constantly keep scaling it if the scaled image isn't even what the user zoom level is at now
+// trying to make sure the user stops changing the zoom level for a certain amount of time before scaling
+void media_view_scale_thread_wait_timer()
+{
+	//int recheck_time = 0;
+timer_wait:
+	g_scale_lock.lock();
+	u64 cur_time = sys_get_time_ms();
+
+	if ( cur_time < g_scale_time )
+	{
+		u64 diff = g_scale_time - cur_time;
+		g_scale_lock.unlock();
+		//printf( "SCALE WAIT %d\n", ++recheck_time );
+
+		SDL_Delay( std::min( SCALE_WAIT_TIME, diff ) );
+
+		// I use this goto here in case the main thread reset the scale timer once again in between this state
+		goto timer_wait;
+	}
+
+	g_scale_lock.unlock();
+}
 
 
 void media_view_scale_thread_run()
 {
 	while ( app::running )
 	{
-		if ( g_scale_state != e_scale_state_start )
-		{
-			SDL_Delay( 250 );
-			continue;
-		}
+		// wait for queued data here
+		g_scale_signal.wait( false );
+
+		if ( !app::running )
+			return;
+
+		media_view_scale_thread_wait_timer();
 
 		g_scale_state = e_scale_state_working;
 
@@ -123,6 +154,7 @@ void media_view_scale_thread_run()
 			g_scale_state = e_scale_state_idle;
 		}
 
+		g_scale_signal.store( false );
 		g_scale_lock.unlock();
 	}
 }
@@ -156,8 +188,95 @@ void media_view_frame_set( size_t frame )
 }
 
 
+void media_view_scale_fire_thread()
+{
+	g_scale_time  = sys_get_time_ms() + SCALE_WAIT_TIME;
+	g_scale_state = e_scale_state_start;
+
+	g_scale_signal = true;
+	g_scale_signal.notify_one();
+}
+
+
+void media_view_scale_reset_timer()
+{
+	g_scale_time = sys_get_time_ms() + SCALE_WAIT_TIME;
+
+	if ( g_scale_state == e_scale_state_finished )
+		g_scale_state = e_scale_state_idle;
+
+	set_frame_draw( 2 );
+}
+
+
+// return true if scale again
+bool media_view_scale_handle_finished()
+{
+	g_scale_time = UINT64_MAX;
+
+	// Are we drawing the image smaller than native size?
+	if ( image_draw::size.x <= ( g_image_data.image.width * UPSCALE_LIMIT ) || round( image_draw::size.x ) != g_image_data.image.width )
+	{
+		// Does the scaled image size match the size we draw it as?
+		if ( int( image_draw::size.x ) == g_image_scaled_data.image.width )
+			return false;
+
+		// it does not, scale again
+		media_view_scale_reset_timer();
+		return true;
+	}
+}
+
+
+void media_view_scale_set_image()
+{
+	if ( g_image_data.image.frame.empty() || g_scale_state != e_scale_state_idle )
+		return;
+
+	// if ( image_draw::size.x >= ( g_image_data.image.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
+	if ( image_draw::zoom > UPSCALE_LIMIT && image_draw::size.x != g_image_data.image.width )
+		return;
+
+	// ????
+	if ( !g_image_data.image.frame[ 0 ].data )
+		return;
+
+	g_scale_lock.lock();
+
+	// copy a new image
+	// TODO: ref count image_t, so we can avoid copying
+	// so when the user switches images during scaling, it still holds on to the previous one thanks to the ref count
+	// plus it uses less memory, unless image switching is happening during scaling, but that's a short time frame
+	image_free( g_scale_src );
+
+	image_copy_data( g_image_data.image, g_scale_src );
+
+	g_scale_src.frame.clear();
+	g_scale_src.frame.resize( 1 );
+
+	image_copy_frame_data( g_image_data.image.frame[ 0 ], g_scale_src.frame[ 0 ] );
+
+	// don't hold onto this
+	g_scale_src.image_format    = nullptr;
+
+	size_t image_size           = (size_t)g_image_data.image.width * (size_t)g_image_data.image.height * (size_t)g_image_data.image.bytes_per_pixel;
+	g_scale_src.frame[ 0 ].data = ch_calloc< u8 >( image_size, e_mem_category_image_data );
+	memcpy( g_scale_src.frame[ 0 ].data, g_image_data.image.frame[ 0 ].data, image_size * sizeof( u8 ) );
+
+	g_scale_src.frame[ 0 ].size = image_size;
+	g_image_scaled_data.index   = g_image_data.index;
+
+	media_view_scale_fire_thread();
+
+	g_scale_lock.unlock();
+}
+
+
 void media_view_scale_check_timer( double frame_time )
 {
+	if ( g_scale_state != e_scale_state_idle && g_scale_state != e_scale_state_finished )
+		return;
+
 	const media_entry_t& entry = gallery_item_get_media_entry( g_image_data.index );
 
 	if ( entry.type == e_media_type_video )
@@ -168,62 +287,14 @@ void media_view_scale_check_timer( double frame_time )
 		return;
 
 	if ( g_scale_state == e_scale_state_finished )
-	{
-		// Are we drawing the image smaller than native size?
-		if ( image_draw::size.x <= ( g_image_data.image.width * UPSCALE_LIMIT ) || round( image_draw::size.x ) != g_image_data.image.width )
-		{
-			// Does the scaled image size match the size we draw it as?
-			if ( int( image_draw::size.x ) != g_image_scaled_data.image.width )
-			{
-				g_scale_state = e_scale_state_idle;
-				g_scale_timer = SCALE_WAIT_TIME;
-			}
-		}
-	}
-
-	if ( g_scale_state != e_scale_state_idle && g_scale_state != e_scale_state_finished )
-		return;
-
-	if ( g_scale_timer < 0.f )
-		return;
-
-	g_scale_timer -= frame_time;
-
-	if ( g_scale_timer < 0.f && g_image_data.image.frame.size() && g_scale_state == e_scale_state_idle )
-	{
-		// if ( image_draw::size.x >= ( g_image_data.image.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
-		if ( image_draw::zoom > UPSCALE_LIMIT && image_draw::size.x != g_image_data.image.width )
+		if ( !media_view_scale_handle_finished() )
 			return;
 
-		// ????
-		if ( !g_image_data.image.frame[ 0 ].data )
-			return;
+	if ( g_scale_time == UINT64_MAX )
+		return;
 
-		g_scale_lock.lock();
-
-		image_free( g_scale_src );
-
-		image_copy_data( g_image_data.image, g_scale_src );
-
-		g_scale_src.frame.clear();
-		g_scale_src.frame.resize( 1 );
-
-		image_copy_frame_data( g_image_data.image.frame[ 0 ], g_scale_src.frame[ 0 ] );
-
-		// don't hold onto this
-		g_scale_src.image_format = nullptr;
-
-		size_t image_size           = (size_t)g_image_data.image.width * (size_t)g_image_data.image.height * (size_t)g_image_data.image.bytes_per_pixel;
-		g_scale_src.frame[ 0 ].data = ch_calloc< u8 >( image_size, e_mem_category_image_data );
-		memcpy( g_scale_src.frame[ 0 ].data, g_image_data.image.frame[ 0 ].data, image_size * sizeof( u8 ) );
-
-		g_scale_src.frame[ 0 ].size = image_size;
-
-		g_image_scaled_data.index   = g_image_data.index;
-		g_scale_state               = e_scale_state_start;
-
-		g_scale_lock.unlock();
-	}
+	// g_scale_timer -= frame_time;
+	media_view_scale_set_image();
 }
 
 
@@ -251,15 +322,6 @@ void media_view_update( double frame_time )
 }
 
 
-void media_view_scale_reset_timer()
-{
-	g_scale_timer = SCALE_WAIT_TIME;
-
-	if ( g_scale_state == e_scale_state_finished )
-		g_scale_state = e_scale_state_idle;
-}
-
-
 void media_view_init()
 {
 	g_scale_thread = new std::thread( media_view_scale_thread_run );
@@ -272,6 +334,8 @@ void media_view_shutdown()
 		return;
 
 	// wait for scale thread to shutdown
+	g_scale_signal = true;
+	g_scale_signal.notify_all();
 	g_scale_thread->join();
 
 	delete g_scale_thread;
@@ -609,7 +673,6 @@ void media_view_draw_media_info()
 		ImGui::SeparatorText( "Scaling" );
 
 		ImGui::Text( "Scale Thread State: %d - %s", g_scale_state, g_scale_state_str[ g_scale_state ] );
-		ImGui::Text( "Scale Thread Timer: %.3f", g_scale_timer );
 		ImGui::Text( "Scaled: %dx%d", g_image_scaled_data.image.width, g_image_scaled_data.image.height );
 		ImGui::Text( "Render Size: %.0fx%.0f", image_draw::size.x, image_draw::size.y );
 		ImGui::Text( "Render Pos: %.0fx%.0f", image_draw::pos.x, image_draw::pos.y );
@@ -1134,8 +1197,9 @@ void media_view_load()
 	// g_image_data.index = image_draw::media_index;
 
 	update_window_title();
-
+	
 	media_view_scale_reset_timer();
+	media_view_scale_set_image();
 
 	set_frame_draw();
 }
