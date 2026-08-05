@@ -508,7 +508,7 @@ void                              sidebar_draw_directory_recursive( u32 depth, c
 	bool   label_pressed = false;
 	size_t hash          = std::hash< std::string >{}( current_path );
 
-	bool   tree_opened   = TreeNodeBehaviorStupid( hash, node_flags, folder_name ? folder_name : current_path.c_str(), nullptr, label_pressed );
+	bool   tree_opened   = TreeNodeBehaviorStupid( static_cast< ImGuiID >( hash ), node_flags, folder_name ? folder_name : current_path.c_str(), nullptr, label_pressed );
 
 	if ( label_pressed )
 	{

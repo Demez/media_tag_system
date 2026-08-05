@@ -62,19 +62,6 @@ static fy_document* config_open( char* app_dir, bool saving )
 }
 
 
-static bool config_write_internal( fy_document* fyd )
-{
-	printf( "Config:\n" );
-	auto flags = FYECF_OUTPUT_COMMENTS | FYECF_DEFAULT | FYECF_MODE_PRETTY;
-	// auto flags = FYECF_OUTPUT_COMMENTS | FYECF_WIDTH_INF | FYECF_INDENT_DEFAULT | FYECF_MODE_ORIGINAL | FYECF_MODE_PRETTY;
-	// auto flags = FYECF_MODE_PRETTY;
-	fy_emit_document_to_file( fyd, (fy_emitter_cfg_flags)flags, NULL );
-	printf( "\n\n" );
-
-	return true;
-}
-
-
 void config_parse_path( char* app_dir, const char* user_path, std::string& result )
 {
 	if ( !app_dir )
@@ -254,8 +241,8 @@ static bool config_get_color( fy_node* node, const char* path, ImVec4& output )
 		if ( strchr( string, '.' ) )
 		{
 			// Float
-			char*  end    = nullptr;
-			double result = strtod( string, &end );
+			char* end    = nullptr;
+			float result = static_cast< float >( strtod( string, &end ) );
 
 			if ( end )
 			{
@@ -266,7 +253,7 @@ static bool config_get_color( fy_node* node, const char* path, ImVec4& output )
 		{
 			// RGB 0 to 255
 			char* end    = nullptr;
-			long  result = strtol( string, &end, 10 );
+			float result = static_cast< float >( strtol( string, &end, 10 ) );
 
 			if ( end )
 			{

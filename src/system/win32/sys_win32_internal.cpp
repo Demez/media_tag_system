@@ -6,7 +6,7 @@
 // Internal String conversion functions
 
 
-wchar_t* sys_to_wchar( const char* spStr, int sSize )
+wchar_t* sys_to_wchar( const char* spStr, size_t sSize )
 {
 	wchar_t* spDst = (wchar_t*)malloc( ( sSize + 1 ) * sizeof( wchar_t ) );
 	
@@ -35,7 +35,7 @@ wchar_t* sys_to_wchar( const char* spStr )
 
 
 // Allows you to bypass the MAX_PATH limit in windows
-wchar_t* sys_to_wchar_extended( const char* spStr, int sSize )
+wchar_t* sys_to_wchar_extended( const char* spStr, size_t sSize )
 {
 	wchar_t* spDst = (wchar_t*)malloc( ( sSize + 5 ) * sizeof( wchar_t ) );
 
@@ -45,7 +45,7 @@ wchar_t* sys_to_wchar_extended( const char* spStr, int sSize )
 	memset( spDst, 0, ( sSize + 1 ) * sizeof( wchar_t ) );
 	wcscat( spDst, L"\\\\?\\" );
 
-	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst + 4, sSize );
+	MultiByteToWideChar( CP_UTF8, 0, spStr, -1, spDst + 4, static_cast< int >( sSize ) );
 
 	mem_add_item( e_mem_category_string, spDst, ( sSize + 5 ) * sizeof( wchar_t ), 1 );
 
@@ -65,7 +65,31 @@ wchar_t* sys_to_wchar_extended( const char* spStr )
 }
 
 
-char* sys_to_utf8( const wchar_t* spStr, int sSize )
+// Allows you to bypass the MAX_PATH limit in windows
+//wchar_t* sys_to_wchar_extended( const wchar_t* spStr, size_t strLen )
+//{
+//	wchar_t* spDst = (wchar_t*)malloc( ( strLen + 5 ) * sizeof( wchar_t ) );
+//
+//	if ( !spDst )
+//		return nullptr;
+//
+//	memset( spDst, 0, ( strLen + 1 ) * sizeof( wchar_t ) );
+//	wcscat( spDst, L"\\\\?\\" );
+//	wcscat( spDst, spStr );
+//
+//	mem_add_item( e_mem_category_string, spDst, ( strLen + 5 ) * sizeof( wchar_t ), 1 );
+//
+//	return spDst;
+//}
+
+
+//wchar_t* sys_to_wchar_extended( const path_t& path )
+//{
+//	return sys_to_wchar_extended( path.str, path.len );
+//}
+
+
+char* sys_to_utf8( const wchar_t* spStr, size_t sSize )
 {
 	char* spDst = (char*)malloc( ( sSize + 1 ) * sizeof( char ) );
 
@@ -74,7 +98,7 @@ char* sys_to_utf8( const wchar_t* spStr, int sSize )
 
 	memset( spDst, 0, ( sSize + 1 ) * sizeof( char ) );
 
-	WideCharToMultiByte( CP_UTF8, 0, spStr, -1, spDst, sSize, NULL, NULL );
+	WideCharToMultiByte( CP_UTF8, 0, spStr, -1, spDst, static_cast< int >( sSize ), NULL, NULL );
 
 	mem_add_item( e_mem_category_string, spDst, ( sSize + 1 ) * sizeof( char ), 1 );
 
@@ -110,7 +134,7 @@ bool sys_get_data_obj_for_files( const std::vector< fs::path >& paths, IDataObje
 	for ( const auto& path : paths )
 	{
 		PIDLIST_ABSOLUTE pidl = nullptr;
-		HRESULT          hr   = SHParseDisplayName( path.c_str(), nullptr, &pidl, 0, nullptr );
+		hr                    = SHParseDisplayName( path.c_str(), nullptr, &pidl, 0, nullptr );
 
 		if ( SUCCEEDED( hr ) && pidl )
 		{

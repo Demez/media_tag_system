@@ -37,9 +37,10 @@ void WatchDirectory( fs::path watch_path )
 
 	// Watch the directory for file creation and deletion.
 	dwChangeHandles[ 0 ] = FindFirstChangeNotification(
-	  watch_path.c_str(),                                              // directory to watch
-	  directory::recursive,                                            // do not watch subtree
-	  FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE );  // watch file name and date modified changes
+	  watch_path.c_str(),
+	  directory::recursive,
+	  FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_ATTRIBUTES
+	);
 
 	if ( dwChangeHandles[ 0 ] == INVALID_HANDLE_VALUE )
 	{
@@ -76,6 +77,7 @@ void WatchDirectory( fs::path watch_path )
 			break;
 
 		// Wait for notification.
+		// waiting for 0 ms DOES WORK, i want to try it on the main thread soon
 		dwWaitStatus = WaitForMultipleObjects( 2, dwChangeHandles, FALSE, 500 );
 
 		switch ( dwWaitStatus )

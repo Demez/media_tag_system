@@ -388,7 +388,7 @@ struct LoaderFreeImage : public IImageLoader
 			const char*       exts = FreeImage_GetFIFExtensionList( fif );
 			// const char*       desc = FreeImage_GetFIFDescription( fif );
 
-			char*             ext_cur  = (char*)exts;
+			char*             ext_cur  = const_cast< char* >( exts );
 			char*             ext_next = strchr( ext_cur, ',' );
 
 			while ( ext_cur != nullptr )

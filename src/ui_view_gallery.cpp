@@ -66,7 +66,7 @@ const char* g_gallery_sort_mode_str[] = {
 static_assert( ARR_SIZE( g_gallery_sort_mode_str ) == e_gallery_sort_mode_count );
 
 
-int                  gallery_view_draw_header();
+float                gallery_view_draw_header();
 void                 gallery_view_update_header_directory();
 
 void                 gallery_view_draw_sidebar();
@@ -269,7 +269,7 @@ void gallery_view_input()
 	else if ( ImGui::IsKeyPressed( ImGuiKey_End ) )
 	{
 		if ( gallery::sorted_media.size() )
-			selection = gallery::sorted_media.size() - 1;
+			selection = static_cast< u32 >( gallery::sorted_media.size() - 1 );
 
 		gallery_view_scroll_to_cursor();
 		gallery_view_input_update_multi_select( selection );
@@ -281,7 +281,7 @@ void gallery_view_input()
 		if ( !empty )
 		{
 			if ( selection == 0 )
-				selection = gallery::sorted_media.size();
+				selection = static_cast< u32 >( gallery::sorted_media.size() );
 
 			selection--;
 		}
@@ -294,7 +294,7 @@ void gallery_view_input()
 		gallery_view_input_check_clear_multi_select();
 
 		if ( !empty )
-			selection = ( selection + 1 ) % gallery::sorted_media.size();
+			selection = ( selection + 1 ) % static_cast< u32 >( gallery::sorted_media.size() );
 
 		gallery_view_scroll_to_cursor();
 		gallery_view_input_update_multi_select( selection );
@@ -307,7 +307,7 @@ void gallery_view_input()
 		{
 			if ( selection < gallery::row_count )
 			{
-				size_t count_in_row   = gallery::sorted_media.size() % gallery::row_count;
+				size_t count_in_row   = gallery::sorted_media.size() % static_cast< size_t >( gallery::row_count );
 				size_t missing_in_row = gallery::row_count - count_in_row;
 				size_t row_diff       = gallery::row_count - selection;
 
@@ -924,11 +924,6 @@ bool is_content_area_hovered( float area_width, float area_height )
 }
 
 
-void gallery_view_draw_item_select_bg( size_t i )
-{
-}
-
-
 void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw, ImVec2& scaled_image_size, bool& drew_base_icon )
 {
 	if ( item_draw.media->type == e_media_type_directory )
@@ -994,55 +989,6 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 }
 
 
-#if 0
-void gallery_view_draw_icon_overlay()
-{
-	// Fit image in window size, scaling up if needed
-	float    factor[ 2 ] = { 1.f, 1.f };
-
-	image_t* icon_video  = icon_get_image( e_icon_video );
-
-	//if ( image->width > image_bounds.x )
-	factor[ 0 ]          = (float)image_icon_bounds.x / (float)icon_video->width;
-
-	//if ( image->height > image_bounds.y )
-	factor[ 1 ]          = (float)image_icon_bounds.y / (float)icon_video->height;
-
-	float  zoom_level    = std::min( factor[ 0 ], factor[ 1 ] );
-
-	ImVec2 scaled_icon_size;
-	scaled_icon_size.x              = icon_video->width * zoom_level;
-	scaled_icon_size.y              = icon_video->height * zoom_level;
-
-	ImVec2 image_offset             = saved_pos;
-	float  image_offset_from_side_x = 0.f;
-	float  image_offset_from_side_y = 0.f;
-
-	if ( scaled_image_size.x )
-	{
-		image_offset_from_side_x = ( image_bounds.x - scaled_image_size.x ) / 2.f;
-		image_offset_from_side_y = ( image_bounds.y - scaled_image_size.y ) / 2.f;
-	}
-
-#if 0
-		image_offset.x += ( image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 2.f );
-		image_offset.y += ( image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 2.f );
-#else
-	image_offset.x += ( gallery_draw::image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 1.25f );
-	image_offset.y += ( gallery_draw::image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 1.25f );
-#endif
-
-	// ImVec2 image_offset = ImGui::GetCursorPos();
-	// image_offset.x += image_bounds.x - ( scaled_icon_size.x / 1.25 );
-	// image_offset.y -= ( scaled_icon_size.y / 1.25 ) + style.ItemSpacing.y;
-
-	ImGui::SetCursorPos( image_offset );
-
-	ImGui::Image( icon_get_imtexture( e_icon_video ), scaled_icon_size );
-}
-#endif
-
-
 void TextExFast( const char* text, const char* text_end, ImGuiTextFlags flags, const ImVec2& text_size )
 {
 	ImGuiWindow* window = ImGui::GetCurrentWindow();
@@ -1084,7 +1030,7 @@ void TextExFast( const char* text, const char* text_end, ImGuiTextFlags flags, c
 		// - We use memchr(), pay attention that well optimized versions of those str/mem functions are much faster than a casually written loop.
 		const char* line        = text;
 		const float line_height = ImGui::GetTextLineHeight();
-		ImVec2      text_size( 0, 0 );
+		ImVec2      text_size2( 0, 0 );
 
 		// Lines to skip (can't skip when logging text)
 		ImVec2      pos = text_pos;
@@ -1100,7 +1046,7 @@ void TextExFast( const char* text, const char* text_end, ImGuiTextFlags flags, c
 					if ( !line_end )
 						line_end = text_end;
 					if ( ( flags & ImGuiTextFlags_NoWidthForLargeClippedText ) == 0 )
-						text_size.x = ImMax( text_size.x, ImGui::CalcTextSize( line, line_end ).x );
+						text_size2.x = ImMax( text_size2.x, ImGui::CalcTextSize( line, line_end ).x );
 					line = line_end + 1;
 					lines_skipped++;
 				}
@@ -1120,7 +1066,7 @@ void TextExFast( const char* text, const char* text_end, ImGuiTextFlags flags, c
 				const char* line_end = (const char*)ImMemchr( line, '\n', text_end - line );
 				if ( !line_end )
 					line_end = text_end;
-				text_size.x = ImMax( text_size.x, ImGui::CalcTextSize( line, line_end ).x );
+				text_size2.x = ImMax( text_size2.x, ImGui::CalcTextSize( line, line_end ).x );
 				ImGui::RenderText( pos, line, line_end, false );
 				line = line_end + 1;
 				line_rect.Min.y += line_height;
@@ -1136,16 +1082,16 @@ void TextExFast( const char* text, const char* text_end, ImGuiTextFlags flags, c
 				if ( !line_end )
 					line_end = text_end;
 				if ( ( flags & ImGuiTextFlags_NoWidthForLargeClippedText ) == 0 )
-					text_size.x = ImMax( text_size.x, ImGui::CalcTextSize( line, line_end ).x );
+					text_size2.x = ImMax( text_size2.x, ImGui::CalcTextSize( line, line_end ).x );
 				line = line_end + 1;
 				lines_skipped++;
 			}
 			pos.y += lines_skipped * line_height;
 		}
-		text_size.y = ( pos - text_pos ).y;
+		text_size2.y = ( pos - text_pos ).y;
 
-		ImRect bb( text_pos, text_pos + text_size );
-		ImGui::ItemSize( text_size, 0.0f );
+		ImRect bb( text_pos, text_pos + text_size2 );
+		ImGui::ItemSize( text_size2, 0.0f );
 		ImGui::ItemAdd( bb, 0 );
 	}
 }
@@ -1321,17 +1267,8 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 		}
 
 		// TODO: this doesn't work as well at different zoom levels
-#if 0
-		image_offset.x += ( gallery_draw::image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 2.f );
-		image_offset.y += ( gallery_draw::image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 2.f );
-#else
 		image_offset.x += ( gallery_draw::image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 1.25f );
 		image_offset.y += ( gallery_draw::image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 1.25f );
-#endif
-
-		// ImVec2 image_offset = ImGui::GetCursorPos();
-		// image_offset.x += image_bounds.x - ( scaled_icon_size.x / 1.25 );
-		// image_offset.y -= ( scaled_icon_size.y / 1.25 ) + style.ItemSpacing.y;
 
 		ImGui::SetCursorPos( image_offset );
 
@@ -1348,7 +1285,7 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 // ----------------------------------------------------------------------------------------------------------
 // Handle Actions
 // ----------------------------------------------------------------------------------------------------------
-void gallery_view_item_actions( size_t i, gallery_item_draw_t& item_draw )
+void gallery_view_handle_item_actions( size_t i, gallery_item_draw_t& item_draw )
 {
 	if ( item_draw.selected_item && item_draw.item_hovered )
 	{
@@ -1568,13 +1505,6 @@ void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 }
 
 
-//bool IsRectVisibleFast( ImGuiWindow* window, ImVec2& rect_min, ImVec2& rect_max )
-//{
-//	return window->ClipRect.Min.y < rect_max.y && window->ClipRect.Max.y > rect_min.y && window->ClipRect.Min.x < rect_max.x && window->ClipRect.Max.x > rect_min.x;
-//	// bool        Overlaps(const ImRect& r) const     { return r.Min.y <  Max.y && r.Max.y >  Min.y && r.Min.x <  Max.x && r.Max.x >  Min.x; }
-//}
-
-
 #define IsRectVisibleFast( window, rect_min, rect_max ) \
 	( window->ClipRect.Min.y < rect_max.y && window->ClipRect.Max.y > rect_min.y && window->ClipRect.Min.x < rect_max.x && window->ClipRect.Max.x > rect_min.x )
 
@@ -1653,7 +1583,6 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 		if ( row_max_item_height < layout.item_size_y )
 			row_max_item_height = layout.item_size_y;
 
-		// layout.visible = ImGui::IsRectVisible( layout.item_rect_min, layout.item_rect_max );
 		layout.visible = IsRectVisibleFast( window, layout.item_rect_min, layout.item_rect_max );
 
 		if ( layout.visible )
@@ -1672,7 +1601,7 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 // ----------------------------------------------------------------------------------------------------------
 // Gallery Item
 // ----------------------------------------------------------------------------------------------------------
-void gallery_view_item( ImGuiStyle& style, size_t i, u32& grid_pos_x, gallery_item_draw_t& item_draw )
+void gallery_view_draw_item( ImGuiStyle& style, size_t i, u32& grid_pos_x, gallery_item_draw_t& item_draw )
 {
 	if ( gallery_draw::content_area_hovered )
 	{
@@ -1685,7 +1614,7 @@ void gallery_view_item( ImGuiStyle& style, size_t i, u32& grid_pos_x, gallery_it
 	}
 
 	gallery_view_draw_item_content( style, i, item_draw );
-	gallery_view_item_actions( i, item_draw );
+	gallery_view_handle_item_actions( i, item_draw );
 }
 
 
@@ -1707,7 +1636,7 @@ void gallery_view_draw_items( ImGuiWindow* window, ImGuiStyle& style, size_t cou
 		window->DC.CursorPos = item_draw->cursor_screen_pos;
 		window->DC.IsSetPos  = true;
 
-		gallery_view_item( style, item_draw->i, grid_pos_x, *item_draw );
+		gallery_view_draw_item( style, item_draw->i, grid_pos_x, *item_draw );
 		grid_pos_x++;
 	}
 }

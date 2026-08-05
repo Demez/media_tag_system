@@ -17,7 +17,7 @@
 #include <wtypes.h>    // HWND
 
 
-ULONG g_drop_formats[] = {
+CLIPFORMAT g_drop_formats[] = {
 	// CF_TEXT,   // dragging in a file path/url from discord or your internet browser
 	CF_HDROP,  // file drop
 };

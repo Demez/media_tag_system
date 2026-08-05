@@ -93,11 +93,11 @@ struct notification_t
 {
 	std::string msg;
 	u64         time_added;
-	float       time_remain;
+	double      time_remain;
 };
 
-constexpr float               NOTIFICATION_DURATION  = 5;
-constexpr float               NOTIFICATION_FADE_TIME = 0.5;
+constexpr double              NOTIFICATION_DURATION  = 5;
+constexpr double              NOTIFICATION_FADE_TIME = 0.5;
 constexpr size_t              NOTIFICATION_MAX_SHOWN = 5;
 
 std::vector< notification_t > g_notification_queue;
@@ -105,7 +105,7 @@ std::vector< notification_t > g_notification_queue;
 // =================================================================================
 
 
-bool delete_file_window( u32 count )
+bool delete_file_window( size_t count )
 {
 	SDL_MessageBoxButtonData buttons[ 2 ]{};
 	buttons[ 1 ].buttonID = 1;
@@ -120,7 +120,7 @@ bool delete_file_window( u32 count )
 
 	if ( count > 1 )
 	{
-		snprintf( message, 512, "Delete %d Files?", count );
+		snprintf( message, 512, "Delete %zu Files?", count );
 	}
 	else
 	{
@@ -334,7 +334,7 @@ void folder_history_add( const fs::path& entry )
 }
 
 
-const fs::path& folder_history_get_prev()
+fs::path folder_history_get_prev()
 {
 	if ( directory::folder_history.empty() || directory::folder_history_pos <= 1 )
 		return {};
@@ -343,7 +343,7 @@ const fs::path& folder_history_get_prev()
 }
 
 
-const fs::path& folder_history_get_next()
+fs::path folder_history_get_next()
 {
 	if ( directory::folder_history.empty() || directory::folder_history_pos == directory::folder_history.size() )
 		return {};
@@ -422,7 +422,7 @@ void notification_draw( double frame_time )
 	SDL_GetWindowSize( app::window, &width, &height );
 
 	ImVec2 notif_pos{};
-	notif_pos.x = width / 2;
+	notif_pos.x = static_cast< float >( width ) / 2.f;
 	notif_pos.y = 40.f;
 
 	// ----------------------------------------
@@ -437,13 +437,13 @@ void notification_draw( double frame_time )
 	ImVec4      border_color = style.Colors[ ImGuiCol_Border ];
 	bg_color.w               = 0.75;
 
-	float  max_notif_time    = -1.f;
+	double  max_notif_time    = -1.0;
 	// get fadeout time
 	size_t count             = std::min( NOTIFICATION_MAX_SHOWN, g_notification_queue.size() );
 
 	//float  fade_in_amount    = std::min( 1.f, time_drawn / NOTIFICATION_FADE_IN_TIME );
 	// float  fade_amount    = std::min( 1.f, time_drawn / NOTIFICATION_FADE_IN_TIME );
-	float  fade_amount    = 1.f;
+	double  fade_amount    = 1.0;
 
 	for ( size_t j = 0, i = g_notification_queue.size() - 1;; i--, j++ )
 	{
@@ -740,8 +740,8 @@ void frame_draw_start()
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
-	ImGui::GetIO().DisplaySize.x = width;
-	ImGui::GetIO().DisplaySize.y = height;
+	ImGui::GetIO().DisplaySize.x = static_cast< float >( width );
+	ImGui::GetIO().DisplaySize.y = static_cast< float >( height );
 
 	ImGui_ImplSDL3_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
@@ -956,8 +956,8 @@ bool handle_event( SDL_Event& event )
 		case SDL_EVENT_WINDOW_RESIZED:
 			int width, height;
 			SDL_GetWindowSize( app::window, &width, &height );
-			ImGui::GetIO().DisplaySize.x = width;
-			ImGui::GetIO().DisplaySize.y = height;
+			ImGui::GetIO().DisplaySize.x = static_cast< float >( width );
+			ImGui::GetIO().DisplaySize.y = static_cast< float >( height );
 
 			// clear focusing of any windows
 			ImGui::SetNextFrameWantCaptureKeyboard( false );
@@ -1022,6 +1022,8 @@ bool handle_event( SDL_Event& event )
 			app::running = false;
 			return true;
 	}
+
+	return false;
 }
 
 
@@ -1050,13 +1052,15 @@ bool handle_events()
 		if ( SDL_WaitEvent( &event ) )
 		{
 			//printf( "END WAITING %zu\n", app::total_time );
-			handle_event( event );
+			if ( handle_event( event ) )
+				return true;
 		}
 	}
 
 	while ( SDL_PollEvent( &event ) )
 	{
-		handle_event( event );
+		if ( handle_event( event ) )
+			return true;
 	}
 
 	app::in_drag_drop = false;
@@ -1076,9 +1080,9 @@ void check_need_draw( bool playing_back_video )
 	ImGuiContext* ctx = ImGui::GetCurrentContext();
 	ImGuiIO&      io  = ImGui::GetIO();
 
-	if ( io.MouseDown[ 0 ] > 0 || io.MouseDown[ 1 ] > 0 )
+	if ( io.MouseDown[ 0 ] || io.MouseDown[ 1 ] )
 	{
-		if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
+		if ( app::mouse_delta[ 0 ] != 0.f || app::mouse_delta[ 1 ] != 0.f )
 			set_frame_draw();
 	}
 
@@ -1270,7 +1274,7 @@ void main_loop()
 	//	}
 
 		app::frame_time = time;
-		app::total_time += ( time * 1000.0 );
+		app::total_time += static_cast< u64 >( time * 1000.0 );
 
 		sys_update();
 
@@ -1532,7 +1536,7 @@ int startup( int argc, char* argv[] )
 
 	if ( font_data.font_path )
 	{
-		font_data.height = app::config.font_size;
+		font_data.height = static_cast< float >( app::config.font_size );
 		//char* exe_path = sys_get_exe_folder();
 
 		{
@@ -1567,8 +1571,8 @@ int startup( int argc, char* argv[] )
 
 	int      width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
-	io.DisplaySize.x = width;
-	io.DisplaySize.y = height;
+	io.DisplaySize.x = static_cast< float >( width );
+	io.DisplaySize.y = static_cast< float >( height );
 
 	// Set imgui.ini path to exe directory
 	{

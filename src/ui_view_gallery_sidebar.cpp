@@ -173,7 +173,7 @@ void gallery_header_draw_path_bar( bool& was_in_path_edit, float& bar_width, ImV
 
 		bool   item_hovered = false;
 
-		size_t id           = 1;
+		int    id           = 1;
 		ImVec2 item_size{};
 		for ( size_t i = 0; i < directory::path_chunks.size(); i++ )
 		{
@@ -231,7 +231,7 @@ void gallery_header_draw_path_bar( bool& was_in_path_edit, float& bar_width, ImV
 		float   space_avail       = ( cursor_pos.x + style.FramePadding.x );
 
 		float   free_space        = region_avail.x - cursor_screen_pos.x;
-		float   space_avail2      = window_width - cursor_screen_pos.x;
+		float   space_avail2      = static_cast< float >( window_width ) - cursor_screen_pos.x;
 
 		// float       bar_size                      = std::max( std::min( cursor_pos.x + padding_extra, bar_size_min + padding_extra ), free_space - space_needed );
 		float   bar_size          = std::max( padding_extra, free_space - right_side_space_needed );
@@ -347,7 +347,7 @@ void gallery_header_draw_path( ImVec2 region_avail, float& right_side_space_need
 }
 
 
-int gallery_view_draw_header()
+float gallery_view_draw_header()
 {
 	int window_width, window_height;
 	SDL_GetWindowSize( app::window, &window_width, &window_height );
@@ -451,7 +451,7 @@ int gallery_view_draw_header()
 		sep_space_needed = style.ItemSpacing.x + style.WindowBorderSize;
 
 	// estimate
-	int arrow_size = style.FontSizeBase;
+	float arrow_size = style.FontSizeBase;
 
 	// ??
 	// space_needed += 60.f;
@@ -563,60 +563,8 @@ int gallery_view_draw_header()
 	ImVec2 sort_entry_size   = ImGui::CalcTextSize( "Date Modified - New to Old" );
 	ImVec2 filter_entry_size = ImGui::CalcTextSize( "Quick Filter" );
 
-	int    sort_width   = sort_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
-	int    filter_width = filter_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
-
-#if 0
-	ImVec2 region_avail    = ImGui::GetContentRegionAvail();
-
-	int    space_needed    = 100;
-
-	ImVec2 zoom_size         = ImGui::CalcTextSize( "Zoom" );
-
-	space_needed += zoom_size.x + sort_size.x + filter_size.x;
-	space_needed += style.ItemSpacing.x * 2;  // Zoom Text
-	space_needed += style.WindowBorderSize;   // Separator
-	space_needed += style.ItemSpacing.x * 2;  // Sort By Text
-	space_needed += style.ItemSpacing.x * 2;  // Fiter Size Text
-	space_needed += style.ItemSpacing.x;      // Padding
-	
-	int sep_space_needed = 0;
-
-	if ( style.WindowBorderSize )
-		sep_space_needed = style.ItemSpacing.x + style.WindowBorderSize;
-
-	// estimate
-	int arrow_size = style.FontSizeBase;
-
-
-	space_needed += sort_width;
-	space_needed += filter_width;
-
-	// ??
-	// space_needed += 60.f;
-	space_needed += style.ItemSpacing.x;
-
-	if ( ( space_needed + sep_space_needed ) < region_avail.x )
-	{
-		//ImGui::SetCursorPosX( ImGui::GetCursorPosX() + ( region_avail.x - space_needed ) );
-
-		//draw_vertical_separator( draw_list, style );
-
-		// ImColor border_col   = ImVec4( 1, 0, 0, 1 );
-		// ImVec2  cursor_pos   = ImGui::GetCursorPos();
-		// ImVec2  region_avail = ImGui::GetContentRegionAvail();
-		// 
-		// cursor_pos.x += space_needed;
-		// 
-		// ImVec2  line_start   = cursor_pos;
-		// ImVec2  line_end     = cursor_pos;
-		// 
-		// line_start.y -= style.FramePadding.y;
-		// line_end.y += region_avail.y + style.FramePadding.y;
-		// 
-		// draw_list->AddLine( line_start, line_end, border_col, style.WindowBorderSize );
-	}
-#endif
+	float  sort_width   = sort_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
+	float  filter_width = filter_entry_size.x + arrow_size + ( style.FramePadding.x * 3 ) + ( style.FramePadding.y * 2 );
 
 	// ---------------------------------------------------------------------------------
 
@@ -734,7 +682,7 @@ int gallery_view_draw_header()
 	// if ( gallery::selection.size() )
 	{
 		ImGui::SameLine( 0, 0 );
-		ImVec2 region_avail = ImGui::GetContentRegionAvail();
+		ImVec2 region_avail_tmp = ImGui::GetContentRegionAvail();
 
 		char   buf[ 256 ]{};
 		// snprintf( buf, 256, "%zu File%s Selected", gallery::selection.size(), gallery::selection.size() == 1 ? "" : "s" );
@@ -749,7 +697,7 @@ int gallery_view_draw_header()
 
 		ImVec2 text_size = ImGui::CalcTextSize( buf );
 
-		ImVec2 spacing_size( region_avail.x - ( text_size.x + style.ItemSpacing.x ), text_size.y );
+		ImVec2 spacing_size( region_avail_tmp.x - ( text_size.x + style.ItemSpacing.x ), text_size.y );
 		spacing_size.x = std::max( spacing_size.x, style.ItemSpacing.x );
 
 		ImGui::Dummy( spacing_size );
@@ -759,9 +707,9 @@ int gallery_view_draw_header()
 		ImGui::SameLine( 0, 0 );
 	}
 
-	int im_window_height = ImGui::GetWindowHeight();
+	float im_window_height = ImGui::GetWindowHeight();
 
-	if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, (float)im_window_height } ) && !ImGui::IsAnyItemHovered() )
+	if ( ImGui::IsMouseHoveringRect( { 0, 0 }, { (float)window_width, im_window_height } ) && !ImGui::IsAnyItemHovered() )
 	{
 		/*if ( !app::in_window_drag )
 		{
@@ -1106,43 +1054,6 @@ void gallery_view_draw_sidebar()
 			sidebar_draw_bookmarks( style );
 			dir_tree_draw( style );
 			sidebar_draw_file_information( style );
-
-			#if 0
-			ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
-			ImGui::TextUnformatted( "History\n" );
-			ImGui::Separator();
-			ImGui::PopFont();
-
-			u32 id = 1;
-			for ( size_t i = directory::media_history.size(); i > 0; i-- )
-			{
-				const std::string& entry = directory::media_history[ i - 1 ];
-
-				ImGui::PushID( id++ );
-
-				if ( fs_is_file( entry.c_str() ) )
-				{
-					char* filename = fs_get_filename( entry.c_str(), entry.size() );
-
-					if ( ImGui::Selectable( filename ) )
-					{
-						directory::queued = entry;
-					}
-
-					ch_free_str( filename );
-				}
-				else
-				{
-					if ( ImGui::Selectable( entry.c_str() ) )
-					{
-						directory::queued = entry;
-					}
-				}
-				
-
-				ImGui::PopID();
-			}
-			#endif
 
 			ImGui::EndTabItem();
 		}

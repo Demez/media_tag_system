@@ -59,6 +59,7 @@ if ( MSVC )
 	# set( MSVC_VERSION 1939 )
 
 	add_compile_options(
+		"/WX"               # treat warnings as errors
 		# "/Wall"             # Show ALL Warnings
 		"/W4"               # Warning Level 4
 		"/MP"               # multi-threaded compilation
@@ -69,9 +70,13 @@ if ( MSVC )
 		
 		# disable stupid warnings
 		"/wd4100"  # 'X' unreferenced formal paramter
+		"/wd4189"  # local variable is initialized but not referenced
+		"/wd4996"  # The POSIX name for this item is deprecated.
 
-	#	"/wd4244"  # conversion from 'X' to 'Y', possible loss of data
-	#	"/wd4267"  # conversion from 'X' to 'Y', possible loss of data (yes there's 2 idk why)
+		# there's a lot of number type conversions, don't feel like dealing with that currently
+		"/wd4244"  # conversion from 'X' to 'Y', possible loss of data
+		"/wd4267"  # conversion from 'X' to 'Y', possible loss of data (yes there's 2 idk why)
+		
 	#	"/wd4305"  # truncation from 'double' to 'float'
 	#	"/wd4464"  # relative include path contains ".."
 	#	"/wd4668"  # 'X' is not defined as a preprocessor macro, replacing '0' for '#if/#elif' (floods with win32 stuff)

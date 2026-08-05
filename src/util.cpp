@@ -102,7 +102,7 @@ char* strcasestr( const char* s, const char* find )
 		return ( (char*)s );
 
 	// convert to lower case character
-	c          = tolower( (unsigned char)c );
+	c          = tolower( static_cast< int >( c ) );
 	size_t len = strlen( find );
 	do
 	{

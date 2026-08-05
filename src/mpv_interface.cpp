@@ -301,9 +301,7 @@ void mpv_update_frame()
 	if ( !g_mpv_gl )
 		mpv_init_render_context();
 
-	u64 start_time = sys_get_time_ms();
-
-	mpv_opengl_fbo fbo{ g_mpv_fbo, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGB };
+	mpv_opengl_fbo fbo{ static_cast< int >( g_mpv_fbo ), g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGB };
 	int            yes  = 1;
 
 	mpv_render_param rp[] = {
@@ -320,9 +318,6 @@ void mpv_update_frame()
 	}
 
 	g_mpv_redraw = false;
-
-	u64 end_time = sys_get_time_ms();
-	//printf( "UPDATE TIME: %.4f\n", (float)(end_time - start_time) / 1000.f );
 }
 
 
@@ -339,23 +334,8 @@ void mpv_draw_frame()
 	//if ( g_mpv_redraw )
 	mpv_update_frame();
 
-	// called so mpv doesn't get flooded with too many events, and becomes unresponsive
-//	mpv_handle_wait_event( g_mpv, 0.01f );
-
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
-
-	//if ( width < g_mpv_framebuffer_size[ 0 ] / 2 )
-	//	printf( "lol\n" );
-
-	// width /= 2;
-	// height /= 2;
-
-	// width  = g_mpv_framebuffer_size[ 0 ];
-	// height = g_mpv_framebuffer_size[ 1 ];
-
-	// p_mpv_get_property( g_mpv, "dwidth", MPV_FORMAT_INT64, &g_video_width );
-	// p_mpv_get_property( g_mpv, "dheight", MPV_FORMAT_INT64, &g_video_height );
 
 	p_mpv_get_property( g_mpv, "width", MPV_FORMAT_INT64, &g_video_width );
 	p_mpv_get_property( g_mpv, "height", MPV_FORMAT_INT64, &g_video_height );
@@ -372,43 +352,20 @@ void mpv_draw_frame()
 	if ( g_scale_up_video || g_video_height > g_mpv_framebuffer_size[ 1 ] )
 		factor[ 1 ] = (float)g_mpv_framebuffer_size[ 1 ] / (float)g_video_height;
 
-	float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
+	float     zoom_level        = std::min( factor[ 0 ], factor[ 1 ] );
 
-	int   new_width  = g_video_width * zoom_level;
-	int   new_height = g_video_height * zoom_level;
+	float     new_width         = static_cast< float >( g_video_width ) * zoom_level;
+	float     new_height        = static_cast< float >( g_video_height ) * zoom_level;
 
-	int   pos_x      = g_mpv_framebuffer_size[ 0 ] / 2 - ( new_width / 2 );
-	int   pos_y      = g_mpv_framebuffer_size[ 1 ] / 2 - ( new_height / 2 );
+	float     pos_x             = static_cast< float >( g_mpv_framebuffer_size[ 0 ] ) / 2.f - ( new_width / 2.f );
+	float     pos_y             = static_cast< float >( g_mpv_framebuffer_size[ 1 ] ) / 2.f - ( new_height / 2.f );
 
-	// pos_x *= 2;
+	int       viewport_offset_x = ( g_mpv_framebuffer_size[ 0 ] - width ) / 2;
+	int       viewport_offset_y = ( g_mpv_framebuffer_size[ 1 ] - height ) / 2;
 
-	//int   offset_x   = g_mpv_framebuffer_size[ 0 ] - new_width;
-	//int   offset_y   = g_mpv_framebuffer_size[ 1 ] - new_height;
+	int       clamped_width     = g_mpv_framebuffer_size[ 0 ];
+	int       clamped_height    = g_mpv_framebuffer_size[ 1 ];
 
-	//if ( app::window_resized )
-	//	printf( "MPV RESIZE\n" );
-
-	// glFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, g_mpv_rbo );
-
-	//glBindFramebuffer( GL_FRAMEBUFFER, 0 );
-	//glBindFramebuffer( GL_READ_BUFFER, g_mpv_fbo );
-	//
-	//glBlitFramebuffer( 0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_LINEAR );
-
-	// int       viewport_offset_x = ( g_mpv_framebuffer_size[ 0 ] - width ) / 1;
-	// int       viewport_offset_y = ( g_mpv_framebuffer_size[ 1 ] - height ) / 1;
-
-	int viewport_offset_x = ( g_mpv_framebuffer_size[ 0 ] - width ) / 2;
-	int viewport_offset_y = ( g_mpv_framebuffer_size[ 1 ] - height ) / 2;
-
-	int clamped_width     = g_mpv_framebuffer_size[ 0 ];
-	int clamped_height    = g_mpv_framebuffer_size[ 1 ];
-
-	// TODO: keep the full video in frame when live resizing the window
-	// scale it up or down when needed
-	//if ( width < new_width )
-	//	printf( "TEST\n" );
-	
 	SDL_FRect dst_area{};
 	dst_area.w = 1;
 	dst_area.h = 1;
@@ -416,8 +373,8 @@ void mpv_draw_frame()
 	dst_area.y = 0;
 	
 	SDL_FRect dst_rect{};
-	dst_rect.w = width;
-	dst_rect.h = height;
+	dst_rect.w = static_cast< float >( width );
+	dst_rect.h = static_cast< float >( height );
 	dst_rect.x = 0;
 	dst_rect.y = 0;
 	
@@ -434,17 +391,6 @@ void mpv_draw_frame()
 	}
 	
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
-	//glBindRenderbuffer( GL_RENDERBUFFER, 0 );
-
-	//if ( image_draw::flip_h )
-	//	glViewport( pos_x + width, pos_y, -width, height );
-	//else
-	//	glViewport( pos_x, pos_y, width, height );
-
-	//if ( image_draw::flip_h )
-	//	glViewport( pos_x - offset_x, pos_y, width, height );
-	//else
-	//	glViewport( pos_x, pos_y, width, height );
 
 	if ( image_draw::flip_h )
 		glViewport( -viewport_offset_x, -viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
@@ -567,6 +513,8 @@ void mpv_create_texture()
 }
 
 
+// TODO: try reimplementing this again, now that i use wait event instead of running normally
+#if 0
 static void on_mpv_render_update( void* ctx )
 {
 	SDL_Event event = {.type = g_wakeup_on_mpv_render_update};
@@ -578,6 +526,7 @@ static void on_mpv_events( void* ctx )
 	//SDL_Event event = {.type = g_wakeup_on_mpv_events};
 	//SDL_PushEvent(&event);
 }
+#endif
 
 
 void mpv_sdl_event( SDL_Event& event )

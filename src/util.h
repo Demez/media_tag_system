@@ -184,6 +184,7 @@ mem_category_info_t* get_mem_categories();
 
 
 template< typename T >
+requires std::is_arithmetic_v< T >
 T CLAMP( T value, T low, T high )
 {
 	return ( value < low ) ? low : ( ( value > high ) ? high : value );

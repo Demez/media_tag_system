@@ -122,7 +122,7 @@ std::string fs_get_extension( std::string_view path )
 	if ( path.empty() )
 		return result;
 
-	char* path_c = (char*)path.data();
+	char* path_c = const_cast< char* >( path.data() );
 	char* dot    = strrchr( path_c, '.' );
 
 	if ( !dot || dot == path_c )
@@ -275,7 +275,7 @@ char* fs_read_file( const char* path, size_t* len )
 	long size = ftell( fp );
 	fseek( fp, 0, SEEK_SET );
 
-	char* output = (char*)malloc( ( size + 1 ) * sizeof( char ) );
+	char* output = static_cast< char* >( malloc( ( size + 1 ) * sizeof( char ) ) );
 
 	if ( !output )
 	{

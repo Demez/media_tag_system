@@ -146,7 +146,7 @@ struct app_config_t
 	u32                       font_size                      = 17;
 
 	u32                       gallery_zoom_default           = 200;
-	float                     media_zoom_scale               = 0.1;
+	float                     media_zoom_scale               = 0.1f;
 
 	bool                      no_video                       = false;
 	bool                      gallery_show_filenames         = true;
@@ -581,7 +581,7 @@ void                                 media_view_load();
 void                                 media_view_input();
 void                                 media_view_draw_imgui();
 void                                 media_view_draw();
-void                                 media_view_scroll_zoom( float amount );
+void                                 media_view_scroll_zoom( int amount );
 void                                 media_view_advance( bool prev = false );
 void                                 media_view_window_resize();
 void                                 media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true );
@@ -610,8 +610,8 @@ media_entry_t                        gallery_view_get_last_selected_entry();
 
 void                                 media_history_add( const std::string& entry );
 void                                 folder_history_add( const fs::path& entry );
-const fs::path&                      folder_history_get_prev();
-const fs::path&                      folder_history_get_next();
+fs::path                             folder_history_get_prev();
+fs::path                             folder_history_get_next();
 bool                                 folder_history_nav_prev();
 bool                                 folder_history_nav_next();
 
@@ -625,7 +625,7 @@ void                                 folder_load_media_list();
 void                                 push_notification( const char* msg );
 
 // if returned true, delete files
-bool                                 delete_file_window( u32 count );
+bool                                 delete_file_window( size_t count );
 
 bool                                 icon_preload();
 void                                 icon_free();

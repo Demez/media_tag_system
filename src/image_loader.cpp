@@ -96,12 +96,12 @@ void gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t f
 	if ( textures.count != frame_count )
 	{
 		if ( textures.frame )
-			glDeleteTextures( textures.count, textures.frame );
+			glDeleteTextures( static_cast< int >( textures.count ), textures.frame );
 
 		textures.frame = ch_realloc< GLuint >( textures.frame, frame_count, e_mem_category_gl_texture_data, 2 );
 		memset( textures.frame, 0, sizeof( GLuint ) * frame_count );
 
-		glGenTextures( frame_count, textures.frame );
+		glGenTextures( static_cast< int >( frame_count ), textures.frame );
 		textures.count = frame_count;
 	}
 
@@ -115,7 +115,7 @@ void gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t f
 void gl_free_textures( uploaded_textures_t& textures )
 {
 	if ( textures.frame )
-		glDeleteTextures( textures.count, textures.frame );
+		glDeleteTextures( static_cast< int >( textures.count ), textures.frame );
 
 	ch_free( e_mem_category_gl_texture_data, textures.frame );
 
@@ -175,7 +175,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 	for ( size_t i = 0; i < ext.size(); i++ )
 	{
-		ext[ i ] = std::tolower( static_cast< unsigned char >( ext.data()[ i ] ) );
+		ext[ i ] = static_cast< char >( std::tolower( static_cast< int >( ext.data()[ i ] ) ) );
 	}
 
 	IImageLoader* loader = image_check_extension( ext );

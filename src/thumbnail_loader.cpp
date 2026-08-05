@@ -207,35 +207,24 @@ search:
 	thumbnail_loader_free_data( cache_pos );
 	//printf( "THUMBNAIL %d USED\n", cache_pos );
 
-	try
-	{
-		std::string path_str                              = sys_path_to_string( media_entry.file.path );
-		g_thumbnail_cache.buffer[ cache_pos ].path        = util_strdup( path_str.c_str() );
-		g_thumbnail_cache.buffer[ cache_pos ].status      = e_thumbnail_status_queued;
-		g_thumbnail_cache.buffer[ cache_pos ].save_status = e_thumbnail_save_idle;
-		g_thumbnail_cache.buffer[ cache_pos ].type        = media_entry.type;
-		g_thumbnail_cache.used_this_frame[ cache_pos ]    = true;
+	std::string path_str                              = sys_path_to_string( media_entry.file.path );
+	g_thumbnail_cache.buffer[ cache_pos ].path        = util_strdup( path_str.c_str() );
+	g_thumbnail_cache.buffer[ cache_pos ].status      = e_thumbnail_status_queued;
+	g_thumbnail_cache.buffer[ cache_pos ].save_status = e_thumbnail_save_idle;
+	g_thumbnail_cache.buffer[ cache_pos ].type        = media_entry.type;
+	g_thumbnail_cache.used_this_frame[ cache_pos ]    = true;
 
-		h_thumbnail handle;
-		handle.index      = cache_pos;
-		handle.generation = ++g_thumbnail_cache.generation[ cache_pos ];
+	h_thumbnail handle;
+	handle.index      = cache_pos;
+	handle.generation = ++g_thumbnail_cache.generation[ cache_pos ];
 
-		g_thumbnail_thread_data[ thread_id ].thumbnail = handle;
-		g_thumbnail_thread_data[ thread_id ].file      = media_entry.file;
+	g_thumbnail_thread_data[ thread_id ].thumbnail = handle;
+	g_thumbnail_thread_data[ thread_id ].file      = media_entry.file;
 
-		g_thumbnail_thread_data[ thread_id ].state.store( e_thumbnail_thread_queued );
-		g_thumbnail_thread_data[ thread_id ].state.notify_one();
+	g_thumbnail_thread_data[ thread_id ].state.store( e_thumbnail_thread_queued );
+	g_thumbnail_thread_data[ thread_id ].state.notify_one();
 
-		return handle;
-	}
-	// fs::path.string() conversion error
-	catch ( std::system_error )
-	{
-		g_thumbnail_cache.buffer[ cache_pos ].status = e_thumbnail_status_failed;
-		return {};
-	}
-
-	return {};
+	return handle;
 }
 
 
@@ -550,8 +539,8 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 		load_info.load_quick     = true;
 		load_info.threaded_load  = true;
 		load_info.thumbnail_load = true;
-		load_info.target_size.x  = app::config.thumbnail_size;
-		load_info.target_size.y  = app::config.thumbnail_size;
+		load_info.target_size.x  = static_cast< float >( app::config.thumbnail_size );
+		load_info.target_size.y  = static_cast< float >( app::config.thumbnail_size );
 
 		if ( !image_load( video_thumbnail_path, load_info ) )
 		{
@@ -574,8 +563,8 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 		load_info.threaded_load  = true;
 		load_info.thumbnail_load = true;
 		load_info.single_frame   = true;
-		load_info.target_size.x  = app::config.thumbnail_size;
-		load_info.target_size.y  = app::config.thumbnail_size;
+		load_info.target_size.x  = static_cast< float >( app::config.thumbnail_size );
+		load_info.target_size.y  = static_cast< float >( app::config.thumbnail_size );
 
 		if ( !image_load( thumbnail->path, load_info ) )
 		{
@@ -646,8 +635,8 @@ void thumbnail_loader_worker( u32 thread_id )
 			{
 				// Load Image Normally
 				jxl_thumbnail.image          = ch_calloc< image_t >( 1, e_mem_category_image );
-				jxl_thumbnail.target_size.x  = thumbnail_size;
-				jxl_thumbnail.target_size.y  = thumbnail_size;
+				jxl_thumbnail.target_size.x  = static_cast< float >( thumbnail_size );
+				jxl_thumbnail.target_size.y  = static_cast< float >( thumbnail_size );
 				jxl_thumbnail.load_quick     = true;
 				jxl_thumbnail.threaded_load  = true;
 				jxl_thumbnail.thumbnail_load = true;
@@ -704,7 +693,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		thumbnail_printf( "[THUMBNAIL %d] LOADED IMAGE: %s\n", thread_data.thumbnail.index, thumbnail->path );
 
-		float max_image_size = std::max( thumbnail->image->width, thumbnail->image->height );
+		int max_image_size = std::max( thumbnail->image->width, thumbnail->image->height );
 
 		// ---------------------------------------------------------------------------------------------------------
 		// If we didn't find the thumbnail on disk, write it!
@@ -719,7 +708,7 @@ void thumbnail_loader_worker( u32 thread_id )
 			if ( !cleaned_path.starts_with( app::config.thumbnail_cache_path ) )
 			{
 				// prescale the image instead, that way the save thread doesn't need to hold onto images nearly as long
-				if ( max_image_size > app::config.thumbnail_size )
+				if ( static_cast< u64 >( max_image_size ) > static_cast< u64 >( app::config.thumbnail_size ) )
 				{
 					float factor[ 2 ]  = { 1.f, 1.f };
 
@@ -767,10 +756,10 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		if ( scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f )
 		{
-			float new_width         = thumbnail->image->width * scale_amount;
-			float new_height        = thumbnail->image->height * scale_amount;
+			int new_width           = static_cast< int >( thumbnail->image->width * scale_amount );
+			int new_height          = static_cast< int >( thumbnail->image->height * scale_amount );
 
-			u8*   old_frame         = thumbnail->image->frame[ 0 ].data;
+			u8* old_frame           = thumbnail->image->frame[ 0 ].data;
 
 			thumbnail->image_scaled = ch_calloc< image_t >( 1, e_mem_category_image );
 
@@ -795,12 +784,12 @@ bool thumbnail_loader_init()
 	g_thumbnail_save_worker = ch_calloc< std::thread* >( app::config.thumbnail_save_threads, e_mem_category_general );
 	g_thumbnail_thread_data = new thumbnail_thread_data_t[ app::config.thumbnail_threads ];
 
-	for ( int i = 0; i < app::config.thumbnail_save_threads; i++ )
+	for ( u32 i = 0; i < app::config.thumbnail_save_threads; i++ )
 	{
 		g_thumbnail_save_worker[ i ] = new std::thread( thumbnail_save_worker, i );
 	}
 
-	for ( int i = 0; i < app::config.thumbnail_threads; i++ )
+	for ( u32 i = 0; i < app::config.thumbnail_threads; i++ )
 	{
 		g_thumbnail_worker[ i ] = new std::thread( thumbnail_loader_worker, i );
 	}
@@ -817,7 +806,7 @@ void thumbnail_loader_shutdown( bool free_thumbnails )
 	g_thumbnails_running.store( false );
 
 	// wait for threads to shutdown
-	for ( int i = 0; i < app::config.thumbnail_save_threads; i++ )
+	for ( u32 i = 0; i < app::config.thumbnail_save_threads; i++ )
 	{
 		g_thumbnail_save_wait.store( true );
 		g_thumbnail_save_wait.notify_all();
@@ -825,7 +814,7 @@ void thumbnail_loader_shutdown( bool free_thumbnails )
 		delete g_thumbnail_save_worker[ i ];
 	}
 
-	for ( int i = 0; i < app::config.thumbnail_threads; i++ )
+	for ( u32 i = 0; i < app::config.thumbnail_threads; i++ )
 	{
 		g_thumbnail_thread_data[ i ].state = e_thumbnail_thread_exit;
 		g_thumbnail_thread_data[ i ].state.notify_all();

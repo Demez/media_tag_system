@@ -76,7 +76,7 @@ static_assert( ARR_SIZE( g_scale_state_str ) == e_scale_state_count );
 
 // TODO: put these in the config
 // constexpr float                     SCALE_WAIT_TIME = 0.1f;
-constexpr u64              SCALE_WAIT_TIME = 100;  // in ms
+constexpr u32              SCALE_WAIT_TIME = 100;  // in ms
 constexpr float            UPSCALE_LIMIT   = 2.f;
 
 static std::thread*        g_scale_thread;
@@ -100,7 +100,7 @@ timer_wait:
 
 	if ( cur_time < g_scale_time )
 	{
-		u64 diff = g_scale_time - cur_time;
+		u32 diff = static_cast< u32 >( g_scale_time - cur_time );
 		g_scale_lock.unlock();
 		//printf( "SCALE WAIT %d\n", ++recheck_time );
 
@@ -225,6 +225,8 @@ bool media_view_scale_handle_finished()
 		media_view_scale_reset_timer();
 		return true;
 	}
+	
+	return false;
 }
 
 
@@ -522,7 +524,7 @@ void media_view_zoom_reset()
 }
 
 
-void media_view_scroll_zoom( float scroll )
+void media_view_scroll_zoom( int scroll )
 {
 	if ( directory::delayed_folder_load )
 		return;
@@ -1791,8 +1793,8 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 	glLoadIdentity();
 
 	// get the center of the image
-	int image_center_x = draw_x + draw_width * 0.5;
-	int image_center_y = draw_y + draw_height * 0.5;
+	float image_center_x = static_cast< float >( draw_x + draw_width ) * 0.5f;
+	float image_center_y = static_cast< float >( draw_y + draw_height ) * 0.5f;
 
 	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
 	glRotatef( image_draw::rot, 0, 0, 1 );                   // rotate around the image
@@ -1845,8 +1847,7 @@ static void media_view_draw_image()
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	}
 
-	image_frame_t&   frame         = g_image_data.image.frame[ image_draw::frame ];
-	e_frame_disposal prev_disposal = frame.frame_disposal;
+	e_frame_disposal prev_disposal = g_image_data.image.frame[ image_draw::frame ].frame_disposal;
 
 	// frame disposal seems to be how to handle THIS frame for the next frame drawn
 	// so here, the current frame will use the last frame's disposal method for how to draw it
@@ -1858,8 +1859,7 @@ static void media_view_draw_image()
 
 	if ( image_draw::frame > 0 )
 	{
-		image_frame_t& frame = g_image_data.image.frame[ image_draw::frame - 1 ];
-		prev_disposal        = frame.frame_disposal;
+		prev_disposal = g_image_data.image.frame[ image_draw::frame - 1 ].frame_disposal;
 	}
 
 	if ( prev_disposal == e_frame_disposal_keep )

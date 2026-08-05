@@ -401,7 +401,7 @@ e_sys_init sys_init( int argc, char* argv[] )
 
 				// Write to the pipe
 				DWORD bytes_written = 0;
-				BOOL  pipe_write    = WriteFile( g_singleton_pipe, path_w, len, &bytes_written, NULL );
+				BOOL  pipe_write    = WriteFile( g_singleton_pipe, path_w, static_cast< DWORD >( len ), &bytes_written, NULL );
 
 				ch_free_str( path_w );
 			}
@@ -909,7 +909,7 @@ struct _recursive_depth_t
 
 // https://blog.s-schoener.com/2024-06-24-find-files-internals/
 
-static bool _open_dir( std::wstring& path, HANDLE& dir_handle, IO_STATUS_BLOCK& statusBlock, void* buffer, size_t buffer_size, std::vector< file_t >& files )
+static bool _open_dir( std::wstring& path, HANDLE& dir_handle, IO_STATUS_BLOCK& statusBlock, void* buffer, ULONG buffer_size )
 {
 	dir_handle = CreateFileW( path.c_str(),
 	                          FILE_LIST_DIRECTORY,
@@ -940,71 +940,39 @@ static bool _open_dir( std::wstring& path, HANDLE& dir_handle, IO_STATUS_BLOCK& 
 		return false;
 	}
 
-	//FILE_DIRECTORY_INFORMATION* file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
-	//size_t                      files_scanned = 0;
-	//
-	//while ( file_dir_info->NextEntryOffset != 0 )
-	//{
-	//	file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)file_dir_info ) + file_dir_info->NextEntryOffset );
-	//	files_scanned++;
-	//}
-	//
-	//files.resize( files.size() + files_scanned );
-
 	return true;
+}
+
+
+static size_t __get_scan_count( FILE_DIRECTORY_INFORMATION* tmp_file_dir_info )
+{
+	size_t files_scanned     = 0;
+
+	while ( tmp_file_dir_info->NextEntryOffset != 0 )
+	{
+		tmp_file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)tmp_file_dir_info ) + tmp_file_dir_info->NextEntryOffset );
+		files_scanned++;
+	}
+
+	return files_scanned;
 }
 
 
 constexpr size_t BUFFER_CHUNK_SIZE = 1024 * 6;
 
 
-void expand_buffer_list( m_array< m_array< file_t > >& file_buffers, size_t files_scanned, size_t& file_index )
+static size_t preallocate_vector( FILE_DIRECTORY_INFORMATION* file_dir_info, size_t file_index, std::vector< file_t >& files )
 {
-  #if 1
-	if ( file_buffers.back().aCapacity > file_buffers.back().aSize + files_scanned )
-		return;
+	size_t files_scanned = __get_scan_count( file_dir_info );
 
-	file_buffers.back().reserve( file_buffers.back().size() + BUFFER_CHUNK_SIZE );
-  #else
-	if ( file_buffers.back().size() + files_scanned < BUFFER_CHUNK_SIZE )
-		return;
+	if ( files.size() < file_index + files_scanned )
+		files.resize( file_index + std::max( files_scanned, BUFFER_CHUNK_SIZE ) );
 
-	file_index = 0;
-	file_buffers.resize( file_buffers.size() + 1 );
-	file_buffers.back().reserve( BUFFER_CHUNK_SIZE );
-  #endif
+	return files_scanned;
 }
 
 
-void expand_file_list( std::vector< file_t >& file_buffers, size_t files_scanned, size_t file_index )
-{
-	//if ( file_buffers.capacity() > files_scanned + file_buffers.size() )
-	//	return;
-	//
-	//file_buffers.reserve( file_buffers.size() + BUFFER_CHUNK_SIZE );
-
-	if ( file_buffers.capacity() >= file_index )
-		return;
-
-	file_buffers.reserve( file_buffers.size() + BUFFER_CHUNK_SIZE );
-}
-
-
-void expand_buffer_list_from_files( FILE_DIRECTORY_INFORMATION* buffer, m_array< m_array< file_t > >& file_buffers, size_t& file_index )
-{
-	FILE_DIRECTORY_INFORMATION* file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
-	size_t                      files_scanned = 0;
-
-	while ( file_dir_info->NextEntryOffset != 0 )
-	{
-		file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)file_dir_info ) + file_dir_info->NextEntryOffset );
-		files_scanned++;
-	}
-
-	expand_buffer_list( file_buffers, files_scanned, file_index );
-}
-
-
+// TODO: increase stack size, and increase size of temp_path_buffer to 32k characters
 static bool sys_scandir_internal( const wchar_t* root, std::vector< file_t >& files, e_scandir_flags flags )
 {
 	std::wstring scan_dir = root, scan_dir_wildcard{};
@@ -1019,8 +987,8 @@ static bool sys_scandir_internal( const wchar_t* root, std::vector< file_t >& fi
 	std::forward_list< _recursive_depth_t > recursive_paths{};
 	std::wstring                            current_depth{};
 
-	constexpr u64               buffer_count = 4096;
-	constexpr u64               buffer_size  = sizeof( FILE_DIRECTORY_INFORMATION ) * buffer_count;
+	constexpr ULONG             buffer_count = 4096;
+	constexpr ULONG             buffer_size  = sizeof( FILE_DIRECTORY_INFORMATION ) * buffer_count;
 	FILE_DIRECTORY_INFORMATION* buffer       = ch_calloc< FILE_DIRECTORY_INFORMATION >( buffer_count, e_mem_category_general );
 
 	IO_STATUS_BLOCK statusBlock;
@@ -1033,33 +1001,19 @@ static bool sys_scandir_internal( const wchar_t* root, std::vector< file_t >& fi
 	//size_t                       file_index = 0;
 	size_t file_index = files.size();
 
-	m_array< m_array< file_t > > file_buffers( 1 );
-	file_buffers.back().reserve( BUFFER_CHUNK_SIZE );
-
-	if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size, files ) )
+	if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size ) )
 	{
 		wprintf( L"Failed to search directory: %s\n", scan_dir.c_str() );
 		ch_free( e_mem_category_general, buffer );
 		return false;
 	}
 
-	FILE_DIRECTORY_INFORMATION* tmp_file_dir_info = buffer;
-	size_t                      files_scanned     = 0;
-
 	// allocate more memory
-	while ( tmp_file_dir_info->NextEntryOffset != 0 )
-	{
-		tmp_file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)tmp_file_dir_info ) + tmp_file_dir_info->NextEntryOffset );
-		files_scanned++;
-	}
+	preallocate_vector( buffer, file_index, files );
 
-	//files.resize( files.size() + files_scanned );
-	//files.reserve( files.size() + files_scanned );
+	// file dir info pointer gets offset as this loop goes on, so keep the starting memory pointer to free it later
+	FILE_DIRECTORY_INFORMATION* file_dir_info = buffer;
 
-	if ( files.size() < file_index + files_scanned )
-		files.resize( files.size() + std::max( files_scanned, BUFFER_CHUNK_SIZE ) );
-
-	FILE_DIRECTORY_INFORMATION* file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
 	while ( true )
 	{
 		if ( file_dir_info->NextEntryOffset == 0 )
@@ -1116,7 +1070,7 @@ open_dir_recurse_fail:
 				//fputws( scan_dir_wildcard.c_str(), stdout );
 				//fputws( L"\n", stdout );
 
-				if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size, files ) )
+				if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size ) )
 				{
 					wprintf( L"Failed to search directory: %s\n", scan_dir_wildcard.c_str() );
 					goto open_dir_recurse_fail;
@@ -1124,19 +1078,8 @@ open_dir_recurse_fail:
 			}
 
 			// ASSERT( status >= 0, "NtQueryDirectoryFileEx failed while getting more files" );
-			file_dir_info = (FILE_DIRECTORY_INFORMATION*)buffer;
-			FILE_DIRECTORY_INFORMATION* tmp_file_dir_info = file_dir_info;
-			size_t files_scanned = 0;
-			
-			// allocate more memory
-			while ( tmp_file_dir_info->NextEntryOffset != 0 )
-			{
-				tmp_file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)tmp_file_dir_info ) + tmp_file_dir_info->NextEntryOffset );
-				files_scanned++;
-			}
-
-			if ( files.size() < file_index + files_scanned )
-				files.resize( files.size() + std::max( files_scanned, BUFFER_CHUNK_SIZE ) );
+			file_dir_info = buffer;
+			preallocate_vector( file_dir_info, file_index, files );
 
 			// file_buffers.reserve( file_buffers.size() + std::max( files_scanned, BUFFER_CHUNK_SIZE ) );
 			//expand_file_list( files, files_scanned );
@@ -1491,9 +1434,9 @@ bool sys_copy_to_clipboard( const std::vector< fs::path >& files )
 
 void sys_browse_to_file( const char* path )
 {
-	wchar_t*    path_w = sys_to_wchar( path );
+	wchar_t*         path_w = sys_to_wchar( path );
 
-	ITEMIDLIST* pidl   = ILCreateFromPath( path_w );
+	PIDLIST_ABSOLUTE pidl   = ILCreateFromPathW( path_w );
 	if ( pidl )
 	{
 		SHOpenFolderAndSelectItems( pidl, 0, 0, 0 );
@@ -1546,7 +1489,7 @@ void sys_browse_to_files( const fs::path& root, const std::vector< fs::path > pa
 	for ( const auto& path : paths )
 	{
 		PIDLIST_ABSOLUTE pidl = nullptr;
-		HRESULT          hr   = SHParseDisplayName( path.c_str(), nullptr, &pidl, 0, nullptr );
+		hr                    = SHParseDisplayName( path.c_str(), nullptr, &pidl, 0, nullptr );
 
 		if ( SUCCEEDED( hr ) && pidl )
 		{
