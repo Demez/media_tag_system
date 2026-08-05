@@ -1,12 +1,14 @@
 #pragma once
 
-#include "array.hpp"
+// #include "array.hpp"
 
-#include <unordered_map>
 #include <stacktrace>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
 
 #if USE_MIMALLOC
-#include <mimalloc.h>
+  #include <mimalloc.h>
 #endif
 
 // --------------------------------------------------------------------------------------------------------
@@ -14,45 +16,45 @@
 
 #include "imgui.h"
 
+#include <concepts>
 #include <cstdio>
 #include <cstring>
-#include <stdlib.h>
-#include <vector>
-#include <string>
-
 #include <filesystem>
+#include <stdlib.h>
+#include <string>
+#include <vector>
 
-namespace fs   = std::filesystem;
+namespace fs = std::filesystem;
 
 
 // --------------------------------------------------------------------------------------------------------
 
 
-using s8    = char;
-using s16   = short;
-using s32   = int;
-using s64   = long long;
+using s8     = char;
+using s16    = short;
+using s32    = int;
+using s64    = long long;
 
-using u8    = unsigned char;
-using u16   = unsigned short;
-using u32   = unsigned int;
-using u64   = unsigned long long;
+using u8     = unsigned char;
+using u16    = unsigned short;
+using u32    = unsigned int;
+using u64    = unsigned long long;
 
-using f32   = float;
-using f64   = double;
+using f32    = float;
+using f64    = double;
 
 
 // --------------------------------------------------------------------------------------------------------
 
 
 #ifdef _WIN32
-  #define SEP_S "\\"
-  #define SEP '\\'
+  #define SEP_S        "\\"
+  #define SEP          '\\'
 
   #define PATH_SEP_STR "\\"
   #define PATH_SEP     '\\'
 
-  #define strncasecmp _strnicmp
+  #define strncasecmp  _strnicmp
   #define strcasecmp   _stricmp
 
 constexpr float STORAGE_SCALE = 1024.f;
@@ -87,8 +89,8 @@ constexpr float MEM_SCALE = 1000.f;
 // };
 
 
-using ivec2 = int[ 2 ];
-using vec2  = float[ 2 ];
+using ivec2                       = int[ 2 ];
+using vec2                        = float[ 2 ];
 
 
 // struct vec2
@@ -97,8 +99,8 @@ using vec2  = float[ 2 ];
 // };
 
 
-constexpr size_t STR_BUF_SIZE = 512;
-constexpr size_t TIME_BUFFER  = 14;
+constexpr size_t STR_BUF_SIZE     = 512;
+constexpr size_t TIME_BUFFER      = 14;
 constexpr size_t DATE_TIME_BUFFER = TIME_BUFFER + 11;
 
 
@@ -178,7 +180,6 @@ extern size_t        g_total_memory_allocated;
 mem_category_info_t* get_mem_categories();
 
 
-
 // --------------------------------------------------------------------------------------------------------
 
 
@@ -209,11 +210,44 @@ inline void ch_free_str( T*& memory )
 	ch_free( e_mem_category_string, memory );
 }
 
+template< typename T, typename... Args >
+requires std::constructible_from< T, Args... >
+T* ch_new( e_mem_category category, Args&&... args )
+{
+	T* data = static_cast< T* >( malloc( sizeof( T ) ) );
+
+	if ( !data )
+		return data;
+
+	mem_add_item( category, data, sizeof( T ), 1 );
+
+	*data = T( std::forward< Args >( args )... );
+	return data;
+}
+
+template< typename T, typename... Args >
+requires std::constructible_from< T, Args... >
+T* ch_new_multiple( e_mem_category category, size_t count, Args&&... args )
+{
+	T* data = static_cast< T* >( malloc( count * sizeof( T ) ) );
+
+	if ( !data )
+		return data;
+
+	mem_add_item( category, data, count * sizeof( T ), 1 );
+
+	for ( u32 i = 0; i < count; i++ )
+	{
+		data[ i ] = T( std::forward< Args >( args )... );
+	}
+
+	return data;
+}
 
 template< typename T >
 T* ch_malloc( size_t count )
 {
-	T* data = (T*)malloc( count * sizeof( T ) );
+	T* data = static_cast< T* >( malloc( count * sizeof( T ) ) );
 
 	if ( data == nullptr )
 	{
@@ -231,7 +265,7 @@ T* ch_malloc( size_t count )
 template< typename T >
 T* ch_calloc( size_t count, e_mem_category category )
 {
-	T* ptr = (T*)calloc( count, sizeof( T ) );
+	T* ptr = static_cast< T* >( calloc( count, sizeof( T ) ) );
 
 	if ( ptr )
 		mem_add_item( category, ptr, count * sizeof( T ), 1 );
@@ -243,7 +277,7 @@ T* ch_calloc( size_t count, e_mem_category category )
 template< typename T >
 T* ch_realloc( T* data, size_t count, e_mem_category category, size_t stack_skip = 1, size_t stack_depth = 1 )
 {
-	T* ptr = (T*)realloc( data, count * sizeof( T ) );
+	T* ptr = static_cast< T* >( realloc( data, count * sizeof( T ) ) );
 
 	if ( ptr )
 	{
@@ -260,7 +294,7 @@ T* ch_realloc( T* data, size_t count, e_mem_category category, size_t stack_skip
 template< typename T >
 T* ch_recalloc( T* data, size_t count, size_t add_count, e_mem_category category )
 {
-	T* new_data = (T*)realloc( data, (count + add_count) * sizeof( T ) );
+	T* new_data = static_cast< T* >( realloc( data, ( count + add_count ) * sizeof( T ) ) );
 
 	if ( new_data )
 	{
@@ -291,7 +325,6 @@ void util_array_remove_element( T* data, COUNT_TYPE& count, COUNT_TYPE index )
 
 	memset( &data[ count ], 0, sizeof( T ) );
 }
-
 
 
 template< typename T >
@@ -374,34 +407,34 @@ bool util_array_extend( e_mem_category category, T*& data, size_t count, size_t 
 // utility functions
 
 
-bool        point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size );
-bool        mouse_in_rect( ImVec2 min_size, ImVec2 max_size );
-bool        mouse_moving();
+bool point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size );
+bool mouse_in_rect( ImVec2 min_size, ImVec2 max_size );
+bool mouse_moving();
 
 #if _WIN32
-char*       strcasestr( const char* s, const char* find );
+char* strcasestr( const char* s, const char* find );
 #endif
 
-char*       util_strdup( const char* string );
-char*       util_strndup( const char* string, size_t len );
+char* util_strdup( const char* string );
+char* util_strndup( const char* string, size_t len );
 
 // takes in a pointer to realloc to
-char*       util_strdup_r( char* data, const char* string );
-char*       util_strndup_r( char* data, const char* string, size_t len );
+char* util_strdup_r( char* data, const char* string );
+char* util_strndup_r( char* data, const char* string, size_t len );
 
-bool        util_strncmp( const char* left, const char* right, size_t len );
-bool        util_strncmp( const char* left, size_t left_len, const char* right, size_t right_len );
+bool  util_strncmp( const char* left, const char* right, size_t len );
+bool  util_strncmp( const char* left, size_t left_len, const char* right, size_t right_len );
 
-void        util_append_str( str_buf_t& buffer, const char* str, size_t len );
-void        util_append_str( str_buf_t& buffer, const char* str, size_t len, size_t buffer_size );
+void  util_append_str( str_buf_t& buffer, const char* str, size_t len );
+void  util_append_str( str_buf_t& buffer, const char* str, size_t len, size_t buffer_size );
 
 // kinda lame lol
-void        util_format_time( char* buffer, double time );  // expects at least TIME_BUFFER characters in buffer
-void        util_format_time( char* buffer, size_t buffer_size, double time );
+void  util_format_time( char* buffer, double time );  // expects at least TIME_BUFFER characters in buffer
+void  util_format_time( char* buffer, size_t buffer_size, double time );
 
-void        util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool apply_time_zone = true );
+void  util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool apply_time_zone = true );
 
-bool        util_mouse_hovering_imgui_window();
+bool  util_mouse_hovering_imgui_window();
 
 
 template< typename CHAR >
@@ -472,4 +505,3 @@ void        fs_save_file_close( save_file_t& save, const char* path );
 
 // overrwites any existing file
 bool        fs_write_file( const char* path, const char* data, size_t size );
-
