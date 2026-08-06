@@ -1147,7 +1147,7 @@ open_dir_recurse_fail:
 
 		if ( flags & e_scandir_abs_paths )
 		{
-			size_t path_len = scan_dir.size() + character_count + 1;
+			size_t path_len = scan_dir.size() + character_count;
 
 			if ( current_depth.size() )
 				path_len += current_depth.size() + 1;  // add path sep size
