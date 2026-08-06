@@ -1145,7 +1145,12 @@ static void select_image_in_folder( bool force_load_media )
 {
 	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
 	{
-		if ( gallery_item_get_path( i ) != directory::queued )
+		const media_entry_t& entry = gallery_item_get_media_entry( i );
+
+		if ( entry.file.type == e_file_type_directory )
+			continue;
+
+		if ( entry.file.path != directory::queued )
 			continue;
 
 		gallery_view_set_selection( i );
