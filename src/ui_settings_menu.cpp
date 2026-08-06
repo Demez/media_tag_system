@@ -236,6 +236,8 @@ void settings_draw_debug()
 
 	ImGui::Checkbox( "Always Recalc Gallery Item Sizes", &gallery::always_recalc_item_sizes );
 	ImGui::Checkbox( "Always Recalc Gallery Item Layout", &gallery::always_recalc_layout );
+	ImGui::Checkbox( "RESTART: Test 10-bit Color Depth", &app::config.high_bpc );
+	setting_desc( "may break things lol" );
 }
 
 

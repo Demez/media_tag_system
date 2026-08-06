@@ -1419,12 +1419,36 @@ bool startup_set_gl_attributes()
 		return false;
 
 	// 10-bit testing...
-	//SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 10 );
-	//SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 10 );
-	//SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 10 );
-	//SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 2 );
+	if ( app::config.high_bpc )
+	{
+		SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 10 );
+		SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 10 );
+		SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 10 );
+		SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 2 );
+
+		// SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 16 );
+		// SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 16 );
+		// SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 16 );
+		// SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 16 );
+
+		// SDL_GL_SetAttribute( SDL_GL_FLOATBUFFERS, 1 );
+	}
 
 	return true;
+}
+
+
+void test_hdr_state()
+{
+	bool HDR_enabled      = false;
+
+	auto props            = SDL_GetWindowProperties( app::window );
+	HDR_enabled           = SDL_GetBooleanProperty( props, SDL_PROP_WINDOW_HDR_ENABLED_BOOLEAN, false );
+
+	float sdr_white_level = SDL_GetFloatProperty( props, SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT, 1.0 );
+	float hdr_headroom    = SDL_GetFloatProperty( props, SDL_PROP_WINDOW_HDR_HEADROOM_FLOAT, 1.0 );
+
+	printf( "HDR %s", HDR_enabled ? "enabled" : "disabled" );
 }
 
 
@@ -1498,14 +1522,6 @@ int startup( int argc, char* argv[] )
 		return 1;
 	}
 
-	int r, g, b, a, d, h;
-	SDL_GL_GetAttribute( SDL_GL_RED_SIZE, &r );
-	SDL_GL_GetAttribute( SDL_GL_GREEN_SIZE, &g );
-	SDL_GL_GetAttribute( SDL_GL_BLUE_SIZE, &b );
-	SDL_GL_GetAttribute( SDL_GL_ALPHA_SIZE, &a );
-	SDL_GL_GetAttribute( SDL_GL_DEPTH_SIZE, &d );
-	SDL_GL_GetAttribute( SDL_GL_ACCELERATED_VISUAL, &h );
-
 	SDL_GL_MakeCurrent( app::window, g_gl_context );
 
 	if ( !gladLoadGL() )
@@ -1513,6 +1529,20 @@ int startup( int argc, char* argv[] )
 		printf( "Failed to load GL\n" );
 		return 1;
 	}
+
+	int r, g, b, a, f;
+	SDL_GL_GetAttribute( SDL_GL_RED_SIZE, &r );
+	SDL_GL_GetAttribute( SDL_GL_GREEN_SIZE, &g );
+	SDL_GL_GetAttribute( SDL_GL_BLUE_SIZE, &b );
+	SDL_GL_GetAttribute( SDL_GL_ALPHA_SIZE, &a );
+	SDL_GL_GetAttribute( SDL_GL_FLOATBUFFERS, &f );
+	
+	printf( "RED SIZE: %d\n", r );
+	
+	char red[ 32 ];
+	snprintf( red, 32, "RED SIZE: %d\n", r );
+	
+	//SDL_ShowSimpleMessageBox( 0, "red size", red, app::window );
 
 	IMGUI_CHECKVERSION();
 
@@ -1531,6 +1561,8 @@ int startup( int argc, char* argv[] )
 		printf( "Failed to init ImGui OpenGL\n" );
 		return 1;
 	}
+
+	test_hdr_state();
 
 	sys_font_data_t font_data = sys_get_font();
 

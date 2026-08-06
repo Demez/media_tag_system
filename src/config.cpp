@@ -434,6 +434,8 @@ bool config_load()
 	config_get_bool_value( fyd, "/dwm-extend %u", app::config.dwm_extend );
 	config_get_bool_value( fyd, "/use-custom-colors %u", app::config.use_custom_colors );
 	config_get_bool_value( fyd, "/single-instance %u", app::config.single_instance );
+	config_get_bool_value( fyd, "/high-bpc %u", app::config.high_bpc );
+	config_get_bool_value( fyd, "/hdr %u", app::config.hdr );
 
 	config_get_bool_value( fyd, "/directory-tree-auto-expand %u", app::config.directory_tree_auto_expand );
 	config_get_bool_value( fyd, "/directory-tree-expand-on-click %u", app::config.directory_tree_expand_on_click );
@@ -800,6 +802,8 @@ void config_save()
 	config_save_node_bool( doc, doc_root, "", "single-instance", app::config.single_instance );
 	config_save_node_bool( doc, doc_root, "", "no-video", app::config.no_video );
 	config_save_node_bool( doc, doc_root, "", "always-draw", app::config.always_draw );
+	config_save_node_bool( doc, doc_root, "", "high-bpc", app::config.high_bpc );
+	config_save_node_bool( doc, doc_root, "", "hdr", app::config.hdr );
 	config_save_node_s32( doc, doc_root, "", "vsync", app::config.vsync );
 	config_save_node_u32( doc, doc_root, "", "font-size", app::config.font_size );
 

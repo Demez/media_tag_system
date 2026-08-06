@@ -137,6 +137,8 @@ struct app_config_t
 	std::string               thumbnail_video_cache_path{};
 
 	int                       vsync                          = 1;
+	bool                      high_bpc                       = false;
+	bool                      hdr                            = false;
 
 	u32                       sleep_time_no_focus            = 5;
 	u32                       sleep_time_focus               = 1;
