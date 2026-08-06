@@ -265,24 +265,24 @@ def parse_args() -> argparse.Namespace:
 # =================================================================================================
 
 
-def post_mozjpeg_extract():
+def post_jpeg_extract():
     if ARGS.no_build:
         return
         
-    set_project("MozJPEG")
+    set_project("libjpeg-turbo")
 
-    os.chdir("mozjpeg")
+    os.chdir("libjpeg-turbo")
 
-    build_options = "-DPNG_SUPPORTED=0 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    build_options = "-DWITH_TOOLS=OFF -DWITH_TESTS=OFF -DWITH_SYSTEM_SPNG=OFF -DWITH_SYSTEM_ZLIB=OFF -DPNG_SUPPORTED=OFF"
 
     if not syscmd(f"cmake -B build {build_options} .", "Failed to run cmake"):
         return
 
-    print("Building MozJPEG - Release\n")
+    print("Building libjpeg-turbo - Release\n")
     if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
         return
 
-    print("Building MozJPEG - Debug\n")
+    print("Building libjpeg-turbo - Debug\n")
     if not syscmd(f"cmake --build ./build --config Debug --parallel", "Failed to build in Debug"):
         return
 
@@ -543,11 +543,17 @@ TASK_LIST = {
             "file": "freetype-2.14.1.tar.xz",
             "func": post_freetype_extract,
         },
+        # {
+        #     "name": "mozjpeg",
+        #     "url":  "https://github.com/mozilla/mozjpeg/archive/refs/tags/v4.1.1.zip",
+        #     "file": "mozjpeg-4.1.1.zip",
+        #     "func": post_mozjpeg_extract,
+        # },
         {
-            "name": "mozjpeg",
-            "url":  "https://github.com/mozilla/mozjpeg/archive/refs/tags/v4.1.1.zip",
-            "file": "mozjpeg-4.1.1.zip",
-            "func": post_mozjpeg_extract,
+            "name": "libjpeg-turbo",
+            "url":  "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.2.0.zip",
+            "file": "libjpeg-turbo-3.2.0.zip",
+            "func": post_jpeg_extract,
         },
         {
             "name": "zlib-ng",

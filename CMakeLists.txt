@@ -158,6 +158,9 @@ if ( MSVC )
 	message( "Copying SPNG" )
 	configure_file( "thirdparty/libspng/build/Release/spng.dll" "${PROJ_OUT}/spng.dll" COPYONLY )
 	
+	message( "Copying turbojpeg" )
+	configure_file( "thirdparty/libjpeg-turbo/build/Release/turbojpeg.dll" "${PROJ_OUT}/turbojpeg.dll" COPYONLY )
+	
 	message( "Copying FreeImage" )
 	configure_file( "thirdparty/FreeImageRe/bin/FreeImage.dll" "${PROJ_OUT}/FreeImage.dll" COPYONLY )
 	configure_file( "thirdparty/FreeImageRe/bin/heif.dll" "${PROJ_OUT}/heif.dll" COPYONLY )
@@ -301,7 +304,8 @@ include_directories(
 	"thirdparty"
 	"thirdparty/nativefiledialog/src/include"
 	"thirdparty/SDL3/include"
-	"thirdparty/mozjpeg"
+	"thirdparty/libjpeg-turbo/build"
+	"thirdparty/libjpeg-turbo/src"
 	"thirdparty/libspng/spng"
 	"thirdparty/mpv/include"
 	"thirdparty/gif_load"
@@ -360,7 +364,7 @@ if ( WIN32 )
 		"thirdparty/SDL3/lib/x64"
 	)
 	link_libraries(
-		turbojpeg-static
+		turbojpeg
 	)
 elseif( LINUX )
 	link_directories(
@@ -375,7 +379,7 @@ foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	link_directories(
 		"${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static"
 		"thirdparty/nativefiledialog/build/src/${OUTPUT_CONFIG}"
-		"thirdparty/mozjpeg/build/${OUTPUT_CONFIG}"
+		"thirdparty/libjpeg-turbo/build/${OUTPUT_CONFIG}"
 		# "thirdparty/libfyaml/build/${OUTPUT_CONFIG}"
 		# "thirdparty/libspng/build/${OUTPUT_CONFIG}"
 	)

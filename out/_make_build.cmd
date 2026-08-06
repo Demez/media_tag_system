@@ -15,6 +15,7 @@ copy "jxl_threads.dll"  "_new_build/jxl_threads.dll"
 copy "libmpv-2.dll"     "_new_build/libmpv-2.dll"
 copy "SDL3.dll"         "_new_build/SDL3.dll"
 copy "spng.dll"         "_new_build/spng.dll"
+copy "turbojpeg.dll"    "_new_build/turbojpeg.dll"
 
 copy "media_tag_system.com" "_new_build/media_tag_system.com"
 copy "media_tag_system.exe" "_new_build/media_tag_system.exe"
