@@ -24,6 +24,7 @@ namespace image_draw
 	size_t      frame            = 0;
 	double      playback_speed   = 1.0;
 	bool        pause            = false;
+	bool        scaling          = true;
 
 	// index into gallery::sorted_media
 	//size_t      media_index      = 0;
@@ -954,6 +955,7 @@ void media_view_context_menu()
 
 	ImGui::MenuItem( "Demo Window", nullptr, &g_draw_imgui_demo, true );
 	ImGui::MenuItem( "Memory Stats", nullptr, &g_draw_mem_stats, true );
+	ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
 
 	// 	if ( ImGui::MenuItem( "Show ImGui Demo", nullptr, gShowImGuiDemo ) )
 	// 	{
@@ -1775,7 +1777,7 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 
 	glEnable( GL_TEXTURE_2D );
 
-	if ( g_scale_state == e_scale_state_finished )
+	if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
 	{
 		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.textures.frame[ frame_i ] );
 	}

@@ -548,6 +548,7 @@ namespace image_draw
 	extern size_t frame;
 	extern double playback_speed;
 	extern bool   pause;
+	extern bool   scaling;
 
 	// index into gallery::sorted_media
 	//extern size_t media_index;
