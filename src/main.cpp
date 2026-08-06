@@ -181,7 +181,7 @@ void update_window_title()
 	else
 	{
 		if ( gallery::sorted_media.size() >= g_image_data.index )
-			snprintf( buf, 512, "Media Tag System [%zu / %zu] - %s", g_image_data.index, gallery::sorted_media.size(), gallery_item_get_path_string( g_image_data.index ).c_str() );
+			snprintf( buf, 512, "Media Tag System [%zu / %zu] - %s", g_image_data.index + 1, gallery::sorted_media.size(), gallery_item_get_path_string( g_image_data.index ).c_str() );
 		else
 			snprintf( buf, 512, "Media Tag System [%zu]", gallery::sorted_media.size() );
 	}
