@@ -57,6 +57,13 @@ struct proc_mem_info_t
 };
 
 
+struct scandir_status_t
+{
+	//size_t search_count = 0;      // scandir updates this per file
+	bool   cancel       = false;  // set this to true to cancel the search
+};
+
+
 struct file_t
 {
 	fs::path    path{};
@@ -213,7 +220,9 @@ void                    sys_browse_to_files( const fs::path& root, const std::ve
 // print color with \aFFF escape codes for color values
 //void        sys_print_color( const char* string );
 
-bool                    sys_scandir( const char* root, std::vector< file_t >& files, e_scandir_flags flags );
+// Search a directory
+// pass in a pointer to a boolean if you want to be able to cancel the search at any point in time
+bool                    sys_scandir( const char* root, std::vector< file_t >& files, e_scandir_flags flags, bool* cancel = nullptr );
 
 // --------------------------------------------------------------------------------------------------------
 // Terminal
