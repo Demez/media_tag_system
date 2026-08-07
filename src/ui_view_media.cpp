@@ -593,6 +593,19 @@ void media_view_scroll_zoom( int scroll )
 	// if ( fmod( rounded_zoom, 1.0 ) == 0 )
 	// 	factor = rounded_zoom / image_draw::zoom;
 
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	float fit_factor[ 2 ] = { 1.f, 1.f };
+
+	if ( g_image_data.image.width > width )
+		fit_factor[ 0 ] = (float)width / (float)g_image_data.image.width;
+
+	if ( g_image_data.image.height > height )
+		fit_factor[ 1 ] = (float)height / (float)g_image_data.image.height;
+
+	float  fit_zoom  = std::min( fit_factor[ 0 ], fit_factor[ 1 ] );
+
 	double old_zoom = image_draw::zoom;
 
 	// image_draw::zoom    = (double)( std::max( 1.f, image_draw::size.x ) * factor ) / (double)g_image_data.image.width;
@@ -603,11 +616,30 @@ void media_view_scroll_zoom( int scroll )
 
 	// Snap to 100% zoom level
 	if ( old_zoom < 1.0 && image_draw::zoom >= 1.0 || old_zoom > 1.0 && image_draw::zoom <= 1.0 )
-		image_draw::zoom = 1.0;
+		image_draw::zoom      = 1.0;
 
 	// Snap to 200% zoom level
-	if ( old_zoom < 2.0 && image_draw::zoom >= 2.0 || old_zoom > 2.0 && image_draw::zoom <= 2.0 )
+	else if ( old_zoom < 2.0 && image_draw::zoom >= 2.0 || old_zoom > 2.0 && image_draw::zoom <= 2.0 )
+	{
 		image_draw::zoom = 2.0;
+
+		// hack to keep the zoom step level so we don't skip a step
+		if ( old_zoom < 2.0 )  // zooming in
+		{
+			//image_draw::zoom_step--;
+		}
+		else if ( old_zoom > 2.0 )  // zooming out
+		{
+			image_draw::zoom_step++;
+		}
+	}
+
+	// Snap to Fit zoom level
+	else if ( old_zoom < fit_zoom && image_draw::zoom >= fit_zoom || old_zoom > fit_zoom && image_draw::zoom <= fit_zoom )
+	{
+		media_view_fit_in_view();
+		return;
+	}
 
 	// round it so we don't get something like 0.9999564598 or whatever instead of 1.0
 	//if ( image_draw::zoom < 0.01 )
