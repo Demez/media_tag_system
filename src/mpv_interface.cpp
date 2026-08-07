@@ -389,6 +389,12 @@ void mpv_draw_frame()
 		dst_rect.h = -1;
 		dst_rect.y = 1;
 	}
+
+#if 1
+
+	// render_draw_texture();
+
+#else // compatibity opengl rendering
 	
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 
@@ -443,6 +449,8 @@ void mpv_draw_frame()
 
 	glDisable( GL_SCISSOR_TEST );
 	glDisable( GL_TEXTURE_2D );
+
+#endif
 }
 
 
@@ -461,7 +469,8 @@ void mpv_update_texture()
 	SDL_GetWindowSize( app::window, &width, &height );
 
 	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
+	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0, GL_RGBA16, GL_UNSIGNED_INT_10_10_10_2, nullptr );
 
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
@@ -493,7 +502,8 @@ void mpv_create_texture()
 	glGenTextures( 1, &g_mpv_fbo_tex );
 	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
 
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
+	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_INT_10_10_10_2, nullptr );
 
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
@@ -606,7 +616,7 @@ bool start_mpv()
 	p_mpv_set_option_string( g_mpv, "demuxer-max-bytes", "10M" );
 
 	// disabled for 10-bit testing
-	// p_mpv_set_option_string( g_mpv, "dither-depth", "no" );
+	p_mpv_set_option_string( g_mpv, "dither-depth", "no" );
 
 	//p_mpv_set_option_string( g_mpv, "cache-secs", "60" );
 	//p_mpv_set_option_string( g_mpv, "cache-pause-initial", "no" );

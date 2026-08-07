@@ -62,11 +62,11 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	}
 	else if ( image->format == GL_R16UI )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, (u16*)image->frame[ frame_i ].data );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, width, height, 0, GL_ALPHA, GL_UNSIGNED_SHORT, (u16*)image->frame[ frame_i ].data );
 	}
 	else if ( image->format == GL_R16I )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, width, height, 0, GL_LUMINANCE, GL_SHORT, (s16*)image->frame[ frame_i ].data );
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, width, height, 0, GL_ALPHA, GL_SHORT, (s16*)image->frame[ frame_i ].data );
 	}
 	else if ( image->format == GL_R8 )
 	{
@@ -418,7 +418,7 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 
 	switch ( old_image->format )
 	{
-		case GL_LUMINANCE:
+		case GL_ALPHA:
 			pixel_layout = STBIR_1CHANNEL;
 			break;
 
@@ -494,7 +494,7 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 			break;
 
 		case 1:
-			new_image->format = GL_LUMINANCE;
+			new_image->format = GL_ALPHA;
 			break;
 	}
 
@@ -535,9 +535,7 @@ static_assert( ARR_SIZE( g_icon_paths ) == e_icon_count );
 
 bool icon_preload()
 {
-	char*    exe_dir  = sys_get_exe_folder();
-	fs::path exe_path = exe_dir;
-	ch_free_str( exe_dir );
+	fs::path exe_path = sys_get_exe_folder_fspath();
 
 	for ( u8 i = 0; i < e_icon_count; i++ )
 	{

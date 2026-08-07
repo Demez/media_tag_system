@@ -703,8 +703,8 @@ void media_view_draw_media_info()
 			case GL_RGBA16:
 				ImGui::TextUnformatted( "GL Format: RGBA16" );
 				break;
-			case GL_LUMINANCE:
-				ImGui::TextUnformatted( "GL Format: LUMINANCE" );
+			case GL_ALPHA:
+				ImGui::TextUnformatted( "GL Format: ALPHA" );
 				break;
 		}
 
@@ -1737,15 +1737,6 @@ void media_view_draw_imgui()
 }
 
 
-float vertices[] = {
-	// positions          // colors           // texture coords
-	0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,    // top right
-	0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,   // bottom right
-	-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom left
-	-0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f    // top left
-};
-
-
 static void media_view_draw_frame( int width, int height, size_t frame_i )
 {
 	image_frame_t& frame       = g_image_data.image.frame[ frame_i ];
@@ -1767,6 +1758,23 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 		draw_y += -draw_height;
 	}
 
+#if 1
+	render_draw_texture_t draw_info{};
+	draw_info.width    = draw_width;
+	draw_info.height   = draw_height;
+	draw_info.x        = draw_x;
+	draw_info.y        = draw_y;
+	draw_info.rotation = image_draw::rot;
+
+	if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
+		draw_info.texture = g_image_scaled_data.textures.frame[ frame_i ];
+	else
+		draw_info.texture = g_image_data.textures.frame[ frame_i ];
+
+	render_draw_texture( draw_info );
+
+#else  // old 1.0 GL rendering style path
+	
 	// dst_rect.w = round( dst_rect.w );
 	// dst_rect.h = round( dst_rect.h );
 	// dst_rect.x = round( dst_rect.x );
@@ -1817,6 +1825,7 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 
 	glDisable( GL_TEXTURE_2D );
 	glDisable( GL_BLEND );
+#endif
 }
 
 

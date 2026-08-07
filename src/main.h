@@ -543,16 +543,37 @@ namespace gallery
 // Media View
 namespace image_draw
 {
+	extern e_zoom_mode zoom_mode;
+	extern double      zoom;
+	extern int         zoom_step;  // 0 = 100% zoom
+	extern ImVec2      pos;
+	extern ImVec2      size;
+	extern bool        flip_v;
+	extern bool        flip_h;
+	extern float       rot;
+
 	// Animated image playback information
-	extern double next_frame_timer;
-	extern size_t frame;
-	extern double playback_speed;
-	extern bool   pause;
-	extern bool   scaling;
+	extern double      next_frame_timer;
+	extern size_t      frame;
+	extern double      playback_speed;
+	extern bool        pause;
+	extern bool        scaling;
 
 	// index into gallery::sorted_media
 	//extern size_t media_index;
 }
+
+
+struct render_draw_texture_t
+{
+	int    width;
+	int    height;
+	int    x;
+	int    y;
+	float  rotation;
+
+	GLuint texture;
+};
 
 
 extern bool                          g_gallery_view;
@@ -639,6 +660,11 @@ ImTextureRef                         icon_get_imtexture( e_icon icon_type );
 void                                 gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t frame_count );
 void                                 gl_update_texture( GLuint texture, image_t* image, size_t frame_i = 0 );
 void                                 gl_free_textures( uploaded_textures_t& textures );
+
+bool                                 render_init();
+void                                 render_shutdown();
+void                                 render_window_resize();
+void                                 render_draw_texture( render_draw_texture_t draw_info );
 
 void                                 config_reset();
 bool                                 config_load();

@@ -175,13 +175,12 @@ void                    sys_print_last_error();
 
 // get folder exe is stored in
 // pass in a ref to a size_t to get the length of the folder
-// FREE THIS AFTER USE
-char*                   sys_get_exe_folder( size_t* len = nullptr );
+const char*             sys_get_exe_folder( size_t* len = nullptr );
+fs::path                sys_get_exe_folder_fspath();
 
 // get the full path of the exe
 // pass in a ref to a size_t to get the length of the path
-// FREE THIS AFTER USE
-char*                   sys_get_exe_path( size_t* len = nullptr );
+const char*             sys_get_exe_path( size_t* len = nullptr );
 
 // get current working directory
 char*                   sys_get_cwd();

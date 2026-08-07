@@ -12,6 +12,10 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+// extended path limit in windows
+// TODO: use the manifest if possible as well to enable long path support
+#define MAX_PATH_EXT 32767
+
 #include <Windows.h>
 #include <shlobj_core.h>
 

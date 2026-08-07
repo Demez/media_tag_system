@@ -264,6 +264,9 @@ u64 fs_file_size( const char* path )
 // returns the file length in the len argument
 char* fs_read_file( const char* path, size_t* len )
 {
+	if ( !path )
+		return nullptr;
+
 	FILE* fp = fopen( path, "rb" );
 
 	if ( !fp )
@@ -294,6 +297,37 @@ char* fs_read_file( const char* path, size_t* len )
 		*len = size;
 
 	return output;
+}
+
+
+char* fs_read_file_app_dir( const char* path, size_t* len )
+{
+	if ( !path )
+		return nullptr;
+
+	size_t path_len = strlen( path );
+
+	if ( path_len == 0 )
+		return nullptr;
+
+	size_t      app_dir_len = 0;
+	const char* app_dir     = sys_get_exe_folder( &app_dir_len );
+
+	// 2 for path sep and null terminator
+	char*       path_full   = ch_calloc< char >( app_dir_len + path_len + 2, e_mem_category_string );
+
+	if ( !path_full )
+		return nullptr;
+
+	strcat( path_full, app_dir );
+	strcat( path_full, SEP_S );
+	strcat( path_full, path );
+
+	char* result = fs_read_file( path_full, len );
+
+	ch_free_str( path_full );
+
+	return result;
 }
 
 

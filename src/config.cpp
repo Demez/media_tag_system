@@ -13,8 +13,10 @@
 #define DEFAULT_VIDEO_THUMBNAIL_CACHE "$app_path$/thumbnail_video_cache"
 
 
-static fy_document* config_open( char* app_dir, bool saving )
+static fy_document* config_open( bool saving )
 {
+	const char* app_dir     = sys_get_exe_folder();
+
 	std::string config_path = app_dir;
 	config_path += SEP_S;
 	config_path += "config.yaml";
@@ -62,7 +64,7 @@ static fy_document* config_open( char* app_dir, bool saving )
 }
 
 
-void config_parse_path( char* app_dir, const char* user_path, std::string& result )
+void config_parse_path( const char* app_dir, const char* user_path, std::string& result )
 {
 	if ( !app_dir )
 	{
@@ -330,7 +332,7 @@ void config_read_bookmarks( fy_document* fyd )
 }
 
 
-void config_read_thumbnail_settings( char* app_dir, fy_document* fyd )
+void config_read_thumbnail_settings( fy_document* fyd )
 {
 	fy_node* thumbnail = fy_node_by_path( fy_document_root( fyd ), "/thumbnail", FY_NT, FYNWF_PTR_DEFAULT );
 
@@ -339,6 +341,8 @@ void config_read_thumbnail_settings( char* app_dir, fy_document* fyd )
 
 	char cache_dir[ 256 ]{};
 	char cache_video_dir[ 256 ]{};
+
+	const char* app_dir = sys_get_exe_folder();
 
 	if ( config_get_node_string( thumbnail, "/cache-path %255s", cache_dir ) )
 		config_parse_path( app_dir, cache_dir, app::config.thumbnail_cache_path );
@@ -387,7 +391,7 @@ void config_read_thumbnail_settings( char* app_dir, fy_document* fyd )
 
 void config_reset()
 {
-	char* app_dir = sys_get_exe_folder();
+	const char* app_dir = sys_get_exe_folder();
 
 	app::config.bookmark.clear();
 
@@ -399,8 +403,6 @@ void config_reset()
 
 	app::config.gallery_header_padding.x = 6;
 	app::config.gallery_header_padding.y = 6;
-
-	free( app_dir );
 }
 
 
@@ -408,20 +410,17 @@ bool config_load()
 {
 	config_reset();
 
-	char* app_dir = sys_get_exe_folder();
-
-	fy_document* fyd = config_open( app_dir, false );
+	fy_document* fyd = config_open( false );
 
 	if ( !fyd )
 	{
-		free( app_dir );
 		return false;
 	}
 
 	printf( "Reading config\n" );
 
 	config_read_bookmarks( fyd );
-	config_read_thumbnail_settings( app_dir, fyd );
+	config_read_thumbnail_settings( fyd );
 
 	// =====================================================================================================================
 	// General Settings
@@ -470,7 +469,6 @@ bool config_load()
 
 	// "config: Invalid path for thumbnail/cache-path!\n"
 
-	free( app_dir );
 	fy_document_destroy( fyd );
 
 	// Make Directories
@@ -726,8 +724,7 @@ fy_node* config_save_get_list_node( fy_document* doc, fy_node* root, const char*
 
 void config_save()
 {
-	char*        app_dir = sys_get_exe_folder();
-	fy_document* doc     = config_open( app_dir, true );
+	fy_document* doc = config_open( true );
 
 	if ( !doc )
 	{
@@ -740,7 +737,6 @@ void config_save()
 		if ( ret != 0 )
 		{
 			printf( "Failed to create root of document for config!\n" );
-			free( app_dir );
 			return;
 		}
 	}
@@ -845,7 +841,7 @@ void config_save()
 
 	config_save_str_pool_free();
 
-	std::string config_path = app_dir;
+	std::string config_path = sys_get_exe_folder();
 	config_path += SEP;
 	config_path += "config.yaml";
 
@@ -855,6 +851,5 @@ void config_save()
 	}
 
 	ch_free( e_mem_category_file_data, my_stupid_buffer );
-	free( app_dir );
 }
 

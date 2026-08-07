@@ -84,8 +84,8 @@ std::vector< fs::path >      g_drag_drop_files;
 main_image_data_t            g_image_data;
 main_image_data_t            g_image_scaled_data;
 
-static SDL_GLContext         g_gl_context;
-static bool                  g_in_draw = false;
+SDL_GLContext                g_gl_context;
+bool                         g_in_draw = false;
 
 // =================================================================================
 
@@ -227,24 +227,6 @@ void folder_load_media_list()
 		directory::path_chunks.push_back( sys_path_to_string( *it ) );
 		path_i++;
 	}
-
-	// const char* root_c = root.c_str();
-	// const char* sep    = strchr( root_c, SEP );
-	// 
-	// while ( sep )
-	// {
-	// 	root_c++;
-	// 
-	// 	if ( root_c == '\0' )
-	// 		break;
-	// 
-	// 	const char* next_sep = strchr( root_c, SEP );
-	// 
-	// 	if ( !next_sep )
-	// 		break;
-	// 
-	// 	fs::path chunk( directory::path )
-	// }
 
 	std::vector< file_t > files{};
 
@@ -1381,13 +1363,21 @@ void main_loop()
 }
 
 
+extern bool startup_set_gl_attributes();
+
+
 void shutdown()
 {
-	ImGui::GetIO().Fonts->Clear();
+	if ( ImGui::GetCurrentContext() )
+	{
+		ImGui::GetIO().Fonts->Clear();
 
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplSDL3_Shutdown();
-	ImGui::DestroyContext();
+		ImGui_ImplOpenGL3_Shutdown();
+		ImGui_ImplSDL3_Shutdown();
+		ImGui::DestroyContext();
+	}
+
+	render_shutdown();
 
 	if ( app::window )
 		SDL_DestroyWindow( app::window );
@@ -1403,43 +1393,12 @@ void shutdown()
 	image_free( g_image_data.image );
 	image_free( g_image_scaled_data.image );
 
-	SDL_GL_DestroyContext( g_gl_context );
+	//SDL_GL_DestroyContext( g_gl_context );
 
 	args_free();
 	sys_shutdown();
 
 	SDL_Quit();
-}
-
-
-bool startup_set_gl_attributes()
-{
-	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY ) )
-		return false;
-
-	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 ) )
-		return false;
-
-	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 ) )
-		return false;
-
-	// 10-bit testing...
-	if ( app::config.high_bpc )
-	{
-		SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 10 );
-		SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 10 );
-		SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 10 );
-		SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 2 );
-
-		// SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 16 );
-		// SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 16 );
-		// SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 16 );
-		// SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 16 );
-
-		// SDL_GL_SetAttribute( SDL_GL_FLOATBUFFERS, 1 );
-	}
-
-	return true;
 }
 
 
@@ -1453,7 +1412,7 @@ void test_hdr_state()
 	float sdr_white_level = SDL_GetFloatProperty( props, SDL_PROP_WINDOW_SDR_WHITE_LEVEL_FLOAT, 1.0 );
 	float hdr_headroom    = SDL_GetFloatProperty( props, SDL_PROP_WINDOW_HDR_HEADROOM_FLOAT, 1.0 );
 
-	printf( "HDR %s", HDR_enabled ? "enabled" : "disabled" );
+	printf( "HDR %s\n", HDR_enabled ? "enabled" : "disabled" );
 }
 
 
@@ -1519,35 +1478,11 @@ int startup( int argc, char* argv[] )
 
 	sys_set_receive_drag_drop_func( drag_drop_recieve_func );
 
-	g_gl_context = SDL_GL_CreateContext( app::window );
-
-	if ( !g_gl_context )
+	if ( !render_init() )
 	{
-		printf( "Failed to create GL Context\n" );
+		printf( "Failed to setup renderer!\n" );
 		return 1;
 	}
-
-	SDL_GL_MakeCurrent( app::window, g_gl_context );
-
-	if ( !gladLoadGL() )
-	{
-		printf( "Failed to load GL\n" );
-		return 1;
-	}
-
-	int r, g, b, a, f;
-	SDL_GL_GetAttribute( SDL_GL_RED_SIZE, &r );
-	SDL_GL_GetAttribute( SDL_GL_GREEN_SIZE, &g );
-	SDL_GL_GetAttribute( SDL_GL_BLUE_SIZE, &b );
-	SDL_GL_GetAttribute( SDL_GL_ALPHA_SIZE, &a );
-	SDL_GL_GetAttribute( SDL_GL_FLOATBUFFERS, &f );
-	
-	printf( "RED SIZE: %d\n", r );
-	
-	char red[ 32 ];
-	snprintf( red, 32, "RED SIZE: %d\n", r );
-	
-	//SDL_ShowSimpleMessageBox( 0, "red size", red, app::window );
 
 	IMGUI_CHECKVERSION();
 
@@ -1613,14 +1548,12 @@ int startup( int argc, char* argv[] )
 
 	// Set imgui.ini path to exe directory
 	{
-		char* exe_path = sys_get_exe_folder();
+		const char* exe_path = sys_get_exe_folder();
 
 		char  imgui_path[ 1024 ];
 		snprintf( imgui_path, 1024, "%s" SEP_S "imgui.ini", exe_path );
 
 		io.IniFilename = util_strdup( imgui_path );
-
-		free( exe_path );
 	}
 
 	style_imgui();

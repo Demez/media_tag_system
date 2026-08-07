@@ -202,6 +202,14 @@ HANDLE                         g_con_out         = INVALID_HANDLE_VALUE;
 HWND                           g_main_hwnd       = 0;
 static LARGE_INTEGER           g_win_perf_freq;
 
+static char*                   g_exe_path       = nullptr;
+static size_t                  g_exe_path_len   = 0;
+
+static char*                   g_exe_folder     = nullptr;
+static size_t                  g_exe_folder_len = 0;
+
+static wchar_t*                g_exe_path_w     = nullptr;
+static wchar_t*                g_exe_folder_w   = nullptr;
 
 // ----------------------------------------------------------------------------------------
 
@@ -358,6 +366,39 @@ void pipe_read_worker()
 }
 
 
+void sys_setup_exe_path_vars()
+{
+	// this SUCKS, just in case if we are using a STUPID long path
+	std::wstring buffer;
+	buffer.resize( MAX_PATH_EXT );
+
+	//wchar_t output_w[ 4096 ];
+	DWORD copied = GetModuleFileName( NULL, buffer.data(), MAX_PATH_EXT );
+	buffer.resize( copied );
+
+	size_t   len_w   = wcslen( buffer.data() );
+
+	// find index of last path separator
+	wchar_t* sep     = wcsrchr( buffer.data(), '\\' );
+	size_t   path_i  = sep - buffer.data();
+
+	g_exe_path       = sys_to_utf8( buffer.data(), len_w );
+	g_exe_folder     = sys_to_utf8( buffer.data(), path_i );
+
+	g_exe_path_len   = strlen( g_exe_path );
+	g_exe_folder_len = strlen( g_exe_folder );
+
+	g_exe_path_w     = (wchar_t*)malloc( ( len_w + 1 ) * sizeof( wchar_t ) );
+	g_exe_folder_w   = (wchar_t*)malloc( ( path_i + 1 ) * sizeof( wchar_t ) );
+
+	memcpy( g_exe_path_w, buffer.data(), len_w * sizeof( wchar_t ) );
+	memcpy( g_exe_folder_w, buffer.data(), path_i * sizeof( wchar_t ) );
+
+	g_exe_path_w[ len_w ]    = '\0';
+	g_exe_folder_w[ path_i ] = '\0';
+}
+
+
 e_sys_init sys_init( int argc, char* argv[] )
 {
 	// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/setlocale-wsetlocale?view=msvc-170#utf-8-support
@@ -446,6 +487,8 @@ e_sys_init sys_init( int argc, char* argv[] )
 		sys_print_last_error();
 		return e_sys_init_fail;
 	}
+
+	sys_setup_exe_path_vars();
 
 	return e_sys_init_success;
 }
@@ -698,7 +741,7 @@ void sys_print_last_error()
 // Filesystem
 
 
-char* sys_get_exe_folder( size_t* len )
+const char* sys_get_exe_folder( size_t* len )
 {
 	wchar_t output_w[ 4096 ];
 	GetModuleFileName( NULL, output_w, 4096 );
@@ -716,7 +759,13 @@ char* sys_get_exe_folder( size_t* len )
 }
 
 
-char* sys_get_exe_path( size_t* len )
+fs::path sys_get_exe_folder_fspath()
+{
+	return g_exe_folder_w;
+}
+
+
+const char* sys_get_exe_path( size_t* len )
 {
 	wchar_t output_w[ 4096 ];
 	GetModuleFileName( NULL, output_w, 4096 );

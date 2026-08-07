@@ -584,7 +584,7 @@ struct LoaderFreeImage : public IImageLoader
 					break;
 
 				case 1:
-					load_info.image->format = GL_LUMINANCE;
+					load_info.image->format = GL_ALPHA;
 					break;
 			}
 		}

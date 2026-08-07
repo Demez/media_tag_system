@@ -491,6 +491,10 @@ u64         fs_file_size( const char* path );
 // returns the file length in the len argument, optional
 char*       fs_read_file( const char* path, size_t* len = nullptr );
 
+// reads a file relative to the app directory
+// returns the file length in the len argument, optional
+char*       fs_read_file_app_dir( const char* path, size_t* len = nullptr );
+
 // ensures no data loss happens and backs up the old file
 bool        fs_save_file( const char* path, const char* data, size_t size );
 
