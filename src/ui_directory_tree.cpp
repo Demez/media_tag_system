@@ -547,6 +547,9 @@ void                              sidebar_draw_directory_recursive( u32 depth, c
 }
 
 
+extern float g_file_info_height;
+
+
 void dir_tree_draw( ImGuiStyle& style )
 {
 	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
@@ -559,7 +562,11 @@ void dir_tree_draw( ImGuiStyle& style )
 
 	ImGui::PopFont();
 
-	if ( !ImGui::BeginChild( "##directory_tree", {}, ImGuiChildFlags_ResizeY | ImGuiChildFlags_FrameStyle ) )
+	ImVec2 dir_tree_size = ImGui::GetContentRegionAvail();
+	// dir_tree_size.y -= g_file_info_height + ( style.ItemSpacing.y * 2 );
+	dir_tree_size.y -= g_file_info_height;
+
+	if ( !ImGui::BeginChild( "##directory_tree", dir_tree_size, ImGuiChildFlags_FrameStyle ) )
 	{
 		ImGui::EndChild();
 		//ImGui::PopStyleVar();

@@ -436,7 +436,7 @@ float gallery_view_draw_header()
 	int          search_box_size  = 150;
 
 	ImVec2       search_size      = ImGui::CalcTextSize( "Search" );
-	ImVec2       recursive_size   = ImGui::CalcTextSize( "Recursive" );
+	ImVec2       recursive_size   = ImGui::CalcTextSize( "Search Subfolders" );
 
 	space_needed += search_size.x + recursive_size.x;
 	space_needed += style.WindowBorderSize * 2;  // Separator
@@ -517,7 +517,7 @@ float gallery_view_draw_header()
 			ImGui::SameLine();
 			draw_vertical_separator( draw_list, style );
 
-			if ( ImGui::Checkbox( "Recursive", &directory::recursive ) )
+			if ( ImGui::Checkbox( "Search Subfolders", &directory::recursive ) )
 			{
 				directory::queued        = g_folder_buf;
 				directory::folder_reload = true;
@@ -781,23 +781,17 @@ void sidebar_draw_bookmarks( ImGuiStyle& style )
 	if ( !ImGui::BeginChild( "##bookmarks", {}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_FrameStyle ) )
 	{
 		ImGui::EndChild();
-		//ImGui::PopStyleVar();
-		//ImGui::PopStyleColor( 4 );
 		return;
 	}
 
-	//ImGui::PopStyleVar();
-	//ImGui::PopStyleColor( 4 );
+	if ( ImGui::Selectable( "Add Folder" ) )
+	{
+		app::config.bookmark.emplace_back( directory::path.filename().string(), directory::path.string(), true );
+		config_save();
+	}
 
-
-	//ImGui::SetCursorPos( { 0.f, 0.f } );
-
-	//if ( !opened )
-	//{
-	//	ImGui::EndChild();
-	//	//ImGui::PopStyleVar();
-	//	return;
-	//}
+	if ( app::config.bookmark.size() )
+		ImGui::Separator();
 
 	ImVec2 remove_text_size = ImGui::CalcTextSize( "X" );
 	ImVec2 region_avail     = ImGui::GetContentRegionAvail();
@@ -806,16 +800,15 @@ void sidebar_draw_bookmarks( ImGuiStyle& style )
 	ImVec2 bookmark_size( bookmark_width, ImGui::GetTextLineHeight() );
 	ImVec2 remove_size( ImGui::GetTextLineHeight(), bookmark_size.y );
 
-	//ImGui::PushItemWidth( region_avail.x - remove_text_size.x );
-
 	ImVec2 screen_cursor_pos = ImGui::GetCursorScreenPos();
 
-	u32 id = 1;
+	size_t remove_bookmark   = SIZE_MAX;
+	int id = 1;
+	size_t bookmark_i        = 0;
 	for ( const bookmark_t& bookmark : app::config.bookmark )
 	{
 		ImGui::PushID( id++ );
 		ImGui::BeginDisabled( !bookmark.valid );
-
 
 		if ( ImGui::Selectable( bookmark.name.data(), false, 0, bookmark_size ) )
 		{
@@ -829,10 +822,11 @@ void sidebar_draw_bookmarks( ImGuiStyle& style )
 		{
 			ImGui::PushID( id++ );
 			ImGui::SameLine();
-			ImGui::PushStyleVar( ImGuiStyleVar_SelectableTextAlign, { 0.5, 0.5 } );
+			ImGui::PushStyleVar( ImGuiStyleVar_SelectableTextAlign, { 0.5f, 0.5f } );
 
 			if ( ImGui::Selectable( "X", false, 0, remove_size ) )
 			{
+				remove_bookmark = bookmark_i;
 			}
 
 			ImGui::PopStyleVar();
@@ -840,31 +834,43 @@ void sidebar_draw_bookmarks( ImGuiStyle& style )
 		}
 
 		screen_cursor_pos.y += bookmark_size.y;
+		bookmark_i++;
 	}
-
-	ImGui::Separator();
-
-	if ( ImGui::Button( "Add Current Directory" ) )
-	{
-		app::config.bookmark.emplace_back( directory::path.filename().string(), directory::path.string(), true );
-	}
-
-	//ImGui::PopItemWidth();
 
 	ImGui::EndChild();
+
+	if ( remove_bookmark != SIZE_MAX )
+	{
+		app::config.bookmark.erase( app::config.bookmark.begin() + remove_bookmark );
+		config_save();
+	}
 }
+
+
+float g_file_info_height = 0;
 
 
 void sidebar_draw_file_information( ImGuiStyle& style )
 {
+	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
+	g_file_info_height = ImGui::GetFrameHeightWithSpacing();
+
+	if ( !ImGui::CollapsingHeader( "File Information", ImGuiTreeNodeFlags_DefaultOpen ) )
+	{
+		ImGui::PopFont();
+		return;
+	}
+
+	ImGui::PopFont();
+
 	// if ( gallery::sorted_media.size() && gallery::last_selection.entry.type != e_media_type_none )
 	if ( gallery::sorted_media.empty() )
 		return;
 
-	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
-	ImGui::TextUnformatted( "File Information\n" );
-	ImGui::Separator();
-	ImGui::PopFont();
+	//ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
+	//ImGui::TextUnformatted( "File Information\n" );
+	//ImGui::Separator();
+	//ImGui::PopFont();
 
 	// const media_entry_t& entry = gallery_item_get_media_entry( gallery_view_get_last_selected() );
 	media_entry_t entry{};
@@ -1018,7 +1024,15 @@ void sidebar_draw_file_information( ImGuiStyle& style )
 		}
 	}
 
+	g_file_info_height += ImGui::GetWindowHeight() + style.ItemSpacing.y;
+
 	ImGui::EndChild();
+}
+
+
+bool gallery_begin_tab_content()
+{
+	return ImGui::BeginChild( "##sidebar_tab_content", {}, 0, ImGuiWindowFlags_NoScrollbar );
 }
 
 
@@ -1034,7 +1048,7 @@ void gallery_view_draw_sidebar()
 	  { 40.f, region_avail.y + style.WindowPadding.y },
 	  { (float)window_width / 2.f, region_avail.y + style.WindowPadding.y } );
 
-	if ( !ImGui::BeginChild( "##gallery_sidebar", {}, ImGuiChildFlags_ResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar ) )
+	if ( !ImGui::BeginChild( "##gallery_sidebar", {}, ImGuiChildFlags_ResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar ) )
 	{
 		//ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 		ImGui::EndChild();
@@ -1046,7 +1060,7 @@ void gallery_view_draw_sidebar()
 	{
 		if ( ImGui::BeginTabItem( "Filesystem" ) )
 		{
-			if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+			if ( gallery_begin_tab_content() )
 			{
 				sidebar_draw_bookmarks( style );
 				dir_tree_draw( style );
@@ -1061,7 +1075,7 @@ void gallery_view_draw_sidebar()
 		{
 			if ( ImGui::BeginTabItem( "Tags" ) )
 			{
-				if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+				if ( gallery_begin_tab_content() )
 				{
 					ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
 
@@ -1083,7 +1097,7 @@ void gallery_view_draw_sidebar()
 
 		if ( ImGui::BeginTabItem( "Settings" ) )
 		{
-			if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+			if ( gallery_begin_tab_content() )
 			{
 				settings_draw();
 			}
@@ -1096,7 +1110,7 @@ void gallery_view_draw_sidebar()
 		{
 			if ( ImGui::BeginTabItem( "Style Editor" ) )
 			{
-				if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+				if ( gallery_begin_tab_content() )
 				{
 					ImGui::ShowStyleEditor();
 				}
@@ -1107,7 +1121,7 @@ void gallery_view_draw_sidebar()
 
 			if ( ImGui::BeginTabItem( "Stats" ) )
 			{
-				if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+				if ( gallery_begin_tab_content() )
 				{
 					thumbnail_cache_debug_draw();
 					ImGui::Separator();

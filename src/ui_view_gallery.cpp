@@ -1611,8 +1611,8 @@ void gallery_view_draw_item( ImGuiStyle& style, size_t i, u32& grid_pos_x, galle
 		gallery_draw::any_item_hovered |= item_draw.item_hovered;
 
 		// extra frame draw for the file information, so it can get an extra frame to resize it's content
-		if ( !item_draw.item_hovered && was_hovered )
-			set_frame_draw( 2 );
+		if ( item_draw.item_hovered != was_hovered )
+			set_frame_draw( 4 );  // oh my god bruh
 	}
 	else
 	{
@@ -1877,6 +1877,7 @@ void gallery_view_draw_content()
 	{
 		// also clears last selection cache
 		gallery_view_clear_selection();
+		set_frame_draw();
 	}
 
 	if ( !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed( ImGuiKey_Enter, false ) && gallery::sorted_media.size() )
