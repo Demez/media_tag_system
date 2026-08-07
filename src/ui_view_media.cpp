@@ -26,6 +26,8 @@ namespace image_draw
 	bool        pause            = false;
 	bool        scaling          = true;
 
+	bool        hide_alpha       = false;
+
 	// index into gallery::sorted_media
 	//size_t      media_index      = 0;
 }
@@ -596,6 +598,9 @@ void media_view_scroll_zoom( int scroll )
 	// image_draw::zoom    = (double)( std::max( 1.f, image_draw::size.x ) * factor ) / (double)g_image_data.image.width;
 	image_draw::zoom = new_zoom;
 
+	// TODO: check if below window size, and then the next zoom level will make the image above the window size
+	// if so, switch zoom mode back to fit
+
 	// Snap to 100% zoom level
 	if ( old_zoom < 1.0 && image_draw::zoom >= 1.0 || old_zoom > 1.0 && image_draw::zoom <= 1.0 )
 		image_draw::zoom = 1.0;
@@ -953,9 +958,18 @@ void media_view_context_menu()
 
 	ImGui::Separator();
 
-	ImGui::MenuItem( "Demo Window", nullptr, &g_draw_imgui_demo, true );
-	ImGui::MenuItem( "Memory Stats", nullptr, &g_draw_mem_stats, true );
-	ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
+	if ( ImGui::BeginMenu( "Tools" ) )
+	{
+		ImGui::MenuItem( "Memory Stats", nullptr, &g_draw_mem_stats, true );
+		ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
+		ImGui::MenuItem( "Hide Alpha Channel", nullptr, &image_draw::hide_alpha, true );
+
+		ImGui::Separator();
+
+		ImGui::MenuItem( "Demo Window", nullptr, &g_draw_imgui_demo, true );
+
+		ImGui::EndMenu();
+	}
 
 	// 	if ( ImGui::MenuItem( "Show ImGui Demo", nullptr, gShowImGuiDemo ) )
 	// 	{
@@ -1739,32 +1753,23 @@ void media_view_draw_imgui()
 
 static void media_view_draw_frame( int width, int height, size_t frame_i )
 {
-	image_frame_t& frame       = g_image_data.image.frame[ frame_i ];
+	image_frame_t&        frame       = g_image_data.image.frame[ frame_i ];
 
-	int            draw_width  = frame.width * image_draw::zoom;
-	int            draw_height = frame.height * image_draw::zoom;
-	int            draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
-	int            draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
+	int                   draw_width  = frame.width * image_draw::zoom;
+	int                   draw_height = frame.height * image_draw::zoom;
+	int                   draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
+	int                   draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
 
-	if ( image_draw::flip_h )
-	{
-		draw_width *= -1;
-		draw_x += -draw_width;
-	}
-
-	if ( image_draw::flip_v )
-	{
-		draw_height *= -1;
-		draw_y += -draw_height;
-	}
-
-#if 1
 	render_draw_texture_t draw_info{};
-	draw_info.width    = draw_width;
-	draw_info.height   = draw_height;
-	draw_info.x        = draw_x;
-	draw_info.y        = draw_y;
-	draw_info.rotation = image_draw::rot;
+	draw_info.width      = draw_width;
+	draw_info.height     = draw_height;
+	draw_info.x          = draw_x;
+	draw_info.y          = draw_y;
+	draw_info.rotation   = image_draw::rot;
+	draw_info.hide_alpha = image_draw::hide_alpha;
+
+	draw_info.flip_h     = image_draw::flip_h;
+	draw_info.flip_v     = image_draw::flip_v;
 
 	if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
 		draw_info.texture = g_image_scaled_data.textures.frame[ frame_i ];
@@ -1772,60 +1777,6 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 		draw_info.texture = g_image_data.textures.frame[ frame_i ];
 
 	render_draw_texture( draw_info );
-
-#else  // old 1.0 GL rendering style path
-	
-	// dst_rect.w = round( dst_rect.w );
-	// dst_rect.h = round( dst_rect.h );
-	// dst_rect.x = round( dst_rect.x );
-	// dst_rect.y = round( dst_rect.y );
-
-	glEnable( GL_BLEND );
-	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-
-	glEnable( GL_TEXTURE_2D );
-
-	if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
-	{
-		glBindTexture( GL_TEXTURE_2D, g_image_scaled_data.textures.frame[ frame_i ] );
-	}
-	else
-	{
-		glBindTexture( GL_TEXTURE_2D, g_image_data.textures.frame[ frame_i ] );
-	}
-
-	glMatrixMode( GL_PROJECTION );
-	glLoadIdentity();
-
-	glOrtho( 0, width, height, 0, -1, 1 );
-
-	glMatrixMode( GL_MODELVIEW );
-	glLoadIdentity();
-
-	// get the center of the image
-	float image_center_x = static_cast< float >( draw_x + draw_width ) * 0.5f;
-	float image_center_y = static_cast< float >( draw_y + draw_height ) * 0.5f;
-
-	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
-	glRotatef( image_draw::rot, 0, 0, 1 );                   // rotate around the image
-	glTranslatef( -image_center_x, -image_center_y, 0.0f );  // move back
-
-	glBegin( GL_QUADS );
-
-	glTexCoord2i( 0, 0 );
-	glVertex2i( draw_x, draw_y );
-	glTexCoord2i( 1, 0 );
-	glVertex2i( draw_x + draw_width, draw_y );
-	glTexCoord2i( 1, 1 );
-	glVertex2i( draw_x + draw_width, draw_y + draw_height );
-	glTexCoord2i( 0, 1 );
-	glVertex2i( draw_x, draw_y + draw_height );
-
-	glEnd();
-
-	glDisable( GL_TEXTURE_2D );
-	glDisable( GL_BLEND );
-#endif
 }
 
 

@@ -573,6 +573,14 @@ struct render_draw_texture_t
 	float  rotation;
 
 	GLuint texture;
+
+	// draw settings
+	bool   flip_v     = false;
+	bool   flip_h     = false;
+
+	// draw a specific channel of the image
+	int    channel    = -1;
+	bool   hide_alpha = false;
 };
 
 

@@ -269,8 +269,26 @@ void render_shutdown()
 
 void render_draw_texture( render_draw_texture_t draw_info )
 {
+	if ( draw_info.flip_h )
+	{
+		draw_info.x += draw_info.width;
+		draw_info.width *= -1;
+	}
+
+	if ( draw_info.flip_v )
+	{
+		draw_info.y += draw_info.height;
+		draw_info.height *= -1;
+	}
+
 	glBindVertexArray( g_image_vao );
 	glUseProgram( g_shader_program );
+
+	if ( !draw_info.hide_alpha )
+	{
+		glEnable( GL_BLEND );
+		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+	}
 
 	int window_width, window_height;
 	SDL_GetWindowSizeInPixels( app::window, &window_width, &window_height );
@@ -300,5 +318,10 @@ void render_draw_texture( render_draw_texture_t draw_info )
 	glBindTexture( GL_TEXTURE_2D, draw_info.texture );
 
 	glDrawElements( GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 );
+
+	if ( !draw_info.hide_alpha )
+	{
+		glDisable( GL_BLEND );
+	}
 }
 

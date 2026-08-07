@@ -301,12 +301,13 @@ void mpv_update_frame()
 	if ( !g_mpv_gl )
 		mpv_init_render_context();
 
+	//mpv_opengl_fbo fbo{ static_cast< int >( g_mpv_fbo ), g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGBA16 };
 	mpv_opengl_fbo fbo{ static_cast< int >( g_mpv_fbo ), g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGB };
 	int            yes  = 1;
 
 	mpv_render_param rp[] = {
 		{ MPV_RENDER_PARAM_OPENGL_FBO, &fbo },
-		{ MPV_RENDER_PARAM_FLIP_Y, &yes },
+		//{ MPV_RENDER_PARAM_FLIP_Y, &yes },
 		{ MPV_RENDER_PARAM_INVALID, NULL },
 	};
 
@@ -331,7 +332,6 @@ void mpv_draw_frame()
 	//if ( !g_mpv_video_ready )
 	//	return;
 
-	//if ( g_mpv_redraw )
 	mpv_update_frame();
 
 	int width, height;
@@ -366,91 +366,20 @@ void mpv_draw_frame()
 	int       clamped_width     = g_mpv_framebuffer_size[ 0 ];
 	int       clamped_height    = g_mpv_framebuffer_size[ 1 ];
 
-	SDL_FRect dst_area{};
-	dst_area.w = 1;
-	dst_area.h = 1;
-	dst_area.x = 0;
-	dst_area.y = 0;
-	
-	SDL_FRect dst_rect{};
-	dst_rect.w = static_cast< float >( width );
-	dst_rect.h = static_cast< float >( height );
-	dst_rect.x = 0;
-	dst_rect.y = 0;
-	
-	if ( image_draw::flip_h )
-	{
-		dst_rect.w = -1;
-		dst_rect.x = 1;
-	}
-
-	if ( image_draw::flip_v )
-	{
-		dst_rect.h = -1;
-		dst_rect.y = 1;
-	}
-
-#if 1
-
-	// render_draw_texture();
-
-#else // compatibity opengl rendering
-	
-	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
-
-	if ( image_draw::flip_h )
-		glViewport( -viewport_offset_x, -viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
-	else
-		// glViewport( 0, 0, width, height );
-		// glViewport( -viewport_offset_x, 0, width, height );
-		glViewport( -viewport_offset_x, -viewport_offset_y, g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
+	render_draw_texture_t draw_info{};
+	draw_info.width    = static_cast< float >( width );
+	draw_info.height   = static_cast< float >( height );
+	draw_info.x        = 0;
+	draw_info.y        = 0;
+	draw_info.rotation = 0;
+	draw_info.texture  = g_mpv_fbo_tex;
 
 	glEnable( GL_SCISSOR_TEST );
 	glScissor( pos_x - viewport_offset_x, pos_y - viewport_offset_y, new_width, new_height );
 
-	glClearColor( app::config.media_bg_color.x, app::config.media_bg_color.y, app::config.media_bg_color.z, app::config.media_bg_color.w );
-	glClear( GL_COLOR_BUFFER_BIT );
-
-	glEnable( GL_TEXTURE_2D );
-	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
-
-	glMatrixMode( GL_PROJECTION );
-	glLoadIdentity();
-	// glOrtho( 0, 1, 0, 1, -1, 1 );
-	glOrtho( 0, dst_rect.w, 0, dst_rect.h, -1, 1 );
-	// glOrtho( 0, 1, 1, 0, -1, 1 );
-
-	glMatrixMode( GL_MODELVIEW );
-	glLoadIdentity();
-
-	// get the center of the video
-	// float image_center_x = ( ( pos_x + new_width ) / (float)width ) * 0.5f;
-	// float image_center_y = ( ( pos_y + new_height ) / (float)height ) * 0.5f;
-	
-//	float image_center_x = ( pos_x + new_width ) * 0.5f;
-//	float image_center_y = ( pos_y + new_height ) * 0.5f;
-//
-//	glTranslatef( image_center_x, image_center_y, 0.0f );    // move pivot to center of the image
-//	glRotatef( image_draw::rot, 0, 0, 1 );                       // rotate around the image
-//	glTranslatef( -image_center_x, -image_center_y, 0.0f );  // move back
-
-	glBegin( GL_QUADS );
-
-	glTexCoord2f( 0, 0 );
-	glVertex2f( dst_rect.x, dst_rect.y );
-	glTexCoord2f( 1, 0 );
-	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y );
-	glTexCoord2f( 1, 1 );
-	glVertex2f( dst_rect.x + dst_rect.w, dst_rect.y + dst_rect.h );
-	glTexCoord2f( 0, 1 );
-	glVertex2f( dst_rect.x, dst_rect.y + dst_rect.h );
-
-	glEnd();
+	render_draw_texture( draw_info );
 
 	glDisable( GL_SCISSOR_TEST );
-	glDisable( GL_TEXTURE_2D );
-
-#endif
 }
 
 
@@ -469,8 +398,8 @@ void mpv_update_texture()
 	SDL_GetWindowSize( app::window, &width, &height );
 
 	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
-	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0, GL_RGBA16, GL_UNSIGNED_INT_10_10_10_2, nullptr );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
+	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0, GL_RGBA16, GL_UNSIGNED_INT_10_10_10_2, nullptr );
 
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
@@ -502,8 +431,8 @@ void mpv_create_texture()
 	glGenTextures( 1, &g_mpv_fbo_tex );
 	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
 
-	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_INT_10_10_10_2, nullptr );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
+	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_INT_10_10_10_2, nullptr );
 
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
@@ -527,28 +456,27 @@ void mpv_create_texture()
 #if 0
 static void on_mpv_render_update( void* ctx )
 {
-	SDL_Event event = {.type = g_wakeup_on_mpv_render_update};
-	SDL_PushEvent(&event);
+	SDL_Event event = { .type = g_wakeup_on_mpv_render_update };
+	SDL_PushEvent( &event );
 }
 
 static void on_mpv_events( void* ctx )
 {
-	//SDL_Event event = {.type = g_wakeup_on_mpv_events};
-	//SDL_PushEvent(&event);
+	SDL_Event event = { .type = g_wakeup_on_mpv_events };
+	SDL_PushEvent( &event );
 }
 #endif
 
 
 void mpv_sdl_event( SDL_Event& event )
 {
-#if 0
+#if 1
 	if ( event.type == g_wakeup_on_mpv_render_update )
 	{
 		u64 flags = p_mpv_render_context_update( g_mpv_gl );
 		if ( flags & MPV_RENDER_UPDATE_FRAME )
 			g_mpv_redraw = true;
 	}
-	else
 #endif
 #if 0
 	if ( event.type == g_wakeup_on_mpv_events )
