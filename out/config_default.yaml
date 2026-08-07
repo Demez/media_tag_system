@@ -79,3 +79,4 @@ gallery-content-bg-color: [12, 12, 12, 1.0]
 gallery-header-padding-x: 6
 gallery-header-padding-y: 6
 
+dev-mode: 0

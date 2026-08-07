@@ -7,6 +7,7 @@
 // - Reset to default button next to each setting
 // - Preview what the default value is
 // - Something to keep clamped values in sync, and descriptions
+// - maybe store all changed settings in a separate config struct, then if anything changed, apply the changes at the end or start of the main loop
 // 
 
 
@@ -63,35 +64,27 @@ void settings_draw_vsync()
 {
 	SDL_GL_GetSwapInterval( &app::config.vsync );
 
-	ImGui::PushItemWidth( SCALAR_OPTION_WIDTH );
-
-	if ( ImGui::Selectable( "VSync OFF", app::config.vsync == 0, 0, { 64.f, ImGui::GetFontSize() } ) )
+	if ( ImGui::RadioButton( "VSync Off", app::config.vsync == 0 ) )
 	{
 		if ( app::config.vsync != 0 )
 			SDL_GL_SetSwapInterval( 0 );
 	}
 
 	ImGui::SameLine();
-	ImGui::Spacing();
-	ImGui::SameLine();
 
-	if ( ImGui::Selectable( "VSync ON", app::config.vsync == 1, 0, { 64.f, ImGui::GetFontSize() } ) )
+	if ( ImGui::RadioButton( "VSync On", app::config.vsync == 1 ) )
 	{
 		if ( app::config.vsync != 1 )
 			SDL_GL_SetSwapInterval( 1 );
 	}
 
 	ImGui::SameLine();
-	ImGui::Spacing();
-	ImGui::SameLine();
 
-	if ( ImGui::Selectable( "VSync Adaptive", app::config.vsync == -1, 0, { 96.f, ImGui::GetFontSize() } ) )
+	if ( ImGui::RadioButton( "VSync Adaptive", app::config.vsync == -1 ) )
 	{
 		if ( app::config.vsync != -1 )
 			SDL_GL_SetSwapInterval( -1 );
 	}
-
-	ImGui::PopItemWidth();
 }
 
 
@@ -180,7 +173,13 @@ void settings_draw_thumbnails()
 	  app::config.thumbnail_size,
 	  1, 4096, 1 );
 
-	ImGui::Separator();
+	setting_u32_option(
+	  "Uploads Per Frame",
+	  "Amount of thumbnails allowed to upload to the GPU per frame on the main thread\nThis Blocks the main thread to upload, so don't set this number too high",
+	  app::config.thumbnail_uploads_per_frame,
+	  1, 64, 1 );
+
+	ImGui::SeparatorText( "Thumbnails Threads" );
 
 	// crashing still
 	ImGui::BeginDisabled();
@@ -209,14 +208,6 @@ void settings_draw_thumbnails()
 
 	ImGui::EndDisabled();
 
-	ImGui::Separator();
-
-	setting_u32_option(
-	  "Uploads Per Frame",
-	  "Amount of thumbnails allowed to upload to the GPU per frame on the main thread\nThis Blocks the main thread to upload, so don't set this number too high",
-	  app::config.thumbnail_uploads_per_frame,
-	  1, 64, 1 );
-
 	ImGui::PopItemWidth();
 }
 
@@ -243,23 +234,43 @@ void settings_draw_debug()
 
 void settings_draw()
 {
-	ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-	ImGui::Text( "%.8lf Frametime", app::frame_time );
+	if ( app::config.dev_mode )
+	{
+		ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
+		ImGui::Text( "%.8lf Frametime", app::frame_time );
 
-	// ImGui::Text( "App Time: %.3f Sec", app::total_time );
-	ImGui::Text( "App Time: %.3f Sec", app::total_time / 1000.f );
+		// ImGui::Text( "App Time: %.3f Sec", app::total_time );
+		ImGui::Text( "App Time: %.3f Sec", app::total_time / 1000.f );
+	}
 
-	ImGui::SeparatorText( "General" );
-	settings_draw_general();
+	ImGuiStyle& style        = ImGui::GetStyle();
+	ImVec2      final_size   = ImGui::GetContentRegionAvail();
+	final_size.y -= ImGui::GetFrameHeightWithSpacing() + style.ItemSpacing.y;  // separator
 
-	ImGui::SeparatorText( "Gallery" );
-	settings_draw_gallery();
+	// ImGuiChildFlags_Border
 
-	ImGui::SeparatorText( "Thumbnails" );
-	settings_draw_thumbnails();
+	if ( ImGui::BeginChild( "##settings_area", final_size ) )
+	{
+		ImGui::SeparatorText( "General" );
+		settings_draw_general();
 
-	ImGui::SeparatorText( "Debug" );
-	settings_draw_debug();
+		ImGui::SeparatorText( "Gallery" );
+		settings_draw_gallery();
+
+		ImGui::SeparatorText( "Thumbnails" );
+		settings_draw_thumbnails();
+
+		ImGui::SeparatorText( "Debug" );
+
+		ImGui::Checkbox( "Developer Mode", &app::config.dev_mode );
+
+		if ( app::config.dev_mode )
+		{
+			settings_draw_debug();
+		}
+	}
+
+	ImGui::EndChild();
 
 	ImGui::Separator();
 
@@ -286,8 +297,5 @@ void settings_draw()
 	{
 		config_reset();
 	}
-
-	// ??? for some reason i need this here
-	ImGui::Spacing();
 }
 

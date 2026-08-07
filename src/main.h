@@ -154,6 +154,7 @@ struct app_config_t
 	bool                      gallery_show_filenames         = true;
 	bool                      always_draw                    = false;
 	bool                      single_instance                = false;
+	bool                      dev_mode                       = false;
 
 	bool                      directory_tree_auto_expand     = true;
 	bool                      directory_tree_expand_on_click = true;

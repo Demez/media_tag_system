@@ -852,14 +852,38 @@ void media_view_context_menu()
 
 	ImGui::Separator();
 
+	ImGui::TextUnformatted( "Rotate" );
+
+	ImGui::SameLine();
+
 	ImGui::PushItemWidth( 150.f );
-	ImGui::SliderFloat( "Rotation", &image_draw::rot, 0, 360 );
+	ImGui::SliderFloat( "##rotation", &image_draw::rot, 0, 360 );
 	ImGui::PopItemWidth();
 
 	ImGui::Separator();
 
-	if ( ImGui::MenuItem( "Invert Colors", nullptr, false, false ) )
+	if ( ImGui::BeginMenu( "Tools" ) )
 	{
+		// TODO: side menu to show information on the image or video overlayed next to the image in a window
+		ImGui::MenuItem( "Media Info", nullptr, &g_draw_media_info, true );
+
+		ImGui::Separator();
+
+		if ( ImGui::MenuItem( "Invert Colors", nullptr, false, false ) )
+		{
+		}
+
+		ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
+		ImGui::MenuItem( "Hide Alpha Channel", nullptr, &image_draw::hide_alpha, true );
+
+		if ( app::config.dev_mode )
+		{
+			ImGui::Separator();
+			ImGui::MenuItem( "Memory Stats", nullptr, &g_draw_mem_stats, true );
+			ImGui::MenuItem( "Demo Window", nullptr, &g_draw_imgui_demo, true );
+		}
+
+		ImGui::EndMenu();
 	}
 
 	ImGui::Separator();
@@ -932,9 +956,6 @@ void media_view_context_menu()
 		sys_open_file_properties( { gallery_item_get_path( g_image_data.index ) } );
 	}
 
-	// TODO: side menu to show information on the image or video overlayed next to the image in a window
-	ImGui::MenuItem( "Media Info", nullptr, &g_draw_media_info, true );
-
 	ImGui::Separator();
 
 	if ( ImGui::MenuItem( "Undo", nullptr, false, 0 ) )
@@ -986,21 +1007,6 @@ void media_view_context_menu()
 	if ( ImGui::MenuItem( "Reload Folder", nullptr, false ) )
 	{
 		folder_load_media_list();
-	}
-
-	ImGui::Separator();
-
-	if ( ImGui::BeginMenu( "Tools" ) )
-	{
-		ImGui::MenuItem( "Memory Stats", nullptr, &g_draw_mem_stats, true );
-		ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
-		ImGui::MenuItem( "Hide Alpha Channel", nullptr, &image_draw::hide_alpha, true );
-
-		ImGui::Separator();
-
-		ImGui::MenuItem( "Demo Window", nullptr, &g_draw_imgui_demo, true );
-
-		ImGui::EndMenu();
 	}
 
 	// 	if ( ImGui::MenuItem( "Show ImGui Demo", nullptr, gShowImGuiDemo ) )

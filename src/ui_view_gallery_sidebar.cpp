@@ -1030,14 +1030,9 @@ void gallery_view_draw_sidebar()
 	ImVec2      region_avail = ImGui::GetContentRegionAvail();
 	ImGuiStyle& style        = ImGui::GetStyle();
 
-	ImVec2      cursor_pos   = ImGui::GetCursorPos();
-	// ImGui::SetCursorPosX( 0.f );
-
-	// weirdly sized still
-	// ImGui::SetNextWindowPos( { 0, 32.f } );
 	ImGui::SetNextWindowSizeConstraints(
-	  { 40.f, region_avail.y + style.ItemSpacing.y + style.ItemSpacing.y },
-	  { (float)window_width / 2.f, region_avail.y + style.ItemSpacing.y + style.ItemSpacing.y } );
+	  { 40.f, region_avail.y + style.WindowPadding.y },
+	  { (float)window_width / 2.f, region_avail.y + style.WindowPadding.y } );
 
 	if ( !ImGui::BeginChild( "##gallery_sidebar", {}, ImGuiChildFlags_ResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar ) )
 	{
@@ -1051,51 +1046,77 @@ void gallery_view_draw_sidebar()
 	{
 		if ( ImGui::BeginTabItem( "Filesystem" ) )
 		{
-			sidebar_draw_bookmarks( style );
-			dir_tree_draw( style );
-			sidebar_draw_file_information( style );
-
-			ImGui::EndTabItem();
-		}
-
-		if ( ImGui::BeginTabItem( "Tags" ) )
-		{
-			ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
-
-			ImGui::TextUnformatted( "Tag Databases" );
-			ImGui::Separator();
-
-			ImGui::PopFont();
-
-			if ( ImGui::BeginListBox( "##TagDatabases" ) )
+			if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
 			{
-				ImGui::EndListBox();
+				sidebar_draw_bookmarks( style );
+				dir_tree_draw( style );
+				sidebar_draw_file_information( style );
 			}
 
+			ImGui::EndChild();
 			ImGui::EndTabItem();
 		}
 
-		if ( ImGui::BeginTabItem( "Style Editor" ) )
+		if ( app::config.dev_mode )
 		{
-			ImGui::ShowStyleEditor();
-			ImGui::EndTabItem();
+			if ( ImGui::BeginTabItem( "Tags" ) )
+			{
+				if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+				{
+					ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
+
+					ImGui::TextUnformatted( "Tag Databases" );
+					ImGui::Separator();
+
+					ImGui::PopFont();
+
+					if ( ImGui::BeginListBox( "##TagDatabases" ) )
+					{
+						ImGui::EndListBox();
+					}
+				}
+
+				ImGui::EndChild();
+				ImGui::EndTabItem();
+			}
 		}
 
 		if ( ImGui::BeginTabItem( "Settings" ) )
 		{
-			settings_draw();
+			if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+			{
+				settings_draw();
+			}
+
+			ImGui::EndChild();
 			ImGui::EndTabItem();
 		}
 
-		if ( ImGui::BeginTabItem( "Stats" ) )
+		if ( app::config.dev_mode )
 		{
-			thumbnail_cache_debug_draw();
+			if ( ImGui::BeginTabItem( "Style Editor" ) )
+			{
+				if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+				{
+					ImGui::ShowStyleEditor();
+				}
 
-			ImGui::Separator();
+				ImGui::EndChild();
+				ImGui::EndTabItem();
+			}
 
-			mem_draw_debug_ui();
+			if ( ImGui::BeginTabItem( "Stats" ) )
+			{
+				if ( ImGui::BeginChild( "##sidebar_tab_content" ) )
+				{
+					thumbnail_cache_debug_draw();
+					ImGui::Separator();
+					mem_draw_debug_ui();
+				}
 
-			ImGui::EndTabItem();
+				ImGui::EndChild();
+				ImGui::EndTabItem();
+			}
 		}
 	}
 
