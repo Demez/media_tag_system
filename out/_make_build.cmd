@@ -1,7 +1,9 @@
 mkdir _new_build
 mkdir _new_build\icons
+mkdir _new_build\shaders
 
-copy "icons" "_new_build\icons"
+copy "icons"   "_new_build\icons"
+copy "shaders" "_new_build\shaders"
 
 copy "brotlicommon.dll" "_new_build/brotlicommon.dll"
 copy "brotlidec.dll"    "_new_build/brotlidec.dll"
