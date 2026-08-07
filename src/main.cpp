@@ -1422,6 +1422,12 @@ int startup( int argc, char* argv[] )
 {
 	args_init( argc, argv );
 
+	if ( !sys_setup_exe_path_vars() )
+	{
+		printf( "Failed to setup exe path variables!\n" );
+		return 1;
+	}
+
 	if ( !config_load() )
 	{
 		printf( "Failed to load config, using defaults\n" );

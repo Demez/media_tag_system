@@ -132,10 +132,6 @@ void pipe_read_worker()
 }
 
 
-bool       sys_setup_exe_path_vars();
-void       sys_free_exe_path_vars();
-
-
 e_sys_init sys_init( int argc, char* argv[] )
 {
 	// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/setlocale-wsetlocale?view=msvc-170#utf-8-support
@@ -225,12 +221,6 @@ e_sys_init sys_init( int argc, char* argv[] )
 		return e_sys_init_fail;
 	}
 
-	if ( !sys_setup_exe_path_vars() )
-	{
-		printf( "Failed to setup exe path variables!\n" );
-		return e_sys_init_fail;
-	}
-
 	return e_sys_init_success;
 }
 
@@ -267,64 +257,6 @@ void sys_update()
 {
 	if ( app::config.single_instance )
 	{
-#if 0
-		static bool window_raised = false;
-
-		// wait for any other instance to connect to this pipe
-		ConnectNamedPipe( g_singleton_pipe, NULL );
-
-		DWORD pipe_state = GetLastError();
-
-		switch ( pipe_state )
-		{
-			default:
-				printf( "UNKNOWN PIPE STATE: %d\n", pipe_state );
-				// SDL_Delay( 500 );
-				break;
-
-			// client dropped
-			case ERROR_NO_DATA:
-				// user didn't write anything, probably just called the main exe again
-				if ( !window_raised )
-					SDL_RaiseWindow( app::window );
-
-				window_raised = false;
-				DisconnectNamedPipe( g_singleton_pipe );
-				break;
-
-			// waiting for a client
-			case ERROR_PIPE_LISTENING:
-				window_raised = false;
-				// SDL_Delay( 500 );
-				break;
-
-			case ERROR_PIPE_CONNECTED:
-			{
-				wchar_t buffer[ WINDOW_PIPE_SIZE ]{};
-				DWORD   bytes_read    = 0;
-
-				BOOL    read_file_ret = ReadFile(
-                  g_singleton_pipe,  // handle to pipe
-                  buffer,            // buffer to receive data
-                  WINDOW_PIPE_SIZE,  // size of buffer
-                  &bytes_read,       // number of bytes read
-                  NULL );            // not overlapped I/O
-
-				if ( read_file_ret )
-				{
-					on_new_file( buffer );
-					SDL_RaiseWindow( app::window );
-					window_raised = true;
-					// g_pipe_buffer.store( wcsdup( buffer ) );
-
-					// disconnect it, and wait for the next instance
-					DisconnectNamedPipe( g_singleton_pipe );
-				}
-
-				break;
-			}
-		}
-#endif
 		wchar_t* buffer = g_pipe_buffer.load();
 
 		if ( buffer )
@@ -361,11 +293,6 @@ bool sys_set_window( SDL_Window* window )
 	if ( app::config.dwm_extend )
 	{
 		MARGINS margins{ -1 };
-		// margins.cxLeftWidth = 0;
-		// margins.cxRightWidth = 800;
-		// margins.cyBottomHeight = 400;
-		// margins.cyTopHeight = 0;
-
 		HRESULT res = DwmExtendFrameIntoClientArea( g_main_hwnd, &margins );
 
 		if ( res != S_OK )
@@ -384,40 +311,9 @@ constexpr int SC_DRAGMOVE = SC_MOVE | HTCAPTION;
 
 void sys_do_window_drag( ImVec2 last_mouse_pos, ImVec2 new_mouse_pos )
 {
-	// POINT cursor_pos;
-	// GetCursorPos( &cursor_pos );
-	// 
-	// ImVec2 new_pos;
-	// new_pos[ 0 ] = cursor_pos.x - last_pos.x;
-	// new_pos[ 1 ] = cursor_pos.y - last_pos.y;
-
-	// MoveWindow( g_main_hwnd, new_pos[ 0 ], new_pos[ 1 ], WINDOW_SIZE[ 0 ], WINDOW_SIZE[ 1 ], false );
-
 	// INSTANT WINDOW DRAGGING
 	// https://stackoverflow.com/a/66919909/12778316
 	SendMessage( g_main_hwnd, WM_SYSCOMMAND, SC_DRAGMOVE, 0 );
-}
-
-
-// ----------------------------------------------------------------------------------------
-// Library Loading
-
-
-module_t sys_load_library( const wchar_t* path )
-{
-	return (module_t)LoadLibrary( path );
-}
-
-
-void sys_close_library( module_t mod )
-{
-	FreeLibrary( (HMODULE)mod );
-}
-
-
-void* sys_load_func( module_t mod, const char* name )
-{
-	return GetProcAddress( (HMODULE)mod, name );
 }
 
 

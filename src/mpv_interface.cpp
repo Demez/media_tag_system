@@ -4,7 +4,7 @@
 // some reference here
 // https://github.com/mpv-player/mpv-examples/blob/master/libmpv/sdl/main.c
 
-void*                             g_mpv_module  = nullptr;
+SDL_SharedObject*                 g_mpv_module  = nullptr;
 mpv_handle*                       g_mpv         = nullptr;
 mpv_render_context*               g_mpv_gl      = nullptr;
 GLuint                            g_mpv_fbo     = 0;
@@ -95,7 +95,7 @@ FUNC_PTR( mpv_render_context_free );
 
 
 #define LOAD_FUNC( func )                                            \
-	p_##func = (func##_t)sys_load_func( g_mpv_module, #func ); \
+	p_##func = (func##_t)SDL_LoadFunction( g_mpv_module, #func ); \
 	if ( p_##func == nullptr )                                 \
 	{                                                          \
 		char* sys_error = sys_get_error();                     \
@@ -116,10 +116,18 @@ bool load_mpv_dll()
 	if ( app::config.no_video )
 		return false;
 
-#if _WIN32
-	g_mpv_module = sys_load_library( L"libmpv-2.dll" );
+#if 1
+  #if _WIN32
+	g_mpv_module = SDL_LoadObject( "libmpv-2.dll" );
+  #else
+	g_mpv_module = SDL_LoadObject( "libmpv.so" );
+  #endif
 #else
+  #if _WIN32
+	g_mpv_module = sys_load_library( L"libmpv-2.dll" );
+  #else
 	g_mpv_module = sys_load_library( "libmpv.so" );
+  #endif
 #endif
 
 	if ( g_mpv_module == nullptr )
@@ -289,7 +297,7 @@ void unload_mpv_dll()
 	p_mpv_create             = nullptr;
 	p_mpv_client_api_version = nullptr;
 
-	sys_close_library( g_mpv_module );
+	SDL_UnloadObject( g_mpv_module );
 }
 
 

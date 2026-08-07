@@ -6,18 +6,18 @@
 #include <mutex>
 #include <forward_list>
 
-constexpr int       MAX_THUMBNAILS    = 512;
+constexpr int            MAX_THUMBNAILS = 512;
 
-std::atomic< bool > g_thumbnails_running;
-std::thread**       g_thumbnail_worker;
-std::thread**       g_thumbnail_save_worker;
+std::atomic< bool >      g_thumbnails_running;
+std::thread**            g_thumbnail_worker;
+std::thread**            g_thumbnail_save_worker;
 
 // thumbnail save threads sleep, and wait on this signal before doing any work
-std::atomic< bool > g_thumbnail_save_wait = false;
+std::atomic< bool >      g_thumbnail_save_wait = false;
 
-extern void*        g_mpv_module;
+extern SDL_SharedObject* g_mpv_module;
 
-constexpr bool      THUMBNAIL_DEBUG_PRINT = false;
+constexpr bool           THUMBNAIL_DEBUG_PRINT = false;
 
 
 enum e_thumbnail_thread_state

@@ -156,22 +156,16 @@ using f_drag_drop_receive = bool( const std::vector< fs::path >& files );
 
 // --------------------------------------------------------------------------------------------------------
 
+// call this before sys_init
+bool                    sys_setup_exe_path_vars();
+void                    sys_free_exe_path_vars();
+
 e_sys_init              sys_init( int argc, char* argv[] );
 void                    sys_shutdown();
 void                    sys_update();
 
 bool                    sys_set_window( SDL_Window* window );
 void                    sys_do_window_drag( ImVec2 last_mouse_pos, ImVec2 new_mouse_pos );
-
-// library loading
-#ifdef _WIN32
-module_t                sys_load_library( const wchar_t* path );
-#else
-module_t                sys_load_library( const char* path );
-#endif
-
-void                    sys_close_library( module_t mod );
-void*                   sys_load_func( module_t mod, const char* path );
 
 // system error, make sure to free this string!
 char*                   sys_get_error();
