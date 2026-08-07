@@ -90,6 +90,86 @@ std::string fs_path_clean( const char* path, size_t path_len )
 }
 
 
+fs::path fs_path_clean( const fs::path& path )
+{
+	if ( path.empty() )
+		return {};
+
+	std::vector< fs::path::string_type > path_segments;
+
+#ifdef __unix__
+	if ( fs_is_absolute( path, path_len ) )
+	{
+		path_segments.push_back( "/" );
+	}
+#endif
+
+	const auto& path_str    = path.native();
+	size_t      path_len    = path_str.size();
+
+	size_t      start_index = 0;
+	size_t      end_index   = 0;
+
+	while ( end_index < path.native().size() )
+	{
+		while ( end_index < path_len )
+		{
+			if ( path_str[ end_index ] == '/' || path_str[ end_index ] == '\\' )
+				break;
+
+			end_index++;
+		}
+
+		// this might occur on unix systems if the path starts with "/", an absolute path, where start_index and end_index are 0
+		// or if we have a path like "C://test", with extra path separators for some reason
+		if ( end_index == start_index )
+		{
+			start_index++;
+			end_index++;
+			continue;
+		}
+
+		// check if it's a "." segment and skip it
+		if ( end_index - start_index == 1 && path_str[ start_index ] == '.' )
+		{
+			start_index = ++end_index;
+			continue;
+		}
+
+		// check if this is a ".." segment and remove last path segment
+		// if ( end_index - start_index == 2 && path[ start_index ] == '.' && path[ start_index + 1 ] == '.' )
+		if ( !path_segments.empty() && ( end_index - start_index == 2 && path_str[ start_index ] == '.' && path_str[ start_index + 1 ] == '.' ) )
+		{
+			//if ( !path_segments.empty() )
+			{
+				// pop the last segment
+				path_segments.pop_back();
+			}
+		}
+		else if ( end_index - start_index > 1 )  // if it's not an empty segment
+		{
+			fs::path::string_type segment( &path_str[ start_index ], end_index - start_index );
+			path_segments.push_back( segment );
+		}
+
+		start_index = ++end_index;
+	}
+
+	// build the cleaned path
+	fs::path::string_type final_path{};
+
+	for ( size_t i = 0; i < path_segments.size(); i++ )
+	{
+		final_path += path_segments[ i ];
+
+		if ( i < path_segments.size() - 1 )
+			final_path += SEP;
+	}
+
+	return final_path;
+}
+
+
 // replace all backslash path separators with forward slashes
 char* fs_replace_path_seps_unix( const char* path )
 {

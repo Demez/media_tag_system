@@ -462,6 +462,7 @@ CHAR* util_strxndup_r( CHAR* data, const CHAR* string, size_t len )
 // file system functions
 
 std::string fs_path_clean( const char* path, size_t path_len );
+fs::path    fs_path_clean( const fs::path& path );
 
 char*       fs_get_filename( const char* path );
 char*       fs_get_filename_no_ext( const char* path );

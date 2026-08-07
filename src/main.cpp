@@ -592,23 +592,25 @@ void set_view_type_media( bool force_load_media )
 
 bool on_new_file( const fs::path& file_path )
 {
-	bool is_file = fs_is_file( file_path.string().c_str() );
+	fs::path    clean_path = fs_path_clean( file_path );
+	std::string path_str   = sys_path_to_string( clean_path );
+	bool        is_file    = fs_is_file( path_str.c_str() );
 
 	if ( is_file )
 	{
 		// can we open this file?
 		e_media_type type = e_media_type_none;
-		std::string  ext  = fs_get_extension( file_path.string() );
+		std::string  ext  = fs_get_extension( path_str );
 
 		if ( !media_check_extension( ext, type ) )
 			return false;
 
-		directory::queued = file_path;
+		directory::queued = clean_path;
 		return true;
 	}
-	else if ( fs_is_dir( file_path.string().c_str() ) )
+	else if ( fs_is_dir( path_str.c_str() ) )
 	{
-		directory::queued = file_path;
+		directory::queued = clean_path;
 		return true;
 	}
 
