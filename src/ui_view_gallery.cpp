@@ -1603,10 +1603,16 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 // ----------------------------------------------------------------------------------------------------------
 void gallery_view_draw_item( ImGuiStyle& style, size_t i, u32& grid_pos_x, gallery_item_draw_t& item_draw )
 {
+	bool was_hovered = item_draw.item_hovered;
+
 	if ( gallery_draw::content_area_hovered )
 	{
 		item_draw.item_hovered = ImGui::IsMouseHoveringRect( item_draw.item_rect_min, item_draw.item_rect_max );
 		gallery_draw::any_item_hovered |= item_draw.item_hovered;
+
+		// extra frame draw for the file information, so it can get an extra frame to resize it's content
+		if ( !item_draw.item_hovered && was_hovered )
+			set_frame_draw( 2 );
 	}
 	else
 	{
