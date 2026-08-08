@@ -334,7 +334,6 @@ void folder_load_media_list_finish( folder_scan_status_t* status )
 
 	select_image_in_folder( false );
 
-	folder_scan_free( status );
 	g_main_dir_scan_status = nullptr;
 
 	// gallery::scan_state    = e_gallery_scan_idle;
@@ -1144,6 +1143,8 @@ bool handle_event( SDL_Event& event )
 					status->callback( status );
 				else
 					printf( "FOLDER SCAN DOES NOT HAVE CALLBACK?\n" );
+
+				folder_scan_free( status );
 			}
 			else if ( event.user.code == g_event_job_finish.user.code )
 			{

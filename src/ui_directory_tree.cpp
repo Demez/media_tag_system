@@ -39,8 +39,6 @@ void dir_tree_add_folder_callback( folder_scan_status_t* status )
 	g_directory_entries[ status->root ] = directory_entry;
 
 	g_directory_entry_status.erase( status->root );
-
-	folder_scan_free( status );
 }
 
 
