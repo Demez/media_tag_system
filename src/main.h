@@ -579,6 +579,7 @@ namespace image_draw
 
 
 struct folder_scan_status_t;
+struct job_status_t;
 
 
 typedef void ( folder_scan_callback_t )( folder_scan_status_t* status );
@@ -760,27 +761,42 @@ void                                 dir_tree_draw( ImGuiStyle& style );
 // Job System
 
 
-// current progress of a job
-enum e_job_state
+struct job_status_t;
+
+
+typedef void( job_function_t )( job_status_t* status );
+
+
+// For running the scan directory in a background thread
+struct job_status_t
 {
-	e_job_state_idle,
-	e_job_state_working,
-	// e_job_state_paused,
-	e_job_state_finished,
-	e_job_state_error,
+	// function to call when job is finished on the main thread
+	job_function_t* callback = nullptr;
+
+	// function to call internally
+	job_function_t* function = nullptr;
+
+	// store information you need here
+	void*           userdata = nullptr;
+
+	// set to true to cancel the job
+	bool            cancel   = false;
+
+	// check to see if it finished
+	bool            finished = false;
 };
 
 
-typedef void( *f_job_func )( void* user_data );
+extern SDL_Event g_event_job_finish;
 
 
-bool        job_init();
-void        job_shutdown();
+job_status_t*    job_push( job_function_t* callback, job_function_t* function, void* userdata );
 
-h_job       job_push( f_job_func job_func );
-e_job_state job_get_status( h_job job );
-void        job_cancel( h_job job );
-void        job_cancel_wait( h_job job );
+// call this when finished doing work
+void             job_free( job_status_t* status );
+
+bool             job_init();
+void             job_shutdown();
 
 
 // -------------------------------------------------------------------------------------------

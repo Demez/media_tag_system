@@ -224,6 +224,7 @@ set(
     src/memory.cpp
     src/config.cpp
     src/folder_scan.cpp
+    src/job_system.cpp
     src/gl_render.cpp
     
 	src/ui_directory_tree.cpp

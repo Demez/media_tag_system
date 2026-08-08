@@ -1513,6 +1513,7 @@ void shutdown()
 
 	thumbnail_loader_shutdown();
 	folder_scan_shutdown();
+	job_shutdown();
 	sys_folder_mon_shutdown();
 
 	media_view_shutdown();
@@ -1520,8 +1521,6 @@ void shutdown()
 
 	image_free( g_image_data.image );
 	image_free( g_image_scaled_data.image );
-
-	//SDL_GL_DestroyContext( g_gl_context );
 
 	args_free();
 	sys_shutdown();
@@ -1714,6 +1713,12 @@ int startup( int argc, char* argv[] )
 	if ( !folder_scan_init() )
 	{
 		printf( "Failed to init folder scan thread\n" );
+		return 1;
+	}
+
+	if ( !job_init() )
+	{
+		printf( "Failed to init job threads!\n" );
 		return 1;
 	}
 
