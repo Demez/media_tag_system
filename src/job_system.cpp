@@ -26,6 +26,9 @@ void job_worker( u32 thread )
 	{
 		g_job_queue_size.wait( 0 );
 
+		if ( !app::running )
+			return;
+
 		g_job_lock.lock();
 
 		job_status_t* status = g_job_queue.back();
@@ -75,7 +78,7 @@ bool job_init()
 void job_shutdown()
 {
 	g_job_lock.lock();
-	g_job_queue_size.store( 0 );
+	g_job_queue_size.store( 64 );
 	g_job_lock.unlock();
 
 	for ( u32 i = 0; i < app::config.thumbnail_save_threads; i++ )

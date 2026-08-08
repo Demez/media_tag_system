@@ -19,6 +19,9 @@ void folder_scan_thread()
 	{
 		g_folder_scan_queue_size.wait( 0 );
 
+		if ( !app::running )
+			return;
+
 		g_folder_scan_lock.lock();
 
 		folder_scan_status_t* status = g_folder_scan_queue.back();
@@ -115,7 +118,7 @@ bool folder_scan_init()
 
 void folder_scan_shutdown()
 {
-	g_folder_scan_queue_size.store( 0 );
+	g_folder_scan_queue_size.store( 64 );
 	g_folder_scan_queue_size.notify_all();
 
 	if ( g_folder_scan_thread )
