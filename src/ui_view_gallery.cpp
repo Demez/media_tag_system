@@ -516,33 +516,56 @@ void gallery_find_selected_file()
 }
 
 
-void gallery_view_sort_dir()
+struct gallery_sort_dir_data_t
 {
-	static std::vector< size_t > folders;
-	static std::vector< size_t > files;
+};
 
-	folders.clear();
-	files.clear();
+
+static job_status_t* g_item_size_calc_job = nullptr;
+static job_status_t* g_gallery_sort_job   = nullptr;
+
+
+// this is actually such a lazy way to do this, it is not good lol
+static bool          g_gallery_sort_block_new_jobs = false;
+
+
+void                 gallery_view_item_size_calc( ImGuiStyle& style, size_t count );
+
+
+void gallery_view_sort_dir_func( job_status_t* status )
+{
+	if ( g_gallery_sort_block_new_jobs )
+	{
+		status->cancel = true;
+		return;
+	}
+
+	std::vector< size_t > folders;
+	std::vector< size_t > files;
 
 	folders.reserve( directory::media_list.size() );
 	files.reserve( directory::media_list.size() );
 
-	size_t search_len = strlen( gallery::search );
+	size_t           search_len = strlen( gallery::search );
+	e_gallery_filter filter     = gallery::filter;
 
 	// Split up lists
 	for ( size_t i = 0; i < directory::media_list.size(); i++ )
 	{
+		//if ( status->cancel )
+		//	return;
+
 		e_media_type type = directory::media_list[ i ].type;
 
-		if ( gallery::filter )
+		if ( filter )
 		{
-			if ( type == e_media_type_directory && !( gallery::filter & e_gallery_filter_folders ) )
+			if ( type == e_media_type_directory && !( filter & e_gallery_filter_folders ) )
 				continue;
 
-			if ( type == e_media_type_image && !( gallery::filter & e_gallery_filter_images ) )
+			if ( type == e_media_type_image && !( filter & e_gallery_filter_images ) )
 				continue;
 
-			if ( type == e_media_type_video && !( gallery::filter & e_gallery_filter_videos ) )
+			if ( type == e_media_type_video && !( filter & e_gallery_filter_videos ) )
 				continue;
 		}
 
@@ -565,17 +588,62 @@ void gallery_view_sort_dir()
 	if ( gallery::sort_mode != e_gallery_sort_mode_size_large_to_small && gallery::sort_mode != gallery::sort_mode )
 		gallery_view_sort_list( folders );
 
+	if ( status->cancel )
+		return;
+
 	gallery_view_sort_list( files );
 
-	gallery::sorted_media.clear();
-	gallery::sorted_media.resize( folders.size() + files.size() );
+	if ( status->cancel )
+		return;
+
+	auto sorted_media = new std::vector< size_t >;
+	sorted_media->resize( folders.size() + files.size() );
 
 	// Add Folders First
-	std::copy( folders.begin(), folders.end(), gallery::sorted_media.begin() );
+	std::copy( folders.begin(), folders.end(), sorted_media->begin() );
 
 	// Add Files next
-	std::copy( files.begin(), files.end(), gallery::sorted_media.begin() + folders.size() );
+	std::copy( files.begin(), files.end(), sorted_media->begin() + folders.size() );
+
+	// Store it in the userdata
+	status->userdata = sorted_media;
+
+	printf( "DONE SORTING\n" );
+
+	// ugh
+	//g_gallery_sort_block_new_jobs = true;
+	//
+	//gallery::sorted_media = *sorted_media;
+	//
+	//delete sorted_media;
+	//
+	//gallery_view_reset_text_size();
+	//
+	//if ( gallery::item_size_changed || directory::folder_changed || gallery::always_recalc_item_sizes )
+	//{
+	//	gallery_view_item_size_calc( ImGui::GetStyle(), sorted_media->size() );
+	//}
+}
+
+
+void gallery_view_sort_dir_finish( job_status_t* status )
+{
+	printf( "SORT FINISH FUNC\n" );
+
+	g_gallery_sort_block_new_jobs = false;
+
+	gallery::scan_state = e_gallery_scan_idle;
+	g_gallery_sort_job  = nullptr;
+
+	auto sorted_media   = static_cast< std::vector< size_t >* >( status->userdata );
 	
+	if ( !sorted_media )
+		return;
+	
+	gallery::sorted_media = *sorted_media;
+	
+	delete sorted_media;
+
 	if ( !gallery::selection.empty() )
 		gallery_find_selected_file();
 
@@ -584,6 +652,25 @@ void gallery_view_sort_dir()
 	gallery_view_reset_text_size();
 
 	update_window_title();
+
+	set_frame_draw();
+}
+
+
+void gallery_view_sort_dir()
+{
+	if ( gallery::scan_state == e_gallery_scan_sorting )
+		return;
+
+	if ( g_gallery_sort_block_new_jobs )
+		return;
+
+	gallery::scan_state = e_gallery_scan_sorting;
+	set_frame_draw();
+
+	job_cancel_and_free( g_gallery_sort_job );
+
+	g_gallery_sort_job = job_push( gallery_view_sort_dir_finish, gallery_view_sort_dir_func, nullptr );
 }
 
 
@@ -789,10 +876,10 @@ void gallery_view_reset_text_size()
 	// gallery_view_scroll_to_cursor();
 
 	gallery::item_text_size.clear();
-	gallery::item_text_size.resize( gallery::sorted_media.size() );
+	gallery::item_text_size.resize( gallery::sorted_media.size() );  // SLOW
 
 	gallery::item_layout.clear();
-	gallery::item_layout.resize( gallery::sorted_media.size() );
+	gallery::item_layout.resize( gallery::sorted_media.size() );  // SLOW
 
 	// TODO: this could use less memory
 	gallery::visible_item       = ch_realloc( gallery::visible_item, gallery::sorted_media.size() + 2, e_mem_category_general );
@@ -1776,6 +1863,16 @@ void gallery_view_draw_content()
 	if ( gallery_draw::scroll_changed )
 		ImGui::SetNextWindowScroll( { 0.f, gallery_draw::scroll } );
 
+	else if ( directory::folder_changed )
+	{
+		gallery_draw::scroll_prev    = 0.f;
+		gallery_draw::scroll         = 0.f;
+		gallery_draw::scroll_changed = true;
+		gallery::scroll_to_cursor    = false;
+
+		ImGui::SetNextWindowScroll( { 0.f, 0.f } );
+	}
+
 	// if ( !ImGui::BeginChild( "##gallery_content", { region_avail.x + style.WindowPadding.x, region_avail.y }, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollWithMouse ) )
 	if ( !ImGui::BeginChild( "##gallery_content", {}, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus ) )
 	{
@@ -1792,8 +1889,6 @@ void gallery_view_draw_content()
 
 	gallery_draw::scroll_prev = gallery_draw::scroll;
 	gallery_draw::scroll      = ImGui::GetScrollY();
-
-	// ScrollToBringRectIntoView
 
 	// reset per frame data
 	gallery_draw::thumbnail_requests.clear();
@@ -1856,16 +1951,19 @@ void gallery_view_draw_content()
 
 	gallery::drawn_image_count       = 0;
 	gallery_draw::first_visible_item = gallery::first_visible_item;
+	gallery::content_area_resized |= app::window_resized || row_count_changed;
 
 	gallery_draw::keep_scroll_pos    = gallery::item_size_changing;
 	gallery_draw::keep_scroll_pos |= filenames_shown_last != app::config.gallery_show_filenames;
-	gallery_draw::keep_scroll_pos |= gallery::scroll_to_cursor;
 
-	gallery::content_area_resized |= app::window_resized || row_count_changed;
+	if ( !directory::folder_changed )
+	{
+		gallery_draw::keep_scroll_pos |= gallery::scroll_to_cursor;
+		gallery_draw::keep_scroll_pos |= gallery::content_area_resized;
+	}
 
 	gallery_draw::lock_visible_item = gallery_draw::keep_scroll_pos || gallery::content_area_resized;
 
-	gallery_draw::keep_scroll_pos |= gallery::content_area_resized;
 	gallery_draw::scroll_changed |= gallery_draw::keep_scroll_pos;
 
 	bool   no_extra_refresh   = gallery_draw::extra_refresh == 0;

@@ -337,12 +337,13 @@ void folder_load_media_list_finish( folder_scan_status_t* status )
 	folder_scan_free( status );
 	g_main_dir_scan_status = nullptr;
 
-	gallery::scan_state    = e_gallery_scan_idle;
+	// gallery::scan_state    = e_gallery_scan_idle;
 }
 
 
 void folder_load_media_list()
 {
+	// TODO: MEMORY LEAK - THIS NEVER GETS FREED !!!!
 	if ( g_main_dir_scan_status )
 	{
 		g_main_dir_scan_status->cancel = true;
@@ -1144,6 +1145,20 @@ bool handle_event( SDL_Event& event )
 				else
 					printf( "FOLDER SCAN DOES NOT HAVE CALLBACK?\n" );
 			}
+			else if ( event.user.code == g_event_job_finish.user.code )
+			{
+				auto status = static_cast< job_status_t* >( event.user.data1 );
+
+				if ( !status )
+					break;
+
+				if ( status->callback )
+					status->callback( status );
+				else
+					printf( "JOB DOES NOT HAVE CALLBACK?\n" );
+
+				job_free( status );
+			}
 
 			break;
 		}
@@ -1399,7 +1414,8 @@ void main_loop()
 			directory::folder_reload = true;
 		}
 
-		directory::folder_changed = false;
+		if ( gallery::scan_state == e_gallery_scan_idle )
+			directory::folder_changed = false;
 
 		if ( !directory::queued.empty() )
 			check_queued_path();

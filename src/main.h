@@ -790,10 +790,13 @@ struct job_status_t
 extern SDL_Event g_event_job_finish;
 
 
-job_status_t*    job_push( job_function_t* callback, job_function_t* function, void* userdata );
+job_status_t*    job_push( job_function_t* finish_callback, job_function_t* function, void* userdata );
 
 // call this when finished doing work
 void             job_free( job_status_t* status );
+
+// cancel a job and free it later
+void             job_cancel_and_free( job_status_t* status );
 
 bool             job_init();
 void             job_shutdown();
