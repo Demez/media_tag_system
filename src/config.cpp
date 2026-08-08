@@ -446,6 +446,7 @@ bool config_load()
 	config_get_doc_value( fyd, "/sleep-time-idle %u", app::config.sleep_time_idle );
 
 	config_get_doc_value( fyd, "/font-size %u", app::config.font_size );
+	config_get_doc_value( fyd, "/job-threads %u", app::config.job_threads );
 
 	config_get_doc_value( fyd, "/gallery-zoom-default %u", app::config.gallery_zoom_default );
 	config_get_doc_value( fyd, "/media-zoom-scale %f", app::config.media_zoom_scale );
@@ -804,6 +805,7 @@ void config_save()
 	//config_save_node_bool( doc, doc_root, "", "hdr", app::config.hdr );
 	config_save_node_s32( doc, doc_root, "", "vsync", app::config.vsync );
 	config_save_node_u32( doc, doc_root, "", "font-size", app::config.font_size );
+	config_save_node_u32( doc, doc_root, "", "job-threads", app::config.job_threads );
 
 	config_save_node_bool( doc, doc_root, "", "directory-tree-auto-expand", app::config.directory_tree_auto_expand );
 	config_save_node_bool( doc, doc_root, "", "directory-tree-expand-on-click", app::config.directory_tree_expand_on_click );

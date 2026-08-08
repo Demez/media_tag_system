@@ -89,10 +89,10 @@ bool job_init()
 	// TODO: maybe use a "thread pool" kind of system?
 	// that way you can have dedicated threads for certain tasks?
 
-	g_job_threads     = ch_calloc< std::thread* >( app::config.thumbnail_save_threads, e_mem_category_general );
-	g_job_worker_data = new job_worker_data_t[ app::config.thumbnail_save_threads ];
+	g_job_threads     = ch_calloc< std::thread* >( app::config.job_threads, e_mem_category_general );
+	g_job_worker_data = new job_worker_data_t[ app::config.job_threads ];
 
-	for ( u32 i = 0; i < app::config.thumbnail_save_threads; i++ )
+	for ( u32 i = 0; i < app::config.job_threads; i++ )
 	{
 		g_job_threads[ i ] = new std::thread( job_worker, i );
 	}
@@ -110,7 +110,7 @@ void job_shutdown()
 	g_job_queue_size.store( 64 );
 	g_job_lock.unlock();
 
-	for ( u32 i = 0; i < app::config.thumbnail_save_threads; i++ )
+	for ( u32 i = 0; i < app::config.job_threads; i++ )
 	{
 		g_job_queue_size.notify_all();
 		g_job_threads[ i ]->join();
@@ -166,7 +166,8 @@ void job_cancel_and_free( job_status_t* status )
 	// if it's already finished, free it now
 	if ( status->finished )
 	{
-		job_free( status );
+		// free later in event loop, easier to manage frees
+		// job_free( status );
 		return;
 	}
 

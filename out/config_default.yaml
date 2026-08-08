@@ -80,3 +80,4 @@ gallery-header-padding-x: 6
 gallery-header-padding-y: 6
 
 dev-mode: 0
+job-threads: 3

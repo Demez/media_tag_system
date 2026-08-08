@@ -1153,10 +1153,15 @@ bool handle_event( SDL_Event& event )
 				if ( !status )
 					break;
 
-				if ( status->callback )
-					status->callback( status );
-				else
-					printf( "JOB DOES NOT HAVE CALLBACK?\n" );
+				//printf( "JOB FINISH EVENT - %p\n", status );
+
+				if ( !status->cancel )
+				{
+					if ( status->callback )
+						status->callback( status );
+					else
+						printf( "JOB DOES NOT HAVE CALLBACK?\n" );
+				}
 
 				job_free( status );
 			}

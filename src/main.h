@@ -151,6 +151,8 @@ struct app_config_t
 	bool                      high_bpc                       = false;
 	bool                      hdr                            = false;
 
+	u32                       job_threads                    = 3;
+
 	u32                       sleep_time_no_focus            = 5;
 	u32                       sleep_time_focus               = 1;
 	u32                       sleep_time_idle                = 15;
