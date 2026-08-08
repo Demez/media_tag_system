@@ -540,30 +540,41 @@ void                              sidebar_draw_directory_recursive( u32 depth, c
 
 	if ( entry )
 	{
-		for ( const file_t& folder : entry->folders )
+		if ( entry->folders.empty() )
 		{
-			fs::path filename = folder.path.filename();
-			tmp_path          = current_path;
+			ImGui::BeginDisabled();
+			ImGui::TextUnformatted( "Empty" );
+			ImGui::EndDisabled();
+		}
+		else
+		{
+			for ( const file_t& folder : entry->folders )
+			{
+				fs::path filename = folder.path.filename();
+				tmp_path          = current_path;
 
-			if ( !current_path.ends_with( SEP ) )
-				tmp_path += SEP;
+				if ( !current_path.ends_with( SEP ) )
+					tmp_path += SEP;
 
-			tmp_path += sys_path_to_string( filename );
+				tmp_path += sys_path_to_string( filename );
 
-			sidebar_draw_directory_recursive( depth + 1, tmp_path );
+				sidebar_draw_directory_recursive( depth + 1, tmp_path );
+			}
 		}
 	}
 	else
 	{
+		ImGui::BeginDisabled();
+
 		// are we scanning the directory?
 		folder_scan_status_t* status = dir_tree_get_scan_status( evil );
 
 		if ( status )
-		{
-			ImGui::BeginDisabled();
 			ImGui::TextUnformatted( "Scanning..." );
-			ImGui::EndDisabled();
-		}
+		else
+			ImGui::TextUnformatted( "Failed to Search" );
+
+		ImGui::EndDisabled();
 	}
 
 	ImGui::TreePop();
