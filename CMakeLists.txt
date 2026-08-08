@@ -223,6 +223,7 @@ set(
     src/image_loader.cpp
     src/memory.cpp
     src/config.cpp
+    src/folder_scan.cpp
     src/gl_render.cpp
     
 	src/ui_directory_tree.cpp

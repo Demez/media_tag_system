@@ -5,6 +5,8 @@
 
 namespace gallery
 {
+	e_gallery_scan                       scan_state;
+
 	// a sorted list of media entries, each item is an index to an entry in directory::media_list
 	std::vector< size_t >                sorted_media{};
 
@@ -766,6 +768,18 @@ void gallery_view_context_menu()
 	}
 
 	ImGui::EndPopup();
+}
+
+
+void gallery_view_reset()
+{
+	gallery::item_size_changed = true;
+
+	gallery::sorted_media.clear();
+	gallery::item_text_size.clear();
+	gallery::item_layout.clear();
+
+	gallery::visible_item_count = 0;
 }
 
 
@@ -1680,6 +1694,64 @@ void gallery_view_handle_scroll_event( float mouse_y )
 }
 
 
+void gallery_view_draw_scan_state()
+{
+	e_gallery_scan scan_state = gallery::scan_state;
+
+	if ( scan_state == e_gallery_scan_idle )
+		return;
+
+	// center it in the content area
+	ImVec2 pos = gallery_draw::region_size;
+	pos.x *= 0.5f;
+	pos.y *= 0.5f;
+	pos += ImGui::GetCursorScreenPos();
+
+	ImGui::SetNextWindowPos( pos, 0, { 0.5f, 0.5f } );
+
+	if ( !ImGui::BeginChild( "##gallery_scan_status", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize ) )
+	{
+		ImGui::EndChild();
+		return;
+	}
+
+	if ( app::config.dev_mode )
+	{
+		ImGui::PushFont( font::normal_bold, app::config.font_size * 2 );
+		switch ( scan_state )
+		{
+			default:
+				break;
+
+			case e_gallery_scan_filesystem:
+				ImGui::TextUnformatted( "Reading Filesystem" );
+				break;
+
+			case e_gallery_scan_building:
+				ImGui::TextUnformatted( "Building Media Entries" );
+				break;
+
+			case e_gallery_scan_sorting:
+				ImGui::TextUnformatted( "Sorting" );
+				break;
+		}
+		ImGui::PopFont();
+	}
+	else
+	{
+		image_t* image = icon_get_image( e_icon_loading );
+
+		if ( image )
+		{
+			ImVec2 image_size( image->width, image->height );
+			ImGui::Image( icon_get_imtexture( e_icon_loading ), image_size );
+		}
+	}
+
+	ImGui::EndChild();
+}
+
+
 void gallery_view_draw_content()
 {
 	int window_width, window_height;
@@ -1713,6 +1785,7 @@ void gallery_view_draw_content()
 
 	if ( gallery::sorted_media.empty() )
 	{
+		gallery_view_draw_scan_state();
 		ImGui::EndChild();
 		return;
 	}

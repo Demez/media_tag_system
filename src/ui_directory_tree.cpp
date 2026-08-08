@@ -7,6 +7,7 @@
 
 
 static std::unordered_map< fs::path, directory_entry_t > g_directory_entries{};
+static std::unordered_map< fs::path, folder_scan_status_t* > g_directory_entry_status{};
 // static std::vector< directory_entry_t >       g_directory_entries{};
 // static std::unordered_map< fs::path, size_t > g_directory_entry_map{};
 static std::unordered_set< fs::path >         g_failed_directories{};
@@ -17,14 +18,35 @@ void dir_tree_watch_changes()
 }
 
 
+void dir_tree_add_folder_callback( folder_scan_status_t* status )
+{
+	if ( !status )
+		return;
+
+	// scan failed
+	if ( !status->result )
+	{
+		g_failed_directories.emplace( status->root );
+		return;
+	}
+
+	directory_entry_t directory_entry{
+		.path    = status->root,
+		.folders = status->files,
+		.valid   = true
+	};
+
+	g_directory_entries[ status->root ] = directory_entry;
+
+	g_directory_entry_status.erase( status->root );
+
+	folder_scan_free( status );
+}
+
+
 void dir_tree_add_folder( fs::path& path )
 {
-	// split into chunks
-	std::vector< std::string > dir_tree_path_chunks;
-
-	std::vector< file_t >      dir_tree;
-
-	std::string                current_scan{};
+	std::string current_scan{};
 
 	size_t path_i = 0;
 	for ( fs::path::iterator it = path.begin(); it != path.end(); it++ )
@@ -38,7 +60,14 @@ void dir_tree_add_folder( fs::path& path )
 #endif
 
 		std::string filename = sys_path_to_string( *it );
-		dir_tree_path_chunks.push_back( filename );
+
+		// ??
+		if ( filename.empty() )
+		{
+			path_i++;
+			continue;
+		}
+
 		current_scan += filename;
 		current_scan += SEP_S;
 
@@ -51,17 +80,7 @@ void dir_tree_add_folder( fs::path& path )
 		}
 
 		// scan for a new folder
-		directory_entry_t directory_entry{};
-
-		if ( sys_scandir( current_scan.c_str(), directory_entry.folders, e_scandir_no_files ) )
-		{
-			g_directory_entries[ current_scan ] = directory_entry;
-		}
-		else
-		{
-			g_failed_directories.emplace( current_scan );
-		}
-
+		g_directory_entry_status[ current_scan ] = folder_scan_push( current_scan.c_str(), e_scandir_no_files, dir_tree_add_folder_callback );
 		path_i++;
 	}
 }
@@ -119,46 +138,40 @@ void dir_tree_add_folder( fs::path& path )
 //}
 
 
+folder_scan_status_t* dir_tree_get_scan_status( fs::path& path )
+{
+	auto status_it = g_directory_entry_status.find( path );
+
+	if ( status_it == g_directory_entry_status.end() )
+		return nullptr;
+
+	return status_it->second;
+}
+
+
 directory_entry_t* dir_tree_get( fs::path& path )
 {
 	auto dir_it = g_directory_entries.find( path );
 
-	if ( dir_it == g_directory_entries.end() )
-	{
-		auto fail_it = g_failed_directories.find( path );
+	if ( dir_it != g_directory_entries.end() )
+		return &dir_it->second;
 
-		if ( fail_it != g_failed_directories.end() )
-			return nullptr;
+	// is this a failed directory?
+	auto fail_it = g_failed_directories.find( path );
 
-		dir_tree_add_folder( path );
+	if ( fail_it != g_failed_directories.end() )
+		return nullptr;
 
-		dir_it = g_directory_entries.find( path );
+	// is this directory being scanned?
+	auto status_it = g_directory_entry_status.find( path );
 
-		if ( dir_it == g_directory_entries.end() )
-			return nullptr;
-	}
+	if ( status_it != g_directory_entry_status.end() )
+		return nullptr;
 
-	return &dir_it->second;
+	// no results, scan it
+	dir_tree_add_folder( path );
+	return nullptr;
 }
-
-
-//directory_entry_t* dir_tree_get( size_t entry_index, fs::path& path )
-//{
-//	if ( entry_index > g_directory_entries.size() )
-//	{
-//		auto fail_it = g_failed_directories.find( path );
-//
-//		if ( fail_it != g_failed_directories.end() )
-//			return nullptr;
-//
-//		size_t index = dir_tree_add_folder( path );
-//
-//		if ( entry_index == SIZE_MAX )
-//			return nullptr;
-//	}
-//
-//	return &g_directory_entries.at( entry_index );
-//}
 
 
 static bool g_dir_change_from_dir_tree = false;
@@ -540,6 +553,18 @@ void                              sidebar_draw_directory_recursive( u32 depth, c
 			tmp_path += sys_path_to_string( filename );
 
 			sidebar_draw_directory_recursive( depth + 1, tmp_path );
+		}
+	}
+	else
+	{
+		// are we scanning the directory?
+		folder_scan_status_t* status = dir_tree_get_scan_status( evil );
+
+		if ( status )
+		{
+			ImGui::BeginDisabled();
+			ImGui::TextUnformatted( "Scanning..." );
+			ImGui::EndDisabled();
 		}
 	}
 

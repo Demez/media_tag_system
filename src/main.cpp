@@ -87,6 +87,8 @@ main_image_data_t            g_image_scaled_data;
 SDL_GLContext                g_gl_context;
 bool                         g_in_draw = false;
 
+folder_scan_status_t*        g_main_dir_scan_status = nullptr;
+
 // =================================================================================
 
 struct notification_t
@@ -155,7 +157,7 @@ void set_frame_draw( u32 count )
 
 
 static bool      g_pushed_draw_event = false;
-static SDL_Event g_draw_event{};
+static SDL_Event g_event_draw{};
 
 
 void send_frame_draw_event()
@@ -163,7 +165,7 @@ void send_frame_draw_event()
 	if ( g_pushed_draw_event )
 		return;
 
-	if ( !SDL_PushEvent( &g_draw_event ) )
+	if ( !SDL_PushEvent( &g_event_draw ) )
 		printf( "FAILED TO PUSH DRAW EVENT\n" );
 
 	set_frame_draw();
@@ -190,8 +192,162 @@ void update_window_title()
 }
 
 
+static void select_image_in_folder( bool force_load_media )
+{
+	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
+	{
+		const media_entry_t& entry = gallery_item_get_media_entry( i );
+
+		if ( entry.file.type & e_file_type_directory )
+			continue;
+
+		if ( entry.file.path != directory::queued )
+			continue;
+
+		gallery_view_set_selection( i );
+		set_view_type_media( force_load_media );
+		break;
+	}
+}
+
+
+void folder_media_list_reset()
+{
+	directory::media_list.clear();
+	directory::thumbnail_list.clear();
+
+	gallery_view_reset();
+}
+
+
+void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
+{
+	if ( !status )
+		return nullptr;
+
+	// was this cancelled?
+	if ( status->cancel )
+		return nullptr;
+
+	gallery::scan_state = e_gallery_scan_building;
+
+	send_frame_draw_event();
+	set_frame_draw( 2 );
+
+	auto media_list = new std::vector< media_entry_t >;
+	media_list->reserve( status->files.size() );
+
+	for ( const file_t& entry : status->files )
+	{
+		if ( status->cancel )
+		{
+			delete media_list;
+			return nullptr;
+		}
+
+		media_entry_t media_entry{};
+		media_entry.file     = entry;
+		media_entry.filename = sys_path_to_string( entry.path.filename() );
+
+		// if ( fs_is_dir( entry.data() ) )
+		if ( entry.type & e_file_type_directory )
+		{
+			media_entry.type = e_media_type_directory;
+			media_list->push_back( media_entry );
+			continue;
+		}
+
+		std::string ext = fs_get_extension( media_entry.filename );
+
+		if ( !media_check_extension( ext, media_entry.type ) )
+			continue;
+
+		media_list->push_back( media_entry );
+	}
+
+	// TODO: GALLERY SORT !!
+
+	return media_list;
+}
+
+
+void folder_load_media_list_finish( folder_scan_status_t* status )
+{
+	if ( !status )
+		return;
+
+	// was this cancelled?
+	if ( status->cancel )
+		return;
+
+	if ( !status->thread_userdata )
+	{
+		printf( "NO MEDIA LIST FROM THREAD!!\n" );
+		return;
+	}
+
+	folder_media_list_reset();
+
+	media_history_add( status->root );
+	folder_history_add( directory::path );
+
+#if 1
+	auto media_entry_list = static_cast< std::vector< media_entry_t >* >( status->thread_userdata );
+
+	// copy this list over
+	directory::media_list = *media_entry_list;
+
+	delete media_entry_list;
+#else
+	directory::media_list.reserve( status->files.size() );
+
+	for ( const file_t& entry : status->files )
+	{
+		media_entry_t media_entry{};
+		media_entry.file     = entry;
+		media_entry.filename = sys_path_to_string( entry.path.filename() );
+
+		// if ( fs_is_dir( entry.data() ) )
+		if ( entry.type & e_file_type_directory )
+		{
+			media_entry.type = e_media_type_directory;
+			directory::media_list.push_back( media_entry );
+			continue;
+		}
+
+		std::string ext = fs_get_extension( media_entry.filename );
+
+		if ( !media_check_extension( ext, media_entry.type ) )
+			continue;
+
+		directory::media_list.push_back( media_entry );
+	}
+#endif
+
+	directory::thumbnail_list.resize( directory::media_list.size() );
+
+	gallery_view_dir_change( false );
+
+	gallery::item_text_size.resize( directory::media_list.size() );
+
+	dir_tree_add_folder( directory::path );
+
+	select_image_in_folder( false );
+
+	folder_scan_free( status );
+	g_main_dir_scan_status = nullptr;
+
+	gallery::scan_state    = e_gallery_scan_idle;
+}
+
+
 void folder_load_media_list()
 {
+	if ( g_main_dir_scan_status )
+	{
+		g_main_dir_scan_status->cancel = true;
+	}
+
 	thumbnail_clear_cache();
 
 	if ( directory::folder_reload )
@@ -203,14 +359,10 @@ void folder_load_media_list()
 		gallery_view_clear_selection();
 	}
 
-	directory::media_list.clear();
-	directory::thumbnail_list.clear();
+	folder_media_list_reset();
 
 	directory::media_list.reserve( 5000 );
 	directory::thumbnail_list.reserve( 5000 );
-
-	gallery::item_size_changed = true;
-	gallery::item_text_size.clear();
 
 	std::string root = directory::path.string();
 
@@ -235,48 +387,11 @@ void folder_load_media_list()
 	if ( directory::recursive )
 		scan_flags |= e_scandir_recursive | e_scandir_no_dirs;
 
-	// TODO: make this a background task, especially for large folders/recursive mode
-	if ( !sys_scandir( root.c_str(), files, scan_flags ) )
-	{
-		printf( "Failed to scan directory\n" );
-		gallery_view_dir_change( false );
-		return;
-	}
+	set_frame_draw( 2 );
 
-	media_history_add( root );
-	folder_history_add( directory::path );
-
-	directory::media_list.reserve( files.size() );
-
-	for ( const file_t& entry : files )
-	{
-		media_entry_t media_entry{};
-		media_entry.file     = entry;
-		media_entry.filename = sys_path_to_string( entry.path.filename() );
-
-		// if ( fs_is_dir( entry.data() ) )
-		if ( entry.type & e_file_type_directory )
-		{
-			media_entry.type = e_media_type_directory;
-			directory::media_list.push_back( media_entry );
-			continue;
-		}
-
-		std::string ext = fs_get_extension( media_entry.filename );
-
-		if ( !media_check_extension( ext, media_entry.type ) )
-			continue;
-
-		directory::media_list.push_back( media_entry );
-	}
-
-	directory::thumbnail_list.resize( directory::media_list.size() );
-
-	gallery_view_dir_change( false );
-	
-	gallery::item_text_size.resize( directory::media_list.size() );
-
-	dir_tree_add_folder( directory::path );
+	// queue this directory change
+	gallery::scan_state    = e_gallery_scan_filesystem;
+	g_main_dir_scan_status = folder_scan_push( root.c_str(), scan_flags, folder_load_media_list_finish, folder_load_media_list_thread_finish );
 }
 
 constexpr int MAX_HISTORY = 32;
@@ -859,14 +974,16 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 			break;
 		}
 
+		case SDL_EVENT_USER:
+			break;
+
 		default:
-			mpv_sdl_event( *event );
+			//mpv_sdl_event( *event );
 			break;
 	}
 
 	return true;
 }
-
 
 
 bool handle_event( SDL_Event& event )
@@ -1005,6 +1122,31 @@ bool handle_event( SDL_Event& event )
 			set_frame_draw();
 			app::running = false;
 			return true;
+
+		case SDL_EVENT_USER:
+		{
+			set_frame_draw();
+
+			// just a draw event, something finished
+			if ( event.user.code == g_event_draw.user.code )
+			{
+				(void*)0;
+			}
+			else if ( event.user.code == g_event_folder_scan_finish.user.code )
+			{
+				auto status = static_cast< folder_scan_status_t* >( event.user.data1 );
+
+				if ( !status )
+					break;
+
+				if ( status->callback )
+					status->callback( status );
+				else
+					printf( "FOLDER SCAN DOES NOT HAVE CALLBACK?\n" );
+			}
+
+			break;
+		}
 	}
 
 	return false;
@@ -1125,25 +1267,6 @@ static bool check_mpv_playback()
 }
 
 
-static void select_image_in_folder( bool force_load_media )
-{
-	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
-	{
-		const media_entry_t& entry = gallery_item_get_media_entry( i );
-
-		if ( entry.file.type == e_file_type_directory )
-			continue;
-
-		if ( entry.file.path != directory::queued )
-			continue;
-
-		gallery_view_set_selection( i );
-		set_view_type_media( force_load_media );
-		break;
-	}
-}
-
-
 static void check_queued_path()
 {
 	bool is_file = fs_is_file( directory::queued.string().c_str() );
@@ -1195,7 +1318,7 @@ static void check_queued_path()
 			folder_load_media_list();
 		}
 
-		select_image_in_folder( false );
+		//select_image_in_folder( false );
 		directory::delayed_folder_load = false;
 	}
 	else
@@ -1387,8 +1510,11 @@ void shutdown()
 	app::window = nullptr;
 
 	stop_mpv();
+
 	thumbnail_loader_shutdown();
+	folder_scan_shutdown();
 	sys_folder_mon_shutdown();
+
 	media_view_shutdown();
 	icon_free();
 
@@ -1576,9 +1702,18 @@ int startup( int argc, char* argv[] )
 			printf( "Failed to start MPV\n" );
 	}
 
+	// ----------------------------------------------------------------
+	// thread creation
+
 	if ( !thumbnail_loader_init() )
 	{
 		printf( "Failed to init thumbnail loader\n" );
+		return 1;
+	}
+
+	if ( !folder_scan_init() )
+	{
+		printf( "Failed to init folder scan thread\n" );
 		return 1;
 	}
 
@@ -1603,7 +1738,8 @@ int startup( int argc, char* argv[] )
 		printf( "Failed to add SDL Event Watch\n" );
 	}
 	
-	g_draw_event.type = SDL_RegisterEvents( 1 );
+	g_event_draw.type      = SDL_EVENT_USER;
+	g_event_draw.user.code = SDL_RegisterEvents( 1 );
 
 	window_quick_draw();
 

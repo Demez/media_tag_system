@@ -26,13 +26,6 @@ bool                              g_mpv_video_ready = false;
 static std::vector< std::string > g_mpv_exts;
 
 
-namespace image_draw
-{
-	extern bool  flip_v;
-	extern bool  flip_h;
-	extern float rot;
-}
-
 #define FUNC_PTR( func ) func##_t p_##func = nullptr
 
 // function pointers

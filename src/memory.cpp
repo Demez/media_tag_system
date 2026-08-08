@@ -28,6 +28,7 @@ mem_category_info_t* get_mem_categories()
 const char* mem_category_str[] = {
     "general",
 
+    "thread_data",
     "image_data",
     "image",
     "gl_texture_data",

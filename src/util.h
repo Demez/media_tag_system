@@ -119,6 +119,7 @@ enum e_mem_category : u8
 {
 	e_mem_category_general,
 
+	e_mem_category_thread_data,
 	e_mem_category_image_data,
 	e_mem_category_image,
 	e_mem_category_gl_texture_data,
