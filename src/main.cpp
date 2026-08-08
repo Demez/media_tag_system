@@ -795,6 +795,10 @@ void style_imgui()
 	colors[ ImGuiCol_ButtonHovered ]        = ImVec4( 0.15f, 0.54f, 1.00f, 1.00f );
 	colors[ ImGuiCol_ButtonActive ]         = ImVec4( 0.00f, 0.24f, 0.55f, 1.00f );
 
+	colors[ ImGuiCol_Header ]               = ImVec4( 0.00f, 0.35f, 0.77f, 0.75f );
+	colors[ ImGuiCol_HeaderHovered ]        = ImVec4( 0.15f, 0.54f, 1.00f, 1.00f );
+	colors[ ImGuiCol_HeaderActive ]         = ImVec4( 0.00f, 0.24f, 0.55f, 1.00f );
+
 	colors[ ImGuiCol_CheckMark ]            = ImVec4( 0.00f, 0.46f, 1.00f, 1.00f );
 }
 
