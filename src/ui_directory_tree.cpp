@@ -18,27 +18,35 @@ void dir_tree_watch_changes()
 }
 
 
-void dir_tree_add_folder_callback( folder_scan_status_t* status )
+void dir_tree_add_folder_callback( folder_scan_status_t* status, bool in_main_thread )
 {
 	if ( !status )
 		return;
 
+	fs::path path = status->root;
+
 	// scan failed
 	if ( !status->result )
 	{
-		g_failed_directories.emplace( status->root );
+		g_failed_directories.emplace( path );
 		return;
 	}
 
+	auto dir_it = g_directory_entries.find( path );
+
+	// already handled earlier
+	if ( dir_it != g_directory_entries.end() )
+		return;
+
 	directory_entry_t directory_entry{
-		.path    = status->root,
+		.path    = path,
 		.folders = status->files,
 		.valid   = true
 	};
 
-	g_directory_entries[ status->root ] = directory_entry;
+	g_directory_entries[ path ] = directory_entry;
 
-	g_directory_entry_status.erase( status->root );
+	g_directory_entry_status.erase( path );
 }
 
 

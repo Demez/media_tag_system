@@ -333,6 +333,12 @@ fs::path sys_get_exe_folder_fspath()
 }
 
 
+fs::path::string_type sys_get_exe_folder_native_str()
+{
+	return g_exe_folder_w;
+}
+
+
 const char* sys_get_exe_path( size_t* len )
 {
 	if ( len )

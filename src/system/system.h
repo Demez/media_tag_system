@@ -178,6 +178,7 @@ void                    sys_print_last_error();
 // pass in a ref to a size_t to get the length of the folder
 const char*             sys_get_exe_folder( size_t* len = nullptr );
 fs::path                sys_get_exe_folder_fspath();
+fs::path::string_type   sys_get_exe_folder_native_str();
 
 // get the full path of the exe
 // pass in a ref to a size_t to get the length of the path
@@ -205,6 +206,8 @@ bool                    sys_recycle_file( const char* path );
 void                    sys_open_file_properties( const std::vector< fs::path >& files );
 
 bool                    sys_copy_to_clipboard( const std::vector< fs::path >& files );
+
+void                    sys_browse_to_file( const char* path );
 
 // simpiler version of sys_browse_to_files, one file or folder
 void                    sys_browse_to_path( const fs::path& path );

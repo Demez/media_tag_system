@@ -122,7 +122,7 @@ void job_shutdown()
 }
 
 
-job_status_t* job_push( job_function_t* finish_callback, job_function_t* function, void* userdata )
+job_status_t* job_push( job_finish_t* finish_callback, job_function_t* function, void* userdata )
 {
 	// auto status = ch_new< folder_scan_status_t >( e_mem_category_thread_data );
 	auto status = new job_status_t;

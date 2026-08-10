@@ -192,7 +192,7 @@ void update_window_title()
 }
 
 
-static void select_image_in_folder( bool force_load_media )
+void select_image_in_folder( bool force_load_media )
 {
 	for ( size_t i = 0; i < gallery::sorted_media.size(); i++ )
 	{
@@ -271,8 +271,11 @@ void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
 }
 
 
-void folder_load_media_list_finish( folder_scan_status_t* status )
+void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_thread )
 {
+	// if ( !in_main_thread )
+	//	return;
+
 	if ( !status )
 		return;
 
@@ -280,59 +283,33 @@ void folder_load_media_list_finish( folder_scan_status_t* status )
 	if ( status->cancel )
 		return;
 
+	// already handled earlier?
 	if ( !status->thread_userdata )
-	{
-		printf( "NO MEDIA LIST FROM THREAD!!\n" );
 		return;
-	}
 
 	folder_media_list_reset();
 
 	media_history_add( status->root );
 	folder_history_add( directory::path );
 
-#if 1
 	auto media_entry_list = static_cast< std::vector< media_entry_t >* >( status->thread_userdata );
 
-	// copy this list over
+	// move this list over we created in the worker thread
 	directory::media_list = *media_entry_list;
+	//directory::media_list = std::move( *media_entry_list );
 
 	delete media_entry_list;
-#else
-	directory::media_list.reserve( status->files.size() );
-
-	for ( const file_t& entry : status->files )
-	{
-		media_entry_t media_entry{};
-		media_entry.file     = entry;
-		media_entry.filename = sys_path_to_string( entry.path.filename() );
-
-		// if ( fs_is_dir( entry.data() ) )
-		if ( entry.type & e_file_type_directory )
-		{
-			media_entry.type = e_media_type_directory;
-			directory::media_list.push_back( media_entry );
-			continue;
-		}
-
-		std::string ext = fs_get_extension( media_entry.filename );
-
-		if ( !media_check_extension( ext, media_entry.type ) )
-			continue;
-
-		directory::media_list.push_back( media_entry );
-	}
-#endif
+	status->thread_userdata = nullptr;
 
 	directory::thumbnail_list.resize( directory::media_list.size() );
+
+	// select_image_in_folder( false );
 
 	gallery_view_dir_change( false );
 
 	gallery::item_text_size.resize( directory::media_list.size() );
 
 	dir_tree_add_folder( directory::path );
-
-	select_image_in_folder( false );
 
 	g_main_dir_scan_status = nullptr;
 
@@ -933,6 +910,53 @@ void update_dpi( float dpi_override )
 }
 
 
+void handle_user_event( SDL_Event& event, bool in_main_thread )
+{
+	set_frame_draw();
+
+	// just a draw event, something finished
+	if ( event.user.code == g_event_draw.user.code )
+	{
+		return;
+	}
+	else if ( event.user.code == g_event_folder_scan_finish.user.code )
+	{
+		auto status = static_cast< folder_scan_status_t* >( event.user.data1 );
+
+		if ( !status )
+			return;
+
+		if ( status->callback )
+			status->callback( status, in_main_thread );
+		else
+			printf( "FOLDER SCAN DOES NOT HAVE CALLBACK?\n" );
+
+		if ( in_main_thread )
+			folder_scan_free( status );
+	}
+	else if ( event.user.code == g_event_job_finish.user.code )
+	{
+		auto status = static_cast< job_status_t* >( event.user.data1 );
+
+		if ( !status )
+			return;
+
+		//printf( "JOB FINISH EVENT - %p\n", status );
+
+		if ( !status->cancel )
+		{
+			if ( status->callback )
+				status->callback( status, in_main_thread );
+			else
+				printf( "JOB DOES NOT HAVE CALLBACK?\n" );
+		}
+
+		if ( in_main_thread )
+			job_free( status );
+	}
+}
+
+
 bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 {
 	if ( app::in_drag_drop )
@@ -979,6 +1003,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 		}
 
 		case SDL_EVENT_USER:
+			// handle_user_event( *event, false );
 			break;
 
 		default:
@@ -1128,50 +1153,9 @@ bool handle_event( SDL_Event& event )
 			return true;
 
 		case SDL_EVENT_USER:
-		{
-			set_frame_draw();
-
-			// just a draw event, something finished
-			if ( event.user.code == g_event_draw.user.code )
-			{
-				(void*)0;
-			}
-			else if ( event.user.code == g_event_folder_scan_finish.user.code )
-			{
-				auto status = static_cast< folder_scan_status_t* >( event.user.data1 );
-
-				if ( !status )
-					break;
-
-				if ( status->callback )
-					status->callback( status );
-				else
-					printf( "FOLDER SCAN DOES NOT HAVE CALLBACK?\n" );
-
-				folder_scan_free( status );
-			}
-			else if ( event.user.code == g_event_job_finish.user.code )
-			{
-				auto status = static_cast< job_status_t* >( event.user.data1 );
-
-				if ( !status )
-					break;
-
-				//printf( "JOB FINISH EVENT - %p\n", status );
-
-				if ( !status->cancel )
-				{
-					if ( status->callback )
-						status->callback( status );
-					else
-						printf( "JOB DOES NOT HAVE CALLBACK?\n" );
-				}
-
-				job_free( status );
-			}
-
+			handle_user_event( event, true );
 			break;
-		}
+		
 	}
 
 	return false;
@@ -1304,6 +1288,7 @@ static void check_queued_path()
 
 		if ( path != directory::path || directory::folder_reload )
 		{
+			// TODO: why are we setting this to true if it's just a folder reload? it's the same folder path!!!
 			directory::folder_changed = true;
 
 			if ( !directory::folder_reload )
@@ -1342,8 +1327,15 @@ static void check_queued_path()
 			directory::path = path;
 			folder_load_media_list();
 		}
+		// if still running a folder change, wait for the thread to 
+		else if ( !directory::folder_changed && gallery::scan_state == e_gallery_scan_idle )
+		{
+			select_image_in_folder( true );
 
-		//select_image_in_folder( false );
+			directory::folder_reload = false;
+			directory::queued.clear();
+		}
+
 		directory::delayed_folder_load = false;
 	}
 	else
@@ -1363,10 +1355,11 @@ static void check_queued_path()
 
 		// gallery_view_scroll_to_cursor();
 		set_view_type_gallery();
+
+		directory::folder_reload = false;
+		directory::queued.clear();
 	}
 
-	directory::folder_reload = false;
-	directory::queued.clear();
 	update_window_title();
 }
 
@@ -1418,14 +1411,14 @@ void main_loop()
 		// -----------------------------------------------------------------------------------
 		// Queued Directory/File to Change to/Load
 
+		if ( gallery::scan_state == e_gallery_scan_idle )
+			directory::folder_changed = false;
+
 		if ( sys_folder_mon_changed() )
 		{
 			directory::queued        = directory::path;
 			directory::folder_reload = true;
 		}
-
-		if ( gallery::scan_state == e_gallery_scan_idle )
-			directory::folder_changed = false;
 
 		if ( !directory::queued.empty() )
 			check_queued_path();

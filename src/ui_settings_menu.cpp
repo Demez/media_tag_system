@@ -1,5 +1,7 @@
 #include "main.h"
 
+#include "imgui_internal.h"
+
 
 // ---------------------------------------------------
 // Settings TODO:
@@ -296,6 +298,25 @@ void settings_draw()
 	if ( ImGui::Button( "Reset" ) )
 	{
 		config_reset();
+	}
+
+	ImGui::SameLine();
+	ImGui::SeparatorEx( ImGuiSeparatorFlags_Vertical );
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "Open Folder" ) )
+	{
+		fs::path::string_type folder;
+		folder += sys_get_exe_folder_native_str();
+		folder += SEP;
+
+#if _WIN32  // ugh
+		folder += L"config.yaml";
+#else
+		folder += "config.yaml";
+#endif	
+
+		sys_browse_to_path( folder );
 	}
 }
 

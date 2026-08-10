@@ -626,13 +626,25 @@ void gallery_view_sort_dir_func( job_status_t* status )
 }
 
 
-void gallery_view_sort_dir_finish( job_status_t* status )
+extern void select_image_in_folder( bool force_load_media );
+
+
+void gallery_view_sort_dir_finish( job_status_t* status, bool in_main_thread )
 {
+	if ( gallery::scan_state == e_gallery_scan_idle )
+		return;
+
+	if ( !status->userdata )
+		return;
+
+	// TODO: it would be nice for this to not be on the main thread when in a resize or something, but that's too tricky atm
+	if ( !in_main_thread )
+		return;
+
 	printf( "SORT FINISH FUNC\n" );
 
 	g_gallery_sort_block_new_jobs = false;
 
-	gallery::scan_state = e_gallery_scan_idle;
 	g_gallery_sort_job  = nullptr;
 
 	auto sorted_media   = static_cast< std::vector< size_t >* >( status->userdata );
@@ -643,6 +655,10 @@ void gallery_view_sort_dir_finish( job_status_t* status )
 	gallery::sorted_media = *sorted_media;
 	
 	delete sorted_media;
+	status->userdata = nullptr;
+
+	if ( !directory::queued.empty() )
+		select_image_in_folder( false );
 
 	if ( !gallery::selection.empty() )
 		gallery_find_selected_file();
@@ -651,9 +667,15 @@ void gallery_view_sort_dir_finish( job_status_t* status )
 
 	gallery_view_reset_text_size();
 
+	// reset vars here, since this is the very end of the folder loading path
+	directory::folder_reload = false;
+	directory::queued.clear();
+
 	update_window_title();
 
 	set_frame_draw();
+
+	gallery::scan_state = e_gallery_scan_idle;
 }
 
 

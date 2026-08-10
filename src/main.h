@@ -584,7 +584,9 @@ struct folder_scan_status_t;
 struct job_status_t;
 
 
-typedef void ( folder_scan_callback_t )( folder_scan_status_t* status );
+// if in_main_thread is false, this is being called from the SDL event watch function, and can be in a different thread
+// some tasks may be ok with calling that from the thread
+typedef void ( folder_scan_callback_t )( folder_scan_status_t* status, bool in_main_thread );
 typedef void* ( folder_scan_thread_func_t )( folder_scan_status_t* status );
 
 
@@ -766,6 +768,7 @@ void                                 dir_tree_draw( ImGuiStyle& style );
 struct job_status_t;
 
 
+typedef void( job_finish_t )( job_status_t* status, bool in_main_thread );
 typedef void( job_function_t )( job_status_t* status );
 
 
@@ -773,7 +776,7 @@ typedef void( job_function_t )( job_status_t* status );
 struct job_status_t
 {
 	// function to call when job is finished on the main thread
-	job_function_t* callback = nullptr;
+	job_finish_t*   callback = nullptr;
 
 	// function to call internally
 	job_function_t* function = nullptr;
@@ -792,7 +795,7 @@ struct job_status_t
 extern SDL_Event g_event_job_finish;
 
 
-job_status_t*    job_push( job_function_t* finish_callback, job_function_t* function, void* userdata );
+job_status_t*    job_push( job_finish_t* finish_callback, job_function_t* function, void* userdata );
 
 // call this when finished doing work
 void             job_free( job_status_t* status );
