@@ -1562,6 +1562,50 @@ void test_hdr_state()
 }
 
 
+bool startup_create_window()
+{
+	// Get the global mouse pos
+	float mouse_x, mouse_y;
+	SDL_GetGlobalMouseState( &mouse_x, &mouse_y );
+
+	SDL_Point mouse;
+	mouse.x = static_cast< int >( mouse_x );
+	mouse.y = static_cast< int >( mouse_y );
+	SDL_DisplayID display_id = SDL_GetDisplayForPoint( &mouse );
+
+	// Create Window
+	SDL_PropertiesID props = SDL_CreateProperties();
+
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 1000 );
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 600 );
+
+	// for some reason, SDL_WINDOWPOS_UNDEFINED is ALWAYS centering the window in the middle on the primary display
+	// so im trying to make it feel better and hacking it to open the window on the monitor the mouse is currently on
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
+
+	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true );
+	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true );
+	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true );
+	//SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true );
+
+	SDL_SetStringProperty( props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Media Tag System" );
+
+	app::window = SDL_CreateWindowWithProperties( props );
+
+	SDL_DestroyProperties( props );
+
+	if ( !app::window )
+	{
+		printf( "Failed to create SDL window\n" );
+		return false;
+	}
+
+	SDL_SetWindowMinimumSize( app::window, 400, 400 );
+	return true;
+}
+
+
 int startup( int argc, char* argv[] )
 {
 	args_init( argc, argv );
@@ -1606,15 +1650,8 @@ int startup( int argc, char* argv[] )
 		return 1;
 	}
 
-	app::window = SDL_CreateWindow( "Media Tag System", 1000, 600, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY );
-
-	if ( !app::window )
-	{
-		printf( "Failed to create SDL window\n" );
+	if ( !startup_create_window() )
 		return 1;
-	}
-
-	SDL_SetWindowMinimumSize( app::window, 400, 400 );
 
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_FILE, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_TEXT, false );
@@ -1764,6 +1801,8 @@ int startup( int argc, char* argv[] )
 	
 	g_event_draw.type      = SDL_EVENT_USER;
 	g_event_draw.user.code = SDL_RegisterEvents( 1 );
+
+	SDL_ShowWindow( app::window );
 
 	window_quick_draw();
 
