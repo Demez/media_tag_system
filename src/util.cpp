@@ -11,66 +11,6 @@
 #include <locale>
 
 
-// Check the function FindHoveredWindowEx() in imgui.cpp to see if you need to update this when updating imgui
-bool util_mouse_hovering_imgui_window()
-{
-	ImGuiContext& g = *ImGui::GetCurrentContext();
-
-	ImVec2        imMousePos{ (float)app::mouse_pos[ 0 ], (float)app::mouse_pos[ 1 ] };
-
-	ImGuiWindow*  hovered_window                     = NULL;
-	ImGuiWindow*  hovered_window_under_moving_window = NULL;
-
-	if ( g.MovingWindow && !( g.MovingWindow->Flags & ImGuiWindowFlags_NoMouseInputs ) )
-		hovered_window = g.MovingWindow;
-
-	ImVec2 padding_regular    = g.Style.TouchExtraPadding;
-	ImVec2 padding_for_resize = ImMax( g.Style.TouchExtraPadding, ImVec2( g.Style.WindowBorderHoverPadding, g.Style.WindowBorderHoverPadding ) );
-	for ( int i = g.Windows.Size - 1; i >= 0; i-- )
-	{
-		ImGuiWindow* window = g.Windows[ i ];
-		IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
-		if ( !window->WasActive || window->Hidden )
-			continue;
-		if ( window->Flags & ImGuiWindowFlags_NoMouseInputs )
-			continue;
-
-		// Using the clipped AABB, a child window will typically be clipped by its parent (not always)
-		ImVec2 hit_padding = ( window->Flags & ( ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize ) ) ? padding_regular : padding_for_resize;
-		if ( !window->OuterRectClipped.ContainsWithPad( imMousePos, hit_padding ) )
-			continue;
-
-		// Support for one rectangular hole in any given window
-		// FIXME: Consider generalizing hit-testing override (with more generic frame, callback, etc.) (#1512)
-		if ( window->HitTestHoleSize.x != 0 )
-		{
-			ImVec2 hole_pos( window->Pos.x + (float)window->HitTestHoleOffset.x, window->Pos.y + (float)window->HitTestHoleOffset.y );
-			ImVec2 hole_size( (float)window->HitTestHoleSize.x, (float)window->HitTestHoleSize.y );
-			if ( ImRect( hole_pos, hole_pos + hole_size ).Contains( imMousePos ) )
-				continue;
-		}
-
-		//if ( find_first_and_in_any_viewport )
-		//{
-		//	hovered_window = window;
-		//	break;
-		//}
-		//else
-		{
-			if ( hovered_window == NULL )
-				hovered_window = window;
-			IM_MSVC_WARNING_SUPPRESS( 28182 );  // [Static Analyzer] Dereferencing NULL pointer.
-			if ( hovered_window_under_moving_window == NULL && ( !g.MovingWindow || window->RootWindow != g.MovingWindow->RootWindow ) )
-				hovered_window_under_moving_window = window;
-			if ( hovered_window && hovered_window_under_moving_window )
-				break;
-		}
-	}
-
-	return hovered_window;
-}
-
-
 bool point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size )
 {
 	return point[ 0 ] >= min_size[ 0 ] && point[ 0 ] <= max_size[ 0 ] && point[ 1 ] <= max_size[ 1 ] && point[ 1 ] >= min_size[ 1 ];

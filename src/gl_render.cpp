@@ -1,5 +1,8 @@
 #include "main.h"
 
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_opengl3.h"
+
 
 constexpr float      M_PI   = 3.14159265358979323846f;
 constexpr float      TO_RAD = M_PI / 180.f;
@@ -67,6 +70,83 @@ static GLint  g_shader_window_size = 0;
 static GLint  g_shader_image_size  = 0;
 static GLint  g_shader_image_pos   = 0;
 static GLint  g_shader_image_rot   = 0;
+
+
+// ================================================================================================
+
+
+void frame_draw_start()
+{
+	g_in_draw = true;
+
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	ImGui::GetIO().DisplaySize.x = static_cast< float >( width );
+	ImGui::GetIO().DisplaySize.y = static_cast< float >( height );
+
+	ImGui_ImplSDL3_NewFrame();
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui::NewFrame();
+
+	glViewport( 0, 0, width, height );
+
+	if ( g_gallery_view )
+		glClearColor( app::config.header_bg_color.x, app::config.header_bg_color.y, app::config.header_bg_color.z, app::config.header_bg_color.w );
+	else
+		glClearColor( app::config.media_bg_color.x, app::config.media_bg_color.y, app::config.media_bg_color.z, app::config.media_bg_color.w );
+
+	glClear( GL_COLOR_BUFFER_BIT );
+}
+
+
+void frame_draw_end()
+{
+	if ( !g_gallery_view )
+		media_view_draw();
+
+	ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
+	SDL_GL_SwapWindow( app::window );
+
+	if ( g_mpv && g_mpv_gl )
+		p_mpv_render_context_report_swap( g_mpv_gl );
+
+	g_in_draw = false;
+}
+
+
+// called initially on startup and on window resize
+void window_quick_draw()
+{
+	if ( g_in_draw )
+		return;
+
+	g_in_draw = true;
+
+	set_frame_draw();
+
+	frame_draw_start();
+
+	imgui_draw( app::frame_time, true );
+
+	media_view_update( app::frame_time );
+
+	if ( app::window_resized )
+	{
+		media_view_window_resize();
+		gallery_view_scroll_to_cursor();
+		// mpv_window_resize();
+	}
+
+	frame_draw_end();
+
+	set_frame_draw();
+
+	g_in_draw = false;
+}
+
+
+// ================================================================================================
 
 
 bool startup_set_gl_attributes()
@@ -180,7 +260,6 @@ bool render_load_shaders()
 }
 
 
-
 void render_bind_buffer_data()
 {
 	// vertex array object
@@ -243,7 +322,7 @@ bool render_init()
 	SDL_GL_GetAttribute( SDL_GL_FLOATBUFFERS, &f );
 
 	printf(
-	  "Window Texture:\n"
+	  "\nWindow Texture:\n"
 	  "RED   - %d\n"
 	  "GREEN - %d\n"
 	  "BLUE  - %d\n"
@@ -265,6 +344,9 @@ void render_shutdown()
 {
 	SDL_GL_DestroyContext( g_gl_context );
 }
+
+
+// ================================================================================================
 
 
 void render_draw_texture( render_draw_texture_t draw_info )

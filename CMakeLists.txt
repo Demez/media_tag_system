@@ -34,17 +34,15 @@ set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
 # Compiler/Platform specifc options
 if ( MSVC )
-	# Sets the subsystem to Windows
-	# set( CMAKE_WIN32_EXECUTABLE ON )
-
-	# sets main function to int main() instead of WinMain()
-	# set( CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup )
-
 	add_compile_definitions(
 		_AMD64_ __x86_64 __amd64
 		NOMINMAX
 		_CRT_SECURE_NO_WARNINGS
+		
+		# TODO: ideally i only want this in debug, but i may still need it in release
+		# https://stackoverflow.com/questions/28702665/warning-lnk4098-defaultlib-libcmt-conflicts-with-use-of-other-libs-use-node
 		_ALLOW_RUNTIME_LIBRARY_MISMATCH _ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH _ALLOW_MSC_VER_MISMATCH
+		
 		_UNICODE=1
 		UNICODE=1
 	)
@@ -227,6 +225,7 @@ set(
     src/job_system.cpp
     src/gl_render.cpp
     
+	src/ui_main.cpp
 	src/ui_directory_tree.cpp
 	src/ui_settings_menu.cpp
     src/ui_view_gallery.cpp
@@ -259,6 +258,8 @@ set(
     src/imgui/imgui_impl_sdl3.cpp
     src/imgui/imgui_tables.cpp
     src/imgui/imgui_widgets.cpp
+
+    src/imgui/imgui_demez.cpp
 
 	src/glad/glad.c
 	src/glad/glad.h
@@ -358,6 +359,12 @@ link_directories(
 	"thirdparty/libspng/build"
 	"thirdparty/FreeImageRe/lib"
 	"thirdparty/libfyaml/build"
+	
+	# i don't want to use static, but for some reason, it can't find the lib when using the dll version?
+	"${FREETYPE_DIR}/objs/x64/Release Static"
+	
+	"thirdparty/nativefiledialog/build/src/${CMAKE_CFG_INTDIR}"
+	"thirdparty/libjpeg-turbo/build/${CMAKE_CFG_INTDIR}"
 )
 
 if ( WIN32 )
@@ -381,9 +388,9 @@ endif()
 
 foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	link_directories(
-		"${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static"
-		"thirdparty/nativefiledialog/build/src/${OUTPUT_CONFIG}"
-		"thirdparty/libjpeg-turbo/build/${OUTPUT_CONFIG}"
+	#	"${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static"
+	#	"thirdparty/nativefiledialog/build/src/${OUTPUT_CONFIG}"
+	#	"thirdparty/libjpeg-turbo/build/${OUTPUT_CONFIG}"
 		# "thirdparty/libfyaml/build/${OUTPUT_CONFIG}"
 		# "thirdparty/libspng/build/${OUTPUT_CONFIG}"
 	)

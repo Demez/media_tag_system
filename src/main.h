@@ -653,6 +653,8 @@ void                                 set_frame_draw( u32 count = 1 );
 void                                 send_frame_draw_event();
 void                                 update_dpi( float dpi_override = 0.f );
 
+void                                 imgui_draw( double frame_time, bool render );
+
 // Handle new file or path from external source
 bool                                 on_new_file( const fs::path& file_path );
 
