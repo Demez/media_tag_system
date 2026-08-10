@@ -68,10 +68,10 @@ namespace directory
 	std::vector< fs::path >      folder_history;
 	size_t                       folder_history_pos;
 
-	bool                         folder_reload          = false;
-	bool                         folder_changed         = false;
-	bool                         recursive              = false;
-	bool                         delayed_folder_load = false;
+	bool                         folder_loading = false;
+	bool                         folder_reload  = false;
+	bool                         folder_changed = false;
+	bool                         recursive      = false;
 }
 
 
@@ -295,6 +295,7 @@ void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_t
 	directory::thumbnail_list.resize( directory::media_list.size() );
 
 	// select_image_in_folder( false );
+	directory::folder_loading = false;
 
 	gallery_view_dir_change( false );
 
@@ -960,89 +961,98 @@ static bool check_mpv_playback()
 }
 
 
-static void check_queued_path()
+static void handle_queued_file()
 {
-	bool is_file = fs_is_file( directory::queued.string().c_str() );
+	fs::path path = directory::queued.parent_path();
 
-	memset( gallery::search, 0, 512 * sizeof( char ) );
-
-	if ( is_file )
+	if ( path != directory::path || directory::folder_reload )
 	{
-		fs::path path = directory::queued.parent_path();
+		// TODO: why are we setting this to true if it's just a folder reload? it's the same folder path!!!
+		directory::folder_changed = true;
 
-		if ( path != directory::path || directory::folder_reload )
+		if ( !directory::folder_reload )
+			gallery_view_clear_selection();
+
+		// create a temporary media entry for showing the image first
+		// then, we can scan the directory next frame
+		media_entry_t entry{};
+		entry.file.path = directory::queued;
+		entry.filename  = sys_path_to_string( entry.file.path.filename() );
+		std::string ext = fs_get_extension( entry.filename );
+
+		if ( media_check_extension( ext, entry.type ) )
 		{
-			// TODO: why are we setting this to true if it's just a folder reload? it's the same folder path!!!
-			directory::folder_changed = true;
+			//directory::folder_changed      = true;
+			//folder_load_media_list();
 
-			if ( !directory::folder_reload )
-				gallery_view_clear_selection();
+			directory::media_list.clear();
+			directory::media_list.push_back( entry );
 
-			// create a temporary media entry for showing the image first
-			// then, we can scan the directory next frame
-			media_entry_t entry{};
-			entry.file.path = directory::queued;
-			entry.filename  = sys_path_to_string( entry.file.path.filename() );
-			std::string ext = fs_get_extension( entry.filename );
+			gallery::sorted_media.clear();
+			gallery::sorted_media.push_back( 0 );
 
-			if ( media_check_extension( ext, entry.type ) )
-			{
-				//directory::folder_changed      = true;
-				//folder_load_media_list();
+			g_image_data.index        = 0;
+			g_image_scaled_data.index = 0;
 
-				directory::media_list.clear();
-				directory::media_list.push_back( entry );
+			set_view_type_media( true );
 
-				gallery::sorted_media.clear();
-				gallery::sorted_media.push_back( 0 );
+			directory::folder_loading = true;
 
-				g_image_data.index        = 0;
-				g_image_scaled_data.index = 0;
-
-				set_view_type_media( true );
-
-				directory::delayed_folder_load = true;
-
-				// draw the window to show the image NOW
-				window_quick_draw();
-			}
-
-			// now we can load the files in the directory
-			directory::path = path;
-			folder_load_media_list();
-		}
-		// if still running a folder change, wait for the thread to 
-		else if ( !directory::folder_changed && gallery::scan_state == e_gallery_scan_idle )
-		{
-			select_image_in_folder( true );
-
-			directory::folder_reload = false;
-			directory::queued.clear();
+			// draw the window to show the image NOW
+			window_quick_draw();
 		}
 
-		directory::delayed_folder_load = false;
+		// now we can load the files in the directory
+		directory::path = path;
+		folder_load_media_list();
 	}
-	else
+	// if still running a folder change, wait for the thread to
+	else if ( !directory::folder_changed && gallery::scan_state == e_gallery_scan_idle )
 	{
-		if ( directory::queued != directory::path )
-		{
-			directory::folder_changed = true;
-			// gallery_view_clear_selection();
-			directory::path           = directory::queued;
-			folder_load_media_list();
-		}
-		else if ( directory::folder_reload )
-		{
-			gallery_view_scroll_to_cursor();
-			folder_load_media_list();
-		}
+		select_image_in_folder( true );
 
-		// gallery_view_scroll_to_cursor();
-		set_view_type_gallery();
-
+		directory::folder_loading = false;
 		directory::folder_reload = false;
 		directory::queued.clear();
 	}
+}
+
+
+static void handle_queued_folder()
+{
+	if ( directory::queued != directory::path )
+	{
+		directory::folder_changed = true;
+		// gallery_view_clear_selection();
+		directory::path           = directory::queued;
+		folder_load_media_list();
+	}
+	else if ( directory::folder_reload )
+	{
+		gallery_view_scroll_to_cursor();
+		folder_load_media_list();
+	}
+
+	// gallery_view_scroll_to_cursor();
+	set_view_type_gallery();
+
+	directory::folder_reload = false;
+	directory::queued.clear();
+}
+
+
+static void check_queued_path()
+{
+	std::string path_str = sys_path_to_string( directory::queued );
+	bool        is_file  = fs_is_file( path_str.c_str() );
+
+	// Reset search string
+	memset( gallery::search, 0, 512 * sizeof( char ) );
+
+	if ( is_file )
+		handle_queued_file();
+	else
+		handle_queued_folder();
 
 	update_window_title();
 }

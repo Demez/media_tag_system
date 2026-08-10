@@ -229,7 +229,7 @@ void set_view_type_media( bool force_load_media )
 
 	u32 selected = gallery_view_get_last_selected_index();
 
-	if ( directory::delayed_folder_load )
+	if ( directory::folder_loading )
 		g_image_data.index = selected;
 
 	bool reload_image = force_load_media;

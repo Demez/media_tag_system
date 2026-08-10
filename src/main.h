@@ -497,10 +497,10 @@ namespace directory
 	extern std::vector< fs::path >       folder_history;
 	extern size_t                        folder_history_pos;
 
-	extern bool                          folder_reload;
-	extern bool                          folder_changed;
+	extern bool                          folder_loading;  // folder is currently loading in the background
+	extern bool                          folder_reload;   // folder has been reloaded, same directory
+	extern bool                          folder_changed;  // folder has been changed
 	extern bool                          recursive;
-	extern bool                          delayed_folder_load;
 }
 
 
