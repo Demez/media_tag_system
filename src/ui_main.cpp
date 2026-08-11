@@ -159,13 +159,6 @@ void notification_draw( double frame_time )
 
 void imgui_draw( double frame_time, bool render )
 {
-	if ( gallery::sort_mode_update )
-	{
-		//gallery_view_set_selection( gallery::cursor );
-		gallery_view_sort_dir();
-		gallery::sort_mode_update = false;
-	}
-
 	if ( g_gallery_view )
 	{
 		gallery_view_draw();

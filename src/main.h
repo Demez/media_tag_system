@@ -140,6 +140,7 @@ struct app_config_t
 
 	bool                      thumbnail_use_fixed_size    = false;
 
+	bool                      thumbnail_enable            = true;
 	bool                      thumbnail_jxl_enable        = true;
 	float                     thumbnail_jxl_distance      = 4;
 	u32                       thumbnail_jxl_effort        = 6;
@@ -539,6 +540,7 @@ namespace gallery
 
 	extern bool                               scroll_to_cursor;
 	extern bool                               keep_scroll_pos;
+	extern int                                refresh_layout;
 
 	extern u32                                drawn_image_count;
 	extern u32                                first_visible_item;

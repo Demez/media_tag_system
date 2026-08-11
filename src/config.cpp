@@ -196,13 +196,28 @@ static bool config_get_node_u32( fy_node* node, const char* path, u32& output )
 }
 
 
-static bool config_get_node_string( fy_node* node, const char* fmt, char* buffer )
+static bool config_get_node_bool( fy_node* node, const char* path, bool& output )
 {
-	int count = fy_node_scanf( node, fmt, buffer );
+	size_t      value_len = 0;
+	const char* value     = nullptr;
+
+	if ( !config_get_node_value_base( node, path, value ) )
+		return false;
+
+	char* end_ptr = nullptr;
+	output        = strtoul( value, &end_ptr, 10 ) == 1;
+
+	return true;
+}
+
+
+static bool config_get_node_string( fy_node* node, const char* path, char* buffer )
+{
+	int count = fy_node_scanf( node, path, buffer );
 
 	if ( count <= 0 )
 	{
-		printf( "config: Failed to get value of \"%s\"\n", fmt );
+		printf( "config: Failed to get value of \"%s\"\n", path );
 		return false;
 	}
 
@@ -356,8 +371,8 @@ void config_read_thumbnail_settings( fy_document* fyd )
 	//config_get_node_value( thumbnail, "/threads %u", app::config.thumbnail_threads );
 	config_get_node_value( thumbnail, "/uploads-per-frame %u", app::config.thumbnail_uploads_per_frame );
 	config_get_node_value( thumbnail, "/memory-cache-size %u", app::config.thumbnail_mem_cache_size );
-	config_get_node_value( thumbnail, "/use-fixed-size %u", app::config.thumbnail_use_fixed_size );
-	config_get_node_value( thumbnail, "/jxl-enable %u", app::config.thumbnail_jxl_enable );
+	config_get_node_bool( thumbnail, "/use-fixed-size %u", app::config.thumbnail_use_fixed_size );
+	config_get_node_bool( thumbnail, "/jxl-enable %u", app::config.thumbnail_jxl_enable );
 	config_get_node_value( thumbnail, "/jxl-effort %u", app::config.thumbnail_jxl_effort );
 	config_get_node_value( thumbnail, "/jxl-distance %f", app::config.thumbnail_jxl_distance );
 	config_get_node_value( thumbnail, "/size %u", app::config.thumbnail_size );

@@ -979,10 +979,9 @@ static void handle_queued_file()
 
 		if ( media_check_extension( ext, entry.type ) )
 		{
-			directory::media_list.clear();
-			directory::media_list.push_back( entry );
+			folder_media_list_reset();
 
-			gallery::sorted_media.clear();
+			directory::media_list.push_back( entry );
 			gallery::sorted_media.push_back( 0 );
 
 			g_image_data.index        = 0;

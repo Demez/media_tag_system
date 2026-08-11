@@ -44,7 +44,6 @@ void gallery_update_filter( e_gallery_filter filter )
 	else
 		gallery::filter |= filter;
 
-	// gallery::sort_mode_update = true;
 	gallery_view_dir_change( true );
 }
 
@@ -398,7 +397,7 @@ float gallery_view_draw_header()
 		}
 		else
 		{
-			ImGui::BeginDisabled( gallery::scan_state != e_gallery_scan_idle );
+			//ImGui::BeginDisabled( gallery::scan_state != e_gallery_scan_idle );
 
 			ImGui::TextUnformatted( "Search" );
 
@@ -421,10 +420,11 @@ float gallery_view_draw_header()
 			// if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 			if ( ImGui::InputText( "##search", gallery::search, 512 ) )
 			{
+				// TODO: QUEUE THIS SEARCH IN CASE A SORT IS CURRENTLY HAPPENING FROM PREVIOUS CHARACTERS IN THE SEARCH BOX !!!!
 				gallery_view_dir_change( true );
 			}
 
-			ImGui::EndDisabled();
+			//ImGui::EndDisabled();
 
 			ImGui::SameLine();
 			draw_vertical_separator( draw_list, style );
@@ -435,7 +435,7 @@ float gallery_view_draw_header()
 
 				if ( !directory::recursive )
 				{
-					gallery::sorted_media.clear();
+					gallery_view_reset();
 					gallery_view_clear_selection();
 					//gallery::cursor = 0;
 				}
@@ -458,7 +458,6 @@ float gallery_view_draw_header()
 	if ( ImGui::Button( "Sidebar" ) )
 	{
 		gallery::sidebar_draw = !gallery::sidebar_draw;
-		gallery::content_area_resized = true;
 		gallery_view_scroll_to_cursor();
 	}
 
@@ -524,8 +523,9 @@ float gallery_view_draw_header()
 	{
 		if ( ImGui::MenuItem( "None", 0, gallery::filter == 0 ) )
 		{
-			gallery::filter           = 0;
-			gallery::sort_mode_update = true;
+			gallery::filter = 0;
+			gallery_update_filter( 0 );
+			//gallery::sort_mode_update = true;
 		}
 
 		// No folders in recursive mode

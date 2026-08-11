@@ -40,6 +40,7 @@ namespace gallery
 	// TODO: this is sometimes used as a way to keep the scroll position
 	bool                                 scroll_to_cursor     = false;
 	bool                                 keep_scroll_pos      = false;  // keeps the scroll position when resizing
+	int                                  refresh_layout       = 0;      // refresh the layout X amount of times, imgui may need another frame to recalc properly
 
 	u32                                  drawn_image_count    = 0;
 	u32                                  first_visible_item   = 0;
@@ -72,16 +73,24 @@ const char* g_gallery_sort_mode_str[] = {
 static_assert( ARR_SIZE( g_gallery_sort_mode_str ) == e_gallery_sort_mode_count );
 
 
-float                gallery_view_draw_header();
-void                 gallery_view_update_header_directory();
+static const media_entry_t __media_entry_empty{};
 
-void                 gallery_view_draw_sidebar();
 
+float                      gallery_view_draw_header();
+void                       gallery_view_update_header_directory();
+
+void                       gallery_view_draw_sidebar();
+
+
+void                       gallery_draw_extra_refresh( int count = 1 )
+{
+	if ( count > gallery::refresh_layout )
+		gallery::refresh_layout = count;
+
+	set_frame_draw( count );
+}
 
 // =============================================================================================
-
-
-static const media_entry_t __media_entry_empty{};
 
 
 const media_entry_t& gallery_item_get_media_entry( size_t index )
@@ -668,6 +677,8 @@ void gallery_view_sort_dir_finish( job_status_t* status, bool in_main_thread )
 		gallery_find_selected_file();
 
 	// gallery_view_scroll_to_cursor();
+	gallery_draw_extra_refresh( 2 );
+	gallery::sort_mode_update = true;
 
 	gallery_view_reset_text_size();
 
@@ -726,9 +737,8 @@ void gallery_view_dir_change( bool keep_selection )
 
 	// TODO: make it work with recursive, so if the selected item is still within the results, use that to snap scroll view to
 	if ( !directory::folder_reload || directory::recursive )
-		gallery::sorted_media.clear();
+		gallery_view_reset();
 
-	// SORT FILE LIST
 	gallery_view_sort_dir();
 
 	// Invalidate These
@@ -961,17 +971,6 @@ namespace gallery_draw
 	bool                          content_area_hovered;
 	bool                          any_item_hovered;
 	bool                          scroll_changed;
-	int                           extra_refresh   = 0;
-	bool                          delayed_refresh = false;
-}
-
-
-void gallery_draw_extra_refresh( int count = 1 )
-{
-	if ( count > gallery_draw::extra_refresh )
-		gallery_draw::extra_refresh = count;
-	
-	set_frame_draw( count );
 }
 
 
@@ -1055,8 +1054,11 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 		return;
 	}
 
-	thumbnail_t* thumbnail = thumbnail_get_data( directory::thumbnail_list[ item_draw.gallery_index ] );
+	thumbnail_t* thumbnail = nullptr;
 	e_icon       base_icon = e_icon_none;
+
+	if ( app::config.thumbnail_enable )
+		thumbnail = thumbnail_get_data( directory::thumbnail_list[ item_draw.gallery_index ] );
 
 	if ( item_draw.media->type == e_media_type_directory )
 		base_icon = e_icon_folder;
@@ -1067,7 +1069,7 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 
 	if ( !thumbnail )
 	{
-		if ( !thumbnail && item_draw.media->type != e_media_type_directory )
+		if ( app::config.thumbnail_enable && !thumbnail && item_draw.media->type != e_media_type_directory )
 			gallery_draw::thumbnail_requests.emplace_back( *item_draw.media, item_draw.gallery_index );
 		// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
@@ -1496,6 +1498,8 @@ void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 	// do an extra refresh next frame
 	//gallery_draw_extra_refresh();
 
+	gallery::image_bounds = { gallery::item_size - ( style.WindowPadding.x * 2 ), gallery::item_size - ( style.WindowPadding.x * 2 ) };
+
 	for ( size_t i = 0; i < count; i++ )
 	{
 		gallery_item_draw_t& layout        = gallery::item_layout[ i ];
@@ -1551,25 +1555,11 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 	visible_bottom += style.WindowPadding.y;
 	visible_top += style.WindowPadding.y;
 
-	//ImVec2 fake_cursor_pos{};
-	// ImVec2 fake_cursor_pos               = ImGui::GetCursorScreenPos();
-
-	// has scroll pos stored in it
-	ImVec2 fake_cursor_pos(
-	  ( window_width - gallery_draw::region_size.x ) + style.WindowPadding.x,
-	  ( window_height - gallery_draw::region_size.y ) + style.WindowPadding.y );
-
-	// offset left side if few items in a row
-	if ( gallery::row_count <= 2 )
-		fake_cursor_pos.x += gallery_draw::item_spacing_x;
-
-	// apply scroll position
-	fake_cursor_pos.y -= gallery_draw::scroll;
-
-	ImVec2 start_cursor_pos              = fake_cursor_pos;
+	ImVec2 fake_cursor_pos     = ImGui::GetCursorScreenPos();
+	ImVec2 start_cursor_pos    = fake_cursor_pos;
 	//ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
 
-	gallery_draw::dummy_area.y           = 0;
+	gallery_draw::dummy_area.y = 0;
 
 	// do an extra frame draw just in case
 	set_frame_draw( 2 );
@@ -1710,12 +1700,61 @@ void gallery_view_handle_scroll_event( float mouse_y )
 	if ( scroll_size == 0.f )
 		return;
 
+	// get the max item height of the 1st visible row
+	// also account for each scroll step with fast scrolling
+	float  max_item_height = gallery_draw::item_size_y;
+	float  scroll_amount   = 0;
+	size_t i               = gallery::first_visible_item;
+	size_t row_i           = 0;
+	s64    scroll_step_add = ( mouse_y < 0 ) ? 1i64 : -1i64;
+	s64    scroll_step     = 0;
+	s64    scroll_end      = -static_cast< s64 >( mouse_y );
+
+	if ( scroll_step_add == -1 )
+	{
+		// if we can still see the first item, just snap to the top
+		if ( gallery::first_visible_item == 0 )
+		{
+			gallery_draw::scroll_changed = true;
+			gallery_draw::scroll         = 0;
+			return;
+		}
+
+		// offset back a row
+		i--;
+	}
+
+	for ( ; i < gallery::sorted_media.size(); )
+	{
+		gallery_item_draw_t& item_draw = gallery::item_layout[ i ];
+		max_item_height                = std::max( max_item_height, item_draw.item_size_y );
+
+		if ( ++row_i == gallery::row_count )
+		{
+			row_i = 0;
+
+			scroll_amount += max_item_height + style.ItemSpacing.y;
+			max_item_height = gallery_draw::item_size_y;
+
+			scroll_step += scroll_step_add;
+
+			if ( scroll_step == scroll_end )
+				break;
+		}
+
+		if ( scroll_step_add == -1 && i == 0 )
+			break;
+
+		i += scroll_step_add;
+	}
+
 	// TODO: Factor in the different text sizes for each row
-	float scroll_amount          = gallery_draw::item_size_y + style.ItemSpacing.y;
+	//float scroll_amount          = max_item_height + style.ItemSpacing.y;
 
 	gallery_draw::scroll_changed = true;
 	//gallery_draw::scroll_queued  = true; // do another update next frame for rect layout
-	gallery_draw::scroll -= scroll_amount * mouse_y;
+	//gallery_draw::scroll -= scroll_amount * mouse_y;
+	gallery_draw::scroll += scroll_amount * scroll_step_add;
 
 	// clamp it to the max scroll area
 	gallery_draw::scroll = CLAMP( gallery_draw::scroll, 0.f, scroll_size );
@@ -1726,11 +1765,13 @@ void gallery_view_draw_scan_state()
 {
 	e_gallery_scan scan_state = gallery::scan_state;
 
-	if ( scan_state == e_gallery_scan_idle )
-		return;
+	ImGuiStyle& style = ImGui::GetStyle();
 
 	// center it in the content area
-	ImVec2 pos = gallery_draw::region_size;
+	ImVec2 region_avail       = ImGui::GetContentRegionAvail();
+	ImVec2 region_size = { region_avail.x + style.WindowPadding.x, region_avail.y + style.WindowPadding.y };
+
+	ImVec2 pos = region_size;
 	pos.x *= 0.5f;
 	pos.y *= 0.5f;
 	pos += ImGui::GetCursorScreenPos();
@@ -1794,12 +1835,19 @@ void gallery_view_draw_content()
 	ImVec2 region_avail       = ImGui::GetContentRegionAvail();
 	gallery_draw::region_size = { region_avail.x + style.WindowPadding.x, region_avail.y + style.WindowPadding.y };
 
+	int region_x               = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
+	gallery_draw::dummy_area.x = region_x;
+
 	ImGui::SetNextWindowSize( gallery_draw::region_size );
 
 	//float content_height = MAX( gallery_draw::region_size.y, gallery_draw::dummy_area.y + style.WindowPadding.y * 2 );
 	//ImGui::SetNextWindowContentSize( { gallery_draw::region_size.x, content_height } );
 
 	gallery_draw::content_area_hovered = is_content_area_hovered( region_avail.x, window_height );
+
+	static size_t last_item_count      = 0;
+	size_t        count                = gallery::sorted_media.size();
+	bool          item_count_changed   = count != last_item_count;
 
 	if ( gallery_draw::scroll_changed )
 		ImGui::SetNextWindowScroll( { 0.f, gallery_draw::scroll } );
@@ -1815,7 +1863,7 @@ void gallery_view_draw_content()
 	}
 
 	// if ( !ImGui::BeginChild( "##gallery_content", { region_avail.x + style.WindowPadding.x, region_avail.y }, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollWithMouse ) )
-	if ( !ImGui::BeginChild( "##gallery_content", {}, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus ) )
+	if ( !ImGui::BeginChild( "##gallery_content", {}, ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoBringToFrontOnFocus ) )
 	{
 		ImGui::EndChild();
 		return;
@@ -1823,40 +1871,29 @@ void gallery_view_draw_content()
 
 	if ( gallery::sorted_media.empty() )
 	{
-		gallery_view_draw_scan_state();
 		ImGui::EndChild();
 		return;
 	}
 
 	ImGuiWindow* window            = ImGui::GetCurrentWindow();
 	ImGuiID      active_id         = ImGui::GetActiveID();
+
 	// bool         scrollbar_active             = active_id && ( active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_X ) || active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y ) );
 	gallery_draw::scrollbar_active = active_id && active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y );
+	gallery_draw::scroll_prev      = gallery_draw::scroll;
+	gallery_draw::scroll           = ImGui::GetScrollY();
+	gallery_draw::any_item_hovered = false;
 
-	// when reloading the folder, the scroll value can change due to no items being here, so don't update our stored scroll value
-	// if ( !directory::folder_reload )
-	if ( gallery_draw::scrollbar_active )
-	{
-		gallery_draw::scroll_prev = gallery_draw::scroll;
-		gallery_draw::scroll      = ImGui::GetScrollY();
-	}
-	else
-	{
-		ImGui::SetScrollY( gallery_draw::scroll );
-	}
-
-	// reset per frame data
 	gallery_draw::thumbnail_requests.clear();
 
-	gallery_draw::any_item_hovered = false;
+	// ----------------------------------------------------------------------------------------------------------
+	// Row Count
 
 	static u32 last_row_count      = 0;
 	last_row_count                 = gallery::row_count;
-
-	int region_x                   = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
 	gallery::row_count             = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
 
-	gallery_draw::dummy_area.x     = region_x;
+	// ----------------------------------------------------------------------------------------------------------
 
 	gallery::keep_scroll_pos |= last_row_count != gallery::row_count;
 
@@ -1869,6 +1906,9 @@ void gallery_view_draw_content()
 	if ( app::config.gallery_show_filenames )
 		gallery_draw::item_size_y += ImGui::GetFontSize() + style.ItemSpacing.y;
 
+	// ----------------------------------------------------------------------------------------------------------
+	// Item Spacing
+
 	float spacing_x_base = float( region_x ) - float( gallery::item_size * gallery::row_count );
 
 	if ( gallery::row_count > 2 )
@@ -1878,14 +1918,11 @@ void gallery_view_draw_content()
 
 	gallery_draw::item_spacing_x = std::max( 0.f, gallery_draw::item_spacing_x );
 
-	gallery_draw::scroll_changed |= gallery_draw::scrollbar_active;
-
-	// ----------------------------------------------------------------------------------------------------------
-
-	gallery::image_bounds = { gallery::item_size - ( style.WindowPadding.x * 2 ), gallery::item_size - ( style.WindowPadding.x * 2 ) };
-
+	// Offset the starting X position if we have a low row count, imo it looks better when at 1 or 2 items per row
 	if ( gallery::row_count <= 2 )
 		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
+
+	// ----------------------------------------------------------------------------------------------------------
 
 	bool               row_count_changed    = last_row_count != gallery::row_count;
 	static bool        filenames_shown_last = app::config.gallery_show_filenames;
@@ -1895,7 +1932,7 @@ void gallery_view_draw_content()
 
 	gallery::drawn_image_count       = 0;
 	gallery_draw::first_visible_item = gallery::first_visible_item;
-	gallery::content_area_resized |= app::window_resized || row_count_changed;
+	gallery::content_area_resized |= app::window_resized || row_count_changed || last_region_avail != region_avail;
 
 	gallery::keep_scroll_pos    = gallery::item_size_changing;
 	gallery::keep_scroll_pos |= filenames_shown_last != app::config.gallery_show_filenames;
@@ -1910,15 +1947,13 @@ void gallery_view_draw_content()
 
 	gallery_draw::scroll_changed |= gallery::keep_scroll_pos;
 
-	bool   no_extra_refresh   = gallery_draw::extra_refresh == 0;
-	bool   no_delayed_refresh = gallery_draw::delayed_refresh;
+	bool no_extra_refresh = gallery::refresh_layout == 0;
 
 	// ----------------------------------------------------------------------------------------------------------
+	// Item Layout
 
 	// TODO: for groups, change how sorted media is handled ?
 	// maybe make gallery::grouped_media ? or just have inserts into groups here
-
-	size_t count              = gallery::sorted_media.size();
 
 	// if size changed, recalculate the text sizes
 	//if ( gallery::item_size_changed || app::window_resized || region_avail != last_region_avail || gallery_draw::scroll_changed )
@@ -1927,27 +1962,20 @@ void gallery_view_draw_content()
 		gallery_view_item_size_calc( style, count );
 	}
 
-	//static std::vector< gallery_item_draw_t > gallery_draw_list{};
-	//gallery_draw_list.clear();
-	//gallery_draw_list.resize( gallery::sorted_media.size() );
-
 	bool recalc_item_rects = gallery::always_recalc_layout;
 	recalc_item_rects |= gallery::item_size_changed;
-	recalc_item_rects |= region_avail != last_region_avail;
+	recalc_item_rects |= gallery::content_area_resized;
 	recalc_item_rects |= gallery_draw::scroll_changed;
 	recalc_item_rects |= directory::folder_changed;
-	recalc_item_rects |= gallery_draw::extra_refresh > 0;
+	recalc_item_rects |= gallery::refresh_layout > 0;
 
-	bool skip_recalc = false;
-
-	// Imgui is weird 
-	//if ( gallery_draw::delayed_refresh )
-
-	//if ( !gallery_draw::delayed_refresh && recalc_item_rects )
 	if ( recalc_item_rects )
 	{
 		gallery_view_item_rect_calc( window, style, count );
 	}
+
+	// ----------------------------------------------------------------------------------------------------------
+	// Item Drawing
 
 	ImVec2 dummy_start_pos        = ImGui::GetCursorPos();
 	ImVec2 dummy_start_pos_screen = ImGui::GetCursorScreenPos();
@@ -2011,21 +2039,21 @@ void gallery_view_draw_content()
 	for ( size_t i = 0; i < gallery_draw::thumbnail_requests.size(); i++ )
 		directory::thumbnail_list[ gallery_draw::thumbnail_requests[ i ].index ] = thumbnail_loader_queue_push( gallery_draw::thumbnail_requests[ i ].media );
 
+	if ( gallery::sort_mode_update )
+		gallery_draw_extra_refresh();
+
 	// adjust saved vars
+	gallery::sort_mode_update                 = false;
 	gallery::content_area_resized             = false;
-	gallery_draw::scroll_changed              = false;
 	gallery::item_size_changed                = false;
+	gallery_draw::scroll_changed              = false;
 	filenames_shown_last                      = app::config.gallery_show_filenames;
 	gallery_draw::scrollbar_active_last_frame = gallery_draw::scrollbar_active;
 	last_region_avail                         = region_avail;
+	last_item_count                           = gallery::sorted_media.size();
 
-	if ( !no_extra_refresh && gallery_draw::extra_refresh > 0 )
-		gallery_draw::extra_refresh--;
-
-	if ( !no_delayed_refresh )
-	{
-		gallery_draw::delayed_refresh = false;
-	}
+	if ( !no_extra_refresh && gallery::refresh_layout > 0 )
+		gallery::refresh_layout--;
 }
 
 
@@ -2084,7 +2112,14 @@ void gallery_view_draw()
 	if ( app::config.use_custom_colors )
 		ImGui::PushStyleColor( ImGuiCol_ChildBg, app::config.content_bg_color );
 
-	gallery_view_draw_content();
+	if ( gallery::scan_state == e_gallery_scan_idle )
+	{
+		gallery_view_draw_content();
+	}
+	else
+	{
+		gallery_view_draw_scan_state();
+	}
 
 	if ( app::config.use_custom_colors )
 		ImGui::PopStyleColor();

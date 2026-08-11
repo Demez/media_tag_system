@@ -153,6 +153,7 @@ void settings_draw_gallery()
 
 void settings_draw_thumbnails()
 {
+	setting_bool( "Enable Thumbnails", app::config.thumbnail_enable, "Enable Thumbnails, if false, draws icons instead" );
 	setting_bool( "Enable Thumbnail Cache", app::config.thumbnail_jxl_enable, "Saves JPEG XL thumbnails to a folder on your computer, for quick thumbnail loading" );
 
 	ImGui::PushItemWidth( SCALAR_OPTION_WIDTH );
