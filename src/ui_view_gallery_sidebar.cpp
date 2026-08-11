@@ -329,8 +329,7 @@ float gallery_view_draw_header()
 
 	if ( ImGui::Button( "Refresh" ) )
 	{
-		directory::queued        = directory::path;
-		directory::folder_reload = true;
+		directory::queued = directory::path;
 	}
 
 	ImGui::SameLine();
@@ -376,9 +375,8 @@ float gallery_view_draw_header()
 	// Enter returns true doesn't work because of gallery view hooking that input currently, need to add a check later for if focused in text input
 	if ( ImGui::ArrowButton( "##nav_enter_path", ImGuiDir_Right ) )
 	{
-		directory::queued        = g_folder_buf;
-		directory::folder_reload = true;
-		directory::path_edit     = false;
+		directory::queued    = g_folder_buf;
+		directory::path_edit = false;
 	}
 
 	if ( space_needed > 0 )
@@ -433,8 +431,7 @@ float gallery_view_draw_header()
 
 			if ( ImGui::Checkbox( "Search Subfolders", &directory::recursive ) )
 			{
-				directory::queued        = g_folder_buf;
-				directory::folder_reload = true;
+				directory::queued = g_folder_buf;
 
 				if ( !directory::recursive )
 				{

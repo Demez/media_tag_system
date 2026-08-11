@@ -480,8 +480,9 @@ bool config_load()
 	if ( !config_mkdir( app::config.thumbnail_video_cache_path, "config: Invalid path for thumbnail/cache-path-video!\n" ) )
 		return false;
 
-	gallery::item_size  = std::clamp( app::config.gallery_zoom_default, gallery::item_size_min, gallery::item_size_max );
-	gallery::image_size = gallery::item_size;
+	gallery::item_size      = std::clamp( app::config.gallery_zoom_default, gallery::item_size_min, gallery::item_size_max );
+	gallery::image_bounds.x = gallery::item_size;
+	gallery::image_bounds.y = gallery::item_size;
 
 	return true;
 }

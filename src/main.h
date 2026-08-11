@@ -532,12 +532,13 @@ namespace gallery
 	extern gallery_item_draw_t**              visible_item;
 	extern size_t                             visible_item_count;
 
-	extern u32                                image_size;
+	extern ImVec2                             image_bounds;
 
 	extern bool                               sidebar_draw;
 	extern bool                               content_area_resized;
 
 	extern bool                               scroll_to_cursor;
+	extern bool                               keep_scroll_pos;
 
 	extern u32                                drawn_image_count;
 	extern u32                                first_visible_item;
@@ -695,6 +696,8 @@ const fs::path&                      gallery_item_get_path( size_t index );
 std::string                          gallery_item_get_path_string( size_t index );
 
 void                                 gallery_view_scroll_to_cursor();
+void                                 gallery_view_keep_scroll_pos();
+
 void                                 gallery_view_handle_scroll_event( float mouse_y );
 void                                 gallery_view_input();
 void                                 gallery_view_draw();

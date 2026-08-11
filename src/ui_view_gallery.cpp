@@ -30,15 +30,19 @@ namespace gallery
 	gallery_item_draw_t**                visible_item       = nullptr;
 	size_t                               visible_item_count = 0;
 
-	u32                                  image_size         = item_size;
+	// area the image can fit within the item
+	ImVec2                               image_bounds{ static_cast< float >( item_size ), static_cast< float >( item_size ) };
 
 	bool                                 sidebar_draw         = true;
 	bool                                 content_area_resized = false;
 
-	bool                                 scroll_to_cursor   = false;
+	// RENAME: scroll to last selected item
+	// TODO: this is sometimes used as a way to keep the scroll position
+	bool                                 scroll_to_cursor     = false;
+	bool                                 keep_scroll_pos      = false;  // keeps the scroll position when resizing
 
-	u32                                  drawn_image_count  = 0;
-	u32                                  first_visible_item = 0;
+	u32                                  drawn_image_count    = 0;
+	u32                                  first_visible_item   = 0;
 
 	// Quick Filter
 	e_gallery_filter                     filter{};
@@ -663,12 +667,12 @@ void gallery_view_sort_dir_finish( job_status_t* status, bool in_main_thread )
 	if ( !gallery::selection.empty() )
 		gallery_find_selected_file();
 
-	gallery_view_scroll_to_cursor();
+	// gallery_view_scroll_to_cursor();
 
 	gallery_view_reset_text_size();
 
 	// reset vars here, since this is the very end of the folder loading path
-	directory::folder_reload = false;
+	// directory::folder_reload = false;
 	directory::queued.clear();
 
 	update_window_title();
@@ -739,7 +743,7 @@ void gallery_view_scroll_to_cursor()
 }
 
 
-void gallery_view_context_menu()
+void gallery_view_handle_context_menu()
 {
 	if ( !ImGui::BeginPopupContextWindow( "##gallery ctx menu", ImGuiPopupFlags_AnyPopup | ImGuiPopupFlags_MouseButtonRight ) )
 	 	return;
@@ -930,15 +934,14 @@ namespace gallery_draw
 	float                         scroll      = 0.f;
 	float                         scroll_prev = 0.f;
 
-	// area the image can fit within the item
-	ImVec2                        image_bounds;
-
+	// Item size with text line height and spacing
 	float                         item_size_y;
+
+	// flexible horizontal spacing between items
 	float                         item_spacing_x;
 
 	// keep the item visible on screen
-	bool                          keep_scroll_pos;
-	bool                          lock_visible_item;
+	bool                          lock_visible_item;  // ?
 
 	// States of last item or draw
 	bool                          scrollbar_active_last_frame;
@@ -950,9 +953,6 @@ namespace gallery_draw
 
 	// thumbnails we want loaded this frame
 	std::vector< delayed_load_t > thumbnail_requests;
-
-	// Store the tallest item in the current row, so we know the next offset for the next row
-	float                         last_max_item_height;
 
 	ImVec2                        dummy_area;
 	ImVec2                        region_size;
@@ -970,7 +970,7 @@ void gallery_draw_extra_refresh( int count = 1 )
 {
 	if ( count > gallery_draw::extra_refresh )
 		gallery_draw::extra_refresh = count;
-
+	
 	set_frame_draw( count );
 }
 
@@ -980,11 +980,11 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, bool upsc
 	// Fit image in window size, scaling up if needed
 	float factor[ 2 ] = { 1.f, 1.f };
 
-	if ( upscale || image->width > gallery_draw::image_bounds.x )
-		factor[ 0 ] = (float)gallery_draw::image_bounds.x / (float)image->width;
+	if ( upscale || image->width > gallery::image_bounds.x )
+		factor[ 0 ] = (float)gallery::image_bounds.x / (float)image->width;
 
-	if ( upscale || image->height > gallery_draw::image_bounds.y )
-		factor[ 1 ] = (float)gallery_draw::image_bounds.y / (float)image->height;
+	if ( upscale || image->height > gallery::image_bounds.y )
+		factor[ 1 ] = (float)gallery::image_bounds.y / (float)image->height;
 
 	float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
@@ -997,8 +997,8 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, bool upsc
 
 	// center the image
 	ImVec2 image_offset = ImGui::GetCursorPos();
-	image_offset.x += int( ( gallery_draw::image_bounds.x - image_size.x ) / 2 );
-	image_offset.y += int( ( gallery_draw::image_bounds.y - image_size.y ) / 2 );
+	image_offset.x += int( ( gallery::image_bounds.x - image_size.x ) / 2 );
+	image_offset.y += int( ( gallery::image_bounds.y - image_size.y ) / 2 );
 
 	ImGui::SetCursorPos( image_offset );
 
@@ -1121,20 +1121,20 @@ void gallery_view_draw_item_text( ImGuiStyle& style, size_t i, gallery_item_draw
 
 	// center align text
 	ImGui::SetCursorPosX( current_pos.x + ( ( gallery::item_size - ( media_text_size.x + style.WindowPadding.x * 2 + style.ItemSpacing.x ) ) * 0.5f ) );
-	ImGui::SetCursorPosY( current_pos.y + gallery_draw::image_bounds.x + style.ItemSpacing.y );
+	ImGui::SetCursorPosY( current_pos.y + gallery::image_bounds.x + style.ItemSpacing.y );
 
-	ImGui::PushTextWrapPos( saved_pos.x + gallery_draw::image_bounds.x + style.ItemSpacing.x );
+	ImGui::PushTextWrapPos( saved_pos.x + gallery::image_bounds.x + style.ItemSpacing.x );
 
 	// Text Clipping
 	ImVec2 window_pos         = ImGui::GetWindowPos();
 	ImVec2 current_screen_pos = ImGui::GetCursorScreenPos();
 
-	// ImVec2 text_clip_min( window_pos.x + gallery_draw_info.start_cursor_pos.x, ( window_pos.y + gallery_draw_info.start_cursor_pos.y + gallery_draw::image_bounds.x + ( style.ItemSpacing.y * 2 ) ) - ImGui::GetScrollY() );
+	// ImVec2 text_clip_min( window_pos.x + gallery_draw_info.start_cursor_pos.x, ( window_pos.y + gallery_draw_info.start_cursor_pos.y + gallery::image_bounds.x + ( style.ItemSpacing.y * 2 ) ) - ImGui::GetScrollY() );
 	//ImVec2 text_clip_min = item_draw.item_rect_min;
 	ImVec2 text_clip_min      = current_screen_pos;
 	ImVec2 text_clip_max = item_draw.item_rect_max;
 
-	//text_clip_min.y += gallery_draw::image_bounds.y + style.ItemSpacing.y;
+	//text_clip_min.y += gallery::image_bounds.y + style.ItemSpacing.y;
 
 	float  text_height   = text_clip_max.y - text_clip_min.y;
 	float  font_height   = ImGui::GetFontSize();
@@ -1242,8 +1242,8 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 	//
 	//ImVec2               image_min  = ImGui::GetCursorScreenPos();
 	//ImVec2               image_max  = image_min;
-	//image_max.x += gallery_draw::image_bounds.x;
-	//image_max.y += gallery_draw::image_bounds.y;
+	//image_max.x += gallery::image_bounds.x;
+	//image_max.y += gallery::image_bounds.y;
 	//
 	//draw_list->AddRect( image_min, image_max, clip_color, 0, ImDrawFlags_None );
 
@@ -1260,7 +1260,7 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 
 		image_t* icon_video        = icon_get_image( e_icon_video );
 
-		ImVec2   image_icon_bounds = { gallery_draw::image_bounds.x / 4.f, gallery_draw::image_bounds.y / 4.f };
+		ImVec2   image_icon_bounds = { gallery::image_bounds.x / 4.f, gallery::image_bounds.y / 4.f };
 
 		//if ( image->width > image_bounds.x )
 		factor[ 0 ]                = (float)image_icon_bounds.x / (float)icon_video->width;
@@ -1280,13 +1280,13 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 
 		if ( scaled_image_size.x )
 		{
-			image_offset_from_side_x = ( gallery_draw::image_bounds.x - scaled_image_size.x ) / 2.f;
-			image_offset_from_side_y = ( gallery_draw::image_bounds.y - scaled_image_size.y ) / 2.f;
+			image_offset_from_side_x = ( gallery::image_bounds.x - scaled_image_size.x ) / 2.f;
+			image_offset_from_side_y = ( gallery::image_bounds.y - scaled_image_size.y ) / 2.f;
 		}
 
 		// TODO: this doesn't work as well at different zoom levels
-		image_offset.x += ( gallery_draw::image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 1.25f );
-		image_offset.y += ( gallery_draw::image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 1.25f );
+		image_offset.x += ( gallery::image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 1.25f );
+		image_offset.y += ( gallery::image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 1.25f );
 
 		ImGui::SetCursorPos( image_offset );
 
@@ -1438,9 +1438,10 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 	{
 		scroll_to_index = last_selected;
 	}
-	else if ( gallery_draw::keep_scroll_pos )
+	else if ( gallery::keep_scroll_pos )
 	{
-		scroll_to_index = gallery_draw::first_visible_item;
+		scroll_to_index           = gallery_draw::first_visible_item;
+		gallery::scroll_to_cursor = true;
 	}
 
 	// if ( gallery::selection.size() && last_selected == i && gallery::scroll_to_cursor )
@@ -1468,7 +1469,6 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 		{
 			// calculate how much to scroll up or down
 			float scroll_offset = 0;
-			float scroll_diff   = gallery_draw::scroll - gallery_draw::scroll_prev;
 
 			if ( scroll_up )
 				scroll_offset = ( item_draw.item_rect_min.y - style.ItemSpacing.y ) - visible_top;
@@ -1513,7 +1513,7 @@ void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 		}
 
 		// Calculate Current Item Height, and store tallest height for current row
-		layout.item_size_y = gallery_draw::image_bounds.y + ( style.WindowPadding.y * 2 );
+		layout.item_size_y = gallery::image_bounds.y + ( style.WindowPadding.y * 2 );
 
 		if ( app::config.gallery_show_filenames )
 			layout.item_size_y += layout.text_size.y + style.ItemSpacing.y;
@@ -1523,6 +1523,8 @@ void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 }
 
 
+// the IsRectVisible Imgui function converts both ImVec2's to a ImRect structure,
+// but that's slow in this loop with potentially over 100,000 items (i've tested on 400,000)
 #define IsRectVisibleFast( window, rect_min, rect_max ) \
 	( window->ClipRect.Min.y < rect_max.y && window->ClipRect.Max.y > rect_min.y && window->ClipRect.Min.x < rect_max.x && window->ClipRect.Max.x > rect_min.x )
 
@@ -1540,15 +1542,37 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 	float  row_max_item_height           = 0.f;
 	//float  last_grid_row_y         = 0.f;
 
+	float  visible_bottom                = window_height;
+	float  visible_top                   = window_height - gallery_draw::region_size.y;
+
+	visible_bottom -= gallery_draw::scroll;
+	visible_top -= gallery_draw::scroll;
+
+	visible_bottom += style.WindowPadding.y;
+	visible_top += style.WindowPadding.y;
+
 	//ImVec2 fake_cursor_pos{};
-	ImVec2 fake_cursor_pos               = ImGui::GetCursorScreenPos();
+	// ImVec2 fake_cursor_pos               = ImGui::GetCursorScreenPos();
+
+	// has scroll pos stored in it
+	ImVec2 fake_cursor_pos(
+	  ( window_width - gallery_draw::region_size.x ) + style.WindowPadding.x,
+	  ( window_height - gallery_draw::region_size.y ) + style.WindowPadding.y );
+
+	// offset left side if few items in a row
+	if ( gallery::row_count <= 2 )
+		fake_cursor_pos.x += gallery_draw::item_spacing_x;
+
+	// apply scroll position
+	fake_cursor_pos.y -= gallery_draw::scroll;
+
 	ImVec2 start_cursor_pos              = fake_cursor_pos;
 	//ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
 
 	gallery_draw::dummy_area.y           = 0;
 
 	// do an extra frame draw just in case
-	//set_frame_draw( 2 );
+	set_frame_draw( 2 );
 
 	// slow call, save the values
 	u32                  last_selected   = gallery_view_get_last_selected_index();
@@ -1804,26 +1828,37 @@ void gallery_view_draw_content()
 		return;
 	}
 
-	gallery_draw::scroll_prev = gallery_draw::scroll;
-	gallery_draw::scroll      = ImGui::GetScrollY();
+	ImGuiWindow* window            = ImGui::GetCurrentWindow();
+	ImGuiID      active_id         = ImGui::GetActiveID();
+	// bool         scrollbar_active             = active_id && ( active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_X ) || active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y ) );
+	gallery_draw::scrollbar_active = active_id && active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y );
+
+	// when reloading the folder, the scroll value can change due to no items being here, so don't update our stored scroll value
+	// if ( !directory::folder_reload )
+	if ( gallery_draw::scrollbar_active )
+	{
+		gallery_draw::scroll_prev = gallery_draw::scroll;
+		gallery_draw::scroll      = ImGui::GetScrollY();
+	}
+	else
+	{
+		ImGui::SetScrollY( gallery_draw::scroll );
+	}
 
 	// reset per frame data
 	gallery_draw::thumbnail_requests.clear();
 
-	// Store the tallest item in the current row, so we know the next offset for the next row
-	gallery_draw::last_max_item_height = 0.f;
-	gallery_draw::any_item_hovered     = false;
+	gallery_draw::any_item_hovered = false;
 
-	static u32 last_row_count          = 0;
-	last_row_count                     = gallery::row_count;
+	static u32 last_row_count      = 0;
+	last_row_count                 = gallery::row_count;
 
-	int region_x                       = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
-	gallery::row_count                 = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
+	int region_x                   = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
+	gallery::row_count             = std::max( 1U, region_x / u32( gallery::item_size + style.ItemSpacing.x ) );
 
-	gallery_draw::dummy_area.x         = region_x;
+	gallery_draw::dummy_area.x     = region_x;
 
-	if ( last_row_count != gallery::row_count )
-		gallery_view_scroll_to_cursor();
+	gallery::keep_scroll_pos |= last_row_count != gallery::row_count;
 
 	gallery_draw::scroll_changed |= gallery::scroll_to_cursor || gallery_draw::scrollbar_active || gallery_draw::scrollbar_active_last_frame;
 
@@ -1843,19 +1878,11 @@ void gallery_view_draw_content()
 
 	gallery_draw::item_spacing_x = std::max( 0.f, gallery_draw::item_spacing_x );
 
-	ImGuiWindow* window            = ImGui::GetCurrentWindow();
-	ImGuiID      active_id         = ImGui::GetActiveID();
-	// bool         scrollbar_active             = active_id && ( active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_X ) || active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y ) );
-	gallery_draw::scrollbar_active = active_id && active_id == ImGui::GetWindowScrollbarID( window, ImGuiAxis_Y );
-
 	gallery_draw::scroll_changed |= gallery_draw::scrollbar_active;
 
 	// ----------------------------------------------------------------------------------------------------------
 
-	gallery_draw::image_bounds         = { gallery::item_size - ( style.WindowPadding.x * 2 ), gallery::item_size - ( style.WindowPadding.x * 2 ) };
-	gallery::image_size                = gallery_draw::image_bounds.x;
-
-	gallery_draw::last_max_item_height = gallery_draw::item_size_y;
+	gallery::image_bounds = { gallery::item_size - ( style.WindowPadding.x * 2 ), gallery::item_size - ( style.WindowPadding.x * 2 ) };
 
 	if ( gallery::row_count <= 2 )
 		ImGui::SetCursorPosX( ImGui::GetCursorPosX() + gallery_draw::item_spacing_x );
@@ -1870,18 +1897,18 @@ void gallery_view_draw_content()
 	gallery_draw::first_visible_item = gallery::first_visible_item;
 	gallery::content_area_resized |= app::window_resized || row_count_changed;
 
-	gallery_draw::keep_scroll_pos    = gallery::item_size_changing;
-	gallery_draw::keep_scroll_pos |= filenames_shown_last != app::config.gallery_show_filenames;
+	gallery::keep_scroll_pos    = gallery::item_size_changing;
+	gallery::keep_scroll_pos |= filenames_shown_last != app::config.gallery_show_filenames;
 
 	if ( !directory::folder_changed )
 	{
-		gallery_draw::keep_scroll_pos |= gallery::scroll_to_cursor;
-		gallery_draw::keep_scroll_pos |= gallery::content_area_resized;
+		gallery::keep_scroll_pos |= gallery::scroll_to_cursor;
+		gallery::keep_scroll_pos |= gallery::content_area_resized;
 	}
 
-	gallery_draw::lock_visible_item = gallery_draw::keep_scroll_pos || gallery::content_area_resized;
+	gallery_draw::lock_visible_item = gallery::keep_scroll_pos || gallery::content_area_resized;
 
-	gallery_draw::scroll_changed |= gallery_draw::keep_scroll_pos;
+	gallery_draw::scroll_changed |= gallery::keep_scroll_pos;
 
 	bool   no_extra_refresh   = gallery_draw::extra_refresh == 0;
 	bool   no_delayed_refresh = gallery_draw::delayed_refresh;
@@ -1939,7 +1966,7 @@ void gallery_view_draw_content()
 	//ImColor main_bg_color = ImVec4( 128, 0, 0, 255 );
 	//draw_list->AddRect( dummy_start_pos_screen, dummy_start_pos_screen + gallery_draw::dummy_area, main_bg_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
 
-	gallery_view_context_menu();
+	gallery_view_handle_context_menu();
 
 	ImGui::EndChild();
 

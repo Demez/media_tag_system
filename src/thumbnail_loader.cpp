@@ -613,9 +613,8 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		thumbnail_printf( "[THUMBNAIL %d][THREAD %d] STARTING LOAD OF IMAGE: %s\n", thread_data.thumbnail.index, thread_id, thumbnail->path );
 
-		size_t            file_hash               = thumbnail_generate_hash( thread_data.file );
-
-		u32               thumbnail_size = gallery::image_size;
+		size_t file_hash      = thumbnail_generate_hash( thread_data.file );
+		u32    thumbnail_size = static_cast< u32 >( gallery::image_bounds.x );
 
 		if ( app::config.thumbnail_use_fixed_size )
 			thumbnail_size = app::config.thumbnail_size;
@@ -874,6 +873,7 @@ void thumbnail_loader_update()
 
 			if ( thumbnail.image_scaled )
 			{
+				// TODO: check if the thumbnail size changed while being generated, and invalidate it
 				gl_update_textures( thumbnail.textures, thumbnail.image_scaled, 1 );
 				image_free_alloc( *thumbnail.image_scaled );
 			}

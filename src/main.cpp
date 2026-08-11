@@ -967,9 +967,6 @@ static void handle_queued_file()
 
 	if ( path != directory::path || directory::folder_reload )
 	{
-		// TODO: why are we setting this to true if it's just a folder reload? it's the same folder path!!!
-		directory::folder_changed = true;
-
 		if ( !directory::folder_reload )
 			gallery_view_clear_selection();
 
@@ -982,9 +979,6 @@ static void handle_queued_file()
 
 		if ( media_check_extension( ext, entry.type ) )
 		{
-			//directory::folder_changed      = true;
-			//folder_load_media_list();
-
 			directory::media_list.clear();
 			directory::media_list.push_back( entry );
 
@@ -1022,21 +1016,29 @@ static void handle_queued_folder()
 {
 	if ( directory::queued != directory::path )
 	{
+		if ( directory::folder_reload )
+		{
+			directory::folder_reload = false;
+			printf( "NOTE: this is not a folder reload!\n" );
+		}
+
 		directory::folder_changed = true;
 		// gallery_view_clear_selection();
 		directory::path           = directory::queued;
+
 		folder_load_media_list();
 	}
-	else if ( directory::folder_reload )
+	else
 	{
-		gallery_view_scroll_to_cursor();
+		directory::folder_reload = true;
+		// gallery::keep_scroll_pos = true;
+		// gallery_view_scroll_to_cursor();
 		folder_load_media_list();
 	}
 
 	// gallery_view_scroll_to_cursor();
 	set_view_type_gallery();
 
-	directory::folder_reload = false;
 	directory::queued.clear();
 }
 
@@ -1104,9 +1106,6 @@ void main_loop()
 
 		// -----------------------------------------------------------------------------------
 		// Queued Directory/File to Change to/Load
-
-		if ( gallery::scan_state == e_gallery_scan_idle )
-			directory::folder_changed = false;
 
 		if ( sys_folder_mon_changed() )
 		{
@@ -1183,6 +1182,14 @@ void main_loop()
 		app::in_window_drag = false;
 
 		last_mouse_pos      = mouse_pos;
+
+		// -----------------------------------------------------------------------------------
+
+		if ( gallery::scan_state == e_gallery_scan_idle )
+		{
+			directory::folder_changed = false;
+			directory::folder_reload  = false;
+		}
 
 		// -----------------------------------------------------------------------------------
 
