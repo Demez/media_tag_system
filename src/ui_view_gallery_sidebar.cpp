@@ -397,8 +397,6 @@ float gallery_view_draw_header()
 		}
 		else
 		{
-			//ImGui::BeginDisabled( gallery::scan_state != e_gallery_scan_idle );
-
 			ImGui::TextUnformatted( "Search" );
 
 			ImGui::SameLine();
@@ -410,21 +408,12 @@ float gallery_view_draw_header()
 					ImGui::SetKeyboardFocusHere();
 			}
 
-			if ( strlen( gallery::search ) == 0 )
-			{
-				// gallery_view_set_selection( gallery::cursor );
-			}
-
 			ImGui::SetNextItemWidth( search_space_avail );
 
-			// if ( ImGui::InputText( "##search", gallery::search, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 			if ( ImGui::InputText( "##search", gallery::search, 512 ) )
 			{
-				// TODO: QUEUE THIS SEARCH IN CASE A SORT IS CURRENTLY HAPPENING FROM PREVIOUS CHARACTERS IN THE SEARCH BOX !!!!
 				gallery_view_dir_change( true );
 			}
-
-			//ImGui::EndDisabled();
 
 			ImGui::SameLine();
 			draw_vertical_separator( draw_list, style );
@@ -516,8 +505,6 @@ float gallery_view_draw_header()
 
 	ImGui::SetNextItemWidth( filter_width );
 
-	ImGui::BeginDisabled( gallery::scan_state != e_gallery_scan_idle );
-
 	// this could be a check box thing for toggling what you want to view, all enabled by default, but that is slower
 	if ( ImGui::BeginCombo( "##quick_filter", "Quick Filter", 0 ) )
 	{
@@ -583,8 +570,6 @@ float gallery_view_draw_header()
 
 		ImGui::EndCombo();
 	}
-
-	ImGui::EndDisabled();
 
 	// if ( gallery::selection.size() )
 	{

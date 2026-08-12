@@ -436,10 +436,10 @@ int qsort_size_small_to_large( const void* left, const void* right )
 }
 
 
-void gallery_view_sort_list( std::vector< size_t >& gallery_list )
+void gallery_view_sort_list( std::vector< size_t >& gallery_list, e_gallery_sort_mode sort_mode )
 {
 	// Sort data
-	switch ( gallery::sort_mode )
+	switch ( sort_mode )
 	{
 		default:
 		case e_gallery_sort_mode_name_a_z:
@@ -531,8 +531,16 @@ void gallery_find_selected_file()
 
 struct gallery_sort_dir_data_t
 {
+	std::vector< size_t > sorted_media;
+	char*                 search;
+	size_t                search_len = 0;
+	e_gallery_sort_mode   sort_mode;
+	e_gallery_filter      filter;
+	bool                  resort;  // true to do another resort, used for live user searching
 };
 
+// check if we are cancelled every X items
+constexpr size_t     SORT_CHECK_CANCEL_ITEM_COUNT  = 150;
 
 static job_status_t* g_item_size_calc_job = nullptr;
 static job_status_t* g_gallery_sort_job   = nullptr;
@@ -542,7 +550,32 @@ static job_status_t* g_gallery_sort_job   = nullptr;
 static bool          g_gallery_sort_block_new_jobs = false;
 
 
-void                 gallery_view_item_size_calc( ImGuiStyle& style, size_t count );
+void gallery_view_item_size_calc( ImGuiStyle& style, size_t count );
+
+
+bool gallery_sort_check_if_canceled( job_status_t* status, gallery_sort_dir_data_t* sort_data )
+{
+	size_t new_search_len = strlen( gallery::search );
+
+	// in case the user changed these while starting the task
+	sort_data->resort |= sort_data->search_len != new_search_len;
+	sort_data->resort |= sort_data->filter != gallery::filter;
+	sort_data->resort |= sort_data->sort_mode != gallery::sort_mode;
+
+	if ( sort_data->resort )
+	{
+		printf( "SORT JOB NEED RESORT - %p\n", status );
+		job_cancel_and_free( status );
+	}
+
+	if ( status->cancel )
+	{
+		printf( "SORT JOB CANCELLED - %p\n", status );
+		return true;
+	}
+
+	return sort_data->resort;
+}
 
 
 void gallery_view_sort_dir_func( job_status_t* status )
@@ -559,33 +592,39 @@ void gallery_view_sort_dir_func( job_status_t* status )
 	folders.reserve( directory::media_list.size() );
 	files.reserve( directory::media_list.size() );
 
-	size_t           search_len = strlen( gallery::search );
-	e_gallery_filter filter     = gallery::filter;
+	auto sort_data = static_cast< gallery_sort_dir_data_t* >( status->userdata );
+
+	if ( gallery_sort_check_if_canceled( status, sort_data ) )
+		return;
 
 	// Split up lists
 	for ( size_t i = 0; i < directory::media_list.size(); i++ )
 	{
-		//if ( status->cancel )
-		//	return;
+		// check every X entries
+		if ( i % SORT_CHECK_CANCEL_ITEM_COUNT == 0 )
+		{
+			if ( gallery_sort_check_if_canceled( status, sort_data ) )
+				return;
+		}
 
 		e_media_type type = directory::media_list[ i ].type;
 
-		if ( filter )
+		if ( sort_data->filter )
 		{
-			if ( type == e_media_type_directory && !( filter & e_gallery_filter_folders ) )
+			if ( type == e_media_type_directory && !( sort_data->filter & e_gallery_filter_folders ) )
 				continue;
 
-			if ( type == e_media_type_image && !( filter & e_gallery_filter_images ) )
+			if ( type == e_media_type_image && !( sort_data->filter & e_gallery_filter_images ) )
 				continue;
 
-			if ( type == e_media_type_video && !( filter & e_gallery_filter_videos ) )
+			if ( type == e_media_type_video && !( sort_data->filter & e_gallery_filter_videos ) )
 				continue;
 		}
 
-		if ( search_len )
+		if ( sort_data->search_len )
 		{
 			media_entry_t& entry = directory::media_list[ i ];
-			char*          find  = SDL_strcasestr( entry.filename.c_str(), gallery::search );
+			char*          find  = SDL_strcasestr( entry.filename.c_str(), sort_data->search );
 
 			if ( !find )
 				continue;
@@ -598,44 +637,28 @@ void gallery_view_sort_dir_func( job_status_t* status )
 	}
 
 	// Sort data
-	if ( gallery::sort_mode != e_gallery_sort_mode_size_large_to_small && gallery::sort_mode != gallery::sort_mode )
-		gallery_view_sort_list( folders );
+	if ( sort_data->sort_mode != e_gallery_sort_mode_size_large_to_small && sort_data->sort_mode != e_gallery_sort_mode_size_small_to_large )
+		gallery_view_sort_list( folders, sort_data->sort_mode );
 
-	if ( status->cancel )
+	if ( gallery_sort_check_if_canceled( status, sort_data ) )
 		return;
 
-	gallery_view_sort_list( files );
+	gallery_view_sort_list( files, sort_data->sort_mode );
 
-	if ( status->cancel )
+	if ( gallery_sort_check_if_canceled( status, sort_data ) )
 		return;
 
-	auto sorted_media = new std::vector< size_t >;
-	sorted_media->resize( folders.size() + files.size() );
+	sort_data->sorted_media.resize( folders.size() + files.size() );
 
 	// Add Folders First
-	std::copy( folders.begin(), folders.end(), sorted_media->begin() );
+	//std::copy( folders.begin(), folders.end(), sort_data->sorted_media.begin() );
+	std::move( folders.begin(), folders.end(), sort_data->sorted_media.begin() );
 
 	// Add Files next
-	std::copy( files.begin(), files.end(), sorted_media->begin() + folders.size() );
+	//std::copy( files.begin(), files.end(), sort_data->sorted_media.begin() + folders.size() );
+	std::move( files.begin(), files.end(), sort_data->sorted_media.begin() + folders.size() );
 
-	// Store it in the userdata
-	status->userdata = sorted_media;
-
-	printf( "DONE SORTING\n" );
-
-	// ugh
-	//g_gallery_sort_block_new_jobs = true;
-	//
-	//gallery::sorted_media = *sorted_media;
-	//
-	//delete sorted_media;
-	//
-	//gallery_view_reset_text_size();
-	//
-	//if ( gallery::item_size_changed || directory::folder_changed || gallery::always_recalc_item_sizes )
-	//{
-	//	gallery_view_item_size_calc( ImGui::GetStyle(), sorted_media->size() );
-	//}
+	printf( "DONE SORTING - %p\n", status );
 }
 
 
@@ -644,31 +667,21 @@ extern void select_image_in_folder( bool force_load_media );
 
 void gallery_view_sort_dir_finish( job_status_t* status, bool in_main_thread )
 {
-	if ( gallery::scan_state == e_gallery_scan_idle )
-		return;
+	g_gallery_sort_job = nullptr;
 
-	if ( !status->userdata )
+	if ( gallery::scan_state == e_gallery_scan_idle )
 		return;
 
 	// TODO: it would be nice for this to not be on the main thread when in a resize or something, but that's too tricky atm
 	if ( !in_main_thread )
 		return;
 
-	printf( "SORT FINISH FUNC\n" );
+	printf( "SORT FINISH FUNC - %p\n", status );
 
-	g_gallery_sort_block_new_jobs = false;
+	//g_gallery_sort_block_new_jobs = false;
 
-	g_gallery_sort_job  = nullptr;
-
-	auto sorted_media   = static_cast< std::vector< size_t >* >( status->userdata );
-	
-	if ( !sorted_media )
-		return;
-	
-	gallery::sorted_media = *sorted_media;
-	
-	delete sorted_media;
-	status->userdata = nullptr;
+	auto sort_data        = static_cast< gallery_sort_dir_data_t* >( status->userdata );
+	gallery::sorted_media = sort_data->sorted_media;
 
 	if ( !directory::queued.empty() )
 		select_image_in_folder( false );
@@ -694,20 +707,56 @@ void gallery_view_sort_dir_finish( job_status_t* status, bool in_main_thread )
 }
 
 
+void gallery_view_sort_dir_free( job_status_t* status )
+{
+	auto sort_data = static_cast< gallery_sort_dir_data_t* >( status->userdata );
+	ch_free_str( sort_data->search );
+
+	// if a resort is needed, push a new job
+	if ( sort_data->resort && status->cancel )
+		gallery_view_sort_dir();
+
+	delete sort_data;
+
+	//if ( g_gallery_sort_job == status )
+	//	printf( "FREEING CURRENT STATUS !!!!\n" );
+	//else if ( g_gallery_sort_job )
+	//	printf( "FREE SORT DATA - g_gallery_sort_job EXISTS\n" );
+	//else
+		printf( "FREE SORT DATA - %p\n", status );
+}
+
+
 void gallery_view_sort_dir()
 {
-	if ( gallery::scan_state == e_gallery_scan_sorting )
+	if ( g_gallery_sort_job )
+	{
+		auto sort_data = static_cast< gallery_sort_dir_data_t* >( g_gallery_sort_job->userdata );
+
+		if ( !sort_data->resort )
+			return;
+	}
+	else if ( gallery::scan_state == e_gallery_scan_sorting )
 		return;
 
-	if ( g_gallery_sort_block_new_jobs )
-		return;
+	//if ( g_gallery_sort_block_new_jobs )
+	//	return;
 
 	gallery::scan_state = e_gallery_scan_sorting;
 	set_frame_draw();
 
 	job_cancel_and_free( g_gallery_sort_job );
 
-	g_gallery_sort_job = job_push( gallery_view_sort_dir_finish, gallery_view_sort_dir_func, nullptr );
+	auto sort_data        = new gallery_sort_dir_data_t;
+	sort_data->search_len = strlen( gallery::search );
+	sort_data->search     = util_strndup( gallery::search, sort_data->search_len );
+	sort_data->filter     = gallery::filter;
+	sort_data->sort_mode  = gallery::sort_mode;
+	sort_data->resort     = false;
+
+	g_gallery_sort_job    = job_push( gallery_view_sort_dir_finish, gallery_view_sort_dir_func, gallery_view_sort_dir_free, sort_data );
+
+	printf( "SORT JOB PUSHED - %p\n", g_gallery_sort_job );
 }
 
 

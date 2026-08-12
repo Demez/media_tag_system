@@ -122,7 +122,7 @@ void job_shutdown()
 }
 
 
-job_status_t* job_push( job_finish_t* finish_callback, job_function_t* function, void* userdata )
+job_status_t* job_push( job_finish_t* finish_callback, job_function_t* function, job_function_t* free_func, void* userdata )
 {
 	// auto status = ch_new< folder_scan_status_t >( e_mem_category_thread_data );
 	auto status = new job_status_t;
@@ -133,6 +133,7 @@ job_status_t* job_push( job_finish_t* finish_callback, job_function_t* function,
 	status->callback = finish_callback;
 	status->function = function;
 	status->userdata = userdata;
+	status->free     = free_func;
 
 	g_job_lock.lock();
 
@@ -149,8 +150,14 @@ job_status_t* job_push( job_finish_t* finish_callback, job_function_t* function,
 // call this when finished doing work
 void job_free( job_status_t* status )
 {
-	if ( status )
-		delete status;
+	if ( !status )
+		return;
+
+	if ( status->free )
+		status->free( status );
+	
+	status->userdata = nullptr;
+	delete status;
 }
 
 

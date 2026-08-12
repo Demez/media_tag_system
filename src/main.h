@@ -795,6 +795,9 @@ struct job_status_t
 	// function to call internally
 	job_function_t* function = nullptr;
 
+	// function to call for freeing userdata
+	job_function_t* free = nullptr;
+
 	// store information you need here
 	void*           userdata = nullptr;
 
@@ -809,7 +812,7 @@ struct job_status_t
 extern SDL_Event g_event_job_finish;
 
 
-job_status_t*    job_push( job_finish_t* finish_callback, job_function_t* function, void* userdata );
+job_status_t*    job_push( job_finish_t* finish_callback, job_function_t* function, job_function_t* free_func, void* userdata );
 
 // call this when finished doing work
 void             job_free( job_status_t* status );
