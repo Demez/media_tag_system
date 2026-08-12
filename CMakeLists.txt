@@ -14,6 +14,7 @@ project( media_tag_system )
 
 set( PROJ_OBJ "obj" )
 set( PROJ_OUT "${CMAKE_CURRENT_LIST_DIR}/out" )
+set( THIRDPARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/thirdparty" )
 
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJ_OUT} )
 set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJ_OUT} )
@@ -353,6 +354,21 @@ if ( MIMALLOC )
 	link_directories( "thirdparty/mimalloc/out/msvc-x64/Release" )
 endif()
 
+set( LINK_DIR_DEBUG
+	"${THIRDPARTY_DIR}/nativefiledialog/build/src/Debug"
+	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Debug"
+)
+
+set( LINK_DIR_RELEASE
+	"${THIRDPARTY_DIR}/nativefiledialog/build/src/Release"
+	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Release"
+)
+
+set( LINK_DIR_RELEASE_DEBUG_INFO
+	"${THIRDPARTY_DIR}/nativefiledialog/build/src/RelWithDebInfo"
+	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Release"
+)
+
 link_directories(
 	"thirdparty/nativefiledialog/build/src"
 	"thirdparty/mozjpeg/build"
@@ -363,8 +379,11 @@ link_directories(
 	# i don't want to use static, but for some reason, it can't find the lib when using the dll version?
 	"${FREETYPE_DIR}/objs/x64/Release Static"
 	
-	"thirdparty/nativefiledialog/build/src/${CMAKE_CFG_INTDIR}"
-	"thirdparty/libjpeg-turbo/build/${CMAKE_CFG_INTDIR}"
+	"$<$<CONFIG:Debug>:${LINK_DIR_DEBUG}>"
+	"$<$<CONFIG:Release>:${LINK_DIR_RELEASE}>"
+	"$<$<CONFIG:RelWithDebInfo>:${LINK_DIR_RELEASE_DEBUG_INFO}>"
+	
+	# "thirdparty/nativefiledialog/build/src/${CMAKE_CFG_INTDIR}"
 )
 
 if ( WIN32 )
