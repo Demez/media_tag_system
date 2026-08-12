@@ -89,7 +89,7 @@ void gallery_selected_item_action( const media_entry_t& media, u32 index )
 {
 	if ( media.type == e_media_type_directory )
 	{
-		directory::queued = media.file.path;
+		directory::queued = directory::path / media.file.path;
 	}
 	else
 	{
