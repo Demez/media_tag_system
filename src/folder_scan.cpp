@@ -12,51 +12,52 @@ std::mutex                           g_folder_scan_lock;
 
 SDL_Event                            g_event_folder_scan_finish{};
 
+typedef void( job_finish_t )( job_status_t* status, bool in_main_thread );
+typedef void( job_function_t )( job_status_t* status );
 
-void folder_scan_thread()
+
+void folder_scan_job_finish( job_status_t* status, bool in_main_thread )
 {
-	while ( app::running )
+	auto scan = static_cast< folder_scan_status_t* >( status->userdata );
+	scan->callback( scan, in_main_thread );
+}
+
+
+void folder_scan_job_run( job_status_t* status )
+{
+	auto scan   = static_cast< folder_scan_status_t* >( status->userdata );
+
+	bool result = sys_scandir( scan->root, scan->files, scan->flags, &status->cancel );
+
+	if ( !result )
+		printf( "Failed to scan directory: %s\n", scan->root );
+
+	// should we mutex lock this by storing a mutex in the status of it?
+	scan->result     = result;
+	//status->finished = true;
+
+	if ( !status->cancel && scan->thread_func )
 	{
-		g_folder_scan_queue_size.wait( 0 );
+		// send draw event
+		send_frame_draw_event();
 
-		if ( !app::running )
-			return;
-
-		g_folder_scan_lock.lock();
-
-		folder_scan_status_t* status = g_folder_scan_queue.back();
-		g_folder_scan_queue.pop_back();
-		g_folder_scan_queue_size.store( g_folder_scan_queue.size() );
-
-		g_folder_scan_lock.unlock();
-
-		if ( !status )
-			continue;
-
-		bool result = sys_scandir( status->root, status->files, status->flags, &status->cancel );
-
-		if ( !result )
-			printf( "Failed to scan directory: %s\n", status->root );
-
-		// should we mutex lock this by storing a mutex in the status of it?
-		status->result   = result;
-		status->finished = true;
-
-		if ( !status->cancel && status->thread_func )
-		{
-			// send draw event
-			send_frame_draw_event();
-
-			// call user function
-			status->thread_userdata = status->thread_func( status );
-		}
-
-		// base event
-		SDL_Event event  = g_event_folder_scan_finish;
-		event.user.data1 = status;
-
-		SDL_PushEvent( &event );
+		// call user function
+		scan->thread_userdata = scan->thread_func( scan );
 	}
+}
+
+
+void folder_scan_job_free( job_status_t* status )
+{
+	if ( !status )
+		return;
+
+	auto scan = static_cast< folder_scan_status_t* >( status->userdata );
+
+	ch_free_str( scan->root );
+	scan->files.clear();
+
+	delete scan;
 }
 
 
@@ -66,7 +67,6 @@ folder_scan_status_t* folder_scan_push( const char* root, e_scandir_flags flags,
 	if ( !fs_is_dir( root ) )
 		return nullptr;
 
-	// auto status = ch_new< folder_scan_status_t >( e_mem_category_thread_data );
 	auto status = new folder_scan_status_t;
 
 	if ( !status )
@@ -77,55 +77,8 @@ folder_scan_status_t* folder_scan_push( const char* root, e_scandir_flags flags,
 	status->callback    = callback;
 	status->thread_func = thread_func;
 
-	g_folder_scan_lock.lock();
-
-	g_folder_scan_queue.push_back( status );
-	g_folder_scan_queue_size.store( g_folder_scan_queue.size() );
-	g_folder_scan_queue_size.notify_one();
-
-	g_folder_scan_lock.unlock();
+	status->job         = job_push( folder_scan_job_finish, folder_scan_job_run, folder_scan_job_free, status );
 
 	return status;
-}
-
-
-void folder_scan_free( folder_scan_status_t* status )
-{
-	if ( !status )
-		return;
-
-	ch_free_str( status->root );
-	status->files.clear();
-
-	//ch_free( e_mem_category_thread_data, status );
-	delete status;
-}
-
-
-bool folder_scan_init()
-{
-	g_folder_scan_thread = new std::thread( folder_scan_thread );
-
-	if ( !g_folder_scan_thread )
-		return false;
-
-	g_event_folder_scan_finish.type      = SDL_EVENT_USER;
-	g_event_folder_scan_finish.user.code = SDL_RegisterEvents( 1 );
-
-	return true;
-}
-
-
-void folder_scan_shutdown()
-{
-	g_folder_scan_queue_size.store( 64 );
-	g_folder_scan_queue_size.notify_all();
-
-	if ( g_folder_scan_thread )
-		g_folder_scan_thread->join();
-
-	//ch_free( e_mem_category_thread_data, g_folder_scan_thread );
-	delete g_folder_scan_thread;
-	g_folder_scan_thread = nullptr;
 }
 

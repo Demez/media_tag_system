@@ -196,7 +196,6 @@ void select_image_in_folder( bool force_load_media )
 			continue;
 
 		gallery_view_set_selection( i );
-		set_view_type_media( force_load_media );
 		break;
 	}
 }
@@ -217,7 +216,7 @@ void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
 		return nullptr;
 
 	// was this cancelled?
-	if ( status->cancel )
+	if ( status->job->cancel )
 		return nullptr;
 
 	gallery::scan_state = e_gallery_scan_building;
@@ -230,7 +229,7 @@ void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
 
 	for ( const file_t& entry : status->files )
 	{
-		if ( status->cancel )
+		if ( status->job->cancel )
 		{
 			delete media_list;
 			return nullptr;
@@ -271,7 +270,7 @@ void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_t
 		return;
 
 	// was this cancelled?
-	if ( status->cancel )
+	if ( status->job->cancel )
 		return;
 
 	// already handled earlier?
@@ -311,10 +310,9 @@ void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_t
 
 void folder_load_media_list()
 {
-	// TODO: MEMORY LEAK - THIS NEVER GETS FREED !!!!
 	if ( g_main_dir_scan_status )
 	{
-		g_main_dir_scan_status->cancel = true;
+		g_main_dir_scan_status->job->cancel = true;
 	}
 
 	thumbnail_clear_cache();
@@ -603,21 +601,6 @@ void handle_user_event( SDL_Event& event, bool in_main_thread )
 	if ( event.user.code == g_event_draw.user.code )
 	{
 		return;
-	}
-	else if ( event.user.code == g_event_folder_scan_finish.user.code )
-	{
-		auto status = static_cast< folder_scan_status_t* >( event.user.data1 );
-
-		if ( !status )
-			return;
-
-		if ( status->callback )
-			status->callback( status, in_main_thread );
-		else
-			printf( "FOLDER SCAN DOES NOT HAVE CALLBACK?\n" );
-
-		if ( in_main_thread )
-			folder_scan_free( status );
 	}
 	else if ( event.user.code == g_event_job_finish.user.code )
 	{
@@ -1231,7 +1214,6 @@ void shutdown()
 	stop_mpv();
 
 	thumbnail_loader_shutdown();
-	folder_scan_shutdown();
 	job_shutdown();
 	sys_folder_mon_shutdown();
 
@@ -1463,12 +1445,6 @@ int startup( int argc, char* argv[] )
 	if ( !thumbnail_loader_init() )
 	{
 		printf( "Failed to init thumbnail loader\n" );
-		return 1;
-	}
-
-	if ( !folder_scan_init() )
-	{
-		printf( "Failed to init folder scan thread\n" );
 		return 1;
 	}
 

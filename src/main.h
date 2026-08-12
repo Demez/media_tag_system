@@ -596,6 +596,8 @@ typedef void* ( folder_scan_thread_func_t )( folder_scan_status_t* status );
 // For running the scan directory in a background thread
 struct folder_scan_status_t
 {
+	job_status_t*              job             = nullptr;
+
 	// function to call on the main thread when finsished
 	folder_scan_callback_t*    callback        = nullptr;
 
@@ -609,12 +611,6 @@ struct folder_scan_status_t
 
 	char*                      root     = nullptr;
 	e_scandir_flags            flags    = 0;
-
-	// set to true to cancel the scan
-	bool                       cancel   = false;
-
-	// check to see if it finished
-	bool                       finished = false;
 
 	// the return value of sys_scandir
 	bool                       result   = false;
@@ -663,12 +659,6 @@ bool                                 on_new_file( const fs::path& file_path );
 
 // non-blocking folder scanning
 folder_scan_status_t*                folder_scan_push( const char* root, e_scandir_flags flags, folder_scan_callback_t* callback, folder_scan_thread_func_t* thread_func = nullptr );
-
-// call this when finished doing work after scanning is complete
-void                                 folder_scan_free( folder_scan_status_t* status );
-
-bool                                 folder_scan_init();
-void                                 folder_scan_shutdown();
 
 void                                 image_copy_data( image_t& src, image_t& dst );
 void                                 image_copy_frame_data( image_frame_t& src, image_frame_t& dst );
