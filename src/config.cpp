@@ -36,6 +36,7 @@ static fy_document* config_open( bool saving )
 		size_t len    = 0;
 		char* buffer = fs_read_file( config_path.c_str(), &len );
 		fyd          = fy_document_build_from_string( &cfg, buffer, len );
+		ch_free( e_mem_category_file_data, buffer );
 	}
 
 	if ( !fyd )
@@ -51,6 +52,7 @@ static fy_document* config_open( bool saving )
 			size_t len    = 0;
 			char*  buffer = fs_read_file( config_path.c_str(), &len );
 			fyd           = fy_document_build_from_string( &cfg, buffer, len );
+			ch_free( e_mem_category_file_data, buffer );
 		}
 
 		if ( !fyd )
