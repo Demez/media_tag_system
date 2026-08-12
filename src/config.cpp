@@ -13,7 +13,7 @@
 #define DEFAULT_VIDEO_THUMBNAIL_CACHE "$app_path$/thumbnail_video_cache"
 
 
-static fy_document* config_open( bool saving )
+static fy_document* config_open( bool saving, char*& buffer )
 {
 	const char* app_dir     = sys_get_exe_folder();
 
@@ -33,10 +33,9 @@ static fy_document* config_open( bool saving )
 
 	if ( fs_is_file( config_path.c_str() ) )
 	{
-		size_t len    = 0;
-		char* buffer = fs_read_file( config_path.c_str(), &len );
-		fyd          = fy_document_build_from_string( &cfg, buffer, len );
-		ch_free( e_mem_category_file_data, buffer );
+		size_t len = 0;
+		buffer     = fs_read_file( config_path.c_str(), &len );
+		fyd        = fy_document_build_from_string( &cfg, buffer, len );
 	}
 
 	if ( !fyd )
@@ -49,10 +48,9 @@ static fy_document* config_open( bool saving )
 
 		if ( fs_is_file( config_path2.c_str() ) )
 		{
-			size_t len    = 0;
-			char*  buffer = fs_read_file( config_path.c_str(), &len );
-			fyd           = fy_document_build_from_string( &cfg, buffer, len );
-			ch_free( e_mem_category_file_data, buffer );
+			size_t len = 0;
+			buffer     = fs_read_file( config_path.c_str(), &len );
+			fyd        = fy_document_build_from_string( &cfg, buffer, len );
 		}
 
 		if ( !fyd )
@@ -427,7 +425,8 @@ bool config_load()
 {
 	config_reset();
 
-	fy_document* fyd = config_open( false );
+	char*        buffer = nullptr;
+	fy_document* fyd = config_open( false, buffer );
 
 	if ( !fyd )
 	{
@@ -501,6 +500,7 @@ bool config_load()
 	gallery::image_bounds.x = gallery::item_size;
 	gallery::image_bounds.y = gallery::item_size;
 
+	ch_free( e_mem_category_file_data, buffer );
 	return true;
 }
 
@@ -744,7 +744,8 @@ fy_node* config_save_get_list_node( fy_document* doc, fy_node* root, const char*
 
 void config_save()
 {
-	fy_document* doc = config_open( true );
+	char*        buffer = nullptr;
+	fy_document* doc = config_open( true, buffer );
 
 	if ( !doc )
 	{
@@ -873,5 +874,6 @@ void config_save()
 	}
 
 	ch_free( e_mem_category_file_data, my_stupid_buffer );
+	ch_free( e_mem_category_file_data, buffer );
 }
 
