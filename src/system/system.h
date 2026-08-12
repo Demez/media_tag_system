@@ -15,6 +15,8 @@ enum e_scandir_flags_ : u8
 	e_scandir_no_dirs       = 1 << 1,  // Don't include any directories
 	e_scandir_no_files      = 1 << 2,  // Don't include any files
 	e_scandir_recursive     = 1 << 3,  // Recursively scan a directory, works with e_scandir_no_dirs flag
+	e_scandir_no_filenames  = 1 << 4,  // Don't fill out the name value of file_t
+	e_scandir_no_paths      = 1 << 5,  // Don't fill out the path value of file_t
 
 	e_scandir_abs_recursive = e_scandir_abs_paths | e_scandir_recursive,
 };
@@ -67,6 +69,7 @@ struct scandir_status_t
 struct file_t
 {
 	fs::path    path{};
+	std::string name{};
 	u64         size         = 0;
 	u64         date_mod     = 0;
 	u64         date_created = 0;
@@ -89,6 +92,9 @@ struct file_t
 		if ( path != other.path )
 			return true;
 
+		if ( name != other.name )
+			return true;
+
 		return false;
 	}
 
@@ -109,6 +115,7 @@ struct file_t
 	void assign( const file_t& other ) noexcept
 	{
 		path         = other.path;
+		name         = other.name;
 		date_mod     = other.date_mod;
 		date_created = other.date_created;
 		size         = other.size;
@@ -119,6 +126,7 @@ struct file_t
 	void assign( file_t&& other ) noexcept
 	{
 		path         = std::move( other.path );
+		name         = std::move( other.name );
 		date_mod     = other.date_mod;
 		date_created = other.date_created;
 		size         = other.size;

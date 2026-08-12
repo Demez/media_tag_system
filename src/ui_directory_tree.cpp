@@ -89,7 +89,7 @@ void dir_tree_add_folder( fs::path& path )
 		}
 
 		// scan for a new folder
-		g_directory_entry_status[ current_scan ] = folder_scan_push( current_scan.c_str(), e_scandir_no_files, dir_tree_add_folder_callback );
+		g_directory_entry_status[ current_scan ] = folder_scan_push( current_scan.c_str(), e_scandir_no_files | e_scandir_no_paths, dir_tree_add_folder_callback );
 		path_i++;
 	}
 }
@@ -209,7 +209,7 @@ bool is_path_part_of_current_dir( u32 depth, const std::string& current_path, ch
 
 
 // this is shit
-void                              sidebar_draw_directory_recursive( u32 depth, const std::string& current_path )
+void sidebar_draw_directory_recursive( u32 depth, const std::string& current_path )
 {
 	ImGuiTreeNodeFlags node_flags  = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DrawLinesFull;
 	char*              folder_name = fs_get_filename( current_path.c_str(), current_path.size() );
@@ -262,13 +262,12 @@ void                              sidebar_draw_directory_recursive( u32 depth, c
 		{
 			for ( const file_t& folder : entry->folders )
 			{
-				fs::path filename = folder.path.filename();
-				tmp_path          = current_path;
+				tmp_path = current_path;
 
 				if ( !current_path.ends_with( SEP ) )
 					tmp_path += SEP;
 
-				tmp_path += sys_path_to_string( filename );
+				tmp_path += folder.name;
 
 				sidebar_draw_directory_recursive( depth + 1, tmp_path );
 			}

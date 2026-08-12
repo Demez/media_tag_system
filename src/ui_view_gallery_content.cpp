@@ -451,7 +451,7 @@ void        gallery_view_draw_item_text( ImGuiStyle& style, size_t i, gallery_it
 	//draw_list->AddRect( text_clip_min, text_clip_max, clip_color, 0, ImDrawFlags_None, 2.f );
 
 	//ImGui::TextUnformatted( item_draw.media.filename.c_str() );
-	TextExFast( item_draw.media->filename.c_str(), nullptr, ImGuiTextFlags_NoWidthForLargeClippedText, media_text_size );
+	TextExFast( item_draw.media->file.name.c_str(), nullptr, ImGuiTextFlags_NoWidthForLargeClippedText, media_text_size );
 
 	ImGui::PopTextWrapPos();
 	ImGui::PopClipRect();
@@ -614,7 +614,7 @@ void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 		gallery_item_draw_t& layout        = gallery::item_layout[ i ];
 		size_t               gallery_index = gallery::sorted_media[ i ];
 		const media_entry_t& media         = directory::media_list[ gallery_index ];
-		gallery::item_text_size[ i ]       = ImGui::CalcTextSize( media.filename.c_str(), 0, false, gallery::item_size - ( style.WindowPadding.x * 2 ) );
+		gallery::item_text_size[ i ]       = ImGui::CalcTextSize( media.file.name.c_str(), 0, false, gallery::item_size - ( style.WindowPadding.x * 2 ) );
 
 		layout.i                           = i;
 		layout.gallery_index               = gallery::sorted_media[ i ],

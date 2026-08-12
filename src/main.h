@@ -210,7 +210,6 @@ struct cached_media_info_t
 struct media_entry_t
 {
 	file_t       file{};
-	std::string  filename{};
 	e_media_type type{};
 };
 

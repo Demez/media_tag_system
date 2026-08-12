@@ -240,14 +240,14 @@ void gallery_view_clear_selection()
 {
 	gallery::selection.clear();
 
-	gallery::last_selection.index = 0;
-	gallery::last_selection.entry.filename.clear();
+	gallery::last_selection.index                   = 0;
 	gallery::last_selection.entry.type              = e_media_type_none;
 	gallery::last_selection.entry.file.size         = 0;
 	gallery::last_selection.entry.file.date_mod     = 0;
 	gallery::last_selection.entry.file.date_created = 0;
 	gallery::last_selection.entry.file.type         = e_file_type_invalid;
 	gallery::last_selection.entry.file.path.clear();
+	gallery::last_selection.entry.file.name.clear();
 }
 
 
@@ -626,7 +626,7 @@ void gallery_view_sort_dir_func( job_status_t* status )
 		if ( sort_data->search_len )
 		{
 			media_entry_t& entry = directory::media_list[ i ];
-			char*          find  = SDL_strcasestr( entry.filename.c_str(), sort_data->search );
+			char*          find  = SDL_strcasestr( entry.file.name.c_str(), sort_data->search );
 
 			if ( !find )
 				continue;

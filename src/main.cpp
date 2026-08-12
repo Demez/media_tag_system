@@ -248,49 +248,22 @@ void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
 			type = e_media_type_directory;
 		}
 
-		//media_entry_t media_entry{
-		//	.file = std::move( file ),
-		//	.type = type
-		//};
+		media_entry_t& media_entry = media_list->at( i );
+		media_entry.file           = std::move( file );
+		media_entry.type           = type;
 
-		media_entry_t& media_entry        = media_list->at( i );
-		media_entry.file                  = std::move( file );
-		media_entry.type                  = type;
+		//const fs::path_char* filename_ptr = fs_get_filename_ptr( media_entry.file.path.native() );
 
-		const fs::path_char* filename_ptr = fs_get_filename_ptr( media_entry.file.path.native() );
-
-		sys_path_to_string( filename_ptr, media_entry.filename );
-
-		//if ( ( file.type & e_file_type_directory ) )
-		//{
-		//	type = e_media_type_directory;
-		//}
-		//else
+		//sys_path_to_string( filename_ptr, media_entry.filename );
 
 		if ( !( file.type & e_file_type_directory ) )
 		{
-			fs_get_extension( media_entry.filename, ext );
+			fs_get_extension( media_entry.file.name, ext );
 			if ( !media_check_extension_fast( ext, media_entry.type ) )
 				continue;
 		}
 
-		//media_entry_t media_entry
-		//{
-		//	.file     = std::move( file ),
-		//	.filename = std::move( filename ),
-		//	.type     = type
-		//};
-
 		i++;
-
-		// if ( fs_is_dir( entry.data() ) )
-		//if ( file.type & e_file_type_directory )
-		//{
-		//	//media_list->push_back( std::move( media_entry ) );
-		//	continue;
-		//}
-
-		//media_list->push_back( std::move( media_entry ) );
 	}
 
 	media_list->resize( i );
@@ -998,9 +971,9 @@ static void handle_queued_file()
 		// then, we can scan the directory next frame
 		media_entry_t entry{};
 		entry.file.path = directory::queued.filename();
-		entry.filename  = sys_path_to_string( entry.file.path );
+		entry.file.name = sys_path_to_string( entry.file.path );
 
-		if ( media_check_extension( fs_get_extension( entry.filename ), entry.type ) )
+		if ( media_check_extension( fs_get_extension( entry.file.name ), entry.type ) )
 		{
 			folder_media_list_reset();
 

@@ -118,7 +118,7 @@ void thumbnail_loader_free_data( u32 index )
 
 h_thumbnail thumbnail_loader_queue_push( const media_entry_t& media_entry )
 {
-	if ( media_entry.filename.empty() )
+	if ( media_entry.file.name.empty() )
 		return {};
 
 	// find a free thread

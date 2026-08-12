@@ -910,7 +910,7 @@ void sidebar_draw_file_information( ImGuiStyle& style )
 		}
 	}
 
-	ImGui::TextUnformatted( entry.filename.c_str() );
+	ImGui::TextUnformatted( entry.file.name.c_str() );
 
 	ImGui::PopTextWrapPos();
 
@@ -952,10 +952,10 @@ void sidebar_draw_file_information( ImGuiStyle& style )
 	}
 
 	// unsure what i want to do with this for the long term, but for now, im gonna have this be here
-	if ( entry.file.type & e_file_type_file && entry.filename.starts_with( "[twitter]" ) )
+	if ( entry.file.type & e_file_type_file && entry.file.name.starts_with( "[twitter]" ) )
 	{
 		// if it's a twitter url, construct the original url from the post
-		const char* start = entry.filename.c_str();
+		const char* start = entry.file.name.c_str();
 
 		// offset past the start, skipping "[twitter] "
 		start += 10;

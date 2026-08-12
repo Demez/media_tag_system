@@ -688,7 +688,7 @@ void media_view_draw_media_info()
 
 	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
 
-	ImGui::TextUnformatted( entry.filename.c_str() );
+	ImGui::TextUnformatted( entry.file.name.c_str() );
 
 	ImGui::Separator();
 
