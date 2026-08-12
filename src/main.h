@@ -698,7 +698,6 @@ const fs::path&                      gallery_item_get_path( size_t index );
 std::string                          gallery_item_get_path_string( size_t index );
 
 void                                 gallery_view_scroll_to_cursor();
-void                                 gallery_view_keep_scroll_pos();
 
 void                                 gallery_view_handle_scroll_event( float mouse_y );
 void                                 gallery_view_input();
@@ -708,11 +707,19 @@ void                                 gallery_view_sort_dir();
 void                                 gallery_view_reset_text_size();
 void                                 gallery_view_reset();
 
+void                                 gallery_view_draw_content();
+void                                 gallery_draw_extra_refresh( int count = 1 );
+
 void                                 gallery_view_set_selection( size_t gallery_item_index );
 void                                 gallery_view_clear_selection();
+void                                 gallery_view_delete_selection();
 selection_t                          gallery_view_get_last_selected();
 u32                                  gallery_view_get_last_selected_index( u32 empty_return = 0 );  // returns empty_return if selection is empty
 media_entry_t                        gallery_view_get_last_selected_entry();
+
+bool                                 gallery_view_input_do_multi_select();
+void                                 gallery_view_input_check_clear_multi_select();
+void                                 gallery_view_input_update_multi_select( u32 index, bool readd = true );
 
 void                                 media_history_add( const std::string& entry );
 void                                 folder_history_add( const fs::path& entry );

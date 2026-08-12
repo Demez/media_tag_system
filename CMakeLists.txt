@@ -230,7 +230,7 @@ set(
 	src/ui_settings_menu.cpp
     src/ui_view_gallery.cpp
     src/ui_view_gallery_sidebar.cpp
-    src/ui_view_gallery_item.cpp
+    src/ui_view_gallery_content.cpp
     src/ui_view_media.cpp
 	
     src/util.h
