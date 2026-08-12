@@ -890,7 +890,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
 	{
-		sys_browse_to_path( gallery_item_get_path( g_image_data.index ) );
+		sys_browse_to_path( directory::path / gallery_item_get_path( g_image_data.index ) );
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -1204,7 +1204,8 @@ void media_view_load()
 
 	double            load_time = 0.0;
 	media_entry_t     entry     = gallery_item_get_media_entry( g_image_data.index );
-	std::string       path_str  = sys_path_to_string( entry.file.path );
+	fs::path          full_path = directory::path / entry.file.path;
+	std::string       path_str  = sys_path_to_string( full_path );
 
 	image_load_info_t image_load_info{};
 	image_load_info.image = &g_image_data.image;
@@ -1214,7 +1215,7 @@ void media_view_load()
 	if ( entry.type == e_media_type_image )
 	{
 		mpv_cmd_close_video();
-		image_load( entry.file.path, image_load_info );
+		image_load( full_path, image_load_info );
 	}
 	else
 	{

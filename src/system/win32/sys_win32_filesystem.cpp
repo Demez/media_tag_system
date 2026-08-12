@@ -745,35 +745,32 @@ open_dir_recurse_fail:
 		file.date_created = ( file_dir_info->CreationTime.QuadPart - UNIX_TIME_START ) / TICKS_PER_SECOND;
 		file.date_mod     = ( file_dir_info->LastWriteTime.QuadPart - UNIX_TIME_START ) / TICKS_PER_SECOND;
 
+		memset( temp_path_buffer, 0, sizeof( temp_path_buffer ) );
+		size_t path_len = character_count;
+		size_t offset   = 0;
+
+		if ( current_depth.size() )
+			path_len += current_depth.size() + 1;  // add path sep size
+
 		if ( flags & e_scandir_abs_paths )
 		{
-			size_t path_len = scan_dir.size() + character_count;
+			path_len += scan_dir.size();
 
-			if ( current_depth.size() )
-				path_len += current_depth.size() + 1;  // add path sep size
-
-			memset( temp_path_buffer, 0, sizeof( temp_path_buffer ) );
-
-			size_t   offset = 0;
 			memcpy( temp_path_buffer, scan_dir.c_str(), sizeof( wchar_t ) * ( scan_dir.size() ) );
 			offset += ( scan_dir.size() );
-
-			if ( current_depth.size() )
-			{
-				memcpy( temp_path_buffer + offset, current_depth.c_str(), sizeof( wchar_t ) * ( current_depth.size() ) );
-				offset += ( current_depth.size() );
-
-				memcpy( temp_path_buffer + offset++, L"\\", sizeof( wchar_t ) * 1 );
-			}
-
-			memcpy( temp_path_buffer + offset, file_dir_info->FileName, sizeof( wchar_t ) * character_count );
-
-			file.path.assign( temp_path_buffer, temp_path_buffer + path_len );
 		}
-		else
+
+		if ( current_depth.size() )
 		{
-			file.path.assign( file_dir_info->FileName, file_dir_info->FileName + character_count );
+			memcpy( temp_path_buffer + offset, current_depth.c_str(), sizeof( wchar_t ) * ( current_depth.size() ) );
+			offset += ( current_depth.size() );
+
+			memcpy( temp_path_buffer + offset++, L"\\", sizeof( wchar_t ) * 1 );
 		}
+
+		memcpy( temp_path_buffer + offset, file_dir_info->FileName, sizeof( wchar_t ) * character_count );
+
+		file.path.assign( temp_path_buffer, temp_path_buffer + path_len );
 
 		if ( is_dir )
 		{

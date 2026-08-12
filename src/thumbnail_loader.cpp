@@ -206,7 +206,10 @@ search:
 	thumbnail_loader_free_data( cache_pos );
 	//printf( "THUMBNAIL %d USED\n", cache_pos );
 
-	std::string path_str                              = sys_path_to_string( media_entry.file.path );
+	std::string path_str = sys_path_to_string( directory::path );
+	path_str += SEP;
+	path_str += sys_path_to_string( media_entry.file.path );
+
 	g_thumbnail_cache.buffer[ cache_pos ].path        = util_strdup( path_str.c_str() );
 	g_thumbnail_cache.buffer[ cache_pos ].status      = e_thumbnail_status_queued;
 	g_thumbnail_cache.buffer[ cache_pos ].save_status = e_thumbnail_save_idle;

@@ -192,7 +192,9 @@ void select_image_in_folder( bool force_load_media )
 		if ( entry.file.type & e_file_type_directory )
 			continue;
 
-		if ( entry.file.path != directory::queued )
+		fs::path abs_path = directory::path / entry.file.path;
+
+		if ( abs_path != directory::queued )
 			continue;
 
 		gallery_view_set_selection( i );
@@ -347,9 +349,7 @@ void folder_load_media_list()
 		path_i++;
 	}
 
-	std::vector< file_t > files{};
-
-	e_scandir_flags       scan_flags = e_scandir_abs_paths;
+	e_scandir_flags scan_flags = 0;
 
 	if ( directory::recursive )
 		scan_flags |= e_scandir_recursive | e_scandir_no_dirs;
@@ -950,14 +950,16 @@ static void handle_queued_file()
 
 	if ( path != directory::path || directory::folder_reload )
 	{
+		directory::path = path;
+
 		if ( !directory::folder_reload )
 			gallery_view_clear_selection();
 
 		// create a temporary media entry for showing the image first
 		// then, we can scan the directory next frame
 		media_entry_t entry{};
-		entry.file.path = directory::queued;
-		entry.filename  = sys_path_to_string( entry.file.path.filename() );
+		entry.file.path = directory::queued.filename();
+		entry.filename  = sys_path_to_string( entry.file.path );
 		std::string ext = fs_get_extension( entry.filename );
 
 		if ( media_check_extension( ext, entry.type ) )
@@ -979,7 +981,6 @@ static void handle_queued_file()
 		}
 
 		// now we can load the files in the directory
-		directory::path = path;
 		folder_load_media_list();
 	}
 	// if still running a folder change, wait for the thread to

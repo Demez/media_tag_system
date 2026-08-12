@@ -853,11 +853,11 @@ void gallery_view_handle_context_menu()
 					fs::path::string_type path_parent_str = selection.entry.file.path.parent_path().native();
 
 					if ( base_path == path_parent_str )
-						paths.push_back( selection.entry.file.path );
+						paths.push_back( directory::path / selection.entry.file.path );
 				}
 				else
 				{
-					paths.push_back( selection.entry.file.path );
+					paths.push_back( directory::path / selection.entry.file.path );
 				}
 			}
 

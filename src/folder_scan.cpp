@@ -5,17 +5,6 @@
 #include <atomic>
 
 
-std::thread*                         g_folder_scan_thread = nullptr;
-std::vector< folder_scan_status_t* > g_folder_scan_queue;
-std::atomic< size_t >                g_folder_scan_queue_size;
-std::mutex                           g_folder_scan_lock;
-
-SDL_Event                            g_event_folder_scan_finish{};
-
-typedef void( job_finish_t )( job_status_t* status, bool in_main_thread );
-typedef void( job_function_t )( job_status_t* status );
-
-
 void folder_scan_job_finish( job_status_t* status, bool in_main_thread )
 {
 	auto scan = static_cast< folder_scan_status_t* >( status->userdata );
