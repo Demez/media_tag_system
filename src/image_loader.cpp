@@ -1,6 +1,8 @@
 #include "main.h"
 
 #include <cctype>
+#include <unordered_map>
+#include <unordered_set>
 
 void* malloc_stbi( size_t size )
 {
@@ -129,7 +131,7 @@ void gl_free_textures( uploaded_textures_t& textures )
 
 
 static std::unordered_map< std::string, IImageLoader* > g_ext_loader_map{};
-
+static std::unordered_set< std::string >                g_ext_loader_set{};
 
 void image_register_codec( IImageLoader* codec, bool fallback )
 {
@@ -163,6 +165,7 @@ void image_register_codec( IImageLoader* codec, bool fallback )
 		
 		// Add it
 		g_ext_loader_map[ ext ] = codec;
+		g_ext_loader_set.insert( ext );
 	}
 }
 
@@ -371,6 +374,12 @@ bool image_copy_frame_data( image_t& src, image_t& dst, size_t frame_i )
 }
 
 
+bool image_check_extension_fast( const std::string& ext )
+{
+	return g_ext_loader_set.contains( ext );
+}
+
+
 IImageLoader* image_check_extension( const std::string& ext )
 {
 	auto it = g_ext_loader_map.find( ext );
@@ -382,16 +391,14 @@ IImageLoader* image_check_extension( const std::string& ext )
 }
 
 
-bool media_check_extension( const std::string& ext, e_media_type& type )
+bool media_check_extension_fast( std::string& ext, e_media_type& type )
 {
-	std::string lower_ext = ext;
-
 	for ( size_t i = 0; i < ext.size(); i++ )
 	{
-		lower_ext[ i ] = std::tolower( static_cast< unsigned char >( ext.data()[ i ] ) );
+		ext.data()[ i ] = std::tolower( static_cast< unsigned char >( ext.data()[ i ] ) );
 	}
 
-	if ( image_check_extension( lower_ext ) )
+	if ( image_check_extension_fast( ext ) )
 	{
 		type = e_media_type_image;
 		return true;
@@ -399,7 +406,7 @@ bool media_check_extension( const std::string& ext, e_media_type& type )
 
 	if ( g_mpv )
 	{
-		if ( mpv_supports_ext( lower_ext ) )
+		if ( mpv_supports_ext( ext ) )
 		{
 			type = e_media_type_video;
 			return true;
@@ -408,6 +415,12 @@ bool media_check_extension( const std::string& ext, e_media_type& type )
 
 	type = e_media_type_none;
 	return false;
+}
+
+
+bool media_check_extension( std::string ext, e_media_type& type )
+{
+	return media_check_extension_fast( ext, type );
 }
 
 

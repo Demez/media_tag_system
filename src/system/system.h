@@ -133,7 +133,7 @@ struct file_t
 
 	file_t& operator=( file_t&& other ) noexcept
 	{
-		assign( other );
+		assign( std::move( other ) );
 		return *this;
 	}
 
@@ -262,4 +262,7 @@ u64                     sys_get_time_ms();
 
 // non-exception based path conversion
 std::string             sys_path_to_string( const fs::path& path );
+void                    sys_path_to_string( fs::path&& path, std::string& output );
+void                    sys_path_to_string( const fs::path_char* path, std::string& output );
+
 fs::path                sys_string_to_path( const std::string& path_str );

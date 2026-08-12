@@ -13,6 +13,9 @@
 #endif
 
 
+static std::string __empty_str{};
+
+
 std::string fs_path_clean( const char* path, size_t path_len )
 {
 	if ( !path || path_len == 0 )
@@ -195,24 +198,56 @@ char* fs_replace_path_seps_unix( const char* path )
 }
 
 
-std::string fs_get_extension( std::string_view path )
+void fs_get_extension( std::string_view path, std::string& output )
 {
-	std::string result{};
+	output.clear();
 
 	if ( path.empty() )
-		return result;
+		return;
 
-	char* path_c = const_cast< char* >( path.data() );
-	char* dot    = strrchr( path_c, '.' );
+	const char* path_c = path.data();
+	const char* dot    = strrchr( path_c, '.' );
 
 	if ( !dot || dot == path_c )
+		return;
+
+	output.assign( dot, ( path_c + path.size() ) - dot );
+}
+
+
+std::string fs_get_extension( std::string_view path )
+{
+	std::string output;
+	fs_get_extension( path, output );
+	return output;
+}
+
+
+const fs::path_char* fs_get_filename_ptr( fs::path_view path )
+{
+	if ( path.size() == 0 )
+		return nullptr;
+
+	size_t i = path.size() - 1;
+	for ( ; i > 0; i-- )
 	{
-		result = path;
-		return result;
+		if ( ( path[ i ] == '/' || path[ i ] == '\\' ) && i != path.size() - 1 )
+			break;
 	}
 
-	result.append( dot, ( path_c + path.size() ) - dot );
-	return result;
+	// No File Extension Found
+	if ( i == path.size() )
+		return {};
+
+	size_t start_index = i + 1;
+
+	if ( i == 0 )
+		start_index = 0;
+
+	if ( start_index == path.size() )
+		return {};
+
+	return path.data() + start_index;
 }
 
 

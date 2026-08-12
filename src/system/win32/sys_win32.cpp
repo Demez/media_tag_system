@@ -647,11 +647,30 @@ u64 sys_get_time_ms()
 // non-exception based path conversion
 std::string sys_path_to_string( const fs::path& path )
 {
-	std::wstring wstring = path.native();
-	int          size    = WideCharToMultiByte( CP_UTF8, 0, wstring.c_str(), -1, NULL, 0, NULL, NULL );
-	std::string  ret( size - 1, 0 );
+	const std::wstring& wstring = path.native();
+	int                 size    = WideCharToMultiByte( CP_UTF8, 0, wstring.c_str(), -1, NULL, 0, NULL, NULL );
+	std::string         ret( size - 1, 0 );
 	WideCharToMultiByte( CP_UTF8, 0, wstring.data(), -1, ret.data(), size - 1, NULL, NULL );
 	return ret;
+}
+
+
+void sys_path_to_string( fs::path&& path, std::string& output )
+{
+	const std::wstring& wstring = path.native();
+	int                 size    = WideCharToMultiByte( CP_UTF8, 0, wstring.c_str(), -1, NULL, 0, NULL, NULL );
+
+	output.resize( size - 1 );
+	WideCharToMultiByte( CP_UTF8, 0, wstring.data(), -1, output.data(), size - 1, NULL, NULL );
+}
+
+
+void sys_path_to_string( const fs::path_char* path, std::string& output )
+{
+	int size = WideCharToMultiByte( CP_UTF8, 0, path, -1, NULL, 0, NULL, NULL );
+
+	output.resize( size - 1 );
+	WideCharToMultiByte( CP_UTF8, 0, path, -1, output.data(), size - 1, NULL, NULL );
 }
 
 

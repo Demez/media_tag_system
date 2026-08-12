@@ -226,38 +226,78 @@ void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
 	send_frame_draw_event();
 	set_frame_draw( 2 );
 
-	auto media_list = new std::vector< media_entry_t >;
-	media_list->reserve( status->files.size() );
+	u64  start_time = sys_get_time_ms();
 
-	for ( const file_t& entry : status->files )
+	auto media_list = new std::vector< media_entry_t >;
+	media_list->resize( status->files.size() );
+
+	std::string ext;
+
+	size_t      i = 0;
+	for ( file_t& file : status->files )
 	{
-		if ( status->job->cancel )
+		//if ( status->job->cancel )
+		//{
+		//	delete media_list;
+		//	return nullptr;
+		//}
+
+		e_media_type type = e_media_type_none;
+		if ( ( file.type & e_file_type_directory ) )
 		{
-			delete media_list;
-			return nullptr;
+			type = e_media_type_directory;
 		}
 
-		media_entry_t media_entry{};
-		media_entry.file     = entry;
-		media_entry.filename = sys_path_to_string( entry.path.filename() );
+		//media_entry_t media_entry{
+		//	.file = std::move( file ),
+		//	.type = type
+		//};
+
+		media_entry_t& media_entry        = media_list->at( i );
+		media_entry.file                  = std::move( file );
+		media_entry.type                  = type;
+
+		const fs::path_char* filename_ptr = fs_get_filename_ptr( media_entry.file.path.native() );
+
+		sys_path_to_string( filename_ptr, media_entry.filename );
+
+		//if ( ( file.type & e_file_type_directory ) )
+		//{
+		//	type = e_media_type_directory;
+		//}
+		//else
+
+		if ( !( file.type & e_file_type_directory ) )
+		{
+			fs_get_extension( media_entry.filename, ext );
+			if ( !media_check_extension_fast( ext, media_entry.type ) )
+				continue;
+		}
+
+		//media_entry_t media_entry
+		//{
+		//	.file     = std::move( file ),
+		//	.filename = std::move( filename ),
+		//	.type     = type
+		//};
+
+		i++;
 
 		// if ( fs_is_dir( entry.data() ) )
-		if ( entry.type & e_file_type_directory )
-		{
-			media_entry.type = e_media_type_directory;
-			media_list->push_back( media_entry );
-			continue;
-		}
+		//if ( file.type & e_file_type_directory )
+		//{
+		//	//media_list->push_back( std::move( media_entry ) );
+		//	continue;
+		//}
 
-		std::string ext = fs_get_extension( media_entry.filename );
-
-		if ( !media_check_extension( ext, media_entry.type ) )
-			continue;
-
-		media_list->push_back( media_entry );
+		//media_list->push_back( std::move( media_entry ) );
 	}
 
-	// TODO: GALLERY SORT !!
+	media_list->resize( i );
+
+	u64 end_time = sys_get_time_ms();
+
+	printf( "FILE LIST CHECK TIME: %.4f\n", (float)( end_time - start_time ) / 1000.f );
 
 	return media_list;
 }
@@ -446,9 +486,8 @@ bool on_new_file( const fs::path& file_path )
 	{
 		// can we open this file?
 		e_media_type type = e_media_type_none;
-		std::string  ext  = fs_get_extension( path_str );
 
-		if ( !media_check_extension( ext, type ) )
+		if ( !media_check_extension( fs_get_extension( path_str ), type ) )
 			return false;
 
 		directory::queued = clean_path;
@@ -960,9 +999,8 @@ static void handle_queued_file()
 		media_entry_t entry{};
 		entry.file.path = directory::queued.filename();
 		entry.filename  = sys_path_to_string( entry.file.path );
-		std::string ext = fs_get_extension( entry.filename );
 
-		if ( media_check_extension( ext, entry.type ) )
+		if ( media_check_extension( fs_get_extension( entry.filename ), entry.type ) )
 		{
 			folder_media_list_reset();
 

@@ -171,7 +171,7 @@ struct app_config_t
 	bool                      dev_mode                       = false;
 
 	bool                      directory_tree_auto_expand     = true;
-	bool                      directory_tree_expand_on_click = true;
+	bool                      directory_tree_expand_on_click = false;
 	bool                      directory_tree_simple          = false;
 
 	// Theming
@@ -310,9 +310,91 @@ struct image_t
 
 	int                          loop_count;
 
-	std::vector< image_frame_t > frame;
-
 	char*                        image_format;
+
+	std::vector< image_frame_t > frame;
+	// image_frame_list_t frame;
+
+	image_t()
+	{
+	};
+
+	~image_t()
+	{
+	}
+
+	//image_frame_t* get_frame( size_t i )
+	//{
+	//	if ( !frame.data )
+	//		return nullptr;
+	//
+	//	if ( frame.data->frame.size() >= i )
+	//		return nullptr;
+	//
+	//	return &frame.data->frame[ i ];
+	//}
+
+	// copying
+	void assign( const image_t& other ) noexcept
+	{
+		frame = other.frame;
+
+		width           = other.width;
+		height          = other.height;
+		bit_depth       = other.bit_depth;
+		pitch           = other.pitch;
+		bytes_per_pixel = other.bytes_per_pixel;
+		channels        = other.channels;
+		format          = other.format;
+		loop_count      = other.loop_count;
+		
+		if ( other.image_format )
+			image_format = util_strdup( other.image_format );
+	}
+
+	// moving
+	void assign( image_t&& other ) noexcept
+	{
+		frame              = std::move( other.frame );
+
+		width              = other.width;
+		height             = other.height;
+		bit_depth          = other.bit_depth;
+		pitch              = other.pitch;
+		bytes_per_pixel    = other.bytes_per_pixel;
+		channels           = other.channels;
+		format             = other.format;
+		loop_count         = other.loop_count;
+
+		image_format       = other.image_format;
+		other.image_format = nullptr;
+	}
+
+	image_t& operator=( image_t&& other ) noexcept
+	{
+		assign( other );
+		return *this;
+	}
+
+	// moving
+	image_t( image_t&& other ) noexcept
+	{
+		assign( std::move( other ) );
+	}
+
+//private:
+	// copying
+	image_t& operator=( const image_t& other ) noexcept
+	{
+		assign( other );
+		return *this;
+	}
+
+	// copying
+	image_t( const image_t& other ) noexcept
+	{
+		assign( other );
+	}
 };
 
 
@@ -911,7 +993,9 @@ void          image_free_frames( image_t& image );
 // Free only frames and allocations
 void          image_free_alloc( image_t& image );
 
-bool          media_check_extension( const std::string& ext, e_media_type& type );
+bool          media_check_extension( std::string ext, e_media_type& type );
+bool          media_check_extension_fast( std::string& ext, e_media_type& type );
+
 IImageLoader* image_check_extension( const std::string& ext );
 bool          image_scale( image_t* old_image, image_t* new_image, int new_width, int new_height );
 

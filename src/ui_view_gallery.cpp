@@ -540,7 +540,7 @@ struct gallery_sort_dir_data_t
 };
 
 // check if we are cancelled every X items
-constexpr size_t     SORT_CHECK_CANCEL_ITEM_COUNT  = 150;
+constexpr size_t     SORT_CHECK_CANCEL_ITEM_COUNT  = 3000;
 
 static job_status_t* g_item_size_calc_job = nullptr;
 static job_status_t* g_gallery_sort_job   = nullptr;
@@ -597,6 +597,8 @@ void gallery_view_sort_dir_func( job_status_t* status )
 	if ( gallery_sort_check_if_canceled( status, sort_data ) )
 		return;
 
+	printf( "FILTERING - %p\n", status );
+
 	// Split up lists
 	for ( size_t i = 0; i < directory::media_list.size(); i++ )
 	{
@@ -635,6 +637,8 @@ void gallery_view_sort_dir_func( job_status_t* status )
 		else
 			files.push_back( i );
 	}
+
+	printf( "SORTING - %p\n", status );
 
 	// Sort data
 	if ( sort_data->sort_mode != e_gallery_sort_mode_size_large_to_small && sort_data->sort_mode != e_gallery_sort_mode_size_small_to_large )

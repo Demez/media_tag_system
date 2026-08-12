@@ -470,15 +470,81 @@ float gallery_view_draw_header()
 	ImGui::TextUnformatted( "Zoom" );
 	ImGui::SameLine();
 
-	ImGui::SetNextItemWidth( 190 );
+	ImGui::SetNextItemWidth( 120 );
 
-	SDL_MouseButtonFlags mouse_state     = SDL_GetMouseState( 0, 0 );
+	SDL_MouseButtonFlags mouse_state      = SDL_GetMouseState( 0, 0 );
 	static bool          check_left_mouse = false;
+
+	bool                 zoom_changed     = false;
 
 	// if ( ImGui::SliderInt( "Zoom", &gallery::item_size, gallery::item_size_min, gallery::item_size_max ) )
 	// if ( ImGui::DragInt( "##zoom", &gallery::item_size, 10, gallery::item_size_min, gallery::item_size_max, "Zoom - %d px" ) )
-	if ( ImGui::SliderScalar( "##zoom", ImGuiDataType_U32, &gallery::item_size, &gallery::item_size_min, &gallery::item_size_max, "%d px" ) )
+	//zoom_changed                          = ImGui::SliderScalar( "##zoom", ImGuiDataType_U32, &gallery::item_size, &gallery::item_size_min, &gallery::item_size_max, "%d px" );
+	//u32                  step             = 30;
+	//// zoom_changed                          = ImGui::InputScalar( "##zoom", ImGuiDataType_U32, &gallery::item_size, &step, &step, "%d px" );
+	//zoom_changed                          = ImGui::InputText( "##zoom", ImGuiDataType_U32, &gallery::item_size, &step, &step, "%d px" );
+	//
+	//ImGui::SameLine();
+
+#if 0
+	if ( ImGui::InputScalar( "##zoom", ImGuiDataType_U32, &gallery::item_size, &step, &step, "%d px" ) )
 	{
+		gallery::item_size = CLAMP( gallery::item_size, gallery::item_size_min, gallery::item_size_max );
+
+		gallery_view_reset_text_size();
+		gallery_view_scroll_to_cursor();
+		check_left_mouse            = true;
+		gallery::item_size_changing = true;
+
+		if ( !app::config.thumbnail_use_fixed_size )
+			thumbnail_clear_cache();
+	}
+#endif
+
+	ImGui::PushFont( font::normal_bold );
+
+	ImVec2 xl_size      = ImGui::CalcTextSize( "XL" );
+	ImVec2 button_size{
+		xl_size.y + style.FramePadding.x * 2.0f,
+		xl_size.y + style.FramePadding.y * 2.0f
+	};
+
+	if ( ImGui::Button( "S", button_size ) )
+	{
+		zoom_changed = true;
+		gallery::item_size = gallery::item_size_min;
+	}
+
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "M", button_size ) )
+	{
+		zoom_changed       = true;
+		gallery::item_size = 150;
+	}
+
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "L", button_size ) )
+	{
+		zoom_changed       = true;
+		gallery::item_size = 300;
+	}
+
+	ImGui::SameLine();
+
+	if ( ImGui::Button( "XL", button_size ) )
+	{
+		zoom_changed       = true;
+		gallery::item_size = gallery::item_size_max;
+	}
+
+	ImGui::PopFont();
+
+	if ( zoom_changed )
+	{
+		gallery::item_size = CLAMP( gallery::item_size, gallery::item_size_min, gallery::item_size_max );
+
 		gallery_view_reset_text_size();
 		gallery_view_scroll_to_cursor();
 		check_left_mouse            = true;
@@ -571,29 +637,59 @@ float gallery_view_draw_header()
 		ImGui::EndCombo();
 	}
 
+	ImVec2 dummy_size;
+
+	//if ( gallery::selection.size() )
+	//{
+		ImGui::SameLine( 0, 0 );
+
+		char buf_selected[ 256 ]{};
+		if ( gallery::selection.size() )
+		{
+			snprintf( buf_selected, 256, "%zu Selected", gallery::selection.size() );
+
+			dummy_size = ImGui::CalcTextSize( buf_selected );
+			dummy_size.x += 1 + ( style.ItemSpacing.x * 2 );
+		}
+
+		ImVec2 region_avail_tmp = ImGui::GetContentRegionAvail();
+
+
+		//ImVec2 spacing_size( region_avail_tmp.x - ( dummy_size.x + style.ItemSpacing.x ), dummy_size.y );
+		//spacing_size.x = std::max( spacing_size.x, style.ItemSpacing.x );
+	//}
+
 	// if ( gallery::selection.size() )
 	{
-		ImGui::SameLine( 0, 0 );
-		ImVec2 region_avail_tmp = ImGui::GetContentRegionAvail();
+		//if ( !gallery::selection.size() )
+			ImGui::SameLine( 0, 0 );
 
 		char   buf[ 256 ]{};
 		// snprintf( buf, 256, "%zu File%s Selected", gallery::selection.size(), gallery::selection.size() == 1 ? "" : "s" );
-		if ( gallery::selection.size() )
-		{
-			snprintf( buf, 256, "%zu Selected | %zu File%s", gallery::selection.size(), gallery::sorted_media.size(), gallery::sorted_media.size() == 1 ? "" : "s" );
-		}
-		else
+		//if ( gallery::selection.size() )
+		//{
+		//	snprintf( buf, 256, "%zu Selected | %zu File%s", gallery::selection.size(), gallery::sorted_media.size(), gallery::sorted_media.size() == 1 ? "" : "s" );
+		//}
+		//else
 		{
 			snprintf( buf, 256, "%zu File%s", gallery::sorted_media.size(), gallery::sorted_media.size() == 1 ? "" : "s" );
 		}
 
-		ImVec2 text_size = ImGui::CalcTextSize( buf );
+		dummy_size.x += ImGui::CalcTextSize( buf ).x;
 
-		ImVec2 spacing_size( region_avail_tmp.x - ( text_size.x + style.ItemSpacing.x ), text_size.y );
+		ImVec2 spacing_size( region_avail_tmp.x - ( dummy_size.x + style.ItemSpacing.x ), dummy_size.y );
 		spacing_size.x = std::max( spacing_size.x, style.ItemSpacing.x );
 
 		ImGui::Dummy( spacing_size );
 		ImGui::SameLine( 0, 0 );
+
+		if ( gallery::selection.size() )
+		{
+			ImGui::TextUnformatted( buf_selected );
+
+			ImGui::SameLine();
+			draw_vertical_separator( draw_list, style );
+		}
 
 		ImGui::TextUnformatted( buf );
 		ImGui::SameLine( 0, 0 );
@@ -804,11 +900,14 @@ void sidebar_draw_file_information( ImGuiStyle& style )
 
 	if ( entry.file.type & e_file_type_file )
 	{
-		fs::path    dir     = entry.file.path.parent_path();
-		std::string dir_str = sys_path_to_string( dir );
+		fs::path dir = entry.file.path.parent_path();
 
-		ImGui::TextUnformatted( dir_str.c_str() );
-		ImGui::Separator();
+		if ( !dir.empty() )
+		{
+			std::string dir_str = sys_path_to_string( dir );
+			ImGui::TextUnformatted( dir_str.c_str() );
+			ImGui::Separator();
+		}
 	}
 
 	ImGui::TextUnformatted( entry.filename.c_str() );

@@ -24,8 +24,13 @@
 #include <string>
 #include <vector>
 
-namespace fs = std::filesystem;
+namespace fs
+{
+	using namespace std::filesystem;
 
+	using path_str  = path::string_type;
+	using path_char = path::string_type::value_type;
+}
 
 // --------------------------------------------------------------------------------------------------------
 
@@ -57,6 +62,11 @@ using f64    = double;
   #define strncasecmp  _strnicmp
   #define strcasecmp   _stricmp
 
+namespace fs
+{
+	using path_view = std::wstring_view;
+}
+
 constexpr float STORAGE_SCALE = 1024.f;
 
 #else
@@ -65,6 +75,11 @@ constexpr float STORAGE_SCALE = 1024.f;
 
   #define PATH_SEP_STR "/"
   #define PATH_SEP     '/'
+
+namespace fs
+{
+	using path_view = std::string_view;
+}
 
 constexpr float STORAGE_SCALE = 1000.f;
 
@@ -471,7 +486,10 @@ char*       fs_get_filename_no_ext( const char* path );
 char*       fs_get_filename( const char* path, size_t pathLen );
 char*       fs_get_filename_no_ext( const char* path, size_t pathLen );
 
-std::string fs_get_extension( std::string_view );
+const fs::path_char* fs_get_filename_ptr( fs::path_view path );
+
+std::string          fs_get_extension( std::string_view path );
+void                 fs_get_extension( std::string_view path, std::string& output );
 
 bool        fs_exists( const char* path );
 bool        fs_make_dir( const char* path );
