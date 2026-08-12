@@ -964,7 +964,7 @@ void gallery_view_draw()
 		files.reserve( gallery::selection.size() );
 
 		for ( const selection_t& selection : gallery::selection )
-			files.push_back( selection.entry.file.path );
+			files.push_back( directory::path / selection.entry.file.path );
 
 		if ( sys_copy_to_clipboard( files ) )
 		{

@@ -905,7 +905,7 @@ void media_view_context_menu()
 	{
 		fs::path path = gallery_item_get_path( g_image_data.index );
 
-		if ( sys_copy_to_clipboard( { path } ) )
+		if ( sys_copy_to_clipboard( { directory::path / path } ) )
 		{
 			printf( "Copied to Clipboard\n" );
 			push_notification( "Copied" );
@@ -1063,7 +1063,7 @@ void media_view_input()
 	{
 		fs::path path = gallery_item_get_path( g_image_data.index );
 
-		if ( sys_copy_to_clipboard( { path } ) )
+		if ( sys_copy_to_clipboard( { directory::path / path } ) )
 		{
 			printf( "Copied to Clipboard\n" );
 			push_notification( "Copied" );
