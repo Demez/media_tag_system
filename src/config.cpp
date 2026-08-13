@@ -451,7 +451,8 @@ bool config_load()
 	config_get_bool_value( fyd, "/single-instance %u", app::config.single_instance );
 	config_get_bool_value( fyd, "/high-bpc %u", app::config.high_bpc );
 	//config_get_bool_value( fyd, "/hdr %u", app::config.hdr );
-	config_get_bool_value( fyd, "/dev_mode %u", app::config.dev_mode );
+	config_get_bool_value( fyd, "/dev-mode %u", app::config.dev_mode );
+	config_get_bool_value( fyd, "/zoom-under-window-size %u", app::config.zoom_under_window_size );
 
 	config_get_bool_value( fyd, "/directory-tree-auto-expand %u", app::config.directory_tree_auto_expand );
 	config_get_bool_value( fyd, "/directory-tree-expand-on-click %u", app::config.directory_tree_expand_on_click );
@@ -816,6 +817,7 @@ void config_save()
 	//fy_emit_document_to_file( doc, (fy_emitter_cfg_flags)flags, NULL );
 	//printf( "\n\n" );
 
+	config_save_node_bool( doc, doc_root, "", "zoom-under-window-size", app::config.zoom_under_window_size );
 	config_save_node_bool( doc, doc_root, "", "dev-mode", app::config.dev_mode );
 	config_save_node_bool( doc, doc_root, "", "single-instance", app::config.single_instance );
 	config_save_node_bool( doc, doc_root, "", "no-video", app::config.no_video );

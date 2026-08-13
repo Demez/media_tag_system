@@ -421,6 +421,52 @@ bool util_array_extend( e_mem_category category, T*& data, size_t count, size_t 
 
 
 // --------------------------------------------------------------------------------------------------------
+// Helper Functions for std::vector
+
+
+template< class T >
+constexpr size_t vec_index( const std::vector< T >& vec, T item, size_t fallback = SIZE_MAX )
+{
+	auto it = std::find( vec.begin(), vec.end(), item );
+	if ( it != vec.end() )
+		return it - vec.begin();
+
+	return fallback;
+}
+
+
+template< class T >
+constexpr void vec_remove( std::vector< T >& vec, T item )
+{
+	vec.erase( vec.begin() + vec_index( vec, item ) );
+}
+
+
+// Remove item if it exists
+template< class T >
+constexpr void vec_remove_if( std::vector< T >& vec, T item )
+{
+	size_t index = vec_index( vec, item );
+	if ( index != SIZE_MAX )
+		vec.erase( vec.begin() + index );
+}
+
+
+template< class T >
+constexpr void vec_remove_index( std::vector< T >& vec, size_t index )
+{
+	vec.erase( vec.begin() + index );
+}
+
+
+template< class T >
+constexpr bool vec_contains( const std::vector< T >& vec, T item )
+{
+	return ( std::find( vec.begin(), vec.end(), item ) != vec.end() );
+}
+
+
+// --------------------------------------------------------------------------------------------------------
 // utility functions
 
 
@@ -452,6 +498,7 @@ void  util_format_time( char* buffer, size_t buffer_size, double time );
 void  util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool apply_time_zone = true );
 
 bool  util_mouse_hovering_imgui_window();
+void  util_imgui_set_tooltip( const char* value );
 
 
 template< typename CHAR >

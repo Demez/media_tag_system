@@ -469,3 +469,14 @@ bool util_mouse_hovering_imgui_window()
 	return hovered_window;
 }
 
+
+void util_imgui_set_tooltip( const char* value )
+{
+	if ( !value )
+		return;
+
+	//set_frame_draw( ImGui::IsItemHovered() && mouse_moving() );
+	set_frame_draw( ImGui::IsItemHovered() );
+	ImGui::SetItemTooltip( value );
+}
+

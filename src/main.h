@@ -49,9 +49,11 @@ enum e_icon : u8
 
 enum e_zoom_mode
 {
-	e_zoom_mode_fit,        // image is as large as possible in the window without being cropped
-	e_zoom_mode_fit_width,  // image is as large as possible in the window, but instead is cropped vertically, so the edges of the image touch the sides of the window
-	e_zoom_mode_fixed,      // user specified zoom level
+	e_zoom_mode_fit,            // image is as large as possible in the window without being upscaled
+	e_zoom_mode_fit_window,     // image is as large as possible in the window
+	e_zoom_mode_fit_width,      // image is as large as possible in the window, but instead is cropped vertically, so the edges of the image touch the sides of the window
+	e_zoom_mode_fit_height,     // image is as large as possible in the window, but instead is cropped vertically, so the edges of the image touch the sides of the window
+	e_zoom_mode_fixed,          // user specified zoom level
 };
 
 
@@ -169,6 +171,7 @@ struct app_config_t
 	bool                      always_draw                    = false;
 	bool                      single_instance                = false;
 	bool                      dev_mode                       = false;
+	bool                      zoom_under_window_size         = true;
 
 	bool                      directory_tree_auto_expand     = true;
 	bool                      directory_tree_expand_on_click = false;
@@ -758,7 +761,7 @@ void                                 media_view_draw();
 void                                 media_view_scroll_zoom( int amount );
 void                                 media_view_advance( bool prev = false );
 void                                 media_view_window_resize();
-void                                 media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true );
+void                                 media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true, bool adjust_zoom_step = true );
 void                                 media_view_zoom_reset();
 void                                 media_view_scale_reset_timer();
 

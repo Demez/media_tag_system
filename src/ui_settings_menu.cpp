@@ -18,12 +18,7 @@ constexpr int SCALAR_OPTION_WIDTH = 192;
 
 void setting_desc( const char* desc )
 {
-	if ( !desc )
-		return;
-
-	//set_frame_draw( ImGui::IsItemHovered() && mouse_moving() );
-	set_frame_draw( ImGui::IsItemHovered() );
-	ImGui::SetItemTooltip( desc );
+	util_imgui_set_tooltip( desc );
 }
 
 
@@ -98,6 +93,9 @@ void settings_draw_general()
 	// RESTART NEEDED
 	ImGui::Checkbox( "Disable Video Support", &app::config.no_video );
 	setting_desc( "RESTART NEEDED: Disables the built in MPV Video Player" );
+
+	ImGui::Checkbox( "Allow Zooming Below Window Size", &app::config.zoom_under_window_size );
+	setting_desc( "Allows you to zoom out and make the image smaller than 100%, or the window size" );
 
 #if _WIN32
 	ImGui::Checkbox( "Windows: DWM Extend", &app::config.dwm_extend );

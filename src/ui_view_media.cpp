@@ -10,9 +10,10 @@
 // Image Draw Data
 namespace image_draw
 {
-	e_zoom_mode zoom_mode = e_zoom_mode_fit;
-	double      zoom      = 1.f;
-	int         zoom_step = 0;  // 0 = 100% zoom
+	e_zoom_mode zoom_mode     = e_zoom_mode_fit;
+	double      zoom          = 1.f;
+	int         zoom_step     = 0;  // 0 = 100% zoom
+
 	ImVec2      pos{};
 	ImVec2      size{};
 	bool        flip_v = false;
@@ -51,6 +52,7 @@ bool                     g_draw_mem_stats          = false;
 bool                     g_draw_zoom_level         = true;
 
 constexpr double         ZOOM_MIN    = 0.01;
+constexpr double         ZOOM_MAX    = 1000.0;
 
 // Image Scaling
 
@@ -399,15 +401,6 @@ void media_view_clamp_to_bounds()
 	{
 		// centers the image, this works ok, but feels a bit off when zooming out
 		image_draw::pos.x = width / 2 - ( image_draw::size.x / 2 );
-
-		// this is similar to above, but only allows half the image to go out of bounds instead of most
-		// min_bounds.x        = -image_draw::size.x / 2.f;
-		// max_bounds.x        = width - ( image_draw::size.x / 2.f );
-		// 
-		// // min_bounds.x        = 0;
-		// // max_bounds.x        = width - image_draw::size.x ;
-		// 
-		// image_draw::pos.x   = CLAMP( image_draw::pos.x, min_bounds.x, max_bounds.x );
 	}
 
 	if ( height < image_draw::size.y )
@@ -421,66 +414,229 @@ void media_view_clamp_to_bounds()
 	else
 	{
 		image_draw::pos.y = height / 2 - ( image_draw::size.y / 2 );
-
-		// min_bounds.y      = -image_draw::size.y / 2.f;
-		// max_bounds.y      = height - ( image_draw::size.y / 2.f );
-		// 
-		// // min_bounds.y      = 0;
-		// // max_bounds.y      = height - image_draw::size.y;
-		// 
-		// image_draw::pos.y = CLAMP( image_draw::pos.y, min_bounds.y, max_bounds.y );
 	}
 }
 
 
-void media_view_fit_in_view( bool adjust_zoom, bool center_image )
+// or DBL_EPSILON ?
+constexpr double             ZOOM_EPSILON = 0.01;
+
+static size_t                g_zoom_snap_0_index;
+static std::vector< double > g_zoom_snap_values;
+
+
+int qsort_zoom_values( const void* left, const void* right )
+{
+	const double& zoom_left  = *static_cast< const double* >( left );
+	const double& zoom_right = *static_cast< const double* >( right );
+
+	if ( zoom_left < zoom_right )
+		return -1;
+
+	if ( zoom_left > zoom_right )
+		return 1;
+
+	return 0;
+}
+
+
+bool media_view_is_zoom_level( double snap_level, double new_zoom )
+{
+	// is this zoom close enough to the snap level?
+	if ( new_zoom > snap_level + ZOOM_EPSILON )
+		return false;
+
+	if ( new_zoom < snap_level - ZOOM_EPSILON )
+		return false;
+
+	return true;
+}
+
+
+int media_view_find_closest_zoom_step( double zoom )
+{
+	int    zoom_step = -static_cast< int >( g_zoom_snap_0_index );
+
+	for ( size_t zoom_i = 0; zoom_i < g_zoom_snap_values.size(); zoom_i++, zoom_step++ )
+	{
+		double zoom_level = g_zoom_snap_values[ zoom_i ];
+
+		if ( media_view_is_zoom_level( zoom, zoom_level ) )
+			return zoom_step;
+	}
+
+	// fallback, should not reach here ideally
+	return 0;
+}
+
+
+void media_view_build_zoom_steps( double fit_zoom, double fit_scale_up_zoom )
+{
+	// int zoom_step_fit = media_view_find_closest_zoom_step( fit_zoom );
+
+	g_zoom_snap_values.clear();
+
+	double zoom_min = ZOOM_MIN;
+
+	if ( app::config.zoom_under_window_size )
+	{
+		g_zoom_snap_values.push_back( ZOOM_MIN );
+		g_zoom_snap_values.push_back( 1.0 );
+		g_zoom_snap_values.push_back( 2.0 );
+	}
+	else
+	{
+		if ( fit_zoom + ZOOM_EPSILON <= ZOOM_MIN )
+			g_zoom_snap_values.push_back( ZOOM_MIN );
+
+		if ( fit_zoom + ZOOM_EPSILON <= 1.0 )
+			g_zoom_snap_values.push_back( 1.0 );
+
+		if ( fit_zoom + ZOOM_EPSILON <= 2.0 )
+			g_zoom_snap_values.push_back( 2.0 );
+
+		if ( g_zoom_snap_values.size() )
+			zoom_min = g_zoom_snap_values.front();
+		else
+			zoom_min = fit_zoom;
+	}
+
+	g_zoom_snap_values.push_back( fit_zoom );
+
+	if ( fit_scale_up_zoom != fit_zoom )
+		g_zoom_snap_values.push_back( fit_scale_up_zoom );
+
+	g_zoom_snap_values.push_back( ZOOM_MAX );
+
+	// build the standard zoom levels now
+
+	// Zooming under 100%
+	for ( double zoom = 1.0;; )
+	{
+		zoom *= 1.0 - app::config.media_zoom_scale;
+
+		if ( zoom <= zoom_min )
+			break;
+
+		g_zoom_snap_values.push_back( zoom );
+	}
+
+	// Zooming over 100%
+	for ( double zoom = 1.0;; )
+	{
+		zoom *= 1.0 + app::config.media_zoom_scale;
+
+		if ( zoom >= ZOOM_MAX )
+			break;
+
+		g_zoom_snap_values.push_back( zoom );
+	}
+
+	std::qsort( g_zoom_snap_values.data(), g_zoom_snap_values.size(), sizeof( double ), qsort_zoom_values );
+
+	// remove values that are too close to each other
+	for ( size_t zoom_i = 1; zoom_i < g_zoom_snap_values.size() - 1;  )
+	{
+		double zoom_level_prev = g_zoom_snap_values[ zoom_i - 1 ];
+		double zoom_level      = g_zoom_snap_values[ zoom_i ];
+
+		// duplicate entry
+		if ( zoom_level == zoom_level_prev )
+		{
+			vec_remove_index( g_zoom_snap_values, zoom_i );
+			continue;
+		}
+
+		// don't touch these
+		if ( zoom_level == fit_zoom || zoom_level == fit_scale_up_zoom )
+		{
+			zoom_i++;
+			continue;
+		}
+
+		double zoom_diff_a = fabs( zoom_level - zoom_level_prev );
+
+		//double zoom_threshold = 1.0;
+		//
+		//if ( zoom_level > 1.0 )
+		//	zoom_threshold += app::config.media_zoom_scale;
+		//else
+		//	zoom_threshold -= app::config.media_zoom_scale;
+
+		if ( zoom_diff_a < 0.05 * zoom_level )
+		{
+			vec_remove_index( g_zoom_snap_values, zoom_i );
+		}
+		//else if ( zoom_diff_b < 0.05 * zoom_level )
+		//{
+		//	vec_remove_index( g_zoom_snap_values, zoom_i );
+		//}
+		else
+		{
+			zoom_i++;
+		}
+	}
+
+	g_zoom_snap_0_index = vec_index( g_zoom_snap_values, 1.0, 0 );
+}
+
+
+double media_view_get_zoom_level( int& zoom_step )
+{
+	// if under 100% zoom, and is an out of index range, give them the minimum zoom level
+	if ( zoom_step < 0 && -zoom_step > g_zoom_snap_0_index )
+	{
+		zoom_step = -1 * static_cast< int >( g_zoom_snap_0_index );
+		return g_zoom_snap_values.front();
+	}
+
+	size_t offset = static_cast< size_t >( zoom_step ) + g_zoom_snap_0_index;
+
+	// if the offset is out of range, give them the max zoom level
+	if ( offset >= g_zoom_snap_values.size() )
+	{
+		zoom_step = static_cast< int >( g_zoom_snap_values.size() - g_zoom_snap_0_index );
+		return g_zoom_snap_values.back();
+	}
+
+	return g_zoom_snap_values.at( offset );
+}
+
+
+void media_view_fit_in_view( bool adjust_zoom, bool center_image, bool adjust_zoom_step )
 {
 	// new image size
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
 	// Fit image in window size
-	float factor[ 2 ] = { 1.f, 1.f };
+	double factor[ 2 ] = {
+		(double)width / (double)g_image_data.image.width,
+		(double)height / (double)g_image_data.image.height,
+	};
 
-	if ( g_image_data.image.width > width )
-		factor[ 0 ] = (float)width / (float)g_image_data.image.width;
+	double fit_scale_up_zoom = std::min( factor[ 0 ], factor[ 1 ] );
+	double fit_zoom          = std::min( fit_scale_up_zoom, 1.0 );
 
-	if ( g_image_data.image.height > height )
-		factor[ 1 ] = (float)height / (float)g_image_data.image.height;
+	media_view_build_zoom_steps( fit_zoom, fit_scale_up_zoom );
 
 	if ( adjust_zoom )
 	{
-		image_draw::zoom      = std::min( factor[ 0 ], factor[ 1 ] );
-		image_draw::zoom_mode = e_zoom_mode_fit;
+		if ( image_draw::zoom_mode == e_zoom_mode_fit_window )
+		{
+			image_draw::zoom = fit_scale_up_zoom;
+		}
+		else
+		{
+			image_draw::zoom      = fit_zoom;
+			image_draw::zoom_mode = e_zoom_mode_fit;
+		}
+
+		if ( adjust_zoom_step )
+			image_draw::zoom_step = media_view_find_closest_zoom_step( image_draw::zoom );
 
 		image_draw::size.x    = g_image_data.image.width * image_draw::zoom;
 		image_draw::size.y    = g_image_data.image.height * image_draw::zoom;
-
-		image_draw::zoom_step = 0;
-
-		double new_zoom       = 1.0;
-
-		// calc a close enough zoom step from zoom level
-		if ( image_draw::zoom < 1.0 )
-		{
-			for ( ;; image_draw::zoom_step-- )
-			{
-				new_zoom *= 1.0 - app::config.media_zoom_scale;
-
-				if ( image_draw::zoom > new_zoom )
-					break;
-			}
-		}
-		else if ( image_draw::zoom < 1.0 )
-		{
-			for ( ;; image_draw::zoom_step++ )
-			{
-				new_zoom *= 1.0 + app::config.media_zoom_scale;
-
-				if ( image_draw::zoom < new_zoom )
-					break;
-			}
-		}
 
 		media_view_scale_reset_timer();
 	}
@@ -538,118 +694,60 @@ void media_view_scroll_zoom( int scroll )
 	if ( util_mouse_hovering_imgui_window() )
 		return;
 
-	double factor = 1.0;
-
-	// Zoom in if scrolling up
+	// Check zoom limits
 	if ( scroll > 0 )
 	{
 		// max zoom level
-		if ( image_draw::zoom >= 1000.0 )
+		if ( image_draw::zoom >= ZOOM_MAX )
 			return;
-
-		// factor += ( app::config.media_zoom_scale * scroll );
-		image_draw::zoom_step += scroll;
 	}
 	else
 	{
 		// min zoom level
 		if ( image_draw::zoom <= ZOOM_MIN )
 			return;
-
-		// factor -= ( app::config.media_zoom_scale * abs( scroll ) );
-		image_draw::zoom_step += scroll;
 	}
 
-	double new_zoom = 1.0;
+	double factor = 1.0;
 
-	// calc new zoom from zoom steps
-	if ( image_draw::zoom_step == 0 )
-	{
-		new_zoom = 1.0;
-	}
-	else if ( image_draw::zoom_step < 0 )
-	{
-		for ( int step = 0; step < abs( image_draw::zoom_step ); step++ )
-		{
-			new_zoom *= 1.0 - app::config.media_zoom_scale;
-		}
-	}
-	else if ( image_draw::zoom_step > 0 )
-	{
-		for ( int step = 0; step < image_draw::zoom_step; step++ )
-		{
-			new_zoom *= 1.0 + app::config.media_zoom_scale;
-		}
-	}
-
-	// ??
-	// factor              = new_zoom / image_draw::zoom;
-
-	// TODO: add zoom levels to snap to here
-	// 100, 200, 400, 500, 50, 25, etc
-
-	// auto rounded_zoom = std::max( 0.01f, roundf( image_draw::zoom * factor * 100 ) / 100 );
-	// 
-	// if ( fmod( rounded_zoom, 1.0 ) == 0 )
-	// 	factor = rounded_zoom / image_draw::zoom;
-
-	int width, height;
+	int    width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
-	float fit_factor[ 2 ] = { 1.f, 1.f };
+	double fit_factor[ 2 ] = {
+		(double)width / (double)g_image_data.image.width,
+		(double)height / (double)g_image_data.image.height,
+	};
 
-	if ( g_image_data.image.width > width )
-		fit_factor[ 0 ] = (float)width / (float)g_image_data.image.width;
+	double fit_scale_up_zoom = std::min( fit_factor[ 0 ], fit_factor[ 1 ] );
+	double fit_zoom          = std::min( fit_scale_up_zoom, 1.0 );
 
-	if ( g_image_data.image.height > height )
-		fit_factor[ 1 ] = (float)height / (float)g_image_data.image.height;
+	media_view_build_zoom_steps( fit_zoom, fit_scale_up_zoom );
 
-	float  fit_zoom  = std::min( fit_factor[ 0 ], fit_factor[ 1 ] );
+	// Zoom in if scrolling up
+	image_draw::zoom_step += scroll;
 
-	double old_zoom = image_draw::zoom;
+	double old_zoom  = image_draw::zoom;
+	image_draw::zoom = media_view_get_zoom_level( image_draw::zoom_step );
 
-	// image_draw::zoom    = (double)( std::max( 1.f, image_draw::size.x ) * factor ) / (double)g_image_data.image.width;
-	image_draw::zoom = new_zoom;
-
-	// TODO: check if below window size, and then the next zoom level will make the image above the window size
-	// if so, switch zoom mode back to fit
-
-	// Snap to 100% zoom level
-	if ( old_zoom < 1.0 && image_draw::zoom >= 1.0 || old_zoom > 1.0 && image_draw::zoom <= 1.0 )
-		image_draw::zoom      = 1.0;
-
-	// Snap to 200% zoom level
-	else if ( old_zoom < 2.0 && image_draw::zoom >= 2.0 || old_zoom > 2.0 && image_draw::zoom <= 2.0 )
+	// Special case for fit zoom levels
+	if ( media_view_is_zoom_level( fit_zoom, image_draw::zoom ) )
 	{
-		image_draw::zoom = 2.0;
-
-		// hack to keep the zoom step level so we don't skip a step
-		if ( old_zoom < 2.0 )  // zooming in
-		{
-			//image_draw::zoom_step--;
-		}
-		else if ( old_zoom > 2.0 )  // zooming out
-		{
-			image_draw::zoom_step++;
-		}
-	}
-
-	// Snap to Fit zoom level
-	else if ( old_zoom < fit_zoom && image_draw::zoom >= fit_zoom || old_zoom > fit_zoom && image_draw::zoom <= fit_zoom )
-	{
+		image_draw::zoom_mode = e_zoom_mode_fit;
 		media_view_fit_in_view();
 		return;
 	}
 
-	// round it so we don't get something like 0.9999564598 or whatever instead of 1.0
-	//if ( image_draw::zoom < 0.01 )
-	//{
-	//	image_draw::zoom = std::max( ZOOM_MIN, round( image_draw::zoom * 10000 ) / 10000 );
-	//}
-	//else
+	if ( media_view_is_zoom_level( fit_scale_up_zoom, image_draw::zoom ) )
 	{
-		image_draw::zoom = std::max( ZOOM_MIN, round( image_draw::zoom * 1000 ) / 1000 );
+		image_draw::zoom_mode = e_zoom_mode_fit_window;
+		media_view_fit_in_view();
+		return;
 	}
+
+	image_draw::zoom_mode = e_zoom_mode_fixed;
+
+	// round it so we don't get something like 0.9999564598 or whatever instead of 1.0
+	image_draw::zoom   = std::max( ZOOM_MIN, round( image_draw::zoom * 1000 ) / 1000 );
 
 	// get new factor
 	factor             = image_draw::zoom / old_zoom;
@@ -659,18 +757,12 @@ void media_view_scroll_zoom( int scroll )
 	image_draw::size.y = (double)g_image_data.image.height * image_draw::zoom;
 
 	// recalculate image position to keep image where cursor is
-
-	// New Position = Scale Origin + ( Scale Point - Scale Origin ) * Scale Factor
-	// image_draw::pos.x  = (double)app::mouse_pos[ 0 ] + ( image_draw::pos.x - (double)app::mouse_pos[ 0 ] ) * factor;
-	// image_draw::pos.y  = (double)app::mouse_pos[ 1 ] + ( image_draw::pos.y - (double)app::mouse_pos[ 1 ] ) * factor;
-
 	image_draw::pos.x  = scale_point_from_origin( app::mouse_pos[ 0 ], image_draw::pos.x, factor );
 	image_draw::pos.y  = scale_point_from_origin( app::mouse_pos[ 1 ], image_draw::pos.y, factor );
 
 	media_view_scale_reset_timer();
 	media_view_clamp_to_bounds();
 
-	image_draw::zoom_mode = e_zoom_mode_fixed;
 	set_frame_draw( 2 );
 }
 
@@ -789,12 +881,22 @@ void media_view_context_menu()
 	float       button_width = ( region_avail.x / 2 ) + style.ItemSpacing.x;
 
 	if ( ImGui::Button( "Fit", { 0, 0 } ) )
+	{
+		image_draw::zoom_mode = e_zoom_mode_fit;
 		media_view_fit_in_view();
+	}
+
+	util_imgui_set_tooltip( "Fits the Image within the window up to 100% zoom" );
 
 	ImGui::SameLine();
 
-	if ( ImGui::Button( "Center", { 0, 0 } ) )
-		media_view_fit_in_view( false );
+	if ( ImGui::Button( "Fit Window", { 0, 0 } ) )
+	{
+		image_draw::zoom_mode = e_zoom_mode_fit_window;
+		media_view_fit_in_view();
+	}
+
+	util_imgui_set_tooltip( "Image is as large as possible within the window" );
 
 	ImGui::SameLine();
 
@@ -803,8 +905,8 @@ void media_view_context_menu()
 
 	ImGui::SameLine();
 
-	if ( ImGui::Button( "Gallery" ) )
-		set_view_type_gallery();
+	if ( ImGui::Button( "Center", { 0, 0 } ) )
+		media_view_fit_in_view( false );
 
 	ImGui::Separator();
 
@@ -1183,14 +1285,13 @@ void media_view_input()
 
 void media_view_window_resize()
 {
-	if ( image_draw::zoom_mode == e_zoom_mode_fit || image_draw::zoom_mode == e_zoom_mode_fit_width )
-	{
-		media_view_fit_in_view();
-	}
-	else
+	if ( image_draw::zoom_mode == e_zoom_mode_fixed )
 	{
 		media_view_clamp_to_bounds();
+		return;
 	}
+
+	media_view_fit_in_view();
 }
 
 
