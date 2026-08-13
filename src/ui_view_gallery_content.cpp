@@ -138,7 +138,7 @@ void gallery_view_do_selected_item_behavior( size_t i, gallery_item_draw_t& item
 			std::vector< fs::path > files{};
 
 			for ( selection_t& selection : gallery::selection )
-				files.push_back( selection.entry.file.path );
+				files.push_back( directory::path / selection.entry.file.path );
 
 			sys_do_drag_drop_files( files, button );
 
@@ -304,7 +304,6 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 		gallery_draw_extra_refresh();
 	}
 }
-
 
 
 // =============================================================================================
@@ -972,7 +971,7 @@ void gallery_view_handle_context_menu()
 
 			for ( selection_t& selection : gallery::selection )
 			{
-				paths.push_back( selection.entry.file.path );
+				paths.push_back( directory::path / selection.entry.file.path );
 			}
 
 			sys_open_file_properties( paths );

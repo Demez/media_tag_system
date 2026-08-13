@@ -768,7 +768,9 @@ void                                 media_view_scale_reset_timer();
 // media_entry_t                        gallery_item_get_media_entry( size_t index );
 const media_entry_t&                 gallery_item_get_media_entry( size_t index );
 const file_t&                        gallery_item_get_file( size_t index );
-const fs::path&                      gallery_item_get_path( size_t index );
+
+// returns an absolute path to the file
+fs::path                             gallery_item_get_path( size_t index );
 std::string                          gallery_item_get_path_string( size_t index );
 
 void                                 gallery_view_scroll_to_cursor();

@@ -992,7 +992,7 @@ void media_view_context_menu()
 
 	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
 	{
-		sys_browse_to_path( directory::path / gallery_item_get_path( g_image_data.index ) );
+		sys_browse_to_path( gallery_item_get_path( g_image_data.index ) );
 	}
 
 	if ( ImGui::BeginMenu( "Open With" ) )
@@ -1007,7 +1007,7 @@ void media_view_context_menu()
 	{
 		fs::path path = gallery_item_get_path( g_image_data.index );
 
-		if ( sys_copy_to_clipboard( { directory::path / path } ) )
+		if ( sys_copy_to_clipboard( { path } ) )
 		{
 			printf( "Copied to Clipboard\n" );
 			push_notification( "Copied" );

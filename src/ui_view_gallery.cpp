@@ -109,17 +109,17 @@ const file_t& gallery_item_get_file( size_t index )
 }
 
 
-const fs::path& gallery_item_get_path( size_t index )
+fs::path gallery_item_get_path( size_t index )
 {
 	const media_entry_t& entry = gallery_item_get_media_entry( index );
-	return entry.file.path;
+	return directory::path / entry.file.path;
 }
 
 
 std::string gallery_item_get_path_string( size_t index )
 {
 	const media_entry_t& entry = gallery_item_get_media_entry( index );
-	return sys_path_to_string( entry.file.path );
+	return sys_path_to_string( directory::path / entry.file.path );
 }
 
 
@@ -259,7 +259,7 @@ void gallery_view_delete_selection()
 	for ( selection_t& selection : gallery::selection )
 	{
 		// TODO: undo history
-		std::string path = sys_path_to_string( selection.entry.file.path );
+		std::string path = sys_path_to_string( directory::path / selection.entry.file.path );
 		sys_recycle_file( path.c_str() );
 	}
 }
