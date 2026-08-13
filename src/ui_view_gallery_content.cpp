@@ -47,6 +47,18 @@ namespace gallery_draw
 }
 
 
+float gallery_item_draw_t::get_height( ImGuiStyle& style )
+{
+	float item_size_y = image_bounds.y + ( style.WindowPadding.y * 2 );
+
+	if ( app::config.gallery_show_filenames )
+		item_size_y += text_size.y + style.ItemSpacing.y;
+
+	item_size_y = std::min( item_size_y, gallery_draw::item_size_y * 1.75f );
+	return item_size_y;
+}
+
+
 // =============================================================================================
 // Gallery Content Helpers
 
@@ -299,16 +311,16 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 // Gallery Item Drawing
 
 
-void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, bool upscale, ImVec2& out_image_size )
+void gallery_view_draw_image( ImVec2 image_bounds, image_t* image, ImTextureRef im_texture, bool upscale, bool centered, ImVec2& out_image_size )
 {
 	// Fit image in window size, scaling up if needed
 	float factor[ 2 ] = { 1.f, 1.f };
 
 	if ( upscale || image->width > gallery::image_bounds.x )
-		factor[ 0 ] = (float)gallery::image_bounds.x / (float)image->width;
+		factor[ 0 ] = (float)image_bounds.x / (float)image->width;
 
 	if ( upscale || image->height > gallery::image_bounds.y )
-		factor[ 1 ] = (float)gallery::image_bounds.y / (float)image->height;
+		factor[ 1 ] = (float)image_bounds.y / (float)image->height;
 
 	float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
@@ -321,8 +333,16 @@ void gallery_view_draw_image( image_t* image, ImTextureRef im_texture, bool upsc
 
 	// center the image
 	ImVec2 image_offset = ImGui::GetCursorPos();
-	image_offset.x += int( ( gallery::image_bounds.x - image_size.x ) / 2 );
-	image_offset.y += int( ( gallery::image_bounds.y - image_size.y ) / 2 );
+	image_offset.x += int( ( image_bounds.x - image_size.x ) / 2 );
+
+	if ( centered )
+	{
+		image_offset.y += int( ( image_bounds.y - image_size.y ) / 2 );
+	}
+	else
+	{
+		image_offset.y += int( image_bounds.y - image_size.y );
+	}
 
 	ImGui::SetCursorPos( image_offset );
 
@@ -346,7 +366,7 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 {
 	if ( item_draw.media->type == e_media_type_directory )
 	{
-		gallery_view_draw_image( icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), true, true, scaled_image_size );
 		return;
 	}
 
@@ -370,7 +390,7 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 		// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 		//ImGui::Dummy( image_bounds );
-		gallery_view_draw_image( icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, true, scaled_image_size );
 		drew_base_icon = true;
 		return;
 	}
@@ -378,19 +398,29 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 	if ( thumbnail->status == e_thumbnail_status_finished )
 	{
 		if ( thumbnail->image_scaled )
-			gallery_view_draw_image( thumbnail->image_scaled, thumbnail->textures.frame[ 0 ], true, scaled_image_size );
+			gallery_view_draw_image( item_draw.image_bounds, thumbnail->image_scaled, thumbnail->textures.frame[ 0 ], true, false, scaled_image_size );
 		else
-			gallery_view_draw_image( thumbnail->image, thumbnail->textures.frame[ 0 ], true, scaled_image_size );
+			gallery_view_draw_image( item_draw.image_bounds, thumbnail->image, thumbnail->textures.frame[ 0 ], true, false, scaled_image_size );
+
+		ImVec2 item_image_bounds = item_draw.image_bounds;
+		item_image_bounds.x      = std::min( item_image_bounds.x, scaled_image_size.x );
+		item_image_bounds.y      = std::min( item_image_bounds.y, scaled_image_size.y );
+
+		if ( item_draw.image_size.y != item_image_bounds.y )
+		{
+			item_draw.image_size = item_image_bounds;
+			gallery_draw_extra_refresh( 2 );
+		}
 
 		gallery::drawn_image_count++;
 	}
 	else if ( thumbnail->status == e_thumbnail_status_failed )
 	{
-		gallery_view_draw_image( icon_get_image( e_icon_invalid ), icon_get_imtexture( e_icon_invalid ), false, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( e_icon_invalid ), icon_get_imtexture( e_icon_invalid ), false, true, scaled_image_size );
 	}
 	else if ( thumbnail->status == e_thumbnail_status_queued || thumbnail->status == e_thumbnail_status_loading || thumbnail->status == e_thumbnail_status_uploading )
 	{
-		gallery_view_draw_image( icon_get_image( e_icon_loading ), icon_get_imtexture( e_icon_loading ), false, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( e_icon_loading ), icon_get_imtexture( e_icon_loading ), false, true, scaled_image_size );
 	}
 	else if ( thumbnail->status == e_thumbnail_status_free )
 	{
@@ -398,13 +428,13 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 			gallery_draw::thumbnail_requests.emplace_back( *item_draw.media, item_draw.gallery_index );
 
 		// ImGui::Dummy( image_bounds );
-		gallery_view_draw_image( icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, true, scaled_image_size );
 		drew_base_icon = true;
 	}
 	else  // if ( thumbnail->status == e_thumbnail_status_free )
 	{
 		//ImGui::Dummy( image_bounds );
-		gallery_view_draw_image( icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, true, scaled_image_size );
 		drew_base_icon = true;
 	}
 }
@@ -419,9 +449,9 @@ void        gallery_view_draw_item_text( ImGuiStyle& style, size_t i, gallery_it
 
 	// center align text
 	ImGui::SetCursorPosX( current_pos.x + ( ( gallery::item_size - ( media_text_size.x + style.WindowPadding.x * 2 + style.ItemSpacing.x ) ) * 0.5f ) );
-	ImGui::SetCursorPosY( current_pos.y + gallery::image_bounds.x + style.ItemSpacing.y );
+	ImGui::SetCursorPosY( current_pos.y + item_draw.image_bounds.y + style.ItemSpacing.y );
 
-	ImGui::PushTextWrapPos( saved_pos.x + gallery::image_bounds.x + style.ItemSpacing.x );
+	ImGui::PushTextWrapPos( saved_pos.x + item_draw.image_bounds.x + style.ItemSpacing.x );
 
 	// Text Clipping
 	ImVec2 window_pos         = ImGui::GetWindowPos();
@@ -578,13 +608,13 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 
 		if ( scaled_image_size.x )
 		{
-			image_offset_from_side_x = ( gallery::image_bounds.x - scaled_image_size.x ) / 2.f;
-			image_offset_from_side_y = ( gallery::image_bounds.y - scaled_image_size.y ) / 2.f;
+			image_offset_from_side_x = ( item_draw.image_bounds.x - scaled_image_size.x ) / 2.f;
+			image_offset_from_side_y = ( item_draw.image_bounds.y - scaled_image_size.y ) / 2.f;
 		}
 
 		// TODO: this doesn't work as well at different zoom levels
-		image_offset.x += ( gallery::image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 1.25f );
-		image_offset.y += ( gallery::image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 1.25f );
+		image_offset.x += ( item_draw.image_bounds.x - image_offset_from_side_x ) - ( scaled_icon_size.x / 1.25f );
+		image_offset.y += ( item_draw.image_bounds.y - image_offset_from_side_y ) - ( scaled_icon_size.y / 1.25f );
 
 		ImGui::SetCursorPos( image_offset );
 
@@ -619,6 +649,8 @@ void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 		layout.i                           = i;
 		layout.gallery_index               = gallery::sorted_media[ i ],
 		layout.media                       = &directory::media_list[ layout.gallery_index ];
+		layout.image_size                  = gallery::image_bounds;
+		layout.image_bounds                = gallery::image_bounds;
 
 		if ( app::config.gallery_show_filenames )
 		{
@@ -626,12 +658,12 @@ void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 		}
 
 		// Calculate Current Item Height, and store tallest height for current row
-		layout.item_size_y = gallery::image_bounds.y + ( style.WindowPadding.y * 2 );
-
-		if ( app::config.gallery_show_filenames )
-			layout.item_size_y += layout.text_size.y + style.ItemSpacing.y;
-
-		layout.item_size_y = std::min( layout.item_size_y, gallery_draw::item_size_y * 1.75f );
+	//	layout.item_size_y = gallery::image_bounds.y + ( style.WindowPadding.y * 2 );
+	//
+	//	if ( app::config.gallery_show_filenames )
+	//		layout.item_size_y += layout.text_size.y + style.ItemSpacing.y;
+	//
+	//	layout.item_size_y = std::min( layout.item_size_y, gallery_draw::item_size_y * 1.75f );
 	}
 }
 
@@ -686,6 +718,30 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 
 	memset( gallery::visible_item, 0, sizeof( void* ) * ( gallery::sorted_media.size() + 2 ) );
 
+	// do a quick pass to figure out the new heights
+	// this should be in size calc, but that's really slow due to text sizes being updated
+	// maybe text can be stored in a different function call to calculate them all, imagine i broke it up into jobs lol
+
+	std::vector< float > row_image_heights;
+	float row_count = ceilf( count / gallery::row_count ) + 1;  // extra row i guess
+	row_image_heights.resize( row_count );
+
+	for ( size_t i = 0; i < count; i++ )
+	{
+		gallery_item_draw_t& layout = *( layout_ptr + i );
+		if ( row_x == gallery::row_count )
+		{
+			row_x = 0;
+			row_y++;
+		}
+
+		row_x++;
+		row_image_heights[ row_y ] = std::max( layout.image_size.y, row_image_heights[ row_y ] );
+	}
+
+	row_x = 0;
+	row_y = 0;
+
 	for ( size_t i = 0; i < count; i++ )
 	{
 		gallery_item_draw_t& layout = *( layout_ptr + i );
@@ -700,7 +756,7 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 
 			gallery_draw::dummy_area.y += row_max_item_height + style.ItemSpacing.y;
 
-			row_max_item_height = gallery_draw::item_size_y;
+			row_max_item_height = 0.0;
 		}
 		else if ( row_x > 0 )
 		{
@@ -708,6 +764,9 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 		}
 
 		row_x++;
+
+		layout.image_bounds.y      = row_image_heights[ row_y ];
+		float item_height          = layout.get_height( style );
 
 		// layout.cursor_screen_pos = fake_cursor_pos;
 		layout.cursor_screen_pos.x = fake_cursor_pos.x;
@@ -719,10 +778,10 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 
 		//layout.item_rect_max     = { fake_cursor_pos.x + gallery::item_size, fake_cursor_pos.y + layout.item_size_y };
 		layout.item_rect_max.x     = fake_cursor_pos.x + item_size_x;
-		layout.item_rect_max.y     = fake_cursor_pos.y + layout.item_size_y;
+		layout.item_rect_max.y     = fake_cursor_pos.y + item_height;
 
-		if ( row_max_item_height < layout.item_size_y )
-			row_max_item_height = layout.item_size_y;
+		if ( row_max_item_height < item_height )
+			row_max_item_height = item_height;
 
 		layout.visible = IsRectVisibleFast( window, layout.item_rect_min, layout.item_rect_max );
 
@@ -958,8 +1017,8 @@ void gallery_view_handle_scroll_event( float mouse_y )
 
 	// get the max item height of the 1st visible row
 	// also account for each scroll step with fast scrolling
-	float  max_item_height = gallery_draw::item_size_y;
-	float  scroll_amount   = 0;
+	float  max_item_height = 0.f;
+	float  scroll_amount   = 0.f;
 	size_t i               = gallery::first_visible_item;
 	size_t row_i           = 0;
 	s64    scroll_step_add = ( mouse_y < 0 ) ? 1i64 : -1i64;
@@ -983,14 +1042,14 @@ void gallery_view_handle_scroll_event( float mouse_y )
 	for ( ; i < gallery::sorted_media.size(); )
 	{
 		gallery_item_draw_t& item_draw = gallery::item_layout[ i ];
-		max_item_height                = std::max( max_item_height, item_draw.item_size_y );
+		max_item_height                = std::max( max_item_height, item_draw.get_height( style ) );
 
 		if ( ++row_i == gallery::row_count )
 		{
 			row_i = 0;
 
 			scroll_amount += max_item_height + style.ItemSpacing.y;
-			max_item_height = gallery_draw::item_size_y;
+			max_item_height = ImGui::GetFrameHeight();
 
 			scroll_step += scroll_step_add;
 

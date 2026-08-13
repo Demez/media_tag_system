@@ -501,10 +501,6 @@ struct thumbnail_t
 // internal draw info for gallery for each item
 struct gallery_item_draw_t
 {
-	// position in grid
-	u32            grid_pos_x;
-	u32            grid_pos_y;
-
 	// current gallery index
 	size_t         i             = 0;
 	size_t         gallery_index = 0;
@@ -513,8 +509,10 @@ struct gallery_item_draw_t
 	media_entry_t* media         = nullptr;
 
 	ImVec2         text_size{};
+	ImVec2         image_size{};
+	ImVec2         image_bounds{};
 
-	float          item_size_y = 0.f;
+	// float          item_size_y = 0.f;
 
 	ImVec2         cursor_screen_pos{};
 	ImVec2         item_rect_min{};
@@ -523,6 +521,8 @@ struct gallery_item_draw_t
 	bool           selected_item = false;
 	bool           item_hovered  = false;
 	bool           visible       = false;
+
+	float          get_height( ImGuiStyle& style );
 };
 
 
