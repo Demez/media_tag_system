@@ -49,7 +49,7 @@ static fy_document* config_open( bool saving, char*& buffer )
 		if ( fs_is_file( config_path2.c_str() ) )
 		{
 			size_t len = 0;
-			buffer     = fs_read_file( config_path.c_str(), &len );
+			buffer     = fs_read_file( config_path2.c_str(), &len );
 			fyd        = fy_document_build_from_string( &cfg, buffer, len );
 		}
 
@@ -421,18 +421,8 @@ void config_reset()
 }
 
 
-bool config_load()
+void config_read_document( fy_document* fyd )
 {
-	config_reset();
-
-	char*        buffer = nullptr;
-	fy_document* fyd = config_open( false, buffer );
-
-	if ( !fyd )
-	{
-		return false;
-	}
-
 	printf( "Reading config\n" );
 
 	config_read_bookmarks( fyd );
@@ -473,7 +463,7 @@ bool config_load()
 
 	//int media_bg_color[ 4 ]{};
 	//int color_count = fy_document_scanf( fyd, "/media-background-color %d %d %d %d", &media_bg_color[ 0 ], &media_bg_color[ 1 ], &media_bg_color[ 2 ], &media_bg_color[ 3 ] );
-	
+
 	config_get_color( fy_document_root( fyd ), "/media-background-color", app::config.media_bg_color );
 	config_get_color( fy_document_root( fyd ), "/gallery-header-background-color", app::config.header_bg_color );
 	config_get_color( fy_document_root( fyd ), "/gallery-sidebar-bg-color", app::config.sidebar_bg_color );
@@ -483,12 +473,24 @@ bool config_load()
 
 	// config_write_internal( fyd );
 
-	if ( args_register_bool( "Disable Video Support", "--no-video" ) )
-		app::config.no_video = true;
-
 	// "config: Invalid path for thumbnail/cache-path!\n"
 
 	fy_document_destroy( fyd );
+}
+
+
+bool config_load()
+{
+	config_reset();
+
+	char*        buffer = nullptr;
+	fy_document* fyd = config_open( false, buffer );
+
+	if ( fyd )
+		config_read_document( fyd );
+
+	if ( args_register_bool( "Disable Video Support", "--no-video" ) )
+		app::config.no_video = true;
 
 	// Make Directories
 	if ( !config_mkdir( app::config.thumbnail_cache_path, "config: Invalid path for thumbnail/cache-path!\n" ) )

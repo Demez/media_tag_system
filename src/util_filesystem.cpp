@@ -513,7 +513,7 @@ bool fs_save_file( const char* path, const char* data, size_t size )
 
 	if ( fp == nullptr )
 	{
-		printf( "failed to open file handle to write file to\n - \"%s\"\n", temp_path );
+		printf( "failed to open file handle to save file to\n - \"%s\"\n", temp_path );
 		return false;
 	}
 
@@ -598,7 +598,7 @@ save_file_t fs_save_file_open( const char* path )
 
 	if ( fp == nullptr )
 	{
-		printf( "failed to open file handle to write file to\n - \"%s\"\n", save.temp_path );
+		printf( "failed to open file handle to save file to\n - \"%s\"\n", save.temp_path );
 		goto save_file_open_fail;
 	}
 

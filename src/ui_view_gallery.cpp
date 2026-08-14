@@ -308,6 +308,7 @@ void gallery_view_input()
 	{
 		gallery_view_input_check_clear_multi_select();
 
+		// TODO: CRASH HERE ON EMPTY FOLDER
 		if ( !empty )
 			selection = ( selection + 1 ) % static_cast< u32 >( gallery::sorted_media.size() );
 
