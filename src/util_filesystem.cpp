@@ -223,6 +223,7 @@ std::string fs_get_extension( std::string_view path )
 }
 
 
+#if 0
 const fs::path_char* fs_get_filename_ptr( fs::path_view path )
 {
 	if ( path.size() == 0 )
@@ -249,6 +250,7 @@ const fs::path_char* fs_get_filename_ptr( fs::path_view path )
 
 	return path.data() + start_index;
 }
+#endif
 
 
 char* fs_get_filename( const char* path, size_t path_len )

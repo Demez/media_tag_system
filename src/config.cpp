@@ -1,118 +1,87 @@
 #include "main.h"
 #include "util.h"
+#include "kdl/kdl.h"
 
-#include "libfyaml.h"
+#include <type_traits>
 
+constexpr const char DEFAULT_THUMBNAIL_CACHE[]         = "thumbnail_cache";
+constexpr const char DEFAULT_VIDEO_THUMBNAIL_CACHE[]   = "thumbnail_video_cache";
 
-//const char* __default_config = {
-//#include "config_default.yaml"
-//};
-
-
-#define DEFAULT_THUMBNAIL_CACHE       "$app_path$/thumbnail_cache"
-#define DEFAULT_VIDEO_THUMBNAIL_CACHE "$app_path$/thumbnail_video_cache"
+constexpr size_t     DEFAULT_THUMBNAIL_CACHE_LEN       = sizeof( DEFAULT_THUMBNAIL_CACHE );
+constexpr size_t     DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN = sizeof( DEFAULT_VIDEO_THUMBNAIL_CACHE );
 
 
-static fy_document* config_open( bool saving, char*& buffer )
+#define CFG_STR_EQUALS( my_str, kdl_str ) util_strncmp( my_str, sizeof( my_str ) - 1, kdl_str.data, kdl_str.len )
+#define CFG_OP_EQUALS( option, kdl_str )  util_strncmp( option.name, option.name_len, kdl_str.data, kdl_str.len )
+
+
+
+static void config_close_and_free( kdl_parser*& parser, char*& buffer )
+{
+	if ( parser )
+		kdl_destroy_parser( parser );
+
+	parser = nullptr;
+	ch_free( e_mem_category_file_data, buffer );
+}
+
+
+static kdl_parser* _config_open_file( const std::string& config_path, char*& buffer )
+{
+	size_t len = 0;
+	buffer = fs_read_file( config_path.c_str(), &len );
+
+	if ( !buffer )
+		return nullptr;
+
+	// kdl_str kdl_buffer = kdl_str_from_cstr( buffer );
+	kdl_str     kdl_buffer{ buffer, len };
+	kdl_parser* parser = kdl_create_string_parser( kdl_buffer, KDL_EMIT_COMMENTS );
+
+	if ( !parser )
+	{
+		config_close_and_free( parser, buffer );
+		return nullptr;
+	}
+
+	return parser;
+}
+
+
+static bool config_open( bool saving, kdl_parser*& root, char*& buffer )
 {
 	const char* app_dir     = sys_get_exe_folder();
 
 	std::string config_path = app_dir;
 	config_path += SEP_S;
-	config_path += "config.yaml";
-
-	fy_parse_cfg cfg{};
-	cfg.flags        = (fy_parse_cfg_flags)( FYPCF_SLOPPY_FLOW_INDENTATION );
-
-	if ( saving )
-	{
-		cfg.flags = (fy_parse_cfg_flags)( cfg.flags | FYPCF_PARSE_COMMENTS );
-	}
-
-	fy_document* fyd = nullptr;
+	config_path += "config.kdl";
 
 	if ( fs_is_file( config_path.c_str() ) )
-	{
-		size_t len = 0;
-		buffer     = fs_read_file( config_path.c_str(), &len );
-		fyd        = fy_document_build_from_string( &cfg, buffer, len );
-	}
+		root = _config_open_file( config_path, buffer );
 
-	if ( !fyd )
-	{
-		printf( "Failed to open config.yaml, Trying to load config_default.yaml\n" );
+	if ( root )
+		return true;
 
-		std::string config_path2 = app_dir;
-		config_path2 += SEP_S;
-		config_path2 += "config_default.yaml";
+	printf( "Failed to open config.kdl, Trying to load config_default.kdl\n" );
 
-		if ( fs_is_file( config_path2.c_str() ) )
-		{
-			size_t len = 0;
-			buffer     = fs_read_file( config_path2.c_str(), &len );
-			fyd        = fy_document_build_from_string( &cfg, buffer, len );
-		}
+	config_path = app_dir;
+	config_path += SEP_S;
+	config_path += "config_default.kdl";
 
-		if ( !fyd )
-		{
-			printf( "Failed to open config_default.yaml!\n" );
-			return nullptr;
-		}
-	}
+	if ( fs_is_file( config_path.c_str() ) )
+		root = _config_open_file( config_path, buffer );
 
-	return fyd;
+	if ( root )
+		return true;
+
+	printf( "Failed to open config_default.kdl!\n" );
+	return false;
 }
 
 
-void config_parse_path( const char* app_dir, const char* user_path, std::string& result )
+void config_parse_path( const char* user_path, size_t user_path_len, std::string& result )
 {
-	if ( !app_dir )
-	{
-		printf("app_dir is nullptr!\n" );
-		return;
-	}
-
-	result.clear();
-
-	const char* last = user_path;
-	const char* find = strchr( user_path, '$' );
-	size_t      path_len = strlen( user_path );
-
-	while ( last )
-	{
-		// at a macro
-		if ( find == last )
-		{
-			find = strchr( last + 1, '$' );
-		}
-
-		size_t dist = 0;
-		if ( find )
-			dist = ( find - last ) + 1;
-		else
-			dist = path_len - ( last - user_path );
-
-		if ( dist == 0 )
-			break;
-
-		if ( dist == 10 && strncmp( last, "$app_path$", dist ) == 0 )
-		{
-			result += app_dir;
-		}
-		else
-		{
-			std::string tmp( last, dist );
-			result += tmp;
-		}
-
-		if ( !find )
-			break;
-
-		last = ++find;
-		find = strchr( last, '$' );
-	}
-
-	result = fs_path_clean( result.data(), result.size() );
+	result = fs_path_clean( user_path, user_path_len );
 }
 
 
@@ -126,256 +95,245 @@ bool config_mkdir( std::string_view path, const char* fail_str )
 }
 
 
-static void config_get_bool_value( fy_document* doc, const char* fmt, bool& value )
-{
-	u32 number = 0;
-	int count  = fy_document_scanf( doc, fmt, &number );
-
-	if ( count <= 0 )
-		printf( "config: Failed to get value of \"%s\"\n", fmt );
-	else
-		value = number > 0;
-}
-
-
-template< typename T >
-static void config_get_doc_value( fy_document* doc, const char* fmt, T& value )
-{
-	int count = fy_document_scanf( doc, fmt, &value );
-
-	if ( count <= 0 )
-		printf( "config: Failed to get value of \"%s\"\n", fmt );
-}
-
-
-template< typename T >
-static void config_get_node_value( fy_node* node, const char* fmt, T& value )
-{
-	int count = fy_node_scanf( node, fmt, &value );
-
-	if ( count <= 0 )
-		printf( "config: Failed to get value of \"%s\"\n", fmt );
-}
-
-
-static bool config_get_node_value_base( fy_node* node, const char* path, const char*& output )
-{
-	fy_node* node_value = fy_node_by_path( node, path, FY_NT, FYNWF_PTR_DEFAULT );
-
-	if ( !node_value )
-	{
-		printf( "config: Failed to find \"%s\"\n", path );
-		return false;
-	}
-
-	if ( !fy_node_is_scalar( node_value ) )
-	{
-		printf( "config: \"%s\" is not a value!\n", path );
-		return false;
-	}
-
-	size_t value_len = 0;
-	output = fy_node_get_scalar0( node_value );
-
-	return output != nullptr;
-}
-
-
-static bool config_get_node_u32( fy_node* node, const char* path, u32& output )
-{
-	size_t      value_len  = 0;
-	const char* value      = nullptr;
-
-	if ( !config_get_node_value_base( node, path, value ) )
-		return false;
-
-	char* end_ptr = nullptr;
-	output = strtoul( value, &end_ptr, 10 );
-
-	return true;
-}
-
-
-static bool config_get_node_bool( fy_node* node, const char* path, bool& output )
-{
-	size_t      value_len = 0;
-	const char* value     = nullptr;
-
-	if ( !config_get_node_value_base( node, path, value ) )
-		return false;
-
-	char* end_ptr = nullptr;
-	output        = strtoul( value, &end_ptr, 10 ) == 1;
-
-	return true;
-}
-
-
-static bool config_get_node_string( fy_node* node, const char* path, char* buffer )
-{
-	int count = fy_node_scanf( node, path, buffer );
-
-	if ( count <= 0 )
-	{
-		printf( "config: Failed to get value of \"%s\"\n", path );
-		return false;
-	}
-
-	return true;
-}
-
-
-static bool config_get_color( fy_node* node, const char* path, ImVec4& output )
-{
-	fy_node* color_node = fy_node_by_path( node, path, FY_NT, FYNWF_PTR_DEFAULT );
-
-	if ( !color_node )
-	{
-		printf( "config: Failed to find \"%s\"\n", path );
-		return false;
-	}
-
-	fy_node_type color_node_type = fy_node_get_type( color_node );
-
-	if ( color_node_type != FYNT_SEQUENCE )
-	{
-		printf( "config: Expected Sequence like [0.1, 0.2, 0.5, 1.0] or 0 to 255 values in \"%s\"\n", path );
-		return false;
-	}
-
-	int item_count = fy_node_sequence_item_count( color_node );
-
-	for ( int item_i = 0; item_i < item_count; item_i++ )
-	{
-		fy_node*     node_entry = fy_node_sequence_get_by_index( color_node, item_i );
-		fy_node_type node_type  = fy_node_get_type( node_entry );
-
-		if ( node_type != FYNT_SCALAR )
-			continue;
-
-		const char* string = fy_node_get_scalar0( node_entry );
-
-		if ( strchr( string, '.' ) )
-		{
-			// Float
-			char* end    = nullptr;
-			float result = static_cast< float >( strtod( string, &end ) );
-
-			if ( end )
-			{
-				*( &output.x + item_i ) = result;
-			}
-		}
-		else
-		{
-			// RGB 0 to 255
-			char* end    = nullptr;
-			float result = static_cast< float >( strtol( string, &end, 10 ) );
-
-			if ( end )
-			{
-				*( &output.x + item_i ) = result / 255.f;
-			}
-		}
-	}
-
-	return true;
-}
-
-
-//static void config_get_node_path( fy_node* node, char* app_dir, const char* fmt, std::string& value )
-//{
-//	char buffer[ 256 ]{};
-//
-//	int count = fy_node_scanf( node, fmt, buffer );
-//
-//	if ( count <= 0 )
-//	{
-//		printf( "config: Failed to get value of \"%s\"\n", fmt );
-//		return;
-//	}
-//
-//	config_check_path( app_dir, buffer, value, "Invalid \"%s\"!\n", fmt );
-//}
-
-
-void config_read_bookmarks( fy_document* fyd )
+void config_read_bookmarks( kdl_parser* parser )
 {
 	app::config.bookmark.clear();
 
-	fy_node* bookmark_node_list = fy_node_by_path( fy_document_root( fyd ), "/bookmarks", FY_NT, FYNWF_PTR_DEFAULT );
-
-	if ( !bookmark_node_list )
-		return;
-
-	int item_count = fy_node_sequence_item_count( bookmark_node_list );
-
-	for ( int item_i = 0; item_i < item_count; item_i++ )
+	kdl_event_data* event = kdl_parser_next_event( parser );
+	while ( event->event != KDL_EVENT_EOF )
 	{
-		fy_node*    bookmark_node = fy_node_sequence_get_by_index( bookmark_node_list, item_i );
+		if ( event->event != KDL_EVENT_START_NODE )
+			break;
 
-		size_t      len           = 0;
-		const char* string        = fy_node_get_scalar( bookmark_node, &len );
+		bookmark_t bookmark{};
+		bookmark.path.assign( event->name.data, event->name.len );
 
-		if ( string )
+		if ( fs_is_file( bookmark.path.c_str() ) )
 		{
-			bookmark_t bookmark{};
-			bookmark.path.assign( string, len );
-
-			if ( fs_is_file( bookmark.path.c_str() ) )
-			{
-				printf( "config: bookmark points to file, not a directory: \"%s\"\n", string );
-				continue;
-			}
-
-			bookmark.valid = fs_is_dir( bookmark.path.c_str() );
-
-			if ( !bookmark.valid )
-				printf( "config: bookmark does not exist! \"%s\"\n", string );
-
-			char* folder_name = fs_get_filename( string, len );
-			bookmark.name.assign( folder_name );
-			free( folder_name );
-
-			app::config.bookmark.push_back( bookmark );
+			printf( "config: bookmark points to file, not a directory: \"%s\"\n", event->name.data );
+			continue;
 		}
+
+		bookmark.valid = fs_is_dir( bookmark.path.c_str() );
+
+		if ( !bookmark.valid )
+			printf( "config: bookmark does not exist! \"%s\"\n", event->name.data );
+
+		const char* folder_name = fs_get_filename_ptr( event->name.data, event->name.len );
+		bookmark.name.assign( folder_name );
+
+		app::config.bookmark.push_back( bookmark );
+
+		event = kdl_parser_next_event( parser );
+
+		if ( event->event == KDL_EVENT_END_NODE )
+			event = kdl_parser_next_event( parser );
 		else
-		{
-			printf( "config: bookmark not a string?\n" );
-		}
+			break;
 	}
 }
 
 
-void config_read_thumbnail_settings( fy_document* fyd )
+void config_finish_node( kdl_parser* parser )
 {
-	fy_node* thumbnail = fy_node_by_path( fy_document_root( fyd ), "/thumbnail", FY_NT, FYNWF_PTR_DEFAULT );
+	kdl_event_data* event = nullptr;
+	do
+	{
+		event = kdl_parser_next_event( parser );
+	} while ( event->event != KDL_EVENT_END_NODE );
+}
 
-	if ( !thumbnail )
+
+void config_handle_path( kdl_parser* parser, std::string& result )
+{
+	kdl_event_data* event = kdl_parser_next_event( parser );
+
+	if ( event->event != KDL_EVENT_ARGUMENT )
 		return;
 
-	char cache_dir[ 256 ]{};
-	char cache_video_dir[ 256 ]{};
+	kdl_str& str = event->value.string;
+	config_parse_path( str.data, str.len, result );
 
-	const char* app_dir = sys_get_exe_folder();
+	config_finish_node( parser );
+}
 
-	if ( config_get_node_string( thumbnail, "/cache-path %255s", cache_dir ) )
-		config_parse_path( app_dir, cache_dir, app::config.thumbnail_cache_path );
 
-	if ( config_get_node_string( thumbnail, "/cache-path-video %255s", cache_video_dir ) )
-		config_parse_path( app_dir, cache_video_dir, app::config.thumbnail_video_cache_path );
+void config_handle_string( kdl_parser* parser, std::string& result )
+{
+	kdl_event_data* event = kdl_parser_next_event( parser );
 
-	config_get_node_u32( thumbnail, "/threads", app::config.thumbnail_threads );
-	config_get_node_u32( thumbnail, "/threads-save", app::config.thumbnail_save_threads );
+	if ( event->event != KDL_EVENT_ARGUMENT )
+		return;
 
-	//config_get_node_value( thumbnail, "/threads %u", app::config.thumbnail_threads );
-	config_get_node_value( thumbnail, "/uploads-per-frame %u", app::config.thumbnail_uploads_per_frame );
-	config_get_node_value( thumbnail, "/memory-cache-size %u", app::config.thumbnail_mem_cache_size );
-	config_get_node_bool( thumbnail, "/use-fixed-size %u", app::config.thumbnail_use_fixed_size );
-	config_get_node_bool( thumbnail, "/jxl-enable %u", app::config.thumbnail_jxl_enable );
-	config_get_node_value( thumbnail, "/jxl-effort %u", app::config.thumbnail_jxl_effort );
-	config_get_node_value( thumbnail, "/jxl-distance %f", app::config.thumbnail_jxl_distance );
-	config_get_node_value( thumbnail, "/size %u", app::config.thumbnail_size );
+	kdl_str& str = event->value.string;
+	result.assign( str.data, str.len );
+
+	config_finish_node( parser );
+}
+
+
+template< typename NUM >
+void config_get_number_arg( kdl_parser* parser, NUM& result )
+{
+	static_assert( std::is_arithmetic_v< NUM >, "Template argument NUM must be an arithmetic type!" );
+	static_assert( !std::is_same_v< bool, NUM >, "Template argument NUM must not be a bool!" );
+
+	kdl_event_data* event = kdl_parser_next_event( parser );
+
+	if ( event->event != KDL_EVENT_ARGUMENT )
+	{
+		config_finish_node( parser );
+		return;
+	}
+
+	if ( event->value.type != KDL_TYPE_NUMBER )
+	{
+		config_finish_node( parser );
+		return;
+	}
+
+	kdl_number& num = event->value.number;
+
+	switch ( num.type )
+	{
+		case KDL_NUMBER_TYPE_INTEGER:
+			result = static_cast< NUM >( num.integer );
+			break;
+		case KDL_NUMBER_TYPE_FLOATING_POINT:
+			result = static_cast< NUM >( num.floating_point );
+			break;
+		case KDL_NUMBER_TYPE_STRING_ENCODED:
+			if constexpr ( std::is_unsigned_v< NUM > )
+			{
+				result = static_cast< NUM >( std::stoul( num.string.data ) );
+			}
+			else
+			{
+				result = static_cast< NUM >( std::stol( num.string.data ) );
+			}
+			break;
+	}
+
+	config_finish_node( parser );
+}
+
+
+
+template< typename NUM >
+void config_get_vector_arg( kdl_parser* parser, NUM& result, u32 count )
+{
+	kdl_event_data* event = kdl_parser_next_event( parser );
+
+	for ( u32 i = 0; i < count; i++ )
+	{
+		if ( event->value.type != KDL_TYPE_NUMBER )
+		{
+			config_finish_node( parser );
+			return;
+		}
+
+		kdl_number& num = event->value.number;
+
+		switch ( num.type )
+		{
+			case KDL_NUMBER_TYPE_INTEGER:
+				result[ i ] = static_cast< float >( num.integer );
+				break;
+			case KDL_NUMBER_TYPE_FLOATING_POINT:
+				result[ i ] = static_cast< float >( num.floating_point );
+				break;
+			case KDL_NUMBER_TYPE_STRING_ENCODED:
+				result[ i ] = static_cast< float >( std::stof( num.string.data ) );
+				break;
+		}
+
+		event = kdl_parser_next_event( parser );
+	}
+}
+
+
+void config_get_bool_arg( kdl_parser* parser, bool& result )
+{
+	kdl_event_data* event = kdl_parser_next_event( parser );
+
+	if ( event->event != KDL_EVENT_ARGUMENT )
+	{
+		config_finish_node( parser );
+		return;
+	}
+
+	if ( event->value.type == KDL_TYPE_BOOLEAN )
+		result = event->value.boolean;
+
+	config_finish_node( parser );
+}
+
+
+void config_read_thumbnail_settings( kdl_parser* parser )
+{
+	kdl_event_data* event = kdl_parser_next_event( parser );
+	while ( event->event != KDL_EVENT_EOF )
+	{
+		if ( event->event == KDL_EVENT_END_NODE )
+		{
+			event = kdl_parser_next_event( parser );
+			break;
+		}
+
+		if ( event->event != KDL_EVENT_START_NODE )
+		{
+			event = kdl_parser_next_event( parser );
+			continue;
+		}
+
+		if ( CFG_STR_EQUALS( "cache_path", event->name ) )
+		{
+			config_handle_path( parser, app::config.thumbnail_cache_path );
+		}
+		else if ( CFG_STR_EQUALS( "cache_path_video", event->name ) )
+		{
+			config_handle_path( parser, app::config.thumbnail_video_cache_path );
+		}
+		else if ( CFG_STR_EQUALS( "jxl_distance", event->name ) )
+		{
+			config_get_number_arg( parser, app::config.thumbnail_jxl_distance );
+		}
+		else if ( CFG_STR_EQUALS( "jxl_effort", event->name ) )
+		{
+			config_get_number_arg( parser, app::config.thumbnail_jxl_effort );
+		}
+		else if ( CFG_STR_EQUALS( "jxl_enable", event->name ) )
+		{
+			config_get_bool_arg( parser, app::config.thumbnail_jxl_enable );
+		}
+		else if ( CFG_STR_EQUALS( "memory_cache_size", event->name ) )
+		{
+			config_get_number_arg( parser, app::config.thumbnail_mem_cache_size );
+		}
+		else if ( CFG_STR_EQUALS( "size", event->name ) )
+		{
+			config_get_number_arg( parser, app::config.thumbnail_size );
+		}
+		else if ( CFG_STR_EQUALS( "threads", event->name ) )
+		{
+			config_get_number_arg( parser, app::config.thumbnail_threads );
+		}
+		else if ( CFG_STR_EQUALS( "threads_save", event->name ) )
+		{
+			config_get_number_arg( parser, app::config.thumbnail_save_threads );
+		}
+		else if ( CFG_STR_EQUALS( "uploads_per_frame", event->name ) )
+		{
+			config_get_number_arg( parser, app::config.thumbnail_uploads_per_frame );
+		}
+		else if ( CFG_STR_EQUALS( "use_fixed_size", event->name ) )
+		{
+			config_get_bool_arg( parser, app::config.thumbnail_use_fixed_size );
+		}
+
+		// advance to the next node
+		event = kdl_parser_next_event( parser );
+	}
 
 	if ( app::config.thumbnail_threads == 0 )
 	{
@@ -404,6 +362,115 @@ void config_read_thumbnail_settings( fy_document* fyd )
 }
 
 
+void config_handle_registered_option( const config_opt_t* opt_list, const size_t opt_list_len, kdl_parser* parser, kdl_event_data* event )
+{
+	for ( size_t i = 0; i < opt_list_len; i++ )
+	{
+		const config_opt_t& cfg_op = opt_list[ i ];
+
+		if ( !CFG_OP_EQUALS( cfg_op, event->name ) )
+			continue;
+
+		// cast to raw byte pointer before applying byte offset
+		auto member_ptr = reinterpret_cast< u8* >( &app::config ) + cfg_op.offset;
+
+		switch ( cfg_op.type )
+		{
+			case e_cfg_bool:
+			{
+				auto value = reinterpret_cast< bool* >( member_ptr );
+				config_get_bool_arg( parser, *value );
+				break;
+			}
+			case e_cfg_u32:
+			{
+				auto value = reinterpret_cast< u32* >( member_ptr );
+				config_get_number_arg( parser, *value );
+				break;
+			}
+			case e_cfg_s32:
+			{
+				auto value = reinterpret_cast< s32* >( member_ptr );
+				config_get_number_arg( parser, *value );
+				break;
+			}
+			case e_cfg_float:
+			{
+				auto value = reinterpret_cast< float* >( member_ptr );
+				config_get_number_arg( parser, *value );
+				break;
+			}
+			case e_cfg_vec2:
+			{
+				auto value = reinterpret_cast< ImVec2* >( member_ptr );
+				config_get_vector_arg( parser, *value, 2 );
+				break;
+			}
+			case e_cfg_vec4:
+			{
+				auto value = reinterpret_cast< ImVec4* >( member_ptr );
+				config_get_vector_arg( parser, *value, 4 );
+				break;
+			}
+			case e_cfg_stdstring:
+			{
+				auto value = reinterpret_cast< std::string* >( member_ptr );
+				config_handle_string( parser, *value );
+				break;
+			}
+		}
+
+		return;
+	}
+
+	// not found
+	config_finish_node( parser );
+}
+
+
+void config_read_settings_group( kdl_parser* parser, const config_opt_t* opt_list, const size_t opt_list_len )
+{
+	kdl_event_data* event = kdl_parser_next_event( parser );
+	while ( event->event != KDL_EVENT_EOF )
+	{
+		if ( event->event == KDL_EVENT_END_NODE )
+		{
+			event = kdl_parser_next_event( parser );
+			break;
+		}
+
+		if ( event->event != KDL_EVENT_START_NODE )
+		{
+			event = kdl_parser_next_event( parser );
+			continue;
+		}
+
+		config_handle_registered_option( opt_list, opt_list_len, parser, event );
+
+		// advance to the next node
+		event = kdl_parser_next_event( parser );
+	}
+}
+
+
+void config_register()
+{
+}
+
+
+bool config_init()
+{
+	// REGISTER CONFIG OPTIONS
+
+	return true;
+}
+
+
+void config_free()
+{
+}
+
+
 void config_reset()
 {
 	const char* app_dir = sys_get_exe_folder();
@@ -413,17 +480,103 @@ void config_reset()
 	app_config_t reset_config{};
 	app::config = reset_config;
 
-	config_parse_path( app_dir, DEFAULT_THUMBNAIL_CACHE, app::config.thumbnail_cache_path );
-	config_parse_path( app_dir, DEFAULT_VIDEO_THUMBNAIL_CACHE, app::config.thumbnail_video_cache_path );
+	std::string path = app_dir;
+	path += SEP;
+	path.append( DEFAULT_THUMBNAIL_CACHE, DEFAULT_THUMBNAIL_CACHE_LEN );
+
+	config_parse_path( path.c_str(), path.size(), app::config.thumbnail_cache_path );
+
+	path = app_dir;
+	path += SEP;
+	path.append( DEFAULT_VIDEO_THUMBNAIL_CACHE, DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN );
+
+	config_parse_path( path.c_str(), path.size(), app::config.thumbnail_video_cache_path );
 
 	app::config.gallery_header_padding.x = 6;
 	app::config.gallery_header_padding.y = 6;
 }
 
 
-void config_read_document( fy_document* fyd )
+void config_read_document( kdl_parser* parser )
 {
 	printf( "Reading config\n" );
+
+	kdl_event_data* event = kdl_parser_next_event( parser );
+
+	while ( event->event != KDL_EVENT_EOF )
+	{
+		if ( event->event != KDL_EVENT_START_NODE )
+		{
+			event = kdl_parser_next_event( parser );
+			continue;
+		}
+
+		if ( CFG_STR_EQUALS( "bookmarks", event->name ) )
+		{
+			config_read_bookmarks( parser );
+		}
+		else if ( CFG_STR_EQUALS( "thumbnail", event->name ) )
+		{
+			config_read_thumbnail_settings( parser );
+		}
+		else if ( CFG_STR_EQUALS( "theme", event->name ) )
+		{
+			config_read_settings_group( parser, g_cfg_opt_theme, g_cfg_opt_theme_len );
+		}
+		else if ( CFG_STR_EQUALS( "gallery", event->name ) )
+		{
+			config_read_settings_group( parser, g_cfg_opt_gallery, g_cfg_opt_gallery_len );
+		}
+		else if ( CFG_STR_EQUALS( "general", event->name ) )
+		{
+			config_read_settings_group( parser, g_cfg_opt_general, g_cfg_opt_general_len );
+		}
+		else
+		{
+			if ( event->name.data )
+				printf( "Unknown Key: %s\n", event->name.data );
+		}
+	}
+
+#if 0
+	for ( size_t root_i = 0; root_i < root.aObjects.count; root_i++ )
+	{
+		json_object_t& object = root.aObjects.data[ root_i ];
+
+		if ( JSON_STR_EQUALS( "bookmarks", object.aName ) )
+		{
+			config_read_bookmarks( object );
+		}
+		else if ( JSON_STR_EQUALS( "thumbnail", object.aName ) )
+		{
+			config_read_thumbnail_settings( object );
+		}
+		else if ( JSON_STR_EQUALS( "vsync", object.aName ) )
+		{
+		}
+		else if ( JSON_STR_EQUALS( "no_video", object.aName ) )
+		{
+		}
+		else if ( JSON_STR_EQUALS( "gallery_show_filenames", object.aName ) )
+		{
+		}
+		else if ( JSON_STR_EQUALS( "always_draw", object.aName ) )
+		{
+		}
+		else if ( JSON_STR_EQUALS( "dwm_extend", object.aName ) )
+		{
+		}
+		else if ( JSON_STR_EQUALS( "use_custom_colors", object.aName ) )
+		{
+		}
+		else if ( JSON_STR_EQUALS( "single_instance", object.aName ) )
+		{
+		}
+		else if ( JSON_STR_EQUALS( "high_bpc", object.aName ) )
+		{
+		}
+	}
+
 
 	config_read_bookmarks( fyd );
 	config_read_thumbnail_settings( fyd );
@@ -476,6 +629,7 @@ void config_read_document( fy_document* fyd )
 	// "config: Invalid path for thumbnail/cache-path!\n"
 
 	fy_document_destroy( fyd );
+#endif
 }
 
 
@@ -483,11 +637,13 @@ bool config_load()
 {
 	config_reset();
 
-	char*        buffer = nullptr;
-	fy_document* fyd = config_open( false, buffer );
+	char*       buffer = nullptr;
+	kdl_parser* parser = nullptr;
 
-	if ( fyd )
-		config_read_document( fyd );
+	if ( config_open( false, parser, buffer ) )
+		config_read_document( parser );
+
+	config_close_and_free( parser, buffer );
 
 	if ( args_register_bool( "Disable Video Support", "--no-video" ) )
 		app::config.no_video = true;
@@ -503,7 +659,6 @@ bool config_load()
 	gallery::image_bounds.x = gallery::item_size;
 	gallery::image_bounds.y = gallery::item_size;
 
-	ch_free( e_mem_category_file_data, buffer );
 	return true;
 }
 
@@ -601,7 +756,7 @@ static char* config_save_str_alloc( size_t len_needed )
 }
 #endif
 
-
+#if 0
 static void config_save_node_scalar_base( fy_document* doc, fy_node* root_node, const char* root, const char* path, const char* value, size_t value_len )
 {
 	if ( value == nullptr || value_len == 0 )
@@ -743,10 +898,12 @@ fy_node* config_save_get_list_node( fy_document* doc, fy_node* root, const char*
 
 	return node;
 }
+#endif
 
 
 void config_save()
 {
+#if 0
 	char*        buffer = nullptr;
 	fy_document* doc = config_open( true, buffer );
 
@@ -878,6 +1035,6 @@ void config_save()
 	}
 
 	ch_free( e_mem_category_file_data, my_stupid_buffer );
-	ch_free( e_mem_category_file_data, buffer );
+#endif
 }
 

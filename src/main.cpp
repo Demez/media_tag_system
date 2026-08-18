@@ -198,6 +198,7 @@ void select_image_in_folder( bool force_load_media )
 			continue;
 
 		gallery_view_set_selection( i );
+		g_image_data.index = i;
 		break;
 	}
 }
@@ -1307,6 +1308,12 @@ int startup( int argc, char* argv[] )
 	if ( !sys_setup_exe_path_vars() )
 	{
 		printf( "Failed to setup exe path variables!\n" );
+		return 1;
+	}
+
+	if ( !config_init() )
+	{
+		printf( "Failed to startup config system\n" );
 		return 1;
 	}
 

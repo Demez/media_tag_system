@@ -149,6 +149,80 @@ void settings_draw_gallery()
 }
 
 
+void settings_draw_option( const config_opt_t& option )
+{
+	// cast to raw byte pointer before applying byte offset
+	auto member_ptr = reinterpret_cast< u8* >( &app::config ) + option.offset;
+
+	switch ( option.type )
+	{
+		case e_cfg_bool:
+		{
+			auto value = reinterpret_cast< bool* >( member_ptr );
+			ImGui::Checkbox( option.name, value );
+
+			if ( option.desc )
+				setting_desc( option.desc );
+
+			break;
+		}
+		case e_cfg_u32:
+		{
+			auto value = reinterpret_cast< u32* >( member_ptr );
+			setting_u32_option(
+			  option.name,
+			  option.desc,
+			  *value,
+			  option.ranged ? option.min_u32 : 0,
+			  option.ranged ? option.max_u32 : UINT32_MAX,
+			  1 );
+			break;
+		}
+		case e_cfg_s32:
+		{
+			auto value = reinterpret_cast< s32* >( member_ptr );
+			break;
+		}
+		case e_cfg_float:
+		{
+			auto value = reinterpret_cast< float* >( member_ptr );
+			setting_float_option(
+			  option.name,
+			  option.desc,
+			  *value,
+			  option.ranged ? option.min_float : FLT_MIN,
+			  option.ranged ? option.max_float : FLT_MAX,
+			  1 );
+			break;
+		}
+		case e_cfg_vec2:
+		{
+			auto value = reinterpret_cast< ImVec2* >( member_ptr );
+			break;
+		}
+		case e_cfg_vec4:
+		{
+			auto value = reinterpret_cast< ImVec4* >( member_ptr );
+			break;
+		}
+		case e_cfg_stdstring:
+		{
+			auto value = reinterpret_cast< std::string* >( member_ptr );
+			break;
+		}
+	}
+}
+
+
+void settings_draw_category( const config_opt_t* option_list, size_t option_count )
+{
+	for ( size_t i = 0; i < option_count; i++ )
+	{
+		settings_draw_option( option_list[ i ] );
+	}
+}
+
+
 void settings_draw_thumbnails()
 {
 	setting_bool( "Enable Thumbnails", app::config.thumbnail_enable, "Enable Thumbnails, if false, draws icons instead" );
@@ -253,7 +327,11 @@ void settings_draw()
 	if ( ImGui::BeginChild( "##settings_area", final_size ) )
 	{
 		ImGui::SeparatorText( "General" );
+		// settings_draw_category( g_cfg_opt_general, g_cfg_opt_general_len );
 		settings_draw_general();
+
+		//ImGui::SeparatorText( "Theme" );
+		//settings_draw_category( g_cfg_opt_theme, g_cfg_opt_theme_len );
 
 		ImGui::SeparatorText( "Gallery" );
 		settings_draw_gallery();
@@ -310,9 +388,9 @@ void settings_draw()
 		folder += SEP;
 
 #if _WIN32  // ugh
-		folder += L"config.yaml";
+		folder += L"config.kdl";
 #else
-		folder += "config.yaml";
+		folder += "config.kdl";
 #endif	
 
 		sys_browse_to_path( folder );

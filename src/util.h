@@ -200,7 +200,7 @@ mem_category_info_t* get_mem_categories();
 
 
 template< typename T >
-requires std::is_arithmetic_v< T >
+// requires std::is_arithmetic_v< T >
 T CLAMP( T value, T low, T high )
 {
 	return ( value < low ) ? low : ( ( value > high ) ? high : value );
@@ -227,6 +227,7 @@ inline void ch_free_str( T*& memory )
 	ch_free( e_mem_category_string, memory );
 }
 
+#if 0
 template< typename T, typename... Args >
 requires std::constructible_from< T, Args... >
 T* ch_new( e_mem_category category, Args&&... args )
@@ -260,6 +261,7 @@ T* ch_new_multiple( e_mem_category category, size_t count, Args&&... args )
 
 	return data;
 }
+#endif
 
 template< typename T >
 T* ch_malloc( size_t count )
@@ -533,7 +535,8 @@ char*       fs_get_filename_no_ext( const char* path );
 char*       fs_get_filename( const char* path, size_t pathLen );
 char*       fs_get_filename_no_ext( const char* path, size_t pathLen );
 
-const fs::path_char* fs_get_filename_ptr( fs::path_view path );
+//const char*          fs_get_filename_ptr( std::string_view path );
+//const fs::path_char* fs_get_filename_ptr( fs::path_view path );
 
 std::string          fs_get_extension( std::string_view path );
 void                 fs_get_extension( std::string_view path, std::string& output );
@@ -577,3 +580,33 @@ void        fs_save_file_close( save_file_t& save, const char* path );
 
 // overrwites any existing file
 bool        fs_write_file( const char* path, const char* data, size_t size );
+
+
+template< typename CHAR >
+inline const CHAR* fs_get_filename_ptr( CHAR* path, size_t len )
+{
+	if ( !path || len == 0 )
+		return nullptr;
+
+	size_t i = len - 1;
+	for ( ; i > 0; i-- )
+	{
+		if ( ( path[ i ] == '/' || path[ i ] == '\\' ) && i != len - 1 )
+			break;
+	}
+
+	// No File Extension Found
+	if ( i == len )
+		return {};
+
+	size_t start_index = i + 1;
+
+	if ( i == 0 )
+		start_index = 0;
+
+	if ( start_index == len )
+		return {};
+
+	return path + start_index;
+}
+

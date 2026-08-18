@@ -42,7 +42,7 @@ if ( MSVC )
 		
 		# TODO: ideally i only want this in debug, but i may still need it in release
 		# https://stackoverflow.com/questions/28702665/warning-lnk4098-defaultlib-libcmt-conflicts-with-use-of-other-libs-use-node
-		_ALLOW_RUNTIME_LIBRARY_MISMATCH _ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH _ALLOW_MSC_VER_MISMATCH
+		# _ALLOW_RUNTIME_LIBRARY_MISMATCH _ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH _ALLOW_MSC_VER_MISMATCH
 		
 		_UNICODE=1
 		UNICODE=1
@@ -75,6 +75,9 @@ if ( MSVC )
 		# there's a lot of number type conversions, don't feel like dealing with that currently
 		"/wd4244"  # conversion from 'X' to 'Y', possible loss of data
 		"/wd4267"  # conversion from 'X' to 'Y', possible loss of data (yes there's 2 idk why)
+
+		# this one can be brought back later, but it's annoying when overhauling stuff
+		"/wd4505"  # unreferenced function with internal linkage has been removed
 		
 	#	"/wd4305"  # truncation from 'double' to 'float'
 	#	"/wd4464"  # relative include path contains ".."
@@ -125,6 +128,7 @@ if ( MSVC )
 	
 	set( LINK_OPTIONS_DEBUG
 		"/INCREMENTAL"
+		"/NODEFAULTLIB:libcmt"
 	)
 	
 	set( LINK_OPTIONS_RELEASE
@@ -164,8 +168,8 @@ if ( MSVC )
 	configure_file( "thirdparty/FreeImageRe/bin/FreeImage.dll" "${PROJ_OUT}/FreeImage.dll" COPYONLY )
 	configure_file( "thirdparty/FreeImageRe/bin/heif.dll" "${PROJ_OUT}/heif.dll" COPYONLY )
 	
-	message( "Copying fyaml" )
-	configure_file( "thirdparty/libfyaml/build/Release/fyaml.dll" "${PROJ_OUT}/fyaml.dll" COPYONLY )
+	message( "Copying kdl" )
+	configure_file( "thirdparty/ckdl/build/Release/kdl.dll" "${PROJ_OUT}/kdl.dll" COPYONLY )
 	
 	message( "Copying jxl" )
 	configure_file( "thirdparty/libjxl/build/lib/Release/jxl.dll" "${PROJ_OUT}/jxl.dll" COPYONLY )
@@ -195,8 +199,8 @@ else()  # linux
 	configure_file( "thirdparty/FreeImageRe/lib/libFreeImage.so" "${PROJ_OUT}/libFreeImage.so" COPYONLY )
 	configure_file( "thirdparty/FreeImageRe/lib/libheif.so" "${PROJ_OUT}/libheif.so" COPYONLY )
 
-	message( "Copying fyaml" )
-	configure_file( "thirdparty/libfyaml/build/libfyaml.so" "${PROJ_OUT}/libfyaml.so" COPYONLY )
+	message( "Copying kdl" )
+	configure_file( "thirdparty/libfyaml/build/kdl.so" "${PROJ_OUT}/kdl.so" COPYONLY )
 
 	message( "Copying jxl" )
 	configure_file( "thirdparty/libjxl/build/lib/libjxl.so" "${PROJ_OUT}/libjxl.so" COPYONLY )
@@ -222,6 +226,7 @@ set(
     src/image_loader.cpp
     src/memory.cpp
     src/config.cpp
+    src/config_options.h
     src/folder_scan.cpp
     src/job_system.cpp
     src/gl_render.cpp
@@ -237,7 +242,6 @@ set(
     src/util.h
     src/util.cpp
     src/util_filesystem.cpp
-    src/array.hpp
 
     src/args.cpp
     src/args.h
@@ -317,7 +321,7 @@ include_directories(
 	"thirdparty/gif_load"
 	"thirdparty/FreeImageRe/include"
 	"thirdparty/stb"
-	"thirdparty/libfyaml/include"
+	"thirdparty/ckdl/include"
 	"thirdparty/libjxl/lib/include"
 	"thirdparty/libjxl/build/lib/include"
 )
@@ -339,8 +343,8 @@ link_libraries(
 	freetype
 	nfd
 	SDL3
+	kdl
 	spng
-	fyaml
 	jxl
 	jxl_cms
 	jxl_threads
@@ -357,16 +361,19 @@ endif()
 set( LINK_DIR_DEBUG
 	"${THIRDPARTY_DIR}/nativefiledialog/build/src/Debug"
 	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Debug"
+	"${THIRDPARTY_DIR}/ckdl/build/Debug"
 )
 
 set( LINK_DIR_RELEASE
 	"${THIRDPARTY_DIR}/nativefiledialog/build/src/Release"
 	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Release"
+	"${THIRDPARTY_DIR}/ckdl/build/Release"
 )
 
 set( LINK_DIR_RELEASE_DEBUG_INFO
 	"${THIRDPARTY_DIR}/nativefiledialog/build/src/RelWithDebInfo"
 	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Release"
+	"${THIRDPARTY_DIR}/ckdl/build/Release"
 )
 
 link_directories(
@@ -374,7 +381,6 @@ link_directories(
 	"thirdparty/mozjpeg/build"
 	"thirdparty/libspng/build"
 	"thirdparty/FreeImageRe/lib"
-	"thirdparty/libfyaml/build"
 	
 	# i don't want to use static, but for some reason, it can't find the lib when using the dll version?
 	"${FREETYPE_DIR}/objs/x64/Release Static"
@@ -389,7 +395,6 @@ link_directories(
 if ( WIN32 )
 	link_directories(
 		"thirdparty/libspng/build/Release"
-		"thirdparty/libfyaml/build/Release"
 		"thirdparty/libjxl/build/lib/Release"
 		"thirdparty/SDL3/lib/x64"
 	)
@@ -410,7 +415,6 @@ foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	#	"${FREETYPE_DIR}/objs/x64/${OUTPUT_CONFIG} Static"
 	#	"thirdparty/nativefiledialog/build/src/${OUTPUT_CONFIG}"
 	#	"thirdparty/libjpeg-turbo/build/${OUTPUT_CONFIG}"
-		# "thirdparty/libfyaml/build/${OUTPUT_CONFIG}"
 		# "thirdparty/libspng/build/${OUTPUT_CONFIG}"
 	)
 endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )

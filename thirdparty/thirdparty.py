@@ -265,6 +265,19 @@ def parse_args() -> argparse.Namespace:
 # =================================================================================================
 
 
+def cmake_built_targets(targets: List[str]):
+    global CUR_PROJECT
+    for target in targets:
+        print(f"Building {CUR_PROJECT} - {target}\n")
+        if not syscmd(f"cmake --build ./build --config {target} --parallel", f"Failed to build in {target}"):
+            return False
+    
+    return True
+
+
+# =================================================================================================
+
+
 def post_jpeg_extract():
     if ARGS.no_build:
         return
@@ -355,7 +368,7 @@ def post_freetype_extract():
     os.chdir("freetype")
 
     if SYS_OS == OS.Windows:
-        for cfg in {"Debug Static", "Release Static"}:
+        for cfg in {"Debug Static", "Release Static", "Debug", "Release"}:
             # cmd = f"\"{VS_MSBUILD}\" \"{fix_proj}\" -property:Configuration={cfg} -property:Platform=x64"
             cmd = [VS_MSBUILD, "builds\\windows\\vc2010\\freetype.vcxproj", f"-property:Configuration={cfg}", "-property:Platform=x64"]
             subprocess.call(cmd)
@@ -376,40 +389,20 @@ def compile_nativefiledialog():
     if not syscmd(f"cmake -B build .", "Failed to run cmake"):
         return
 
-    print("Building nativefiledialog - RelWithDebInfo\n")
-    if not syscmd(f"cmake --build ./build --config RelWithDebInfo --parallel", "Failed to build in RelWithDebInfo"):
-        return
-
-    print("Building nativefiledialog - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
-        return
-
-    print("Building nativefiledialog - Debug\n")
-    if not syscmd(f"cmake --build ./build --config Debug --parallel", "Failed to build in Debug"):
-        return
+    cmake_built_targets(["RelWithDebInfo", "Release", "Debug"])
 
 
 # =================================================================================================
 
 
-def compile_libfyaml():
-    set_project("libfyaml")
-    os.chdir("libfyaml")
+def compile_ckdl():
+    set_project("ckdl")
+    os.chdir("ckdl")
 
-    if not syscmd(f"cmake -B build -DENABLE_NETWORK=OFF -DBUILD_TESTING=OFF .", "Failed to run cmake"):
+    if not syscmd(f"cmake -B build -DBUILD_SHARED_LIBS=ON .", "Failed to run cmake"):
         return
 
-    print("Building libfyaml - RelWithDebInfo\n")
-    if not syscmd(f"cmake --build ./build --config RelWithDebInfo --parallel", "Failed to build in RelWithDebInfo"):
-        return
-
-    print("Building libfyaml - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
-        return
-
-    print("Building libfyaml - Debug\n")
-    if not syscmd(f"cmake --build ./build --config Debug --parallel", "Failed to build in Debug"):
-        return
+    cmake_built_targets(["RelWithDebInfo", "Release", "Debug"])
 
 
 # =================================================================================================
@@ -574,10 +567,16 @@ TASK_LIST = {
             "func": compile_nativefiledialog,
         },
         {
-            "name": "libfyaml",
-            "url":  "https://github.com/pantoniou/libfyaml/releases/download/v1.0.0-alpha8/libfyaml-1.0.0-alpha8.tar.gz",
-            "file": "libfyaml-1.0.0-alpha8.tar.gz",
-            "func": compile_libfyaml,
+            "name": "ckdl",
+            "url":  "https://github.com/tjol/ckdl/archive/refs/heads/main.zip",
+            "file": "ckdl-main.zip",
+            "func": compile_ckdl,
+        },
+        {
+            "name": "glm",
+            "url":  "https://github.com/g-truc/glm/releases/download/1.0.3/glm-1.0.3.zip",
+            "file": "glm-1.0.3.zip",
+            "extracted_folder": "glm",
         },
         {
             "name": "jxl",

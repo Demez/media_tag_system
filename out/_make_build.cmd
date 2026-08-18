@@ -9,7 +9,7 @@ copy "brotlicommon.dll" "_new_build/brotlicommon.dll"
 copy "brotlidec.dll"    "_new_build/brotlidec.dll"
 copy "brotlienc.dll"    "_new_build/brotlienc.dll"
 copy "FreeImage.dll"    "_new_build/FreeImage.dll"
-copy "fyaml.dll"        "_new_build/fyaml.dll"
+copy "kdl.dll"    "_new_build/kdl.dll"
 copy "heif.dll"         "_new_build/heif.dll"
 copy "jxl.dll"          "_new_build/jxl.dll"
 copy "jxl_cms.dll"      "_new_build/jxl_cms.dll"
@@ -22,7 +22,7 @@ copy "turbojpeg.dll"    "_new_build/turbojpeg.dll"
 copy "media_tag_system.com" "_new_build/media_tag_system.com"
 copy "media_tag_system.exe" "_new_build/media_tag_system.exe"
 
-copy "config_default.yaml" "_new_build/config_default.yaml"
-copy "seguiemj.ttf"        "_new_build/seguiemj.ttf"
+copy "config_default.kdl" "_new_build/config_default.kdl"
+copy "seguiemj.ttf"       "_new_build/seguiemj.ttf"
 
 pause

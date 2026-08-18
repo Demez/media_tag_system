@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util.h"
+#include "config_options.h"
 
 #include "mpv_interface.h"
 #include "args.h"
@@ -118,78 +119,6 @@ struct directory_entry_t
 };
 
 
-struct bookmark_t
-{
-	std::string name{};
-	std::string path{};
-	bool        valid = false;
-};
-
-
-struct app_config_t
-{
-	std::vector< bookmark_t > bookmark{};
-
-	u32                       thumbnail_threads           = 8;
-	u32                       thumbnail_save_threads      = 2;
-	u32                       thumbnail_uploads_per_frame = 4;
-
-	// size in kilobytes
-	u32                       thumbnail_mem_cache_size    = 20000;
-
-	// resoultion of thumbnail
-	u32                       thumbnail_size              = 600;
-
-	bool                      thumbnail_use_fixed_size    = false;
-
-	bool                      thumbnail_enable            = true;
-	bool                      thumbnail_jxl_enable        = true;
-	float                     thumbnail_jxl_distance      = 4;
-	u32                       thumbnail_jxl_effort        = 6;
-
-	std::string               thumbnail_cache_path{};
-	std::string               thumbnail_video_cache_path{};
-
-	int                       vsync                          = 1;
-	bool                      high_bpc                       = false;
-	bool                      hdr                            = false;
-
-	u32                       job_threads                    = 3;
-
-	u32                       sleep_time_no_focus            = 5;
-	u32                       sleep_time_focus               = 1;
-	u32                       sleep_time_idle                = 15;
-	double                    apply_sleep_time_threshold     = 0.005;
-
-	u32                       font_size                      = 17;
-
-	u32                       gallery_zoom_default           = 200;
-	float                     media_zoom_scale               = 0.1f;
-
-	bool                      no_video                       = false;
-	bool                      gallery_show_filenames         = true;
-	bool                      always_draw                    = false;
-	bool                      single_instance                = false;
-	bool                      dev_mode                       = false;
-	bool                      zoom_under_window_size         = true;
-
-	bool                      directory_tree_auto_expand     = true;
-	bool                      directory_tree_expand_on_click = false;
-	bool                      directory_tree_simple          = false;
-
-	// Theming
-	bool                      dwm_extend                     = false;
-	bool                      use_custom_colors              = false;
-
-	ImVec2                    gallery_header_padding{};
-	ImVec4                    header_bg_color{};
-	ImVec4                    sidebar_bg_color{};
-	ImVec4                    content_bg_color{};
-
-	ImVec4                    media_bg_color{};
-};
-
-
 // add this to the thumbnail cache system
 // saves metadata on the image or video here
 // useful for more file info in the gallery
@@ -256,28 +185,99 @@ enum e_frame_blend_mode
 };
 
 
-// TODO: use shaders for drawing images
-// also apply palette's in the shader itself, maybe it will have a faster load time?
+struct animation_format_frame_data_base_t
+{
+	animation_format_frame_data_base_t() {};
+	virtual ~animation_format_frame_data_base_t() = default;
+};
+
+
+struct animation_format_frame_data_gif_t : public animation_format_frame_data_base_t
+{
+	e_frame_disposal frame_disposal;
+};
+
+
+enum e_animation_format
+{
+	e_animation_format_none,
+	
+	e_animation_format_gif,
+
+	// NOT SUPPORTED YET
+	// e_animation_format_apng,
+	// e_animation_format_webp,
+	// e_animation_format_jxl,
+
+	e_animation_format_count,
+};
+
+
+enum e_image_color_format
+{
+	// Standard RGB/RGBA Colors
+	e_image_color_format_rgba,
+
+	// Use the palette rendering shader
+	e_image_color_format_palette,
+
+	e_image_color_format_count,
+};
+
+
+enum e_image_frame_list
+{
+	// This is a standard animated image
+	e_image_frame_list_animated,
+
+	// Every image frame is a different layer, and this image should be treated differently
+	e_image_frame_list_layers,
+};
+
+
+enum e_image_frame_f
+{
+	e_image_frame_f_none          = 0,
+	e_image_frame_f_local_palette = 1 << 0,
+};
+
+
+struct image_palette_elem_t
+{
+	int r;
+	int g;
+	int b;
+	int a;
+};
+
+
+// TODO: test applying palette's in the shader itself, maybe it will have a faster load time?
 struct image_frame_t
 {
 	// image data
-	u8*              data;
+	u8*                  data;
 
 	// size
-	size_t           size;
+	size_t               size;
 
 	// time to spend on frame
-	double           time;
+	double               time;
 
 	// frame width and height
-	int              width;
-	int              height;
+	int                  width;
+	int                  height;
 
 	// frame draw position relative to image draw position
-	int              pos_x;
-	int              pos_y;
+	int                  pos_x;
+	int                  pos_y;
 
-	e_frame_disposal frame_disposal;
+	e_frame_disposal     frame_disposal;
+
+	e_image_frame_f      flags;
+
+	image_palette_elem_t palette;
+
+	// animation_format_frame_data_base_t* frame_data;
 
 	image_frame_t()
 	{
@@ -288,7 +288,7 @@ struct image_frame_t
 		height         = 0;
 		pos_x          = 0;
 		pos_y          = 0;
-		frame_disposal = e_frame_disposal_keep;
+		// frame_data     = nullptr;
 	}
 
 	~image_frame_t()
@@ -313,6 +313,8 @@ struct image_t
 	int                          loop_count;
 
 	char*                        image_format;
+
+	//e_animation_format           animation_format;
 
 	std::vector< image_frame_t > frame;
 	// image_frame_list_t frame;
@@ -830,6 +832,9 @@ bool                                 render_init();
 void                                 render_shutdown();
 void                                 render_window_resize();
 void                                 render_draw_texture( render_draw_texture_t draw_info );
+
+bool                                 config_init();
+void                                 config_free();
 
 void                                 config_reset();
 bool                                 config_load();
