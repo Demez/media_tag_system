@@ -147,9 +147,10 @@ void window_quick_draw()
 
 
 // ================================================================================================
+// Window Handling, pretty basic
 
 
-bool startup_set_gl_attributes()
+bool render_window_prepare_for_creation()
 {
 	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE ) )
 		return false;
@@ -168,6 +169,7 @@ bool startup_set_gl_attributes()
 		SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 10 );
 		SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 2 );
 
+		// this does work, i imagine i need this for HDR later, but i need to adjust how things are rendered
 		// SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 16 );
 		// SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 16 );
 		// SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 16 );
@@ -178,6 +180,127 @@ bool startup_set_gl_attributes()
 
 	return true;
 }
+
+
+bool render_window_test()
+{
+	g_gl_context = SDL_GL_CreateContext( app::window );
+	
+	if ( !g_gl_context )
+	{
+		printf( "Failed to create GL Context\n" );
+		return false;
+	}
+	
+	SDL_GL_MakeCurrent( app::window, g_gl_context );
+
+	// make sure we don't get set to a bit depth of 0, this can happen with hdmi displays that aren't 2.1+, ugh
+	int r = 0;
+	SDL_GL_GetAttribute( SDL_GL_RED_SIZE, &r );
+	return ( r != 0 );
+}
+
+
+void render_window_set_fallbacks()
+{
+	SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 8 );
+	SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 8 );
+	SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 8 );
+	SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 8 );
+}
+
+
+bool render_window_create()
+{
+	if ( !render_window_prepare_for_creation() )
+	{
+		printf( "Failed to set OpenGL attributes\n" );
+		return 1;
+	}
+
+	// Get the global mouse pos
+	float mouse_x, mouse_y;
+	SDL_GetGlobalMouseState( &mouse_x, &mouse_y );
+
+	SDL_Point mouse;
+	mouse.x                     = static_cast< int >( mouse_x );
+	mouse.y                     = static_cast< int >( mouse_y );
+	SDL_DisplayID    display_id = SDL_GetDisplayForPoint( &mouse );
+
+	// Create Window
+	SDL_PropertiesID props      = SDL_CreateProperties();
+
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 1000 );
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 600 );
+
+	// for some reason, SDL_WINDOWPOS_UNDEFINED is ALWAYS centering the window in the middle on the primary display
+	// so im trying to make it feel better and hacking it to open the window on the monitor the mouse is currently on
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
+
+	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true );
+	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true );
+	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true );
+	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true );
+
+	SDL_SetStringProperty( props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Media Tag System" );
+
+	app::window = SDL_CreateWindowWithProperties( props );
+
+	if ( !app::window )
+	{
+		printf( "Failed to create SDL window\n" );
+		SDL_DestroyProperties( props );
+		return false;
+	}
+
+	// test the window to see if it was created correctly
+	// not a bit depth of 0 if an hdmi device is used
+	if ( !render_window_test() )
+	{
+		if ( !app::config.high_bpc )
+		{
+			printf( "Failed to create OpenGL context!\n" );
+			SDL_DestroyProperties( props );
+			return false;
+		}
+
+		fputs( " *** Falling back to 8-bit color depth! This may occur if you have a display plugged into HDMI that older than HDMI 2.1\n", stderr );
+
+		// fallback to 8 bpc and create the window again
+		if ( g_gl_context )
+			SDL_GL_DestroyContext( g_gl_context );
+
+		SDL_DestroyWindow( app::window );
+
+		render_window_set_fallbacks();
+		app::window = SDL_CreateWindowWithProperties( props );
+
+		if ( !app::window )
+		{
+			printf( "Failed to create SDL window\n" );
+			SDL_DestroyProperties( props );
+			return false;
+		}
+
+		// create the opengl context here
+		if ( !render_window_test() )
+		{
+			printf( "Failed to create OpenGL context!\n" );
+			SDL_DestroyProperties( props );
+			return false;
+		}
+	}
+
+	SDL_DestroyProperties( props );
+
+	SDL_ShowWindow( app::window );
+	SDL_SetWindowMinimumSize( app::window, 200, 200 );
+	return true;
+}
+
+
+// ================================================================================================
 
 
 bool render_load_shader( GLuint& shader, const char* shader_path, GLenum shader_type )
@@ -298,21 +421,7 @@ bool render_gen_buffers()
 
 bool render_init()
 {
-	g_gl_context = SDL_GL_CreateContext( app::window );
-
-	if ( !g_gl_context )
-	{
-		printf( "Failed to create GL Context\n" );
-		return false;
-	}
-
-	SDL_GL_MakeCurrent( app::window, g_gl_context );
-
-	if ( !gladLoadGL() )
-	{
-		printf( "Failed to load GL\n" );
-		return false;
-	}
+	render_window_create();
 
 	int r, g, b, a, f;
 	SDL_GL_GetAttribute( SDL_GL_RED_SIZE, &r );
@@ -329,6 +438,12 @@ bool render_init()
 	  "ALPHA - %d\n"
 	  "\n",
 	  r, g, b, a );
+
+	if ( !gladLoadGL() )
+	{
+		printf( "Failed to load GL\n" );
+		return false;
+	}
 
 	if ( !render_gen_buffers() )
 		return false;

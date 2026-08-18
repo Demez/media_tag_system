@@ -1203,9 +1203,6 @@ void main_loop()
 }
 
 
-extern bool startup_set_gl_attributes();
-
-
 void shutdown()
 {
 	if ( ImGui::GetCurrentContext() )
@@ -1257,50 +1254,6 @@ void test_hdr_state()
 }
 
 
-bool startup_create_window()
-{
-	// Get the global mouse pos
-	float mouse_x, mouse_y;
-	SDL_GetGlobalMouseState( &mouse_x, &mouse_y );
-
-	SDL_Point mouse;
-	mouse.x = static_cast< int >( mouse_x );
-	mouse.y = static_cast< int >( mouse_y );
-	SDL_DisplayID display_id = SDL_GetDisplayForPoint( &mouse );
-
-	// Create Window
-	SDL_PropertiesID props = SDL_CreateProperties();
-
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 1000 );
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 600 );
-
-	// for some reason, SDL_WINDOWPOS_UNDEFINED is ALWAYS centering the window in the middle on the primary display
-	// so im trying to make it feel better and hacking it to open the window on the monitor the mouse is currently on
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
-
-	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true );
-	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true );
-	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true );
-	//SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true );
-
-	SDL_SetStringProperty( props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Media Tag System" );
-
-	app::window = SDL_CreateWindowWithProperties( props );
-
-	SDL_DestroyProperties( props );
-
-	if ( !app::window )
-	{
-		printf( "Failed to create SDL window\n" );
-		return false;
-	}
-
-	SDL_SetWindowMinimumSize( app::window, 200, 200 );
-	return true;
-}
-
-
 int startup( int argc, char* argv[] )
 {
 	args_init( argc, argv );
@@ -1308,12 +1261,6 @@ int startup( int argc, char* argv[] )
 	if ( !sys_setup_exe_path_vars() )
 	{
 		printf( "Failed to setup exe path variables!\n" );
-		return 1;
-	}
-
-	if ( !config_init() )
-	{
-		printf( "Failed to startup config system\n" );
 		return 1;
 	}
 
@@ -1331,13 +1278,9 @@ int startup( int argc, char* argv[] )
 	}
 
 	if ( sys_init_ret == e_sys_init_single_instance )
-	{
 		return 0;
-	}
 
-	u64   start_time   = sys_get_time_ms();
-	u64   current_time = start_time;
-	float time         = 0.f;
+	u64 start_time = sys_get_time_ms();
 
 	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
 	{
@@ -1345,20 +1288,19 @@ int startup( int argc, char* argv[] )
 		return 1;
 	}
 
-	if ( !startup_set_gl_attributes() )
-	{
-		printf( "Failed to set OpenGL attributes\n" );
-		return 1;
-	}
-
-	if ( !startup_create_window() )
-		return 1;
+	// ----------------------------------------------------------------
 
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_FILE, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_TEXT, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_BEGIN, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_COMPLETE, false );
 	// SDL_SetEventEnabled( SDL_EVENT_DROP_POSITION, false );
+
+	if ( !render_init() )
+	{
+		printf( "Failed to setup renderer!\n" );
+		return 1;
+	}
 
 	if ( !sys_set_window( app::window ) )
 	{
@@ -1368,11 +1310,8 @@ int startup( int argc, char* argv[] )
 
 	sys_set_receive_drag_drop_func( drag_drop_recieve_func );
 
-	if ( !render_init() )
-	{
-		printf( "Failed to setup renderer!\n" );
-		return 1;
-	}
+	// ----------------------------------------------------------------
+	// ImGui
 
 	IMGUI_CHECKVERSION();
 
@@ -1391,8 +1330,6 @@ int startup( int argc, char* argv[] )
 		printf( "Failed to init ImGui OpenGL\n" );
 		return 1;
 	}
-
-	test_hdr_state();
 
 	sys_font_data_t font_data = sys_get_font();
 
@@ -1421,8 +1358,6 @@ int startup( int argc, char* argv[] )
 		}
 
 		ImGui_ImplOpenGL3_CreateDeviceObjects();
-
-		//free( exe_path );
 	}
 
 	SDL_GL_SetSwapInterval( app::config.vsync );
@@ -1447,6 +1382,8 @@ int startup( int argc, char* argv[] )
 	}
 
 	style_imgui();
+
+	// ----------------------------------------------------------------
 
 	if ( !load_mpv_dll() )
 	{
@@ -1476,6 +1413,7 @@ int startup( int argc, char* argv[] )
 	media_view_init();
 
 	// ----------------------------------------------------------------
+	// Handle File or Directory on the command line
 
 	directory::queued = sys_get_cwd();
 
@@ -1501,11 +1439,14 @@ int startup( int argc, char* argv[] )
 
 	window_quick_draw();
 
-	current_time = sys_get_time_ms();
-	time         = (current_time / 1000.f) - (start_time / 1000.f);
-	start_time   = current_time;
+	u64    current_time = sys_get_time_ms();
+	double time         = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
 
-	printf( "%.3f STARTUP TIME\n", time );
+	printf(
+	  "=====================================================================\n"
+	  "Image Viewer Started - %.3f Seconds to Start\n"
+	  "=====================================================================\n",
+	  time );
 
 	return 0;
 }

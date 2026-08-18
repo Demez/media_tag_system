@@ -828,6 +828,10 @@ void                                 gl_update_textures( uploaded_textures_t& te
 void                                 gl_update_texture( GLuint texture, image_t* image, size_t frame_i = 0 );
 void                                 gl_free_textures( uploaded_textures_t& textures );
 
+bool                                 render_window_prepare_for_creation();
+bool                                 render_window_test();
+void                                 render_window_set_fallbacks();
+
 bool                                 render_init();
 void                                 render_shutdown();
 void                                 render_window_resize();
