@@ -53,6 +53,13 @@ void job_worker( u32 thread )
 
 		g_job_lock.lock();
 
+		if ( g_job_queue.empty() )
+		{
+			printf( "JOB QUEUE EMPTY - THIS SHOULD NOT HAPPEN!!!\n" );
+			g_job_lock.unlock();
+			continue;
+		}
+
 		job_status_t* status = g_job_queue.back();
 		g_job_queue.pop_back();
 		g_job_queue_size.store( g_job_queue.size() );
