@@ -21,7 +21,7 @@ std::string fs_path_clean( const char* path, size_t path_len )
 	if ( !path || path_len == 0 )
 		return {};
 
-	std::vector< std::string > path_segments;
+	std::vector< std::string_view > path_segments;
 
 #ifdef __unix__
 	if ( fs_is_absolute( path, path_len ) )
@@ -71,8 +71,14 @@ std::string fs_path_clean( const char* path, size_t path_len )
 		}
 		else if ( end_index - start_index > 1 )  // if it's not an empty segment
 		{
-			std::string segment( &path[ start_index ], end_index - start_index );
-			path_segments.push_back( segment );
+			std::string_view segment( &path[ start_index ], end_index - start_index );
+
+			// remove extra null terminators
+			while ( segment.back() == '\0' )
+				segment.remove_suffix( 1 );
+
+			if ( segment.size() > 0 )
+				path_segments.push_back( segment );
 		}
 
 		start_index = ++end_index;

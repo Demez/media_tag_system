@@ -201,11 +201,13 @@ void settings_draw_option( const config_opt_t& option )
 			break;
 		}
 		case e_cfg_vec4:
+		case e_cfg_color:
 		{
 			auto value = reinterpret_cast< ImVec4* >( member_ptr );
 			break;
 		}
 		case e_cfg_stdstring:
+		case e_cfg_path:
 		{
 			auto value = reinterpret_cast< std::string* >( member_ptr );
 			break;

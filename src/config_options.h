@@ -79,12 +79,14 @@ struct app_config_t
 enum e_config_opt_type
 {
 	e_cfg_stdstring,
+	e_cfg_path,
 	e_cfg_bool,
 	e_cfg_u32,
 	e_cfg_s32,
 	e_cfg_float,
 	e_cfg_vec2,
 	e_cfg_vec4,
+	e_cfg_color,
 };
 
 
@@ -194,23 +196,29 @@ struct config_opt_t
 
 constexpr config_opt_t g_cfg_opt_thumbnail[] = {
 	// config_opt_t::create_option< decltype( app_config_t::thumbnail_cache_path ) >( "cache_path", sizeof( "cache_path" ) - 1, offsetof( app_config_t, thumbnail_cache_path ), sizeof( app_config_t::thumbnail_cache_path ) ),
-	CONFIG_OPT( e_cfg_stdstring, "cache_path", thumbnail_cache_path, "Folder for the thumbnail cache" ),
-	CONFIG_OPT( e_cfg_stdstring, "cache_path_video", thumbnail_video_cache_path, "Folder for temporary video thumbnails to generate to, before being added to the thumbnail cache" ),
+	CONFIG_OPT( e_cfg_path, "cache_path", thumbnail_cache_path, "Folder for the thumbnail cache" ),
+	CONFIG_OPT( e_cfg_path, "cache_path_video", thumbnail_video_cache_path, "Folder for temporary video thumbnails to generate to, before being added to the thumbnail cache" ),
 	CONFIG_OPT_RANGE( e_cfg_float, "jxl_distance", thumbnail_jxl_distance, -1.f, 25.f, "" ),
 	CONFIG_OPT_RANGE( e_cfg_u32, "jxl_effort", thumbnail_jxl_effort, 0U, 11U, "" ),
 	CONFIG_OPT( e_cfg_bool, "jxl_enable", thumbnail_jxl_enable, "Enable the Thumbnail Cache" ),
+	CONFIG_OPT( e_cfg_u32, "memory_cache_size", thumbnail_mem_cache_size, "UNUSED CURRENTLY" ),
+	CONFIG_OPT( e_cfg_u32, "size", thumbnail_size, "Max size of the Thumbnail Images" ),
+	CONFIG_OPT( e_cfg_u32, "threads", thumbnail_threads, "Threads to use for new thumbnail generation and loading" ),
+	CONFIG_OPT( e_cfg_u32, "threads_save", thumbnail_save_threads, "Threads to use for saving generated thumbnails to disk" ),
+	CONFIG_OPT( e_cfg_u32, "uploads_per_frame", thumbnail_uploads_per_frame, "Max amount of thumbnails you can upload at a time, this blocks the main thread for a second to upload, so don't set this number too high" ),
+	CONFIG_OPT( e_cfg_bool, "use_fixed_size", thumbnail_use_fixed_size, "Don't scale thumbnails based on zoom level" ),
 };
 
 
 constexpr config_opt_t g_cfg_opt_theme[] = {
 	CONFIG_OPT( e_cfg_bool, "dwm_extend", dwm_extend, "" ),
 	CONFIG_OPT( e_cfg_bool, "use_custom_colors", use_custom_colors, "" ),
-	CONFIG_OPT( e_cfg_bool, "font_size", font_size, "" ),
+	CONFIG_OPT( e_cfg_u32, "font_size", font_size, "" ),
 
-	CONFIG_OPT( e_cfg_vec4, "gallery_header_background_color", header_bg_color, "" ),
-	CONFIG_OPT( e_cfg_vec4, "gallery_content_bg_color", content_bg_color, "" ),
-	CONFIG_OPT( e_cfg_vec4, "gallery_sidebar_bg_color", sidebar_bg_color, "" ),
-	CONFIG_OPT( e_cfg_vec4, "media_background_color", media_bg_color, "" ),
+	CONFIG_OPT( e_cfg_color, "gallery_header_background_color", header_bg_color, "" ),
+	CONFIG_OPT( e_cfg_color, "gallery_content_bg_color", content_bg_color, "" ),
+	CONFIG_OPT( e_cfg_color, "gallery_sidebar_bg_color", sidebar_bg_color, "" ),
+	CONFIG_OPT( e_cfg_color, "media_background_color", media_bg_color, "" ),
 
 	CONFIG_OPT( e_cfg_vec2, "gallery_header_padding", gallery_header_padding, "" ),
 };

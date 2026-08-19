@@ -475,6 +475,8 @@ void media_view_build_zoom_steps( double fit_zoom, double fit_scale_up_zoom )
 	// int zoom_step_fit = media_view_find_closest_zoom_step( fit_zoom );
 
 	g_zoom_snap_values.clear();
+		
+	app::config.media_zoom_scale = std::max( 0.01f, app::config.media_zoom_scale );
 
 	double zoom_min = ZOOM_MIN;
 

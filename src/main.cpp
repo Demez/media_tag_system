@@ -1205,6 +1205,8 @@ void main_loop()
 
 void shutdown()
 {
+	config_save();
+
 	if ( ImGui::GetCurrentContext() )
 	{
 		ImGui::GetIO().Fonts->Clear();
