@@ -200,17 +200,32 @@ static wchar_t*                g_exe_folder_w   = nullptr;
 // Filesystem
 
 
-// TODO: we need versions of these with fs::path support
-bool fs_exists( const char* path )
+size_t fs_path_len( const fs::path_char* path )
 {
-	DWORD attributes = GetFileAttributesA( path );
+	size_t  len = 0;
+
+	// a path can't be over the max extended path limit anyway
+	HRESULT hr  = StringCchLengthW( path, MAX_PATH_EXT, &len );
+	if ( SUCCEEDED( hr ) )
+		return len;
+
+	return 0;
+}
+
+
+bool fs_exists( const fs::path_char* path )
+{
+	wchar_t* path_ext   = create_extended_path( path, wcslen( path ) );
+	DWORD    attributes = GetFileAttributesW( path_ext );
+	ch_free_str( path_ext );
 	return attributes != INVALID_FILE_ATTRIBUTES;
 }
 
 
-bool fs_make_dir( const char* path )
+bool fs_make_dir( const fs::path_char* path )
 {
-	int ret = SHCreateDirectoryExA( g_main_hwnd, path, nullptr );
+	// TODO: THIS DOES NOT HANDLE EXTENDED MAX PATH
+	int ret = SHCreateDirectoryExW( g_main_hwnd, path, nullptr );
 
 	if ( ret != 0 )
 	{
@@ -222,9 +237,11 @@ bool fs_make_dir( const char* path )
 }
 
 
-bool fs_is_dir( const char* path )
+bool fs_is_dir( const fs::path_char* path )
 {
-	DWORD attributes = GetFileAttributesA( path );
+	wchar_t* path_ext   = create_extended_path( path, wcslen( path ) );
+	DWORD    attributes = GetFileAttributesW( path_ext );
+	ch_free_str( path_ext );
 
 	if ( attributes == INVALID_FILE_ATTRIBUTES )
 		return false;
@@ -236,16 +253,16 @@ bool fs_is_dir( const char* path )
 }
 
 
-bool fs_is_file( const char* path )
+bool fs_is_file( const fs::path_char* path )
 {
-	wchar_t*                  path_w = sys_to_wchar_extended( path );
+	wchar_t*                  path_ext = create_extended_path( path, wcslen( path ) );
 
 	WIN32_FILE_ATTRIBUTE_DATA data{};
-	BOOL                      ret = GetFileAttributesEx( path_w, GetFileExInfoStandard, &data );
+	BOOL                      ret = GetFileAttributesEx( path_ext, GetFileExInfoStandard, &data );
 
 	// DWORD    attributes = GetFileAttributesEx( path_w,  );
 
-	ch_free_str( path_w );
+	ch_free_str( path_ext );
 
 	if ( !ret )
 	{
@@ -339,6 +356,12 @@ fs::path::string_type sys_get_exe_folder_native_str()
 }
 
 
+const fs::path_char* sys_get_exe_folder_native_char()
+{
+	return g_exe_folder_w;
+}
+
+
 const char* sys_get_exe_path( size_t* len )
 {
 	if ( len )
@@ -393,16 +416,11 @@ static FILETIME file_time_from_unix( u64 time )
 }
 
 
-bool sys_get_file_times_and_size( const char* path, u64* creation, u64* access, u64* write, u64* size )
+bool sys_get_file_times_and_size( const fs::path_char* path, u64* creation, u64* access, u64* write, u64* size )
 {
-	wchar_t* path_w = sys_to_wchar( path );
-
 	struct _stat s;
-	if ( _wstat( path_w, &s ) != 0 )
-	{
-		ch_free_str( path_w );
+	if ( _wstat( path, &s ) != 0 )
 		return false;
-	}
 
 	if ( creation )
 		*creation = s.st_ctime;
@@ -416,16 +434,14 @@ bool sys_get_file_times_and_size( const char* path, u64* creation, u64* access, 
 	if ( size )
 		*size = s.st_size;
 
-	ch_free_str( path_w );
-
 	return true;
 }
 
 
 // unreliable as hell wtf
-bool sys_set_file_times( const char* path, u64* creation, u64* access, u64* write )
+bool sys_set_file_times( const fs::path_char* path, u64* creation, u64* access, u64* write )
 {
-	wchar_t* path_w = sys_to_wchar_extended( path );
+	wchar_t* path_w = create_extended_path( path, wcslen( path ) );
 
 	// FILE_WRITE_ATTRIBUTES
 
@@ -438,7 +454,7 @@ bool sys_set_file_times( const char* path, u64* creation, u64* access, u64* writ
 
 	if ( file == INVALID_HANDLE_VALUE )
 	{
-		printf( "failed to open file handle for \"%s\"\n", path );
+		wprintf( L"failed to open file handle for \"%s\"\n", path );
 		sys_print_last_error();
 		return false;
 	}
@@ -450,7 +466,7 @@ bool sys_set_file_times( const char* path, u64* creation, u64* access, u64* writ
 	{
 		CloseHandle( file );
 		sys_print_last_error();
-		printf( "failed to get file time - \"%s\"\n", path );
+		wprintf( L"failed to get file time - \"%s\"\n", path );
 		return false;
 	}
 
@@ -470,7 +486,7 @@ bool sys_set_file_times( const char* path, u64* creation, u64* access, u64* writ
 	if ( ret == FALSE )
 	{
 		sys_print_last_error();
-		printf( "failed to set file time - \"%s\"\n", path );
+		wprintf( L"failed to set file time - \"%s\"\n", path );
 		return false;
 	}
 
@@ -805,22 +821,19 @@ open_dir_recurse_fail:
 }
 
 
-bool sys_scandir( const char* root, std::vector< file_t >& files, e_scandir_flags flags, bool* cancel )
+bool sys_scandir( const fs::path_char* root, std::vector< file_t >& files, e_scandir_flags flags, bool* cancel )
 {
-	wchar_t* root_w     = sys_to_wchar( root );
 	u64      start_time = sys_get_time_ms();
-
 	bool     tmp_cancel = false;
 
 	if ( !cancel )
 		cancel = &tmp_cancel;
 
-	bool     ret        = sys_scandir_internal( root_w, files, flags, *cancel );
+	bool     ret        = sys_scandir_internal( root, files, flags, *cancel );
 
 	u64      end_time   = sys_get_time_ms();
 	printf( "SCANDIR TIME: %.4f\n", (float)( end_time - start_time ) / 1000.f );
 
-	ch_free_str( root_w );
 	return ret;
 }
 
@@ -829,7 +842,7 @@ bool sys_scandir( const char* root, std::vector< file_t >& files, e_scandir_flag
 // Shell Functions
 
 
-bool sys_recycle_file( const char* path )
+bool sys_recycle_file( const fs::path_char* path )
 {
 	//if ( !hwnd )
 	//{
@@ -837,17 +850,15 @@ bool sys_recycle_file( const char* path )
 	//	return false;
 	//}
 
-	TCHAR    Buffer[ 2048 + 4 ];
+	//TCHAR    Buffer[ 2048 + 4 ];
 
-	wchar_t* path_w = sys_to_wchar( path );
-
-	wcsncpy_s( Buffer, 2048 + 4, path_w, 2048 );
-	Buffer[ wcslen( Buffer ) + 1 ] = 0;  //Double-Null-Termination
+	//wcsncpy_s( Buffer, 2048 + 4, path_w, 2048 );
+	//Buffer[ wcslen( Buffer ) + 1 ] = 0;  //Double-Null-Termination
 
 	SHFILEOPSTRUCT s;
 	s.hwnd                  = NULL;
 	s.wFunc                 = FO_DELETE;
-	s.pFrom                 = Buffer;
+	s.pFrom                 = path;
 	s.pTo                   = NULL;
 	s.fFlags                = FOF_ALLOWUNDO;
 	s.fAnyOperationsAborted = false;
@@ -859,15 +870,15 @@ bool sys_recycle_file( const char* path )
 
 	int rc = SHFileOperation( &s );
 
-	ch_free_str( path_w );
+	//ch_free_str( path_w );
 
 	if ( rc != 0 )
 	{
-		printf( "Failed To Delete File: %s\n", path );
+		path_printf( "Failed To Delete File: %s\n", path );
 		return false;
 	}
 
-	printf( "Deleted File: %s\n", path );
+	path_printf( "Deleted File: %s\n", path );
 	return true;
 }
 

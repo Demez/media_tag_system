@@ -113,6 +113,7 @@ char* util_strndup_r( char* data, const char* string, size_t len )
 }
 
 
+#if 0
 bool util_strncmp( const char* left, const char* right, size_t len )
 {
 	const char*       cur1 = left;
@@ -136,6 +137,7 @@ bool util_strncmp( const char* left, size_t left_len, const char* right, size_t 
 
 	return util_strncmp( left, right, left_len );
 }
+#endif
 
 
 void util_append_str( str_buf_t& buffer, const char* str, size_t len, size_t buffer_size )

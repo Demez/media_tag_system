@@ -1,4 +1,5 @@
 #include "util.h"
+#include "args.h"
 #include "system/system.h"
 #include "sys_win32.h"
 #include "main.h"
@@ -132,12 +133,12 @@ void pipe_read_worker()
 }
 
 
-e_sys_init sys_init( int argc, char* argv[] )
+e_sys_init sys_init()
 {
 	// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/setlocale-wsetlocale?view=msvc-170#utf-8-support
 	// Allows using utf8 in the C runtime in windows 10 1803 or newer
-	setlocale( LC_ALL, ".utf8" );
-	setlocale( LC_NUMERIC, "C" );
+//	setlocale( LC_ALL, ".utf8" );
+//	setlocale( LC_NUMERIC, "C" );
 
 	if ( app::config.single_instance )
 	{
@@ -149,23 +150,22 @@ e_sys_init sys_init( int argc, char* argv[] )
 		if ( pipe_state == 2 )
 		{
 			// opened existing pipe, write to it and close
-			char* path = nullptr;
+			fs::path_char* path = nullptr;
 
 			// take the first path here
-			for ( int i = 1; i < argc; i++ )
+			for ( int i = 1; i < g_argc; i++ )
 			{
-				if ( !fs_exists( argv[ i ] ) )
+				if ( !fs_exists( g_argv[ i ] ) )
 					continue;
 
-				path = argv[ i ];
+				path = g_argv[ i ];
 				break;
 			}
 
 			// optional path to write, still focuses the window either way and keeps it as one program
 			if ( path )
 			{
-				wchar_t* path_w = sys_to_wchar( path );
-				size_t   len    = ( wcslen( path_w ) + 1 ) * sizeof( wchar_t );
+				size_t len = ( wcslen( path ) + 1 ) * sizeof( wchar_t );
 
 				if ( len > WINDOW_PIPE_SIZE )
 				{
@@ -175,9 +175,7 @@ e_sys_init sys_init( int argc, char* argv[] )
 
 				// Write to the pipe
 				DWORD bytes_written = 0;
-				BOOL  pipe_write    = WriteFile( g_singleton_pipe, path_w, static_cast< DWORD >( len ), &bytes_written, NULL );
-
-				ch_free_str( path_w );
+				BOOL  pipe_write    = WriteFile( g_singleton_pipe, path, static_cast< DWORD >( len ), &bytes_written, NULL );
 			}
 			
 			CloseHandle( g_singleton_pipe );
@@ -288,7 +286,7 @@ bool sys_set_window( SDL_Window* window )
 	}
 
 	g_main_hwnd = (HWND)hwnd;
-	// drag_drop_register( g_main_hwnd );
+	drag_drop_register( g_main_hwnd );
 
 	if ( app::config.dwm_extend )
 	{
@@ -680,11 +678,15 @@ fs::path sys_string_to_path( const std::string& path_str )
 	std::wstring ret( size - 1, 0 );
 	MultiByteToWideChar( CP_UTF8, 0, path_str.c_str(), -1, ret.data(), size - 1 );
 	fs::path path( ret );
-
-	//wchar_t*     path_w = sys_to_wchar( path_str.c_str() );
-	//fs::path     path( path_w );
-	//ch_free_str( path_w );
-
 	return path;
+}
+
+
+fs::path_str sys_string_to_path_str( const std::string& path_str )
+{
+	int          size = MultiByteToWideChar( CP_UTF8, 0, path_str.c_str(), -1, NULL, 0 );
+	std::wstring ret( size - 1, 0 );
+	MultiByteToWideChar( CP_UTF8, 0, path_str.c_str(), -1, ret.data(), size - 1 );
+	return ret;
 }
 

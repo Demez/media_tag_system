@@ -66,21 +66,21 @@ wchar_t* sys_to_wchar_extended( const char* spStr )
 
 
 // Allows you to bypass the MAX_PATH limit in windows
-//wchar_t* sys_to_wchar_extended( const wchar_t* spStr, size_t strLen )
-//{
-//	wchar_t* spDst = (wchar_t*)malloc( ( strLen + 5 ) * sizeof( wchar_t ) );
-//
-//	if ( !spDst )
-//		return nullptr;
-//
-//	memset( spDst, 0, ( strLen + 1 ) * sizeof( wchar_t ) );
-//	wcscat( spDst, L"\\\\?\\" );
-//	wcscat( spDst, spStr );
-//
-//	mem_add_item( e_mem_category_string, spDst, ( strLen + 5 ) * sizeof( wchar_t ), 1 );
-//
-//	return spDst;
-//}
+wchar_t* create_extended_path( const wchar_t* spStr, size_t strLen )
+{
+	wchar_t* spDst = (wchar_t*)malloc( ( strLen + 5 ) * sizeof( wchar_t ) );
+
+	if ( !spDst )
+		return nullptr;
+
+	memset( spDst, 0, ( strLen + 1 ) * sizeof( wchar_t ) );
+	wcscat( spDst, L"\\\\?\\" );
+	wcscat( spDst, spStr );
+
+	mem_add_item( e_mem_category_string, spDst, ( strLen + 5 ) * sizeof( wchar_t ), 1 );
+
+	return spDst;
+}
 
 
 //wchar_t* sys_to_wchar_extended( const path_t& path )

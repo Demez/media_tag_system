@@ -4,11 +4,11 @@
 
 #include <type_traits>
 
-constexpr const char DEFAULT_THUMBNAIL_CACHE[]         = "thumbnail_cache";
-constexpr const char DEFAULT_VIDEO_THUMBNAIL_CACHE[]   = "thumbnail_video_cache";
+constexpr const fs::path_char DEFAULT_THUMBNAIL_CACHE[]         = PATH_FMT( "thumbnail_cache" );
+constexpr const fs::path_char DEFAULT_VIDEO_THUMBNAIL_CACHE[]   = PATH_FMT( "thumbnail_video_cache" );
 
-constexpr size_t     DEFAULT_THUMBNAIL_CACHE_LEN       = sizeof( DEFAULT_THUMBNAIL_CACHE );
-constexpr size_t     DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN = sizeof( DEFAULT_VIDEO_THUMBNAIL_CACHE );
+constexpr size_t              DEFAULT_THUMBNAIL_CACHE_LEN       = sizeof( DEFAULT_THUMBNAIL_CACHE ) / sizeof( fs::path_char );
+constexpr size_t              DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN = sizeof( DEFAULT_VIDEO_THUMBNAIL_CACHE ) / sizeof( fs::path_char );
 
 
 #define CFG_STR_EQUALS( my_str, kdl_str ) util_strncmp( my_str, sizeof( my_str ) - 1, kdl_str.data, kdl_str.len )
@@ -26,10 +26,10 @@ static void config_close_and_free( kdl_parser*& parser, char*& buffer )
 }
 
 
-static kdl_parser* _config_open_file( const std::string& config_path, char*& buffer )
+static kdl_parser* _config_open_file( const fs::path_str& config_path, char*& buffer )
 {
 	size_t len = 0;
-	buffer = fs_read_file( config_path.c_str(), &len );
+	buffer     = fs_read_file( config_path.c_str(), &len );
 
 	if ( !buffer )
 		return nullptr;
@@ -50,11 +50,9 @@ static kdl_parser* _config_open_file( const std::string& config_path, char*& buf
 
 static bool config_open( bool saving, kdl_parser*& root, char*& buffer )
 {
-	const char* app_dir     = sys_get_exe_folder();
-
-	std::string config_path = app_dir;
-	config_path += SEP_S;
-	config_path += "config.kdl";
+	fs::path_str config_path = sys_get_exe_folder_native_str();
+	config_path += SEP;
+	config_path += PATH_FMT( "config.kdl" );
 
 	if ( fs_is_file( config_path.c_str() ) )
 		root = _config_open_file( config_path, buffer );
@@ -64,9 +62,9 @@ static bool config_open( bool saving, kdl_parser*& root, char*& buffer )
 
 	printf( "Failed to open config.kdl, Trying to load config_default.kdl\n" );
 
-	config_path = app_dir;
-	config_path += SEP_S;
-	config_path += "config_default.kdl";
+	config_path = sys_get_exe_folder_native_str();
+	config_path += SEP;
+	config_path += PATH_FMT( "config_default.kdl" );
 
 	if ( fs_is_file( config_path.c_str() ) )
 		root = _config_open_file( config_path, buffer );
@@ -79,7 +77,7 @@ static bool config_open( bool saving, kdl_parser*& root, char*& buffer )
 }
 
 
-bool config_mkdir( std::string_view path, const char* fail_str )
+bool config_mkdir( const fs::path_str& path, const char* fail_str )
 {
 	if ( fs_make_dir_check( path.data() ) )
 		return true;
@@ -111,7 +109,7 @@ void config_read_bookmarks( kdl_parser* parser )
 			break;
 
 		bookmark_t bookmark{};
-		bookmark.path = fs_path_clean( event->name.data, event->name.len );
+		bookmark.path = sys_string_to_path_str( fs_path_clean( event->name.data, event->name.len ) );
 
 		if ( fs_is_file( bookmark.path.c_str() ) )
 		{
@@ -127,7 +125,7 @@ void config_read_bookmarks( kdl_parser* parser )
 		const char* folder_name = fs_get_filename_ptr( event->name.data, event->name.len );
 		bookmark.name.assign( folder_name );
 
-		app::config.bookmark.push_back( bookmark );
+		app::config.bookmark.push_back( std::move( bookmark ) );
 
 		event = kdl_parser_next_event( parser );
 
@@ -149,15 +147,16 @@ void config_finish_node( kdl_parser* parser )
 }
 
 
-void config_handle_path( kdl_parser* parser, std::string& result )
+void config_handle_path( kdl_parser* parser, fs::path_str& result )
 {
 	kdl_event_data* event = kdl_parser_next_event( parser );
 
 	if ( event->event != KDL_EVENT_ARGUMENT )
 		return;
 
-	kdl_str& str = event->value.string;
-	result       = fs_path_clean( str.data, str.len );
+	kdl_str&    str  = event->value.string;
+	std::string path = fs_path_clean( str.data, str.len );
+	result           = sys_string_to_path_str( path );
 
 	config_finish_node( parser );
 }
@@ -341,7 +340,7 @@ void config_handle_registered_option( const config_opt_t* opt_list, const size_t
 			}
 			case e_cfg_path:
 			{
-				auto value = reinterpret_cast< std::string* >( member_ptr );
+				auto value = reinterpret_cast< fs::path_str* >( member_ptr );
 				config_handle_path( parser, *value );
 				break;
 			}
@@ -382,24 +381,18 @@ void config_read_settings_group( kdl_parser* parser, const config_opt_t* opt_lis
 
 void config_reset()
 {
-	const char* app_dir = sys_get_exe_folder();
-
 	app::config.bookmark.clear();
 
 	app_config_t reset_config{};
-	app::config = reset_config;
+	app::config       = reset_config;
 
-	std::string path = app_dir;
-	path += SEP;
-	path.append( DEFAULT_THUMBNAIL_CACHE, DEFAULT_THUMBNAIL_CACHE_LEN );
+	app::config.thumbnail_cache_path = sys_get_exe_folder_native_char();
+	app::config.thumbnail_cache_path += SEP;
+	app::config.thumbnail_cache_path.append( DEFAULT_THUMBNAIL_CACHE, DEFAULT_THUMBNAIL_CACHE_LEN );
 
-	app::config.thumbnail_cache_path = fs_path_clean( path.c_str(), path.size() );
-
-	path = app_dir;
-	path += SEP;
-	path.append( DEFAULT_VIDEO_THUMBNAIL_CACHE, DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN );
-
-	app::config.thumbnail_video_cache_path = fs_path_clean( path.c_str(), path.size() );
+	app::config.thumbnail_video_cache_path = sys_get_exe_folder_native_char();
+	app::config.thumbnail_video_cache_path += SEP;
+	app::config.thumbnail_video_cache_path.append( DEFAULT_VIDEO_THUMBNAIL_CACHE, DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN );
 
 	app::config.gallery_header_padding.x   = 6;
 	app::config.gallery_header_padding.y   = 6;
@@ -471,7 +464,7 @@ bool config_load()
 
 	config_close_and_free( parser, buffer );
 
-	if ( args_register_bool( "Disable Video Support", "--no-video" ) )
+	if ( args_register_bool( "Disable Video Support", PATH_FMT( "--no-video" ) ) )
 		app::config.no_video = true;
 
 	if ( app::config.thumbnail_threads == 0 )
@@ -639,12 +632,14 @@ void config_emit_registered_option_list( kdl_emitter* emitter, const config_opt_
 			}
 			case e_cfg_path:
 			{
-				const auto& var   = *reinterpret_cast< std::string* >( member_ptr );
-				value.type        = KDL_TYPE_STRING;
+				const auto& var         = *reinterpret_cast< fs::path_str* >( member_ptr );
+				value.type              = KDL_TYPE_STRING;
 
-				std::string clean = fs_path_clean( var.data(), var.size() );
-				value.string.data = clean.data();
-				value.string.len  = clean.size();
+				fs::path_str clean      = fs_path_clean( var );
+				std::string  clean_utf8 = sys_path_to_string( clean );
+
+				value.string.data       = clean_utf8.data();
+				value.string.len        = clean_utf8.size();
 
 				kdl_emit_arg( emitter, &value );
 				break;
@@ -670,7 +665,12 @@ void config_save()
 	// rebuild list
 	for ( const bookmark_t& bookmark : app::config.bookmark )
 	{
-		config_emit_str( emitter, bookmark.path.data(), bookmark.path.size() );
+		fs::path_str clean      = fs_path_clean( bookmark.path );
+		std::string  clean_utf8 = sys_path_to_string( bookmark.path.data() );
+		kdl_str      name( clean_utf8.data(), clean_utf8.size() );
+
+		if ( !kdl_emit_node( emitter, name ) )
+			printf( "Failed to emit string - %s\n", clean_utf8.data() );
 	}
 
 	kdl_finish_emitting_children( emitter );
@@ -693,10 +693,10 @@ void config_save()
 
 	kdl_emit_end( emitter );
 
-	kdl_str     buffer      = kdl_get_emitter_buffer( emitter );
-	std::string config_path = sys_get_exe_folder();
+	kdl_str      buffer      = kdl_get_emitter_buffer( emitter );
+	fs::path_str config_path = sys_get_exe_folder_native_str();
 	config_path += SEP;
-	config_path += "config.kdl";
+	config_path += PATH_FMT( "config.kdl" );
 
 	if ( fs_save_file( config_path.c_str(), buffer.data, buffer.len ) )
 	{

@@ -259,7 +259,7 @@ void gallery_view_delete_selection()
 	for ( selection_t& selection : gallery::selection )
 	{
 		// TODO: undo history
-		std::string path = sys_path_to_string( directory::path / selection.entry.file.path );
+		fs::path path = directory::path / selection.entry.file.path;
 		sys_recycle_file( path.c_str() );
 	}
 }

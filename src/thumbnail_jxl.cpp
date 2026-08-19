@@ -25,7 +25,7 @@ static void jxl_thumbnail_mem_free( void* opaque, void* address )
 }
 
 
-bool thumbnail_save( image_t& image, const std::string& output )
+bool thumbnail_save( image_t& image, const fs::path_str& output )
 {
 	JxlMemoryManager jxl_mem{};
 	jxl_mem.alloc = jxl_thumbnail_mem_alloc;

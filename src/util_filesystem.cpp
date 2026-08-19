@@ -353,19 +353,19 @@ bool fs_is_relative( const char* path, size_t path_len )
 }
 
 
-bool fs_make_dir_check( const char* path )
+bool fs_make_dir_check( const fs::path_char* path )
 {
 	if ( fs_exists( path ) )
 	{
 		if ( fs_is_file( path ) )
 		{
-			printf( "Error: Directory already exists as a file: \"%s\"\n", path );
+			path_printf( "Error: Directory already exists as a file: \"%s\"\n", path );
 			return false;
 		}
 	}
 	else if ( !fs_make_dir( path ) )
 	{
-		printf( "Error: Failed to create directory: \"%s\"\n", path );
+		path_printf( "Error: Failed to create directory: \"%s\"\n", path );
 		return false;
 	}
 
@@ -385,12 +385,13 @@ u64 fs_file_size( const char* path )
 
 
 // returns the file length in the len argument
-char* fs_read_file( const char* path, size_t* len )
+char* fs_read_file( const fs::path_char* path, size_t* len )
 {
 	if ( !path )
 		return nullptr;
 
-	FILE* fp = fopen( path, "rb" );
+	// TODO: use the windows api instead of posix version, think it gives you better permission handling? maybe faster?
+	FILE* fp = path_open( path, "rb" );
 
 	if ( !fp )
 	{
@@ -423,45 +424,36 @@ char* fs_read_file( const char* path, size_t* len )
 }
 
 
-char* fs_read_file_app_dir( const char* path, size_t* len )
+char* fs_read_file_app_dir( const fs::path_char* path, size_t* len )
 {
 	if ( !path )
 		return nullptr;
 
-	size_t path_len = strlen( path );
+	size_t path_len = fs_path_len( path );
 
 	if ( path_len == 0 )
 		return nullptr;
 
-	size_t      app_dir_len = 0;
-	const char* app_dir     = sys_get_exe_folder( &app_dir_len );
+	fs::path_str path_full = sys_get_exe_folder_native_str();
+	path_full += SEP;
+	path_full += path;
 
-	// 2 for path sep and null terminator
-	char*       path_full   = ch_calloc< char >( app_dir_len + path_len + 2, e_mem_category_string );
-
-	if ( !path_full )
-		return nullptr;
-
-	strcat( path_full, app_dir );
-	strcat( path_full, SEP_S );
-	strcat( path_full, path );
-
-	char* result = fs_read_file( path_full, len );
-
-	ch_free_str( path_full );
-
-	return result;
+	return fs_read_file( path_full.c_str(), len );
 }
 
 
-static bool handle_rename( const char* path, const char* new_path )
+static bool handle_rename( const fs::path_char* path, const fs::path_char* new_path )
 {
+#if WIN32
+	int code = _wrename( path, new_path );
+#else
 	int code = rename( path, new_path );
+#endif
 
 	if ( code == 0 )
 		return true;
 
-	printf( "failed to rename old saved file \"%s\" - \"%s\"\n", path, new_path );
+	path_printf( "failed to rename old saved file \"%s\" - \"%s\"\n", path, new_path );
 
 	switch ( code )
 	{
@@ -488,7 +480,7 @@ static bool handle_rename( const char* path, const char* new_path )
 
 // TODO: look into atomic file operations?
 // TODO: THIS CURRENTLY IGNORES THE READ ONLY ATTRIBUTE, FIX THAT !!!!!!
-bool fs_save_file( const char* path, const char* data, size_t size )
+bool fs_save_file( const fs::path_char* path, const char* data, size_t size )
 {
 	// write to a temp file,
 	// then rename to old saved file to name.bak,
@@ -499,29 +491,29 @@ bool fs_save_file( const char* path, const char* data, size_t size )
 	// TODO: new idea - make a copy of the file on disk, then try to overwrite it
 	// this should respect read only, and other attributes
 
-	char temp_path[ 4096 ] = { 0 };
-	strcat( temp_path, path );
-	strcat( temp_path, ".temp" );
+	fs::path_char temp_path[ 2048 ] = { 0 };
+	pathcat( temp_path, path );
+	pathcat_const( temp_path, ".temp" );
 
-	char bak_path[ 4096 ] = { 0 };
-	strcat( bak_path, path );
-	strcat( bak_path, ".bak" );
+	fs::path_char bak_path[ 2048 ] = { 0 };
+	pathcat( bak_path, path );
+	pathcat_const( bak_path, ".bak" );
 
 	// check if a .temp file exists already
-	if ( access( temp_path, 0 ) != -1 )
+	if ( path_access( temp_path, 0 ) != -1 )
 	{
 		if ( !sys_recycle_file( temp_path ) )
 		{
-			printf( "failed to delete old temp file for saving! - \"%s\"\n", temp_path );
+			path_printf( "failed to delete old temp file for saving! - \"%s\"\n", temp_path );
 			return false;
 		}
 	}
 
-	FILE* fp = fopen( temp_path, "wb" );
+	FILE* fp = path_open( temp_path, "wb" );
 
 	if ( fp == nullptr )
 	{
-		printf( "failed to open file handle to save file to\n - \"%s\"\n", temp_path );
+		path_printf( "failed to open file handle to save file to\n - \"%s\"\n", temp_path );
 		return false;
 	}
 
@@ -530,16 +522,16 @@ bool fs_save_file( const char* path, const char* data, size_t size )
 	fclose( fp );
 
 	// check if a saved file exists already
-	bool old_save_exists = access( path, 0 ) != -1;
+	bool old_save_exists = path_access( path, 0 ) != -1;
 
 	if ( old_save_exists )
 	{
 		// check if a .bak file exists already
-		if ( access( bak_path, 0 ) != -1 )
+		if ( path_access( bak_path, 0 ) != -1 )
 		{
 			if ( !sys_recycle_file( bak_path ) )
 			{
-				printf( "failed to delete old backup file for saving! - \"%s\"\n", bak_path );
+				path_printf( "failed to delete old backup file for saving! - \"%s\"\n", bak_path );
 				return false;
 			}
 		}
@@ -563,6 +555,7 @@ bool fs_save_file( const char* path, const char* data, size_t size )
 }
 
 
+#if 0
 void fs_save_file_free( save_file_t& save )
 {
 	ch_free_str( save.temp_path );
@@ -602,6 +595,11 @@ save_file_t fs_save_file_open( const char* path )
 		}
 	}
 
+#if WIN32
+	FILE* fp = _wfopen( path.data(), L"wb" );
+#else
+	FILE* fp = fopen( path.data(), "wb" );
+#endif
 	fp = fopen( save.temp_path, "wb" );
 
 	if ( fp == nullptr )
@@ -660,15 +658,16 @@ void fs_save_file_close( save_file_t& save, const char* path )
 		sys_set_file_times( path, &create_date, nullptr, nullptr );
 	}
 }
+#endif
 
 
-bool fs_write_file( const char* path, const char* data, size_t size )
+bool fs_write_file( const fs::path_char* path, const char* data, size_t size )
 {
-	FILE* fp = fopen( path, "wb" );
+	FILE* fp = path_open( path, "wb" );
 
 	if ( fp == nullptr )
 	{
-		printf( "failed to open file handle to write file to\n - \"%s\"\n", path );
+		path_printf( "failed to open file handle to write file to\n - \"%s\"\n", path );
 		return false;
 	}
 

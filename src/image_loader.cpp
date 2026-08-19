@@ -173,7 +173,6 @@ void image_register_codec( IImageLoader* codec, bool fallback )
 bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_data, size_t file_len )
 {
 	std::string path_std_string = sys_path_to_string( path );
-	const char* path_str        = path_std_string.c_str();
 	std::string ext             = fs_get_extension( path_std_string );
 
 	for ( size_t i = 0; i < ext.size(); i++ )
@@ -191,10 +190,10 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 		return false;
 	}
 
-	if ( !fs_is_file( path_str ) /*|| fs_file_size( path_str ) == 0*/ )
+	if ( !fs_is_file( path.c_str() ) /*|| fs_file_size( path_str ) == 0*/ )
 	{
 		if ( !load_info.quiet )
-			printf( "File is Empty or Doesn't exist: %s\n", path_str );
+			path_printf( "File is Empty or Doesn't exist: %s\n", path.c_str() );
 
 		return false;
 	}
@@ -225,7 +224,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 	bool internal_file_ptr = !file_data && !file_len;
 
 	if ( internal_file_ptr )
-		file_data = fs_read_file( path_str, &file_len );
+		file_data = fs_read_file( path.c_str(), &file_len );
 
 	if ( !file_data || file_len == 0 )
 		return false;

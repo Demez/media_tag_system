@@ -54,8 +54,8 @@ static u32 indices[] = {
 // Shaders
 // TODO: maybe read this from a file instead, to allow users to do fancy things if they really wanted to?
 
-const char*   g_shader_vert_path   = "shaders/image.vert";
-const char*   g_shader_frag_path   = "shaders/image.frag";
+const fs::path_char*   g_shader_vert_path   = PATH_FMT( "shaders/image.vert" );
+const fs::path_char*   g_shader_frag_path   = PATH_FMT( "shaders/image.frag" );
 
 static GLuint g_shader_vert        = 0;
 static GLuint g_shader_frag        = 0;
@@ -303,14 +303,14 @@ bool render_window_create()
 // ================================================================================================
 
 
-bool render_load_shader( GLuint& shader, const char* shader_path, GLenum shader_type )
+bool render_load_shader( GLuint& shader, const fs::path_char* shader_path, GLenum shader_type )
 {
 	size_t shader_src_len = 0;
 	char* shader_src = fs_read_file_app_dir( shader_path, &shader_src_len );
 
 	if ( !shader_src )
 	{
-		printf( "Failed to find shader: \"%s\"\n", shader_path );
+		path_printf(  "Failed to find shader: \"%s\"\n", shader_path );
 		return false;
 	}
 

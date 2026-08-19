@@ -490,7 +490,7 @@ struct thumbnail_t
 {
 	std::atomic< e_thumbnail_status >      status;
 	std::atomic< e_thumbnail_save_status > save_status;
-	char*                                  path;      // mainly for debugging
+	fs::path_char*                         path;      // mainly for debugging
 	image_t*                               image;
 	image_t*                               image_scaled;
 	uploaded_textures_t                    textures{};
@@ -680,6 +680,7 @@ typedef void* ( folder_scan_thread_func_t )( folder_scan_status_t* status );
 
 
 // For running the scan directory in a background thread
+// TODO: GET RID OF THIS !!!
 struct folder_scan_status_t
 {
 	job_status_t*              job             = nullptr;
@@ -695,7 +696,7 @@ struct folder_scan_status_t
 
 	std::vector< file_t >      files{};
 
-	char*                      root     = nullptr;
+	fs::path_char*             root     = nullptr;
 	e_scandir_flags            flags    = 0;
 
 	// the return value of sys_scandir
@@ -744,7 +745,7 @@ void                                 imgui_draw( double frame_time, bool render 
 bool                                 on_new_file( const fs::path& file_path );
 
 // non-blocking folder scanning
-folder_scan_status_t*                folder_scan_push( const char* root, e_scandir_flags flags, folder_scan_callback_t* callback, folder_scan_thread_func_t* thread_func = nullptr );
+folder_scan_status_t*                folder_scan_push( const fs::path_char* root, e_scandir_flags flags, folder_scan_callback_t* callback, folder_scan_thread_func_t* thread_func = nullptr );
 
 void                                 image_copy_data( image_t& src, image_t& dst );
 void                                 image_copy_frame_data( image_frame_t& src, image_frame_t& dst );

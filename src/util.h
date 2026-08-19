@@ -57,14 +57,26 @@ using f64    = double;
 
 
 #ifdef _WIN32
-  #define SEP_S        "\\"
-  #define SEP          '\\'
+  #define SEP_S                     "\\"
+  #define SEP                       '\\'
 
-  #define PATH_SEP_STR "\\"
-  #define PATH_SEP     '\\'
+  #define PATH_SEP_STR              "\\"
+  #define PATH_SEP                  '\\'
 
-  #define strncasecmp  _strnicmp
-  #define strcasecmp   _stricmp
+  #define path_printf( str, ... )   wprintf( L##str, __VA_ARGS__ )
+  #define path_print( str )         wprintf( L##str )
+  #define PATH_FMT( str )           L##str
+
+  #define pathcat( buf, str )       wcscat( buf, str )
+  #define pathcat_const( buf, str ) wcscat( buf, L##str )
+  #define path_access               _waccess
+  #define path_open( path, mode )   _wfopen( path, L##mode )
+
+  #define strncasecmp               _strnicmp
+  #define strcasecmp                _stricmp
+
+  #define Win32()                   true
+  #define Linux()                   false
 
 namespace fs
 {
@@ -74,11 +86,25 @@ namespace fs
 constexpr float STORAGE_SCALE = 1024.f;
 
 #else
-  #define SEP_S        "/"
-  #define SEP          '/'
+  #define SEP_S                     "/"
+  #define SEP                       '/'
 
-  #define PATH_SEP_STR "/"
-  #define PATH_SEP     '/'
+  #define PATH_SEP_STR              "/"
+  #define PATH_SEP                  '/'
+
+  #define path_printf( str, ... )   printf( str, __VA_ARGS__ )
+  #define path_print( str )         printf( str )
+
+  #define PATH_FMT( str )     str
+  #define fs_path_len         strlen
+
+  #define pathcat( buf, str )       strcat( buf, str )
+  #define pathcat_const( buf, str ) strcat( buf, str )
+  #define path_access               access
+  #define path_open( path, mode )   fopen( path, mode )
+
+  #define Win32()             false
+  #define Linux()             true
 
 namespace fs
 {
@@ -495,8 +521,8 @@ char* util_strndup( const char* string, size_t len );
 char* util_strdup_r( char* data, const char* string );
 char* util_strndup_r( char* data, const char* string, size_t len );
 
-bool  util_strncmp( const char* left, const char* right, size_t len );
-bool  util_strncmp( const char* left, size_t left_len, const char* right, size_t right_len );
+//bool  util_strncmp( const char* left, const char* right, size_t len );
+//bool  util_strncmp( const char* left, size_t left_len, const char* right, size_t right_len );
 
 void  util_append_str( str_buf_t& buffer, const char* str, size_t len );
 void  util_append_str( str_buf_t& buffer, const char* str, size_t len, size_t buffer_size );
@@ -531,8 +557,58 @@ CHAR* util_strxndup_r( CHAR* data, const CHAR* string, size_t len )
 }
 
 
+template< typename CHAR >
+CHAR* util_strxndup( const CHAR* string, size_t len )
+{
+	return util_strxndup_r( (CHAR*)nullptr, string, len );
+}
+
+
+template< typename CHAR >
+bool util_strncmp( const CHAR* left, const CHAR* right, size_t len )
+{
+	const CHAR*       cur1 = left;
+	const CHAR*       cur2 = right;
+	const CHAR* const end  = len + left;
+
+	for ( ; cur1 < end; ++cur1, ++cur2 )
+	{
+		if ( *cur1 != *cur2 )
+			return false;
+	}
+
+	return true;
+}
+
+
+template< typename CHAR >
+bool util_strncmp( const CHAR* left, size_t left_len, const CHAR* right, size_t right_len )
+{
+	if ( left_len != right_len )
+		return false;
+
+	return util_strncmp( left, right, left_len );
+}
+
+
+template< typename CHAR >
+bool util_strcmp( const CHAR* left, const CHAR* right )
+{
+	if constexpr ( std::is_same_v< wchar_t, CHAR > )
+	{
+		return wcscmp( left, right ) == 0;
+	}
+	else
+	{
+		return strcmp( left, right ) == 0;
+	}
+}
+
+
 // --------------------------------------------------------------------------------------------------------
 // file system functions
+
+size_t      fs_path_len( const fs::path_char* path );
 
 std::string fs_path_clean( const char* path, size_t path_len );
 fs::path    fs_path_clean( const fs::path& path );
@@ -546,13 +622,13 @@ char*       fs_get_filename_no_ext( const char* path, size_t pathLen );
 //const char*          fs_get_filename_ptr( std::string_view path );
 //const fs::path_char* fs_get_filename_ptr( fs::path_view path );
 
-std::string          fs_get_extension( std::string_view path );
-void                 fs_get_extension( std::string_view path, std::string& output );
+std::string fs_get_extension( std::string_view path );
+// void        fs_get_extension( std::string_view path, std::string& output );
 
-bool        fs_exists( const char* path );
-bool        fs_make_dir( const char* path );
-bool        fs_is_dir( const char* path );
-bool        fs_is_file( const char* path );
+bool        fs_exists( const fs::path_char* path );
+bool        fs_make_dir( const fs::path_char* path );
+bool        fs_is_dir( const fs::path_char* path );
+bool        fs_is_file( const fs::path_char* path );
 
 bool        fs_is_absolute( const char* path, size_t path_len );
 bool        fs_is_relative( const char* path, size_t path_len );
@@ -561,33 +637,33 @@ bool        fs_is_relative( const char* path, size_t path_len );
 char*       fs_replace_path_seps_unix( const char* path );
 
 // checks if it exists and if it's a file and not a directory
-bool        fs_make_dir_check( const char* path );
+bool        fs_make_dir_check( const fs::path_char* path );
 
 // returns file size in bytes
 u64         fs_file_size( const char* path );
 
 // returns the file length in the len argument, optional
-char*       fs_read_file( const char* path, size_t* len = nullptr );
+char*       fs_read_file( const fs::path_char* path, size_t* len = nullptr );
 
 // reads a file relative to the app directory
 // returns the file length in the len argument, optional
-char*       fs_read_file_app_dir( const char* path, size_t* len = nullptr );
+char*       fs_read_file_app_dir( const fs::path_char* path, size_t* len = nullptr );
 
 // ensures no data loss happens and backs up the old file
-bool        fs_save_file( const char* path, const char* data, size_t size );
+bool        fs_save_file( const fs::path_char* path, const char* data, size_t size );
 
-struct save_file_t
-{
-	void* file;
-	char* temp_path;
-	char* bak_path;
-};
-
-save_file_t fs_save_file_open( const char* path );
-void        fs_save_file_close( save_file_t& save, const char* path );
+//struct save_file_t
+//{
+//	void* file;
+//	char* temp_path;
+//	char* bak_path;
+//};
+//
+//save_file_t fs_save_file_open( const char* path );
+//void        fs_save_file_close( save_file_t& save, const char* path );
 
 // overrwites any existing file
-bool        fs_write_file( const char* path, const char* data, size_t size );
+bool        fs_write_file( const fs::path_char* path, const char* data, size_t size );
 
 
 template< typename CHAR >
@@ -616,5 +692,31 @@ inline const CHAR* fs_get_filename_ptr( CHAR* path, size_t len )
 		return {};
 
 	return path + start_index;
+}
+
+
+template< typename CHAR, typename STRING_TYPE, typename STRING_VIEW >
+void fs_get_extension( STRING_VIEW path, STRING_TYPE& output )
+{
+	output.clear();
+
+	if ( path.empty() )
+		return;
+
+	const CHAR* dot = nullptr;
+
+	if constexpr ( std::is_same_v< CHAR, wchar_t > )
+	{
+		dot = wcsrchr( path.data(), L'.' );
+	}
+	else
+	{
+		dot = strrchr( path.data(), '.' );
+	}
+
+	if ( !dot || dot == path.data() )
+		return;
+
+	output.assign( dot, ( path.data() + path.size() ) - dot );
 }
 

@@ -143,7 +143,7 @@ if ( MSVC )
 	
 	add_link_options(
 		"/SUBSYSTEM:WINDOWS"
-		"/ENTRY:mainCRTStartup"
+		"/ENTRY:wmainCRTStartup"
 		# "/INCREMENTAL"
 	)
 
@@ -275,7 +275,7 @@ set(
 if ( MSVC )
 	set(
 		SYSTEM_FILES
-		src/system/win32/media_tag_system.manifest
+		# src/system/win32/media_tag_system.manifest
 		src/system/win32/sys_win32.h
 		src/system/win32/sys_win32.cpp
 		src/system/win32/sys_win32_filesystem.cpp

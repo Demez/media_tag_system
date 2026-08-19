@@ -42,20 +42,35 @@ bool STDMETHODCALLTYPE GetFilesFromDataObject( FORMATETC& fmtetc, IDataObject* p
 	DROPFILES* dropfiles = (DROPFILES*)GlobalLock( pmedium.hGlobal );
 	HDROP      drop      = (HDROP)dropfiles;
 
-	auto       fileCount = DragQueryFileW( drop, 0xFFFFFFFF, NULL, NULL );
+	auto        fileCount     = DragQueryFileW( drop, 0xFFFFFFFF, NULL, NULL );
+
+	std::string filepath_utf8;
+	std::string ext;
 
 	for ( UINT i = 0; i < fileCount; i++ )
 	{
-		TCHAR filepath[ MAX_PATH ];
-		DragQueryFile( drop, i, filepath, ARR_SIZE( filepath ) );
+		wchar_t filepath[ MAX_PATH ];
+		DragQueryFileW( drop, i, filepath, ARR_SIZE( filepath ) );
 		// NOTE: maybe check if we can load this file here?
 		// some callback function or ImageLoader_SupportsImage()?
 
 		// TODO: DO ASYNC TO NOT LOCK UP FILE EXPLORER !!!!!!!!
 		// 	if ( ImageLoader_SupportsImage( filepath ) )
+		if ( fs_is_file( filepath ) )
 		{
-			drop_files.push_back( filepath );
+			filepath_utf8 = sys_path_to_string( filepath );
+			ext.clear();
+			fs_get_extension< char >( filepath_utf8, ext );
+
+			e_media_type type;
+			if ( !media_check_extension_fast( ext, type ) )
+				continue;
 		}
+		
+		drop_files.push_back( filepath );
+
+		// for now, we only do the first file, no handling for anything else still
+		break;
 	}
 
 	GlobalUnlock( pmedium.hGlobal );
@@ -92,11 +107,21 @@ struct window_drop_target : public IDropTarget
 
 	// ------------------------------------------------------------------------------------------------------------------------
 
+	void get_drop_effect( DWORD* pdwEffect )
+	{
+		if ( drop_supported )
+			*pdwEffect = DROPEFFECT_COPY;
+		else
+			*pdwEffect = DROPEFFECT_NONE;
+	}
+
 	HRESULT STDMETHODCALLTYPE DragEnter( IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect ) override
 	{
 		// needed?
 		// FORMATETC formats;
 		// pDataObj->EnumFormatEtc( DATADIR_GET, formats );
+
+		send_frame_draw_event();
 
 		FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
 		bool      valid  = IsValidClipboardType( pDataObj, fmtetc );
@@ -108,42 +133,30 @@ struct window_drop_target : public IDropTarget
 		if ( !GetFilesFromDataObject( fmtetc, pDataObj, drop_files ) )
 			return S_FALSE;
 
-		if ( drop_files.empty() )
-		{
-			drop_supported = false;
-			*pdwEffect     = DROPEFFECT_SCROLL;
-			// return S_FALSE;
-			return S_OK;
-		}
-		else
-		{
-			drop_supported = true;
-			*pdwEffect     = DROPEFFECT_LINK;
-			return S_OK;
-		}
+		drop_supported = drop_files.size() > 0;
+		get_drop_effect( pdwEffect );
+
+		return S_OK;
 	}
 
 	HRESULT STDMETHODCALLTYPE DragOver( DWORD grfKeyState, POINTL pt, DWORD* pdwEffect ) override
 	{
-		if ( drop_supported )
-		{
-			*pdwEffect = DROPEFFECT_LINK;
-		}
-		else
-		{
-			*pdwEffect = DROPEFFECT_SCROLL;  // actually shows the "invalid" cursor or whatever it's called
-		}
+		send_frame_draw_event();
+		get_drop_effect( pdwEffect );
 
 		return S_OK;
 	}
 
 	HRESULT STDMETHODCALLTYPE DragLeave() override
 	{
+		send_frame_draw_event();
 		return S_OK;
 	}
 
 	HRESULT STDMETHODCALLTYPE Drop( IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect ) override
 	{
+		send_frame_draw_event();
+
 		FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
 		bool      valid  = IsValidClipboardType( pDataObj, fmtetc );
 		if ( !valid )
@@ -155,6 +168,7 @@ struct window_drop_target : public IDropTarget
 			return S_FALSE;
 
 		// TODO: make async/non-blocking
+		// use a new SDL user event instead, at least until we get fullscreen media loading on a job
 
 		if ( drop_files.empty() )
 			return S_FALSE;
@@ -162,7 +176,8 @@ struct window_drop_target : public IDropTarget
 		if ( !g_f_drag_drop_receive( drop_files ) )
 			return S_FALSE;
 
-		// SetFocus( aHWND );
+		// this seems to behave weirdly lol
+		// SetFocus( window_hwnd );
 
 		return S_OK;
 	}

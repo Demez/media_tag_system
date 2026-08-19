@@ -40,6 +40,7 @@ wchar_t*       sys_to_wchar_extended( const char* spStr );
 char*          sys_to_utf8( const wchar_t* spStr, size_t sSize );
 char*          sys_to_utf8( const wchar_t* spStr );
 
+wchar_t*       create_extended_path( const wchar_t* spStr, size_t strLen );
 
 // --------------------------------------------------------------------------------------------------------
 // Internal Drag and Drop functions

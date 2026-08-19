@@ -208,9 +208,10 @@ void gallery_header_draw_path_text_edit( bool& was_in_path_edit, float bar_width
 
 	if ( ImGui::InputText( "##directory", g_folder_buf, 512, ImGuiInputTextFlags_EnterReturnsTrue ) )
 	{
-		if ( fs_is_dir( g_folder_buf ) )
+		fs::path folder_buf = sys_string_to_path( g_folder_buf );
+		if ( fs_is_dir( folder_buf.c_str() ) )
 		{
-			directory::queued = sys_string_to_path( g_folder_buf );
+			directory::queued = std::move( folder_buf );
 		}
 		else
 		{
@@ -774,7 +775,8 @@ void sidebar_draw_bookmarks( ImGuiStyle& style )
 
 	if ( ImGui::Selectable( "Add Folder" ) )
 	{
-		app::config.bookmark.emplace_back( directory::path.filename().string(), directory::path.string(), true );
+		std::string filename = sys_path_to_string( directory::path.filename() );
+		app::config.bookmark.emplace_back( std::move( filename ), directory::path.native(), true );
 		config_save();
 	}
 

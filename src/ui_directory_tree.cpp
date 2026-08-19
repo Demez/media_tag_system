@@ -55,7 +55,7 @@ void dir_tree_add_folder_callback( folder_scan_status_t* status, bool in_main_th
 
 void dir_tree_add_folder( fs::path& path )
 {
-	std::string current_scan{};
+	fs::path_str current_scan{};
 
 	size_t path_i = 0;
 	for ( fs::path::iterator it = path.begin(); it != path.end(); it++ )
@@ -68,7 +68,7 @@ void dir_tree_add_folder( fs::path& path )
 		}
 #endif
 
-		std::string filename = sys_path_to_string( *it );
+		const fs::path_str& filename = *it;
 
 		// ??
 		if ( filename.empty() )
@@ -78,7 +78,7 @@ void dir_tree_add_folder( fs::path& path )
 		}
 
 		current_scan += filename;
-		current_scan += SEP_S;
+		current_scan += SEP;
 
 		auto dir_it = g_directory_entries.find( current_scan );
 

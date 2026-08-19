@@ -19,7 +19,7 @@ void folder_scan_job_run( job_status_t* status )
 	bool result = sys_scandir( scan->root, scan->files, scan->flags, &status->cancel );
 
 	if ( !result )
-		printf( "Failed to scan directory: %s\n", scan->root );
+		path_printf( "Failed to scan directory: %s\n", scan->root );
 
 	// should we mutex lock this by storing a mutex in the status of it?
 	scan->result     = result;
@@ -51,7 +51,7 @@ void folder_scan_job_free( job_status_t* status )
 
 
 // non-blocking folder scanning
-folder_scan_status_t* folder_scan_push( const char* root, e_scandir_flags flags, folder_scan_callback_t* callback, folder_scan_thread_func_t* thread_func )
+folder_scan_status_t* folder_scan_push( const fs::path_char* root, e_scandir_flags flags, folder_scan_callback_t* callback, folder_scan_thread_func_t* thread_func )
 {
 	if ( !fs_is_dir( root ) )
 		return nullptr;
@@ -62,7 +62,7 @@ folder_scan_status_t* folder_scan_push( const char* root, e_scandir_flags flags,
 		return nullptr;
 
 	status->flags       = flags;
-	status->root        = util_strdup( root );
+	status->root        = util_strxndup( root, fs_path_len( root ) );
 	status->callback    = callback;
 	status->thread_func = thread_func;
 

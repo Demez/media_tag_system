@@ -70,7 +70,7 @@ thumbnail_thread_data_t* g_thumbnail_thread_data = nullptr;
 thumbnail_cache_t        g_thumbnail_cache;
 thumbnail_saver_queue_t  g_thumbnail_save;
 
-extern bool              thumbnail_save( image_t& image, const std::string& output );
+extern bool              thumbnail_save( image_t& image, const fs::path_str& output );
 
 // debug printing
 void thumbnail_printf( const char* format, ... )
@@ -206,11 +206,11 @@ search:
 	thumbnail_loader_free_data( cache_pos );
 	//printf( "THUMBNAIL %d USED\n", cache_pos );
 
-	std::string path_str = sys_path_to_string( directory::path );
+	fs::path_str path_str = directory::path;
 	path_str += SEP;
-	path_str += sys_path_to_string( media_entry.file.path );
+	path_str += media_entry.file.path;
 
-	g_thumbnail_cache.buffer[ cache_pos ].path        = util_strdup( path_str.c_str() );
+	g_thumbnail_cache.buffer[ cache_pos ].path        = util_strxndup( path_str.data(), path_str.size() );
 	g_thumbnail_cache.buffer[ cache_pos ].status      = e_thumbnail_status_queued;
 	g_thumbnail_cache.buffer[ cache_pos ].save_status = e_thumbnail_save_idle;
 	g_thumbnail_cache.buffer[ cache_pos ].type        = media_entry.type;
@@ -352,6 +352,23 @@ size_t thumbnail_generate_hash( file_t& file )
 }
 
 
+fs::path_str build_cache_path( size_t file_hash )
+{
+	fs::path_str thumbnail_path = app::config.thumbnail_cache_path;
+	thumbnail_path += SEP;
+
+#if WIN32
+	thumbnail_path += std::to_wstring( file_hash );
+	thumbnail_path += L".jxl";
+#else
+	thumbnail_path += std::to_string( file_hash );
+	thumbnail_path += ".jxl";
+#endif
+
+	return thumbnail_path;
+}
+
+
 void thumbnail_save_worker( int thread )
 {
 	while ( g_thumbnails_running.load( std::memory_order_acquire ) )
@@ -393,10 +410,7 @@ void thumbnail_save_worker( int thread )
 
 		thumbnail->save_status     = e_thumbnail_save_saving;
 
-		std::string thumbnail_path = app::config.thumbnail_cache_path;
-		thumbnail_path += SEP_S;
-		thumbnail_path += std::to_string( entry.file_hash );
-		thumbnail_path += ".jxl";
+		fs::path_str thumbnail_path = build_cache_path( entry.file_hash );
 
 		thumbnail_save( *thumbnail->image, thumbnail_path );
 
@@ -427,7 +441,7 @@ void thumbnail_save_push( h_thumbnail thumbnail_handle, thumbnail_t* thumbnail, 
 }
 
 
-bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*& local_mpv, int thread_id, char* mpv_thread_name, char* video_thumbnail_path )
+bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*& local_mpv, int thread_id, char* mpv_thread_name, fs::path_char* video_thumbnail_path )
 {
 	// No thumbnail was found on disk, load the source file and generate one
 	if ( thumbnail->type == e_media_type_video )
@@ -448,7 +462,10 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 
 		// mpv_handle_wait_event( local_mpv, 0.1, mpv_thread_name );
 
-		const char* cmd[]   = { "loadfile", thumbnail->path, NULL };
+		std::string path_str;
+		sys_path_to_string( thumbnail->path, path_str );
+
+		const char* cmd[]   = { "loadfile", path_str.data(), NULL };
 		int         cmd_ret = p_mpv_command_async( local_mpv, NULL, cmd );
 
 		mpv_event*  event   = p_mpv_wait_event( local_mpv, -1 );
@@ -483,8 +500,9 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 			return false;
 		}
 
-		// TODO: USE screenshot-raw
-		const char* cmd3[] = { "screenshot-to-file", video_thumbnail_path, NULL };
+		// TODO: Use another frame buffer object instead, created at the thumbnail size
+		std::string utf8_path = sys_path_to_string( video_thumbnail_path );
+		const char* cmd3[]    = { "screenshot-to-file", utf8_path.c_str(), NULL };
 		cmd_ret            = p_mpv_command_async( local_mpv, NULL, cmd3 );
 
 		event              = p_mpv_wait_event( local_mpv, -1 );
@@ -546,7 +564,7 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 
 		if ( !image_load( video_thumbnail_path, load_info ) )
 		{
-			printf( "FAILED TO LOAD IMAGE: %s\n", video_thumbnail_path );
+			path_printf( "FAILED TO LOAD IMAGE: %s\n", video_thumbnail_path );
 			thumbnail->status = e_thumbnail_status_failed;
 			return false;
 		}
@@ -570,7 +588,7 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 
 		if ( !image_load( thumbnail->path, load_info ) )
 		{
-			printf( "FAILED TO LOAD IMAGE: %s\n", thumbnail->path );
+			path_printf( "FAILED TO LOAD IMAGE: %s\n", thumbnail->path );
 			thumbnail->status = e_thumbnail_status_failed;
 			return false;
 		}
@@ -582,8 +600,13 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 
 void thumbnail_loader_worker( u32 thread_id )
 {
-	char  video_thumbnail_path[ 512 ];
+	fs::path_char video_thumbnail_path[ 512 ];
+
+#if WIN32
+	_snwprintf( video_thumbnail_path, 512, L"%s\\video_thumbnail_thread_%d.png", app::config.thumbnail_video_cache_path.c_str(), thread_id );
+#else
 	snprintf( video_thumbnail_path, 512, "%s" SEP_S "video_thumbnail_thread_%d.png", app::config.thumbnail_video_cache_path.c_str(), thread_id );
+#endif
 
 	char mpv_thread_name[ 64 ];
 	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );
@@ -627,10 +650,16 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		if ( app::config.thumbnail_jxl_enable )
 		{
-			std::string thumbnail_path = app::config.thumbnail_cache_path;
-			thumbnail_path += SEP_S;
+			fs::path_str thumbnail_path = app::config.thumbnail_cache_path;
+			thumbnail_path += SEP;
+
+#if WIN32
+			thumbnail_path += std::to_wstring( file_hash );
+			thumbnail_path += L".jxl";
+#else
 			thumbnail_path += std::to_string( file_hash );
 			thumbnail_path += ".jxl";
+#endif
 
 			if ( fs_is_file( thumbnail_path.c_str() ) )
 			{
@@ -704,9 +733,10 @@ void thumbnail_loader_worker( u32 thread_id )
 		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
 		{
 			// Make sure it's not in the cache folder
-			std::string cleaned_path = fs_path_clean( thumbnail->path, strlen( thumbnail->path ) );
+			fs::path     cleaned_path     = fs_path_clean( thumbnail->path );
+			fs::path_str cleaned_path_str = cleaned_path.native();
 
-			if ( !cleaned_path.starts_with( app::config.thumbnail_cache_path ) )
+			if ( !cleaned_path_str.starts_with( app::config.thumbnail_cache_path ) )
 			{
 				// prescale the image instead, that way the save thread doesn't need to hold onto images nearly as long
 				if ( static_cast< u64 >( max_image_size ) > static_cast< u64 >( app::config.thumbnail_size ) )

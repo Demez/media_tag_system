@@ -1077,7 +1077,7 @@ void media_view_context_menu()
 		if ( delete_file_window( 1 ) )
 		{
 			// TODO: undo history
-			std::string path = gallery_item_get_path_string( g_image_data.index );
+			fs::path path = gallery_item_get_path( g_image_data.index );
 			sys_recycle_file( path.c_str() );
 		}
 	}
@@ -1201,7 +1201,7 @@ void media_view_input()
 		if ( delete_file_window( 1 ) )
 		{
 			// TODO: undo history
-			std::string path = gallery_item_get_path_string( g_image_data.index );
+			fs::path path = gallery_item_get_path( g_image_data.index );
 			sys_recycle_file( path.c_str() );
 		}
 	}
@@ -1345,14 +1345,14 @@ void media_view_load()
 		}
 		else
 		{
-			printf( "%f FAILED Load - %s\n", load_time, path_str.c_str() );
+			path_printf( "%f FAILED Load - %s\n", load_time, full_path.c_str() );
 		}
 	}
 
 	// auto  currentTime    = std::chrono::high_resolution_clock::now();
 	// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 	//printf( "%f Load - %f Up - %s\n", load_time, up_time, directory::media_list[ g_folder_index ].string().c_str() );
-	printf( "%f Load - %s\n", load_time, path_str.c_str() );
+	path_printf( "%f Load - %s\n", load_time, full_path.c_str() );
 
 	// g_image_data.index = image_draw::media_index;
 

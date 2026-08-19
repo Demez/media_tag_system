@@ -259,7 +259,7 @@ void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
 
 		if ( !( file.type & e_file_type_directory ) )
 		{
-			fs_get_extension( media_entry.file.name, ext );
+			fs_get_extension< char >( media_entry.file.name, ext );
 			if ( !media_check_extension_fast( ext, media_entry.type ) )
 				continue;
 		}
@@ -295,7 +295,7 @@ void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_t
 
 	folder_media_list_reset();
 
-	media_history_add( status->root );
+	//media_history_add( status->root );
 	folder_history_add( directory::path );
 
 	auto media_entry_list = static_cast< std::vector< media_entry_t >* >( status->thread_userdata );
@@ -347,8 +347,6 @@ void folder_load_media_list()
 	directory::media_list.reserve( 5000 );
 	directory::thumbnail_list.reserve( 5000 );
 
-	std::string root = directory::path.string();
-
 	// split into chunks
 	directory::path_chunks.clear();
 
@@ -372,7 +370,7 @@ void folder_load_media_list()
 
 	// queue this directory change
 	gallery::scan_state    = e_gallery_scan_filesystem;
-	g_main_dir_scan_status = folder_scan_push( root.c_str(), scan_flags, folder_load_media_list_finish, folder_load_media_list_thread_finish );
+	g_main_dir_scan_status = folder_scan_push( directory::path.c_str(), scan_flags, folder_load_media_list_finish, folder_load_media_list_thread_finish );
 }
 
 constexpr int MAX_HISTORY = 32;
@@ -454,7 +452,7 @@ bool on_new_file( const fs::path& file_path )
 {
 	fs::path    clean_path = fs_path_clean( file_path );
 	std::string path_str   = sys_path_to_string( clean_path );
-	bool        is_file    = fs_is_file( path_str.c_str() );
+	bool        is_file    = fs_is_file( file_path.c_str() );
 
 	if ( is_file )
 	{
@@ -467,7 +465,7 @@ bool on_new_file( const fs::path& file_path )
 		directory::queued = clean_path;
 		return true;
 	}
-	else if ( fs_is_dir( path_str.c_str() ) )
+	else if ( fs_is_dir( file_path.c_str() ) )
 	{
 		directory::queued = clean_path;
 		return true;
@@ -482,7 +480,11 @@ bool drag_drop_recieve_func( const std::vector< fs::path >& files )
 	if ( files.empty() )
 		return false;
 
-	return on_new_file( files[ 0 ] );
+	if ( !on_new_file( files[ 0 ] ) )
+		return false;
+
+	SDL_RaiseWindow( app::window );
+	return true;
 }
 
 
@@ -794,6 +796,7 @@ bool handle_event( SDL_Event& event )
 			ImGui::SetWindowFocus( nullptr );
 			break;
 
+#if !_WIN32
 		// The system requests a file open
 		case SDL_EVENT_DROP_FILE:
 		{
@@ -822,6 +825,7 @@ bool handle_event( SDL_Event& event )
 		case SDL_EVENT_DROP_POSITION:
 			set_frame_draw();
 			break;
+#endif
 
 		case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
 			update_dpi();
@@ -999,6 +1003,7 @@ static void handle_queued_file()
 	else if ( !directory::folder_changed && gallery::scan_state == e_gallery_scan_idle )
 	{
 		select_image_in_folder( true );
+		set_view_type_media( true );
 
 		directory::folder_loading = false;
 		directory::folder_reload = false;
@@ -1040,8 +1045,7 @@ static void handle_queued_folder()
 
 static void check_queued_path()
 {
-	std::string path_str = sys_path_to_string( directory::queued );
-	bool        is_file  = fs_is_file( path_str.c_str() );
+	bool is_file = fs_is_file( directory::queued.c_str() );
 
 	// Reset search string
 	memset( gallery::search, 0, 512 * sizeof( char ) );
@@ -1256,10 +1260,8 @@ void test_hdr_state()
 }
 
 
-int startup( int argc, char* argv[] )
+int startup()
 {
-	args_init( argc, argv );
-
 	if ( !sys_setup_exe_path_vars() )
 	{
 		printf( "Failed to setup exe path variables!\n" );
@@ -1271,7 +1273,7 @@ int startup( int argc, char* argv[] )
 		printf( "Failed to load config, using defaults\n" );
 	}
 
-	e_sys_init sys_init_ret = sys_init( argc, argv );
+	e_sys_init sys_init_ret = sys_init();
 
 	if ( sys_init_ret == e_sys_init_fail )
 	{
@@ -1292,11 +1294,16 @@ int startup( int argc, char* argv[] )
 
 	// ----------------------------------------------------------------
 
-	// SDL_SetEventEnabled( SDL_EVENT_DROP_FILE, false );
-	// SDL_SetEventEnabled( SDL_EVENT_DROP_TEXT, false );
-	// SDL_SetEventEnabled( SDL_EVENT_DROP_BEGIN, false );
-	// SDL_SetEventEnabled( SDL_EVENT_DROP_COMPLETE, false );
-	// SDL_SetEventEnabled( SDL_EVENT_DROP_POSITION, false );
+	// In windows land, we need our own drag and drop manager so SDL doesn't convert it to UTF-8
+	// this can fail thanks to windows supporting evil and fucked up characters in filenames that cannot be converted to UTF-8 seemingly
+	// basically characters that are split in half i think
+#if _WIN32
+	SDL_SetEventEnabled( SDL_EVENT_DROP_FILE, false );
+	SDL_SetEventEnabled( SDL_EVENT_DROP_TEXT, false );
+	SDL_SetEventEnabled( SDL_EVENT_DROP_BEGIN, false );
+	SDL_SetEventEnabled( SDL_EVENT_DROP_COMPLETE, false );
+	SDL_SetEventEnabled( SDL_EVENT_DROP_POSITION, false );
+#endif
 
 	if ( !render_init() )
 	{
@@ -1420,10 +1427,9 @@ int startup( int argc, char* argv[] )
 	directory::queued = sys_get_cwd();
 
 	// take the first path here
-	for ( int i = 1; i < argc; i++ )
+	for ( int i = 1; i < g_argc; i++ )
 	{
-		fs::path path = sys_string_to_path( argv[ i ] );
-		if ( on_new_file( path ) )
+		if ( on_new_file( g_argv[ i ] ) )
 			break;
 	}
 
@@ -1454,9 +1460,15 @@ int startup( int argc, char* argv[] )
 }
 
 
+#if _WIN32
+int wmain( int argc, wchar_t* argv[] )
+#else
 int main( int argc, char* argv[] )
+#endif
 {
-	int ret = startup( argc, argv );
+	args_init( argc, argv );
+
+	int ret = startup();
 
 	if ( ret != 0 )
 	{
@@ -1466,5 +1478,7 @@ int main( int argc, char* argv[] )
 
 	main_loop();
 	shutdown();
+
+	return 0;
 }
 

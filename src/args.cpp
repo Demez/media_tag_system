@@ -1,4 +1,5 @@
 #include "args.h"
+#include "system/system.h"
 
 
 enum e_arg_type : u8
@@ -12,8 +13,8 @@ enum e_arg_type : u8
 
 struct arg_t
 {
-	const char* cmd_switch;
-	e_arg_type  type;
+	const fs::path_char* cmd_switch;
+	e_arg_type           type;
 	
 	union
 	{
@@ -29,17 +30,21 @@ struct arg_t
 };
 
 
-int    g_argc                  = 0;
-char** g_argv                  = nullptr;
+int             g_argc                  = 0;
+fs::path_char** g_argv                  = nullptr;
 
-arg_t* g_registered_args       = nullptr;
-u32    g_registered_args_count = 0;
+arg_t*          g_registered_args       = nullptr;
+u32             g_registered_args_count = 0;
 
 
-void args_init( int argc, char* argv[] )
+void args_init( int argc, fs::path_char* argv[] )
 {
+#if 0 // _WIN32
+	sys_get_args( g_argc, &g_argv );
+#else
 	g_argc = argc;
 	g_argv = argv;
+#endif
 }
 
 
@@ -56,6 +61,7 @@ void args_print_help()
 {
 	printf( "%d registered arguments:\n\n", g_registered_args_count );
 
+#if 0
 	for ( u32 i = 0; i < g_registered_args_count; i++ )
 	{
 		printf( g_registered_args[ i ].cmd_switch );
@@ -85,6 +91,7 @@ void args_print_help()
 
 		printf( "\n" );
 	}
+#endif
 }
 
 
@@ -101,6 +108,7 @@ arg_t* args_add_registered_arg()
 }
 
 
+#if 0
 const char* args_register_str( const char* default_val, const char* desc, const char* cmd_switch )
 {
 	arg_t* arg           = args_add_registered_arg();
@@ -124,9 +132,10 @@ const char* args_register_str( const char* default_val, const char* desc, const 
 
 	return default_val;
 }
+#endif
 
 
-bool args_register_bool( const char* desc, const char* cmd_switch )
+bool args_register_bool( const char* desc, const fs::path_char* cmd_switch )
 {
 	arg_t* arg        = args_add_registered_arg();
 
@@ -136,7 +145,7 @@ bool args_register_bool( const char* desc, const char* cmd_switch )
 
 	for ( int i = 0; i < g_argc; i++ )
 	{
-		if ( strcmp( g_argv[ i ], cmd_switch ) == 0 )
+		if ( util_strcmp( g_argv[ i ], cmd_switch ) )
 		{
 			arg->val_bool = true;
 			return true;

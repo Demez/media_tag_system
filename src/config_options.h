@@ -5,9 +5,9 @@
 
 struct bookmark_t
 {
-	std::string name{};
-	std::string path{};
-	bool        valid = false;
+	std::string  name{};
+	fs::path_str path{};
+	bool         valid = false;
 };
 
 
@@ -32,8 +32,8 @@ struct app_config_t
 	float                     thumbnail_jxl_distance      = 4;
 	u32                       thumbnail_jxl_effort        = 6;
 
-	std::string               thumbnail_cache_path{};
-	std::string               thumbnail_video_cache_path{};
+	fs::path_str              thumbnail_cache_path{};
+	fs::path_str              thumbnail_video_cache_path{};
 
 	int                       vsync                          = 1;
 	bool                      high_bpc                       = false;
