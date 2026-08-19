@@ -57,6 +57,7 @@ struct app_config_t
 	bool                      single_instance                = false;
 	bool                      dev_mode                       = false;
 	bool                      zoom_under_window_size         = true;
+	bool                      media_vertical_nav_buttons     = false;
 
 	bool                      directory_tree_auto_expand     = true;
 	bool                      directory_tree_expand_on_click = false;
@@ -238,7 +239,8 @@ constexpr config_opt_t g_cfg_opt_general[] = {
 	CONFIG_OPT( e_cfg_bool, "dev_mode", dev_mode, "" ),
 	CONFIG_OPT( e_cfg_bool, "high_bpc", high_bpc, "" ),
 	CONFIG_OPT( e_cfg_bool, "no_video", no_video, "" ),
-	CONFIG_OPT( e_cfg_bool, "single_instance", no_video, "" ),
+	CONFIG_OPT( e_cfg_bool, "single_instance", single_instance, "" ),
+	CONFIG_OPT( e_cfg_bool, "media_vertical_nav_buttons", media_vertical_nav_buttons, "" ),
 
 	// CONFIG_OPT( "job_debug", job_debug, "" ),
 	// CONFIG_OPT( "job_debug_delay", job_debug_delay, "" ),

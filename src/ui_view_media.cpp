@@ -1433,13 +1433,13 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 	ImVec2 playback_control_pos{};
 	playback_control_pos.x = width / 2;
 	//playback_control_pos.y = ( height - 75.f );
-	playback_control_pos.y = ( height - 40.f );
+	playback_control_pos.y = ( height - 60.f );
 
 	// check if mouse in rectangle
 
 	static bool  was_drawing_controls = false;
 
-	static float controls_height = 50.f;
+	static float controls_height = 80.f;
 	if ( !mouse_in_rect( { 0.f, height - ( 80.f + ( controls_height * 2 ) ) }, { (float)width, (float)height } ) )
 	{
 		if ( was_drawing_controls )
@@ -1645,7 +1645,7 @@ void media_view_draw_animated_image_controls( bool mouse_hover_imgui_window )
 	ImVec2 playback_control_pos{};
 	playback_control_pos.x = width / 2;
 	//playback_control_pos.y = ( height - 75.f );
-	playback_control_pos.y = ( height - 40.f );
+	playback_control_pos.y = ( height - 60.f );
 
 	// check if mouse in rectangle
 
@@ -1850,6 +1850,114 @@ void media_view_draw_close_button()
 }
 
 
+void media_view_draw_nav_buttons()
+{
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	ImGui::PushFont( font::normal, app::config.font_size * 1.5 );
+
+	// ImVec2 button_pos{
+	// 	width - ( ImGui::GetFrameHeight() + style.WindowPadding.x * 4 ),
+	// 	( style.WindowPadding.x * 4 )
+	// };
+
+	// check if mouse in rectangle
+
+	static bool was_drawing_controls = false;
+	ImVec2      play_btn_size        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
+	bool        area_focused         = true;
+
+	float       btn_total_width     = play_btn_size.x;
+	float       btn_total_height     = play_btn_size.y;
+
+	if ( app::config.media_vertical_nav_buttons )
+	{
+		btn_total_height = play_btn_size.y * 2 + style.ItemSpacing.y;
+	}
+	else
+	{
+		btn_total_width = play_btn_size.x * 2 + style.ItemSpacing.x;
+	}
+
+	ImVec2      button_pos{
+		width - ( style.WindowPadding.x * 2 ),
+		height - ( ( style.WindowPadding.y * 2 ) )
+	};
+
+	ImVec2 area_rect_min = { button_pos.x - ( ( style.WindowPadding.x * 10 ) + btn_total_width ), button_pos.y - ( ( style.WindowPadding.y * 12 ) + btn_total_height ) };
+	ImVec2 area_rect_max = { static_cast< float >( width ), static_cast< float >( height ) };
+
+	//if ( !mouse_in_rect( { button_pos.x - ( ( style.WindowPadding.x * 4 ) + play_btn_size.x ), 0.f }, { (float)width, ( ( style.WindowPadding.y * 6 ) + play_btn_size.y ) } ) )
+	if ( !mouse_in_rect( area_rect_min, area_rect_max ) )
+	{
+		area_focused = false;
+
+		//if ( was_drawing_controls )
+		//	set_frame_draw();
+	
+		//was_drawing_controls = false;
+		//ImGui::PopFont();
+		//return;
+	}
+	
+	//if ( !was_drawing_controls )
+	if ( was_drawing_controls != area_focused )
+		set_frame_draw();
+	
+	was_drawing_controls = area_focused;
+
+	// ----------------------------------------
+
+	// ImGui::SetNextWindowPos( button_pos, 0, ImVec2( 0.0f, 1.0f ) );
+	ImGui::SetNextWindowPos( button_pos, 0, ImVec2( 1.0f, 1.0f ) );
+	// ImGui::SetNextWindowPos( button_pos );
+
+	//ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, { 0, 0 } );
+	//ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0.f );
+	 
+	if ( !area_focused )
+	{
+		ImVec4 btn_color  = ImGui::GetStyleColorVec4( ImGuiCol_Button );
+		ImVec4 text_color = ImGui::GetStyleColorVec4( ImGuiCol_Text );
+		btn_color.w       = 0.25f;
+		text_color.w      = 0.25f;
+
+		ImGui::PushStyleColor( ImGuiCol_Button, btn_color );
+		ImGui::PushStyleColor( ImGuiCol_Text, text_color );
+	}
+		//ImGui::SetNextWindowBgAlpha( 0.25f );
+
+	if ( ImGui::Begin( "##view_nav_btn_frame", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBackground ) )
+	{
+		if ( ImGui::ArrowButtonEx( "##view_nav_btn_prev", ImGuiDir_Left, play_btn_size ) )
+		{
+			media_view_advance( true );
+		}
+		
+		if ( !app::config.media_vertical_nav_buttons )
+			ImGui::SameLine();
+
+		if ( ImGui::ArrowButtonEx( "##view_nav_btn_next", ImGuiDir_Right, play_btn_size ) )
+		{
+			media_view_advance();
+		}
+	}
+
+	if ( !area_focused )
+	{
+		ImGui::PopStyleColor( 2 );
+	}
+
+	//ImGui::PopStyleVar();
+
+	ImGui::End();
+	ImGui::PopFont();
+}
+
+
 void media_view_draw_imgui()
 {
 	media_view_input();
@@ -1857,6 +1965,7 @@ void media_view_draw_imgui()
 	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
 
 	media_view_draw_close_button();
+	media_view_draw_nav_buttons();
 
 	if ( g_draw_media_info )
 		media_view_draw_media_info();
