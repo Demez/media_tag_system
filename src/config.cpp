@@ -212,6 +212,10 @@ void config_get_number_arg( kdl_parser* parser, NUM& result )
 			{
 				result = static_cast< NUM >( std::stoul( num.string.data ) );
 			}
+			else if constexpr ( std::is_floating_point_v< NUM > )
+			{
+				result = static_cast< NUM >( std::stof( num.string.data ) );
+			}
 			else
 			{
 				result = static_cast< NUM >( std::stol( num.string.data ) );
