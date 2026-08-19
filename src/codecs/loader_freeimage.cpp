@@ -90,6 +90,17 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 		case FIC_RGBALPHA:
 			break;
 
+	#if 0
+		case FIC_PALETTE:
+		{
+			//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
+			FIRGBA8* palette     = FreeImage_GetPalette( bitmap );
+			FIBOOL   trans       = FreeImage_IsTransparent( bitmap );
+			int      trans_index = FreeImage_GetTransparentIndex( bitmap );
+			break;
+		}
+
+	#else
 		case FIC_PALETTE:
 		{
 			//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
@@ -138,6 +149,7 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 
 			break;
 		}
+  #endif
 	}
 #endif
 
@@ -584,7 +596,8 @@ struct LoaderFreeImage : public IImageLoader
 					break;
 
 				case 1:
-					load_info.image->format = GL_ALPHA;
+					// GL_R8I
+					load_info.image->format = GL_R8;
 					break;
 			}
 		}

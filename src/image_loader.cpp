@@ -430,7 +430,7 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 
 	switch ( old_image->format )
 	{
-		case GL_ALPHA:
+		case GL_R8:
 			pixel_layout = STBIR_1CHANNEL;
 			break;
 
@@ -506,7 +506,7 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 			break;
 
 		case 1:
-			new_image->format = GL_ALPHA;
+			new_image->format = GL_R8;
 			break;
 	}
 
