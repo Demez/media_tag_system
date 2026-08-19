@@ -2,7 +2,12 @@
 
 // #include "array.hpp"
 
-#include <stacktrace>
+#define MEM_TRACK_STACK_TRACE 0
+
+#if MEM_TRACK_STACK_TRACE
+  #include <stacktrace>
+#endif
+
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -16,7 +21,6 @@
 
 #include "imgui.h"
 
-#include <concepts>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -161,7 +165,11 @@ struct mem_alloc_info_t
 	void*            ptr;
 	size_t           size;
 	u64              app_time;
+
+#if MEM_TRACK_STACK_TRACE
 	std::stacktrace* stack_trace;
+#endif
+
 	bool             freed;
 };
 

@@ -3,14 +3,12 @@
 #include "imgui_internal.h"
 
 #include <mutex>
-#include <threads.h>
 
 // ====================================================================================================
 
 static thread_local bool MEM_TRACK_PAUSE    = false;
 
 #define MEM_TRACK_ENABLE      1
-#define MEM_TRACK_STACK_TRACE 0
 #define MEM_TRACK_KEEP_FREE   0
 
 
@@ -79,13 +77,17 @@ void mem_add_item( e_mem_category category, void* memory, size_t size, size_t st
 	
 	mem_category_info_t& info = get_mem_categories()[ category ];
 
-	std::stacktrace* stack = nullptr;
-
-	#if MEM_TRACK_STACK_TRACE
-	stack = new std::stacktrace( std::stacktrace::current( stack_skip + 1, stack_depth ) );
+#if MEM_TRACK_STACK_TRACE
+	std::stacktrace* stack = new std::stacktrace( std::stacktrace::current( stack_skip + 1, stack_depth ) );
 	#endif
 
-	info.sizes[ memory ] = { memory, size, app::total_time, stack, false };
+	info.sizes[ memory ] = {
+		memory, size, app::total_time,
+  #if MEM_TRACK_STACK_TRACE
+		stack,
+  #endif
+		false
+	};
 
 	info.total += size;
 	g_total_memory_allocated += size;
@@ -244,6 +246,7 @@ void mem_draw_debug_ui()
 
 					ImGui::Text( "%s%.3f Sec - Ptr: %p - %.3f KB", ptr_info.freed ? "FREE: " : "", ptr_info.app_time / ( 1000.f ), ptr_info.ptr, (float)ptr_info.size / MEM_SCALE );
 
+#if MEM_TRACK_STACK_TRACE
 					if ( ptr_info.stack_trace )
 					{
 						ImGui::PushID( ptr_info.ptr );
@@ -256,6 +259,7 @@ void mem_draw_debug_ui()
 
 						ImGui::PopID();
 					}
+  #endif
 				}
 #else
 				for ( size_t mem_i = 0; mem_i < info.alloc_count; mem_i++ )
