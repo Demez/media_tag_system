@@ -559,8 +559,9 @@ void config_emit_registered_option_list( kdl_emitter* emitter, const config_opt_
 			case e_cfg_bool:
 			{
 				const auto& var = *reinterpret_cast< bool* >( member_ptr );
-				value.type    = KDL_TYPE_BOOLEAN;
-				value.boolean = var;
+				value.type      = KDL_TYPE_BOOLEAN;
+				value.boolean   = var;
+
 				kdl_emit_arg( emitter, &value );
 				break;
 			}
@@ -570,12 +571,6 @@ void config_emit_registered_option_list( kdl_emitter* emitter, const config_opt_
 				value.type           = KDL_TYPE_NUMBER;
 				value.number.type    = KDL_NUMBER_TYPE_INTEGER;
 				value.number.integer = var;
-
-				if ( var > INT32_MAX )
-				{
-					printf( "%s value is too large, clamping!\n", cfg_op.name );
-					value.number.integer = INT32_MAX;
-				}
 
 				kdl_emit_arg( emitter, &value );
 				break;
