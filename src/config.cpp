@@ -7,8 +7,8 @@
 constexpr const fs::path_char DEFAULT_THUMBNAIL_CACHE[]         = PATH_FMT( "thumbnail_cache" );
 constexpr const fs::path_char DEFAULT_VIDEO_THUMBNAIL_CACHE[]   = PATH_FMT( "thumbnail_video_cache" );
 
-constexpr size_t              DEFAULT_THUMBNAIL_CACHE_LEN       = sizeof( DEFAULT_THUMBNAIL_CACHE ) / sizeof( fs::path_char );
-constexpr size_t              DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN = sizeof( DEFAULT_VIDEO_THUMBNAIL_CACHE ) / sizeof( fs::path_char );
+constexpr size_t              DEFAULT_THUMBNAIL_CACHE_LEN       = ( sizeof( DEFAULT_THUMBNAIL_CACHE ) / sizeof( fs::path_char ) ) - 1;
+constexpr size_t              DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN = ( sizeof( DEFAULT_VIDEO_THUMBNAIL_CACHE ) / sizeof( fs::path_char ) ) - 1;
 
 
 #define CFG_STR_EQUALS( my_str, kdl_str ) util_strncmp( my_str, sizeof( my_str ) - 1, kdl_str.data, kdl_str.len )

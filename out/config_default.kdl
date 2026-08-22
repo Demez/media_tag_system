@@ -2,9 +2,6 @@ bookmarks {
 }
 
 thumbnail {
-	cache_path "D:\\projects\\media_tag_system\\out\\thumbnail_cache"
-	cache_path_video "D:\\projects\\media_tag_system\\out\\thumbnail_cache_video"
-
 	// basic JPEG XL thumbnail quality and speed control
 	jxl_distance 1.000000
 	jxl_effort 5
