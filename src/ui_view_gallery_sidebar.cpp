@@ -102,7 +102,9 @@ void gallery_header_draw_path_bar( bool& was_in_path_edit, float& bar_width, ImV
 				{
 					directory::queued += directory::path_chunks[ j ];
 
-					if ( j < i )
+					// add a path separator between each folder, except at the last folder cause my image viewer can't handle it for some reason? lol
+					// but, if it's the root of the drive, add it anyway (TODO: does this work on linux?)
+					if ( j < i || i == 0 )
 						directory::queued += SEP_S;
 				}
 			}
