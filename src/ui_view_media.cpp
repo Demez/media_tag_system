@@ -1220,7 +1220,22 @@ void media_view_input()
 		image_draw::pause = !image_draw::pause;
 	}
 
-	SDL_MouseButtonFlags mouse_btns = SDL_GetMouseState( nullptr, nullptr );
+	int                  window_width, window_height;
+	float                mouse_x, mouse_y;
+	SDL_MouseButtonFlags mouse_btns = SDL_GetMouseState( &mouse_x, &mouse_y );
+	SDL_GetWindowSize( app::window, &window_width, &window_height );
+
+	bool mouse_in_client_area = false;
+
+	// TODO: this is more of a slight patch, need to figure out the root cause of this
+	// after a cancelled drag drop into itself, the titlebar doesn't move, and acts as the client area
+	if ( mouse_x >= 0 && mouse_y >= 0 )
+	{
+		if ( mouse_x <= window_width && mouse_y <= window_height )
+		{
+			mouse_in_client_area = true;
+		}
+	}
 
 	// mouse down and not hovering an imgui window not in an image pan
 	// bool        mouse_middle_down = ImGui::IsMouseDown( ImGuiMouseButton_Middle ) && !( mouse_hover_imgui_window );
@@ -1228,7 +1243,7 @@ void media_view_input()
 
 	static bool drag_cooldown     = false;
 
-	if ( mouse_middle_down && !mouse_hover_imgui_window )
+	if ( mouse_middle_down && !mouse_hover_imgui_window && mouse_in_client_area )
 	{
 		if ( !drag_cooldown )
 		{
