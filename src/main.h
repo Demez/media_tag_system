@@ -655,7 +655,8 @@ namespace image_draw
 	extern float       rot;
 
 	// Animated image playback information
-	extern double      next_frame_timer;
+	extern u64         last_frame_time;  // time in system time
+	extern u64         next_frame_time;  // time until next frame, add to last_frame_time
 	extern size_t      frame;
 	extern double      playback_speed;
 	extern bool        pause;
@@ -750,7 +751,7 @@ bool                                 image_copy_frame_data( image_t& src, image_
 
 void                                 media_view_init();
 void                                 media_view_shutdown();
-void                                 media_view_update( double frame_time );
+void                                 media_view_update();
 e_media_type                         get_media_type();
 
 // Load currently selected file, does not change view type though

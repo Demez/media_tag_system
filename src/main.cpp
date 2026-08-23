@@ -1133,7 +1133,7 @@ void main_loop()
 
 		imgui_draw( frame_time, draw_frame_count );
 
-		media_view_update( frame_time );
+		media_view_update();
 
 		bool want_text_input = ImGui::GetIO().WantTextInput || ImGui::GetCurrentContext()->WantTextInputNextFrame;
 

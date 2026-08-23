@@ -21,7 +21,8 @@ namespace image_draw
 	float       rot              = 0.f;
 
 	// Animated image playback information
-	double      next_frame_timer = 0.0;
+	u64         last_frame_time  = 0;  // time in system time
+	u64         next_frame_time  = 0;  // time until next frame, add to last_frame_time
 	size_t      frame            = 0;
 	double      playback_speed   = 1.0;
 	bool        pause            = false;
@@ -165,6 +166,13 @@ void media_view_scale_thread_run()
 }
 
 
+void media_view_frame_update_timer()
+{
+	image_draw::last_frame_time = sys_get_time_ms();
+	image_draw::next_frame_time = g_image_data.image.frame[ image_draw::frame ].time * 1000.f;
+}
+
+
 void media_view_frame_advance( bool backwards = false )
 {
 	if ( backwards )
@@ -179,7 +187,7 @@ void media_view_frame_advance( bool backwards = false )
 		image_draw::frame = ( image_draw::frame + 1 ) % g_image_data.image.frame.size();
 	}
 
-	image_draw::next_frame_timer = g_image_data.image.frame[ image_draw::frame ].time;
+	media_view_frame_update_timer();
 }
 
 
@@ -188,8 +196,8 @@ void media_view_frame_set( size_t frame )
 	if ( frame >= g_image_data.image.frame.size() )
 		return;
 
-	image_draw::frame            = frame;
-	image_draw::next_frame_timer = g_image_data.image.frame[ image_draw::frame ].time;
+	image_draw::frame = frame;
+	media_view_frame_update_timer();
 }
 
 
@@ -305,19 +313,19 @@ void media_view_scale_check_timer()
 }
 
 
-void media_view_update( double frame_time )
+void media_view_update()
 {
 	media_view_scale_check_timer();
-
-	// TODO: REMOVE FRAME TIME DEPENDENCY
-	// Add frame draw timer here for animated images
+	
+	// Check if the animated image needs to advance a frame
 	if ( g_image_data.image.frame.size() > 1 )
 	{
 		if ( !image_draw::pause )
 		{
-			image_draw::next_frame_timer -= frame_time * image_draw::playback_speed;
+			u64 current_time = sys_get_time_ms();
+			u64 next_time    = image_draw::last_frame_time + ( image_draw::next_frame_time * image_draw::playback_speed );
 
-			if ( image_draw::next_frame_timer < 0.f )
+			if ( next_time < current_time )
 			{
 				media_view_frame_advance();
 			}
@@ -325,7 +333,8 @@ void media_view_update( double frame_time )
 	}
 	else
 	{
-		image_draw::next_frame_timer = 0.0;
+		image_draw::last_frame_time = 0;
+		image_draw::next_frame_time = 0;
 	}
 }
 
@@ -1356,8 +1365,8 @@ void media_view_load()
 			gl_update_textures( g_image_data.textures, &g_image_data.image, g_image_data.image.frame.size() );
 			media_view_fit_in_view();
 
-			image_draw::frame            = 0;
-			image_draw::next_frame_timer = g_image_data.image.frame[ image_draw::frame ].time;
+			image_draw::frame = 0;
+			media_view_frame_update_timer();
 		}
 		else
 		{

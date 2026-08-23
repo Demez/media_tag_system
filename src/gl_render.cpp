@@ -129,7 +129,7 @@ void window_quick_draw()
 
 	imgui_draw( 0.f, true );
 
-	media_view_update( 0.f );
+	media_view_update();
 
 	if ( app::window_resized )
 	{
