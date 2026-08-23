@@ -24,8 +24,8 @@ std::vector< notification_t > g_notification_queue;
 
 void push_notification( const char* msg )
 {
-	g_notification_queue.emplace_back( msg, app::total_time, NOTIFICATION_DURATION );
-	printf( "NOTIFICATION: %.4f - %s\n", app::total_time * 1000.f, msg );
+	g_notification_queue.emplace_back( msg, sys_get_time_ms(), NOTIFICATION_DURATION );
+	printf( "NOTIFICATION: %.4f - %s\n", sys_get_time_ms() * 1000.f, msg );
 }
 
 

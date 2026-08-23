@@ -314,10 +314,6 @@ void settings_draw()
 	if ( app::config.dev_mode )
 	{
 		ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-		ImGui::Text( "%.8lf Frametime", app::frame_time );
-
-		// ImGui::Text( "App Time: %.3f Sec", app::total_time );
-		ImGui::Text( "App Time: %.3f Sec", app::total_time / 1000.f );
 	}
 
 	ImGuiStyle& style        = ImGui::GetStyle();

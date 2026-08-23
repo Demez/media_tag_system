@@ -279,7 +279,7 @@ void media_view_scale_set_image()
 }
 
 
-void media_view_scale_check_timer( double frame_time )
+void media_view_scale_check_timer()
 {
 	if ( g_scale_state != e_scale_state_idle && g_scale_state != e_scale_state_finished )
 		return;
@@ -307,8 +307,9 @@ void media_view_scale_check_timer( double frame_time )
 
 void media_view_update( double frame_time )
 {
-	media_view_scale_check_timer( frame_time );
+	media_view_scale_check_timer();
 
+	// TODO: REMOVE FRAME TIME DEPENDENCY
 	// Add frame draw timer here for animated images
 	if ( g_image_data.image.frame.size() > 1 )
 	{

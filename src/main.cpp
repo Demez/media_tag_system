@@ -24,9 +24,6 @@ namespace app
 	// ImVec4       clear_color    = ImVec4( 0.f, 0.f, 0.f, 0.f );
 	// ImVec4       clear_color    = ImVec4( 1.f, 1.f, 0.f, 0.f );
 
-	u64          total_time     = 0;
-	double       frame_time     = 0.f;
-
 	ImVec2       mouse_delta;
 	ImVec2       mouse_pos;
 	int          mouse_scroll       = 0;
@@ -1065,7 +1062,7 @@ void main_loop()
 
 	u64    start_time                = sys_get_time_ms();
 	u64    current_time              = start_time;
-	double time                      = 0.0;
+	double frame_time                = 0.0;
 
 	ImVec2 mouse_pos                 = ImGui::GetMousePos();
 	ImVec2 last_mouse_pos            = ImGui::GetMousePos();
@@ -1077,29 +1074,8 @@ void main_loop()
 		// -----------------------------------------------------------------------------------
 		// Update Frame Time
 
-		current_time  = sys_get_time_ms();
-		time          = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
-
-		// don't let the time go too crazy, usually happens when in a breakpoint
-		// time                 = std::min( real_time, 0.1f );
-
-		// TODO: GET MONITOR REFRESH RATE
-	//	float max_fps = 300.f;
-	//
-	//	if ( !playing_back_video )
-	//	{
-	//		// check if we still have more than 2ms till next frame and if so, wait for "1ms"
-	//		float min_frame_time = 1.0f / max_fps;
-	//		if ( ( min_frame_time - time ) > ( 2.0f / 1000.f ) )
-	//			SDL_Delay( 1 );
-	//
-	//		// framerate is above max
-	//		if ( time < min_frame_time )
-	//			continue;
-	//	}
-
-		app::frame_time = time;
-		app::total_time += static_cast< u64 >( time * 1000.0 );
+		current_time            = sys_get_time_ms();
+		frame_time              = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
 
 		sys_update();
 
@@ -1155,9 +1131,9 @@ void main_loop()
 
 		frame_draw_start();
 
-		imgui_draw( time, draw_frame_count );
+		imgui_draw( frame_time, draw_frame_count );
 
-		media_view_update( time );
+		media_view_update( frame_time );
 
 		bool want_text_input = ImGui::GetIO().WantTextInput || ImGui::GetCurrentContext()->WantTextInputNextFrame;
 
@@ -1167,7 +1143,7 @@ void main_loop()
 		g_in_draw = false;
 
 		// slow down the app if running really fast, don't need to use all this cpu for rendering
-		if ( app::config.vsync == 0 && app::config.sleep_time_focus && app::frame_time < 0.003 )
+		if ( app::config.vsync == 0 && app::config.sleep_time_focus && frame_time < 0.003 )
 		{
 			if ( want_text_input || app::config.always_draw )
 			{

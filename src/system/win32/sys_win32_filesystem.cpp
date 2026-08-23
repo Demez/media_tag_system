@@ -186,6 +186,8 @@ extern "C"
 // --------------------------------------------------------------------------------------------------------
 
 
+extern LARGE_INTEGER           g_win_perf_freq;
+
 static char*                   g_exe_path       = nullptr;
 static size_t                  g_exe_path_len   = 0;
 
@@ -283,6 +285,9 @@ bool fs_is_file( const fs::path_char* path )
 
 bool sys_setup_exe_path_vars()
 {
+	// call this here, as this is needed for getting the system time
+	QueryPerformanceFrequency( &g_win_perf_freq );
+
 	// this SUCKS, just in case if we are using a STUPID long path
 	std::wstring buffer;
 	buffer.resize( MAX_PATH_EXT );

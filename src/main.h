@@ -541,9 +541,6 @@ namespace app
 	extern bool         window_resized;
 	extern float        dpi;
 
-	extern u64          total_time;
-	extern double       frame_time;
-
 	extern ImVec2       mouse_delta;
 	extern ImVec2       mouse_pos;
 	extern int          mouse_scroll;

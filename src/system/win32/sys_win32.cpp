@@ -42,7 +42,7 @@ static std::atomic< bool >     g_focus_window    = false;
 
 HANDLE                         g_con_out         = INVALID_HANDLE_VALUE;
 HWND                           g_main_hwnd       = 0;
-static LARGE_INTEGER           g_win_perf_freq;
+LARGE_INTEGER                  g_win_perf_freq;
 
 constexpr const wchar_t*       WINDOW_PIPE_PATH = L"\\\\.\\pipe\\media_tag_system";
 constexpr const size_t         WINDOW_PIPE_SIZE = 1024 * sizeof( wchar_t );
@@ -137,8 +137,16 @@ e_sys_init sys_init()
 {
 	// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/setlocale-wsetlocale?view=msvc-170#utf-8-support
 	// Allows using utf8 in the C runtime in windows 10 1803 or newer
-//	setlocale( LC_ALL, ".utf8" );
-//	setlocale( LC_NUMERIC, "C" );
+	// also allows utf-16/utf-8 to be printed to the console, does this work on windows vista?
+	setlocale( LC_ALL, ".utf8" );
+	setlocale( LC_NUMERIC, "C" );
+
+	// https://stackoverflow.com/questions/46512441/how-do-i-print-unicode-to-the-output-console-in-c-with-visual-studio
+
+	// https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
+	// Set console to UTF-8 output
+	// BOOL con_ret = SetConsoleOutputCP( 65001 );
+	// SetConsoleOutputCP( 1200 );
 
 	if ( app::config.single_instance )
 	{
@@ -193,8 +201,6 @@ e_sys_init sys_init()
 			return e_sys_init_fail;
 		}
 	}
-
-	QueryPerformanceFrequency( &g_win_perf_freq );
 
 	g_con_out = GetStdHandle( STD_OUTPUT_HANDLE );
 

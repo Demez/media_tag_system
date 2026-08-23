@@ -82,7 +82,7 @@ void mem_add_item( e_mem_category category, void* memory, size_t size, size_t st
 	#endif
 
 	info.sizes[ memory ] = {
-		memory, size, app::total_time,
+		memory, size, sys_get_time_ms(),
   #if MEM_TRACK_STACK_TRACE
 		stack,
   #endif
@@ -165,9 +165,6 @@ static bool g_mem_allocation_show[ e_mem_category_count ]{};
 void mem_draw_debug_ui()
 {
 	ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-
-	// ImGui::Text( "App Time: %.3f Sec", app::total_time );
-	ImGui::Text( "App Time: %.3f Sec", app::total_time / 1000.f );
 
 	ImGui::SeparatorText( "Memory" );
 
