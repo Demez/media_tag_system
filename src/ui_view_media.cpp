@@ -143,7 +143,7 @@ void media_view_scale_thread_run()
 		image_copy_frame_data( g_scale_src.frame[ 0 ], g_image_scaled_data.image.frame[ 0 ] );
 
 		// Downscale image if size is larger than target size
-		if ( image_draw::size.x <= ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
+		if ( image_draw::size.x < ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 		{
 			if ( image_scale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
 			{
@@ -220,7 +220,7 @@ bool media_view_scale_handle_finished()
 	g_scale_time = UINT64_MAX;
 
 	// Are we drawing the image smaller than native size?
-	if ( image_draw::size.x <= ( g_image_data.image.width * UPSCALE_LIMIT ) || round( image_draw::size.x ) != g_image_data.image.width )
+	if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) || round( image_draw::size.x ) != g_image_data.image.width )
 	{
 		// Does the scaled image size match the size we draw it as?
 		if ( int( image_draw::size.x ) == g_image_scaled_data.image.width )
