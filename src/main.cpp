@@ -1131,7 +1131,7 @@ void main_loop()
 
 		frame_draw_start();
 
-		imgui_draw( frame_time, draw_frame_count );
+		imgui_draw( draw_frame_count );
 
 		media_view_update();
 

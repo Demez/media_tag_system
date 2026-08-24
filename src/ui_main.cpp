@@ -10,10 +10,9 @@ struct notification_t
 {
 	std::string msg;
 	u64         time_added;
-	double      time_remain;
 };
 
-constexpr double              NOTIFICATION_DURATION  = 5;
+constexpr u64                 NOTIFICATION_DURATION  = 5000;
 constexpr double              NOTIFICATION_FADE_TIME = 0.5;
 constexpr size_t              NOTIFICATION_MAX_SHOWN = 5;
 
@@ -24,31 +23,29 @@ std::vector< notification_t > g_notification_queue;
 
 void push_notification( const char* msg )
 {
-	g_notification_queue.emplace_back( msg, sys_get_time_ms(), NOTIFICATION_DURATION );
+	g_notification_queue.emplace_back( msg, sys_get_time_ms() );
 	printf( "NOTIFICATION: %.4f - %s\n", sys_get_time_ms() * 1000.f, msg );
 }
 
 
-void notification_draw( double frame_time )
+void notification_draw()
 {
-	static double time_drawn = 0.f;
-	static bool   fade_in    = true;
+	static bool fade_in = true;
 
 	if ( g_notification_queue.empty() )
 	{
-		time_drawn = 0.f;
-		fade_in    = true;
+		fade_in = true;
 		return;
 	}
+
+	u64 current_time = sys_get_time_ms();
 
 	// find expired ones first
 	for ( size_t i = 0; i < g_notification_queue.size(); )
 	{
 		notification_t& notif = g_notification_queue[ i ];
 
-		notif.time_remain -= frame_time;
-
-		if ( notif.time_remain > 0.f )
+		if ( notif.time_added + NOTIFICATION_DURATION > current_time )
 		{
 			i++;
 			continue;
@@ -60,8 +57,7 @@ void notification_draw( double frame_time )
 	// check if empty again
 	if ( g_notification_queue.empty() )
 	{
-		time_drawn = 0.f;
-		fade_in    = true;
+		fade_in = true;
 		return;
 	}
 
@@ -87,26 +83,29 @@ void notification_draw( double frame_time )
 	ImVec4      border_color = style.Colors[ ImGuiCol_Border ];
 	bg_color.w               = 0.75;
 
-	double max_notif_time    = -1.0;
+	u64    max_notif_time    = 0.0;
 	// get fadeout time
 	size_t count             = std::min( NOTIFICATION_MAX_SHOWN, g_notification_queue.size() );
 
-	//float  fade_in_amount    = std::min( 1.f, time_drawn / NOTIFICATION_FADE_IN_TIME );
-	// float  fade_amount    = std::min( 1.f, time_drawn / NOTIFICATION_FADE_IN_TIME );
 	double fade_amount       = 1.0;
 
 	for ( size_t j = 0, i = g_notification_queue.size() - 1;; i--, j++ )
 	{
 		notification_t& notif = g_notification_queue[ i ];
-		max_notif_time        = std::max( max_notif_time, notif.time_remain );
+		max_notif_time        = std::max( max_notif_time, notif.time_added );
 
 		if ( i == 0 || j == count )
 			break;
 	}
 
-	if ( max_notif_time < NOTIFICATION_FADE_TIME )
+	double notif_time_remain = 0.0;
+
+	if ( current_time < max_notif_time + NOTIFICATION_DURATION )
+		notif_time_remain = static_cast< double >( ( max_notif_time + NOTIFICATION_DURATION ) - current_time ) / 1000.0;
+
+	if ( notif_time_remain < NOTIFICATION_FADE_TIME )
 	{
-		fade_amount = max_notif_time / NOTIFICATION_FADE_TIME;
+		fade_amount = notif_time_remain / NOTIFICATION_FADE_TIME;
 
 		//border_color.w = max_notif_time * border_color.w;
 		//bg_color.w     = max_notif_time;
@@ -133,8 +132,11 @@ void notification_draw( double frame_time )
 			ImVec4          text_color = style.Colors[ ImGuiCol_Text ];
 
 			// nice fade out effect
-			if ( notif.time_remain < NOTIFICATION_FADE_TIME )
-				text_color.w *= notif.time_remain;
+			if ( current_time < notif.time_added + NOTIFICATION_DURATION )
+				notif_time_remain = static_cast< double >( ( notif.time_added + NOTIFICATION_DURATION ) - current_time ) / 1000.0;
+
+			if ( notif_time_remain < NOTIFICATION_FADE_TIME )
+				text_color.w *= notif_time_remain;
 
 			ImGui::PushStyleColor( ImGuiCol_Text, text_color );
 
@@ -152,12 +154,10 @@ void notification_draw( double frame_time )
 
 	ImGui::PopStyleColor();
 	ImGui::PopStyleColor();
-
-	time_drawn += frame_time;
 }
 
 
-void imgui_draw( double frame_time, bool render )
+void imgui_draw( bool render )
 {
 	if ( g_gallery_view )
 	{
@@ -168,7 +168,7 @@ void imgui_draw( double frame_time, bool render )
 		media_view_draw_imgui();
 	}
 
-	notification_draw( frame_time );
+	notification_draw();
 
 	if ( render )
 		ImGui::Render();

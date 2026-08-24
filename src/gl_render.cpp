@@ -127,7 +127,7 @@ void window_quick_draw()
 
 	frame_draw_start();
 
-	imgui_draw( 0.f, true );
+	imgui_draw( true );
 
 	media_view_update();
 
