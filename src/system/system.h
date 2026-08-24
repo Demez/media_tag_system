@@ -175,7 +175,7 @@ void                    sys_shutdown();
 void                    sys_update();
 
 bool                    sys_set_window( SDL_Window* window );
-void                    sys_do_window_drag( ImVec2 last_mouse_pos, ImVec2 new_mouse_pos );
+void                    sys_do_window_drag();
 
 // system error, make sure to free this string!
 char*                   sys_get_error();

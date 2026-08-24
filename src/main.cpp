@@ -1081,9 +1081,6 @@ void main_loop()
 	u64    current_time              = start_time;
 	double frame_time                = 0.0;
 
-	ImVec2 mouse_pos                 = ImGui::GetMousePos();
-	ImVec2 last_mouse_pos            = ImGui::GetMousePos();
-
 	while ( app::running )
 	{
 		bool playing_back_video = check_mpv_playback();
@@ -1167,11 +1164,9 @@ void main_loop()
 		}
 
 		if ( app::in_window_drag )
-			sys_do_window_drag( last_mouse_pos, mouse_pos );
+			sys_do_window_drag();
 
 		app::in_window_drag = false;
-
-		last_mouse_pos      = mouse_pos;
 
 		// -----------------------------------------------------------------------------------
 
