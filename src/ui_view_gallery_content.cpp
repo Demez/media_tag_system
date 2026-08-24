@@ -1,8 +1,5 @@
 #include "main.h"
 
-#include "imgui.h"
-#include "imgui_internal.h"
-
 
 struct delayed_load_t
 {
@@ -37,8 +34,8 @@ namespace gallery_draw
 	// thumbnails we want loaded this frame
 	std::vector< delayed_load_t > thumbnail_requests;
 
-	ImVec2                        dummy_area;
-	ImVec2                        region_size;
+	vec2                        dummy_area;
+	vec2                        region_size;
 
 	// Input states
 	bool                          content_area_hovered;
@@ -47,15 +44,17 @@ namespace gallery_draw
 }
 
 
-float gallery_item_draw_t::get_height( ImGuiStyle& style )
+float gallery_item_draw_t::get_height()
 {
-	float item_size_y = image_bounds.y + ( style.WindowPadding.y * 2 );
+	return gallery_draw::item_size_y;
 
-	if ( app::config.gallery_show_filenames )
-		item_size_y += text_size.y + style.ItemSpacing.y;
-
-	item_size_y = std::min( item_size_y, gallery_draw::item_size_y * 1.75f );
-	return item_size_y;
+	//float item_size_y = image_bounds.y + ( style.WindowPadding.y * 2 );
+	//
+	//if ( app::config.gallery_show_filenames )
+	//	item_size_y += text_size.y + style.ItemSpacing.y;
+	//
+	//item_size_y = std::min( item_size_y, gallery_draw::item_size_y * 1.75f );
+	//return item_size_y;
 }
 
 
@@ -65,35 +64,14 @@ float gallery_item_draw_t::get_height( ImGuiStyle& style )
 
 bool is_content_area_hovered( float area_width, float area_height )
 {
-	ImGuiStyle& style                = ImGui::GetStyle();
-	ImVec2      cursor_screen_pos    = ImGui::GetCursorScreenPos();
-
-	bool        content_area_hovered = ImGui::IsMouseHoveringRect(
-	  cursor_screen_pos,
-	  { cursor_screen_pos.x + area_width + style.WindowPadding.x,
-	    area_height + style.WindowPadding.y } );
-
-	if ( !content_area_hovered )
-		return false;
-
-	//if ( !ImGui::IsPopupOpen( "", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel ) )
-	//	return true;
-
-	for ( int i = 0; i < ImGui::GetCurrentContext()->OpenPopupStack.Size; i++ )
-	{
-		ImGuiPopupData& data   = ImGui::GetCurrentContext()->OpenPopupStack[ i ];
-		ImGuiWindow*    window = data.Window;
-
-		if ( ImGui::IsMouseHoveringRect( window->Pos, { window->Pos.x + window->Size.x, window->Pos.y + window->Size.y } ) )
-			return false;
-	}
-
-	return true;
+	return false;
 }
 
 
 // =============================================================================================
 // Gallery Item Actions/Behavior
+
+#if 0
 
 
 // called when file is double clicked or enter is pressed on it
@@ -155,8 +133,8 @@ void gallery_view_do_selected_item_behavior( size_t i, gallery_item_draw_t& item
 
 void gallery_view_do_hovered_item_behavior( size_t i, gallery_item_draw_t& item_draw )
 {
-	bool mouse_release = ( ImGui::IsMouseReleased( ImGuiMouseButton_Left ) || ImGui::IsMouseReleased( ImGuiMouseButton_Middle ) );
-	bool mouse_press   = ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) || ImGui::IsMouseClicked( ImGuiMouseButton_Middle ) );
+	bool mouse_release = false; // ( ImGui::IsMouseReleased( ImGuiMouseButton_Left ) || ImGui::IsMouseReleased( ImGuiMouseButton_Middle ) );
+	bool mouse_press   = false; // ( ImGui::IsMouseClicked( ImGuiMouseButton_Left ) || ImGui::IsMouseClicked( ImGuiMouseButton_Middle ) );
 
 	if ( !item_draw.item_hovered )
 		return;
@@ -198,14 +176,14 @@ void gallery_view_do_hovered_item_behavior( size_t i, gallery_item_draw_t& item_
 		}
 	}
 
-	if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
-	{
-		gallery_selected_item_action( *item_draw.media, i );
-	}
+	//if ( ImGui::IsMouseDoubleClicked( ImGuiMouseButton_Left ) )
+	//{
+	//	gallery_selected_item_action( *item_draw.media, i );
+	//}
 }
 
 
-void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& item_draw, int window_height, u32 last_selected, size_t selection_count )
+void gallery_view_item_handle_scroll( gallery_item_draw_t& item_draw, int window_height, u32 last_selected, size_t selection_count )
 {
 	// Calculate Distance the Item is from visible scroll area
 	float visible_bottom = window_height;
@@ -310,28 +288,29 @@ void gallery_view_item_handle_scroll( ImGuiStyle& style, gallery_item_draw_t& it
 // Gallery Item Drawing
 
 
-void gallery_view_draw_image( ImVec2 image_bounds, image_t* image, ImTextureRef im_texture, bool upscale, bool centered, ImVec2& out_image_size )
+void gallery_view_draw_image( vec2 image_bounds, image_t* image, bool upscale, bool centered, vec2& out_image_size )
 {
 	// Fit image in window size, scaling up if needed
 	float factor[ 2 ] = { 1.f, 1.f };
 
-	if ( upscale || image->width > gallery::image_bounds.x )
-		factor[ 0 ] = (float)image_bounds.x / (float)image->width;
+	if ( upscale || image->width > gallery::image_bounds[ 0 ] )
+		factor[ 0 ] = (float)image_bounds[ 0 ] / (float)image->width;
 
-	if ( upscale || image->height > gallery::image_bounds.y )
-		factor[ 1 ] = (float)image_bounds.y / (float)image->height;
+	if ( upscale || image->height > gallery::image_bounds[ 1 ] )
+		factor[ 1 ] = (float)image_bounds[ 1 ] / (float)image->height;
 
 	float  zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
 
-	ImVec2 image_size{};
-	image_size.x = int( image->width * zoom_level );
-	image_size.y = int( image->height * zoom_level );
+	vec2 image_size{};
+	image_size[ 0 ] = int( image->width * zoom_level );
+	image_size[ 1 ] = int( image->height * zoom_level );
 
 	if ( upscale )
 		out_image_size = image_size;
 
+#if 0
 	// center the image
-	ImVec2 image_offset = ImGui::GetCursorPos();
+	vec2 image_offset = ImGui::GetCursorPos();
 	image_offset.x += int( ( image_bounds.x - image_size.x ) / 2 );
 
 	if ( centered )
@@ -358,10 +337,11 @@ void gallery_view_draw_image( ImVec2 image_bounds, image_t* image, ImTextureRef 
 	}
 
 	ImGui::Image( im_texture, image_size );
+#endif
 }
 
 
-void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw, ImVec2& scaled_image_size, bool& drew_base_icon )
+void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw, vec2& scaled_image_size, bool& drew_base_icon )
 {
 	if ( item_draw.media->type == e_media_type_directory )
 	{
@@ -389,7 +369,7 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 		// directory::thumbnail_list[ i ] = thumbnail_queue_image( entry );
 
 		//ImGui::Dummy( image_bounds );
-		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), true, true, scaled_image_size );
 		drew_base_icon = true;
 		return;
 	}
@@ -401,7 +381,7 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 		else
 			gallery_view_draw_image( item_draw.image_bounds, thumbnail->image, thumbnail->textures.frame[ 0 ], true, false, scaled_image_size );
 
-		ImVec2 item_image_bounds = item_draw.image_bounds;
+		vec2 item_image_bounds = item_draw.image_bounds;
 		item_image_bounds.x      = std::min( item_image_bounds.x, scaled_image_size.x );
 		item_image_bounds.y      = std::min( item_image_bounds.y, scaled_image_size.y );
 
@@ -415,11 +395,11 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 	}
 	else if ( thumbnail->status == e_thumbnail_status_failed )
 	{
-		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( e_icon_invalid ), icon_get_imtexture( e_icon_invalid ), false, true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( e_icon_invalid ), false, true, scaled_image_size );
 	}
 	else if ( thumbnail->status == e_thumbnail_status_queued || thumbnail->status == e_thumbnail_status_loading || thumbnail->status == e_thumbnail_status_uploading )
 	{
-		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( e_icon_loading ), icon_get_imtexture( e_icon_loading ), false, true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( e_icon_loading ), false, true, scaled_image_size );
 	}
 	else if ( thumbnail->status == e_thumbnail_status_free )
 	{
@@ -427,24 +407,21 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 			gallery_draw::thumbnail_requests.emplace_back( *item_draw.media, item_draw.gallery_index );
 
 		// ImGui::Dummy( image_bounds );
-		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), true, true, scaled_image_size );
 		drew_base_icon = true;
 	}
 	else  // if ( thumbnail->status == e_thumbnail_status_free )
 	{
 		//ImGui::Dummy( image_bounds );
-		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, true, scaled_image_size );
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), true, true, scaled_image_size );
 		drew_base_icon = true;
 	}
 }
 
 
-extern void TextExFast( const char* text, const char* text_end, ImGuiTextFlags flags, const ImVec2& text_size );
-
-
-void        gallery_view_draw_item_text( ImGuiStyle& style, size_t i, gallery_item_draw_t& item_draw, ImVec2 current_pos, ImVec2 saved_pos )
+void gallery_view_draw_item_text( size_t i, gallery_item_draw_t& item_draw, vec2 current_pos, vec2 saved_pos )
 {
-	ImVec2 media_text_size = gallery::item_text_size[ i ];
+	vec2 media_text_size = gallery::item_text_size[ i ];
 
 	// center align text
 	ImGui::SetCursorPosX( current_pos.x + ( ( gallery::item_size - ( media_text_size.x + style.WindowPadding.x * 2 + style.ItemSpacing.x ) ) * 0.5f ) );
@@ -453,13 +430,13 @@ void        gallery_view_draw_item_text( ImGuiStyle& style, size_t i, gallery_it
 	ImGui::PushTextWrapPos( saved_pos.x + item_draw.image_bounds.x + style.ItemSpacing.x );
 
 	// Text Clipping
-	ImVec2 window_pos         = ImGui::GetWindowPos();
-	ImVec2 current_screen_pos = ImGui::GetCursorScreenPos();
+	vec2 window_pos         = ImGui::GetWindowPos();
+	vec2 current_screen_pos = ImGui::GetCursorScreenPos();
 
-	// ImVec2 text_clip_min( window_pos.x + gallery_draw_info.start_cursor_pos.x, ( window_pos.y + gallery_draw_info.start_cursor_pos.y + gallery::image_bounds.x + ( style.ItemSpacing.y * 2 ) ) - ImGui::GetScrollY() );
-	//ImVec2 text_clip_min = item_draw.item_rect_min;
-	ImVec2 text_clip_min      = current_screen_pos;
-	ImVec2 text_clip_max      = item_draw.item_rect_max;
+	// vec2 text_clip_min( window_pos.x + gallery_draw_info.start_cursor_pos.x, ( window_pos.y + gallery_draw_info.start_cursor_pos.y + gallery::image_bounds.x + ( style.ItemSpacing.y * 2 ) ) - ImGui::GetScrollY() );
+	//vec2 text_clip_min = item_draw.item_rect_min;
+	vec2 text_clip_min      = current_screen_pos;
+	vec2 text_clip_max      = item_draw.item_rect_max;
 
 	//text_clip_min.y += gallery::image_bounds.y + style.ItemSpacing.y;
 
@@ -490,7 +467,7 @@ void        gallery_view_draw_item_text( ImGuiStyle& style, size_t i, gallery_it
 void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_draw_t& item_draw )
 {
 	ImDrawList* draw_list   = ImGui::GetWindowDrawList();
-	ImVec2      window_pos  = ImGui::GetWindowPos();
+	vec2      window_pos  = ImGui::GetWindowPos();
 
 	item_draw.selected_item = false;
 
@@ -549,8 +526,8 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 		draw_list->AddRect( item_draw.item_rect_min, item_draw.item_rect_max, main_bg_color, style.ChildRounding, ImDrawFlags_RoundCornersAll );
 	}
 
-	ImVec2 current_pos = ImGui::GetCursorPos();
-	ImVec2 saved_pos   = ImGui::GetCursorPos();
+	vec2 current_pos = ImGui::GetCursorPos();
+	vec2 saved_pos   = ImGui::GetCursorPos();
 
 	current_pos.x += style.WindowPadding.x;
 	current_pos.y += style.WindowPadding.y;
@@ -559,7 +536,7 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 	// ----------------------------------------------------------------------------------------------------------
 	// Draw Thumbnail or Icon
 
-	ImVec2 scaled_image_size{};  // size of image that was drawn
+	vec2 scaled_image_size{};  // size of image that was drawn
 	bool   drew_icon = false;    // was the icon drawn instead of a thumbnail?
 
 	// draw clipping box for debug if needed
@@ -567,8 +544,8 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 	//ImDrawList*          draw_list  = ImGui::GetWindowDrawList();
 	//ImColor              clip_color = style.Colors[ ImGuiCol_Border ];
 	//
-	//ImVec2               image_min  = ImGui::GetCursorScreenPos();
-	//ImVec2               image_max  = image_min;
+	//vec2               image_min  = ImGui::GetCursorScreenPos();
+	//vec2               image_max  = image_min;
 	//image_max.x += gallery::image_bounds.x;
 	//image_max.y += gallery::image_bounds.y;
 	//
@@ -587,7 +564,7 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 
 		image_t* icon_video        = icon_get_image( e_icon_video );
 
-		ImVec2   image_icon_bounds = { gallery::image_bounds.x / 4.f, gallery::image_bounds.y / 4.f };
+		vec2   image_icon_bounds = { gallery::image_bounds.x / 4.f, gallery::image_bounds.y / 4.f };
 
 		//if ( image->width > image_bounds.x )
 		factor[ 0 ]                = (float)image_icon_bounds.x / (float)icon_video->width;
@@ -597,11 +574,11 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 
 		float  zoom_level          = std::min( factor[ 0 ], factor[ 1 ] );
 
-		ImVec2 scaled_icon_size{};
+		vec2 scaled_icon_size{};
 		scaled_icon_size.x              = icon_video->width * zoom_level;
 		scaled_icon_size.y              = icon_video->height * zoom_level;
 
-		ImVec2 image_offset             = saved_pos;
+		vec2 image_offset             = saved_pos;
 		float  image_offset_from_side_x = 0.f;
 		float  image_offset_from_side_y = 0.f;
 
@@ -667,7 +644,7 @@ void gallery_view_item_size_calc( ImGuiStyle& style, size_t count )
 }
 
 
-// the IsRectVisible Imgui function converts both ImVec2's to a ImRect structure,
+// the IsRectVisible Imgui function converts both vec2's to a ImRect structure,
 // but that's slow in this loop with potentially over 100,000 items (i've tested on 400,000)
 #define IsRectVisibleFast( window, rect_min, rect_max ) \
 	( window->ClipRect.Min.y < rect_max.y && window->ClipRect.Max.y > rect_min.y && window->ClipRect.Min.x < rect_max.x && window->ClipRect.Max.x > rect_min.x )
@@ -695,9 +672,9 @@ void gallery_view_item_rect_calc( ImGuiWindow* window, ImGuiStyle& style, size_t
 	visible_bottom += style.WindowPadding.y;
 	visible_top += style.WindowPadding.y;
 
-	ImVec2 fake_cursor_pos     = ImGui::GetCursorScreenPos();
-	ImVec2 start_cursor_pos    = fake_cursor_pos;
-	//ImVec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
+	vec2 fake_cursor_pos     = ImGui::GetCursorScreenPos();
+	vec2 start_cursor_pos    = fake_cursor_pos;
+	//vec2 cursor_screen_pos = ImGui::GetCursorScreenPos();
 
 	gallery_draw::dummy_area.y = 0;
 
@@ -859,7 +836,7 @@ void gallery_view_handle_context_menu()
 		return;
 
 	ImGuiStyle&   style         = ImGui::GetStyle();
-	ImVec2        region_avail  = ImGui::GetContentRegionAvail();
+	vec2        region_avail  = ImGui::GetContentRegionAvail();
 
 	u32           last_selected = gallery_view_get_last_selected_index( UINT32_MAX );
 	media_entry_t media_entry   = gallery_view_get_last_selected_entry();
@@ -993,6 +970,7 @@ void gallery_view_handle_context_menu()
 	ImGui::EndPopup();
 }
 
+#endif
 
 void gallery_view_handle_scroll_event( float mouse_y )
 {
@@ -1002,7 +980,8 @@ void gallery_view_handle_scroll_event( float mouse_y )
 	if ( !gallery_draw::content_area_hovered )
 		return;
 
-	ImGuiStyle& style       = ImGui::GetStyle();
+#if 0
+	//ImGuiStyle& style       = ImGui::GetStyle();
 
 	//int window_width, window_height;
 	//SDL_GetWindowSize( app::window, &window_width, &window_height );
@@ -1041,14 +1020,14 @@ void gallery_view_handle_scroll_event( float mouse_y )
 	for ( ; i < gallery::sorted_media.size(); )
 	{
 		gallery_item_draw_t& item_draw = gallery::item_layout[ i ];
-		max_item_height                = std::max( max_item_height, item_draw.get_height( style ) );
+		max_item_height                = std::max( max_item_height, item_draw.get_height() );
 
 		if ( ++row_i == gallery::row_count )
 		{
 			row_i = 0;
 
 			scroll_amount += max_item_height + style.ItemSpacing.y;
-			max_item_height = ImGui::GetFrameHeight();
+			max_item_height = 1;
 
 			scroll_step += scroll_step_add;
 
@@ -1072,21 +1051,23 @@ void gallery_view_handle_scroll_event( float mouse_y )
 
 	// clamp it to the max scroll area
 	gallery_draw::scroll = CLAMP( gallery_draw::scroll, 0.f, scroll_size );
+#endif
 }
 
 
 void gallery_view_draw_content()
 {
+#if 0
 	int window_width, window_height;
 	SDL_GetWindowSize( app::window, &window_width, &window_height );
 
 	ImGuiStyle& style              = ImGui::GetStyle();
-	ImVec2      content_cursor_pos = ImGui::GetCursorPos();
-	ImVec2      mouse_pos          = ImGui::GetMousePos();
+	vec2      content_cursor_pos = ImGui::GetCursorPos();
+	vec2      mouse_pos          = ImGui::GetMousePos();
 
 	ImGui::SetCursorPosX( std::max( 0.f, content_cursor_pos.x - style.ItemSpacing.x ) );
 
-	ImVec2 region_avail        = ImGui::GetContentRegionAvail();
+	vec2 region_avail        = ImGui::GetContentRegionAvail();
 	gallery_draw::region_size  = { region_avail.x + style.WindowPadding.x, region_avail.y + style.WindowPadding.y };
 
 	int region_x               = region_avail.x - ( style.ScrollbarSize + style.WindowPadding.x );
@@ -1180,7 +1161,7 @@ void gallery_view_draw_content()
 
 	bool               row_count_changed    = last_row_count != gallery::row_count;
 	static bool        filenames_shown_last = app::config.gallery_show_filenames;
-	static ImVec2      last_region_avail    = region_avail;
+	static vec2      last_region_avail    = region_avail;
 
 	static h_thumbnail icons_scaled[ e_icon_count ]{};
 
@@ -1231,8 +1212,8 @@ void gallery_view_draw_content()
 	// ----------------------------------------------------------------------------------------------------------
 	// Item Drawing
 
-	ImVec2 dummy_start_pos        = ImGui::GetCursorPos();
-	ImVec2 dummy_start_pos_screen = ImGui::GetCursorScreenPos();
+	vec2 dummy_start_pos        = ImGui::GetCursorPos();
+	vec2 dummy_start_pos_screen = ImGui::GetCursorScreenPos();
 
 	if ( gallery::visible_item_count > 0 )
 		gallery_view_draw_items( window, style, count );
@@ -1308,5 +1289,6 @@ void gallery_view_draw_content()
 
 	if ( !no_extra_refresh && gallery::refresh_layout > 0 )
 		gallery::refresh_layout--;
+#endif
 }
 

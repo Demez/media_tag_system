@@ -18,9 +18,6 @@
 
 // --------------------------------------------------------------------------------------------------------
 
-
-#include "imgui.h"
-
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -134,8 +131,62 @@ constexpr float MEM_SCALE = 1000.f;
 // };
 
 
-using ivec2                       = int[ 2 ];
-using vec2                        = float[ 2 ];
+struct ivec2
+{
+	int x;
+	int y;
+
+	ivec2()
+	{
+		x = 0;
+		y = 0;
+	}
+
+	~ivec2() {}
+
+	ivec2( int x, int y ):
+		x( x ), y( y )
+	{
+	}
+
+	inline int& operator[]( int index )
+	{
+		return index % 2 ? x : y;
+	}
+};
+
+
+struct vec2
+{
+	float x;
+	float y;
+
+	vec2()
+	{
+		x = 0.f;
+		y = 0.f;
+	}
+
+	~vec2() {}
+
+	vec2( float x, float y ) :
+		x( x ), y( y )
+	{
+	}
+
+	inline float& operator[]( int index )
+	{
+		return index % 2 ? x : y;
+	}
+};
+
+
+// MAKE THESE PROPER STRUCTS !!!
+// using ivec2                       = int[ 2 ];
+using ivec4                       = int[ 2 ];
+
+//using vec2                        = float[ 2 ];
+using vec4                        = float[ 4 ];
 
 
 // struct vec2
@@ -170,8 +221,6 @@ enum e_mem_category : u8
 	e_mem_category_gl_texture_data,
 	e_mem_category_string,
 	e_mem_category_file_data,
-
-	e_mem_category_imgui,
 
 	// image formats
 	e_mem_category_stbi_resize,
@@ -506,8 +555,8 @@ constexpr bool vec_contains( const std::vector< T >& vec, T item )
 // utility functions
 
 
-bool point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size );
-bool mouse_in_rect( ImVec2 min_size, ImVec2 max_size );
+bool point_in_rect( ivec2 point, ivec2 min_size, ivec2 max_size );
+bool mouse_in_rect( ivec2 min_size, ivec2 max_size );
 bool mouse_moving();
 
 #if _WIN32
@@ -532,9 +581,6 @@ void  util_format_time( char* buffer, double time );  // expects at least TIME_B
 void  util_format_time( char* buffer, size_t buffer_size, double time );
 
 void  util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool apply_time_zone = true );
-
-bool  util_mouse_hovering_imgui_window();
-void  util_imgui_set_tooltip( const char* value );
 
 
 template< typename CHAR >

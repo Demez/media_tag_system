@@ -1,7 +1,5 @@
 #include "main.h"
 
-#include "imgui_internal.h"
-
 #include <mutex>
 
 // ====================================================================================================
@@ -33,8 +31,6 @@ const char* mem_category_str[] = {
     "string",
     "file_data",
 
-    "imgui",
-
 	"stbi_resize",
 	"jxl",
 	"jxl_thumbnail",
@@ -43,21 +39,6 @@ const char* mem_category_str[] = {
 
 
 static_assert( ARR_SIZE( mem_category_str ) == e_mem_category_count );
-
-
-void* imgui_mem_alloc( size_t sz, void* user_data )
-{
-	void* memory = malloc( sz );
-	mem_add_item( e_mem_category_imgui, memory, sz, 2 );
-	return memory;
-}
-
-
-void imgui_mem_free( void* ptr, void* user_data )
-{
-	mem_free_item( e_mem_category_imgui, ptr );
-	free( ptr );
-}
 
 
 static std::mutex alloc_lock;
@@ -164,151 +145,5 @@ static bool g_mem_allocation_show[ e_mem_category_count ]{};
 
 void mem_draw_debug_ui()
 {
-	ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-
-	ImGui::SeparatorText( "Memory" );
-
-	proc_mem_info_t proc_mem_info = sys_get_mem_info();
-
-	// ImGui::Text( "Process Memory: %.3f MB", (float)( proc_mem_info.working_set + proc_mem_info.page_file ) / ( 1000.f * 1000.f ) );
-	size_t          untracked_mem = proc_mem_info.working_set - g_total_memory_allocated;
-
-	ImGui::Text( "Process Total: %.3f MB", float( proc_mem_info.working_set ) / ( MEM_SCALE * MEM_SCALE ) );
-	ImGui::Text( "Tracked: %.3f MB", (float)g_total_memory_allocated / ( MEM_SCALE * MEM_SCALE ) );
-	ImGui::Text( "Untracked: %.3f MB", (float)untracked_mem / ( MEM_SCALE * MEM_SCALE ) );
-	ImGui::Text( "Page File: %.3f MB", (float)( proc_mem_info.page_file ) / ( MEM_SCALE * MEM_SCALE ) );
-
-#if USE_MIMALLOC
-	if ( ImGui::Button( "mimalloc print" ) )
-	{
-		mi_options_print();
-
-		mi_collect( true );
-		mi_stats_merge();
-		mi_stats_print( nullptr );
-	}
-#endif
-
-	ImGui::Spacing();
-	ImGui::SeparatorEx( ImGuiSeparatorFlags_Horizontal, 2 );
-
-	// show memory usage
-	static std::vector< mem_alloc_info_t > sorted_mem_infos[ e_mem_category_count ];
-
-	for ( u8 i = 0; i < e_mem_category_count; i++ )
-	{
-		mem_category_info_t& info = get_mem_categories()[ i ];
-
-		ImGui::PushID( i + 1 );
-
-		//ImGui::TextUnformatted( mem_category_str[ i ] );
-		//ImGui::Spacing();
-
-		ImVec2 cursor_pos = ImGui::GetCursorPos();
-
-		// ImGui::Selectable( "Show Allocations", &g_mem_allocation_show[ i ] );
-		ImGui::Selectable( "", &g_mem_allocation_show[ i ] );
-
-		ImGui::SetCursorPos( cursor_pos );
-		// ImGui::SameLine();
-
-		ImGui::Text( "%s - %.3f KB - %zd Allocations", mem_category_str[ i ], (float)info.total / MEM_SCALE, info.sizes.size() );
-
-		//ImGui::SameLine();
-
-		// if ( ImGui::CollapsingHeader( "Allocations" ) )
-		if ( g_mem_allocation_show[ i ] )
-		{
-			ImGui::PushItemWidth( -1 );
-
-			ImGui::SetNextWindowSizeConstraints( ImVec2( 0.0f, ImGui::GetTextLineHeightWithSpacing() * 1 ), ImVec2( FLT_MAX, ImGui::GetTextLineHeightWithSpacing() * 10 ) );
-
-			if ( ImGui::BeginChild( "##alloc", ImVec2( -FLT_MIN, 0.0f ), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY ) )
-			{
-#if 1
-				sorted_mem_infos[ i ].clear();
-				sorted_mem_infos[ i ].reserve( info.sizes.size() );
-
-				for ( const auto& [ ptr, ptr_info ] : info.sizes )
-				{
-					sorted_mem_infos[ i ].push_back( ptr_info );
-				}
-
-				std::qsort( sorted_mem_infos[ i ].data(), sorted_mem_infos[ i ].size(), sizeof( mem_alloc_info_t ), qsort_memory_newest );
-
-				// 	for ( const auto& [ ptr, ptr_info ] : info.sizes )
-				for ( size_t mem_i = 0; mem_i < sorted_mem_infos[ i ].size(); mem_i++ )
-				{
-					const mem_alloc_info_t& ptr_info = sorted_mem_infos[ i ][ mem_i ];
-
-					ImGui::Text( "%s%.3f Sec - Ptr: %p - %.3f KB", ptr_info.freed ? "FREE: " : "", ptr_info.app_time / ( 1000.f ), ptr_info.ptr, (float)ptr_info.size / MEM_SCALE );
-
-#if MEM_TRACK_STACK_TRACE
-					if ( ptr_info.stack_trace )
-					{
-						ImGui::PushID( ptr_info.ptr );
-
-						if ( ImGui::TreeNodeEx( "Stack Trace", ImGuiTreeNodeFlags_SpanFullWidth ) )
-						{
-							ImGui::TextUnformatted( std::to_string( *ptr_info.stack_trace ).c_str() );
-							ImGui::TreePop();
-						}
-
-						ImGui::PopID();
-					}
-  #endif
-				}
-#else
-				for ( size_t mem_i = 0; mem_i < info.alloc_count; mem_i++ )
-				{
-					mem_alloc_info_t& alloc = info.alloc[ mem_i ];
-
-					ImGui::Text( "Ptr: %p - %.3f KB", alloc.ptr, (float)alloc.size / MEM_SCALE );
-
-					if ( alloc.stack_trace )
-					{
-						ImGui::PushID( alloc.ptr );
-
-						if ( ImGui::TreeNodeEx( "Stack Trace", ImGuiTreeNodeFlags_SpanFullWidth ) )
-						{
-							ImGui::TextUnformatted( std::to_string( *alloc.stack_trace ).c_str() );
-							ImGui::TreePop();
-						}
-
-						ImGui::PopID();
-					}
-				}
-#endif
-			}
-
-			ImGui::EndChild();
-
-			//		if ( ImGui::BeginListBox( "##alloc" ) )
-			//		{
-			//			for ( const auto& [ ptr, ptr_info ] : info.sizes )
-			//			{
-			//				ImGui::Text( "Ptr: %p - %.3f KB", ptr, (float)ptr_info.size / 1000.f );
-			//
-			//				ImGui::PushID( ptr );
-			//
-			//				if ( ImGui::TreeNodeEx( "Stack Trace", ImGuiTreeNodeFlags_SpanFullWidth ) )
-			//				{
-			//					ImGui::TextUnformatted( std::to_string( ptr_info.stack_trace ).c_str() );
-			//					ImGui::TreePop();
-			//				}
-			//
-			//				ImGui::PopID();
-			//			}
-			//
-			//			ImGui::EndListBox();
-			//		}
-
-			ImGui::PopItemWidth();
-		}
-
-		ImGui::PopID();
-
-		ImGui::Separator();
-	}
 }
 

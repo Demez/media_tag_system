@@ -25,16 +25,6 @@ theme {
 	font_size 17
 
 	use_custom_colors false
-
-	// gallery_header_background_color .1, .1, .1, 0
-	gallery_header_background_color r=0 g=0 b=0 a=0
-	gallery_content_bg_color r=0.05 g=0.05 b=0.05 a=1
-	gallery_sidebar_bg_color r=0 g=0 b=0 a=0.5
-
-	gallery_header_padding 6 6
-
-	// ALPHA IS WINDOWS ONLY
-	media_background_color r=0.1 g=0.1 b=0.1 a=0.5
 }
 
 gallery {

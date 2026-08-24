@@ -1,7 +1,5 @@
 #include "main.h"
 
-#include "imgui_internal.h"
-
 
 namespace gallery
 {
@@ -24,14 +22,14 @@ namespace gallery
 	u32                                  item_size_max      = 600;
 	bool                                 item_size_changed  = true;
 	bool                                 item_size_changing = false;
-	std::vector< ImVec2 >                item_text_size;
+	std::vector< vec2 >                item_text_size;
 
 	std::vector< gallery_item_draw_t >   item_layout;
 	gallery_item_draw_t**                visible_item       = nullptr;
 	size_t                               visible_item_count = 0;
 
 	// area the image can fit within the item
-	ImVec2                               image_bounds{ static_cast< float >( item_size ), static_cast< float >( item_size ) };
+	vec2                               image_bounds{ static_cast< float >( item_size ), static_cast< float >( item_size ) };
 
 	bool                                 sidebar_draw         = true;
 	bool                                 content_area_resized = false;
@@ -77,7 +75,7 @@ static const media_entry_t __media_entry_empty{};
 
 
 float                      gallery_view_draw_header();
-void                       gallery_view_update_header_directory();
+//void                       gallery_view_update_header_directory();
 
 void                       gallery_view_draw_sidebar();
 
@@ -129,20 +127,21 @@ std::string gallery_item_get_path_string( size_t index )
 
 bool gallery_view_input_do_multi_select()
 {
-	return ImGui::IsKeyDown( ImGuiKey_LeftShift ) || ImGui::IsKeyDown( ImGuiKey_LeftCtrl );
+	return false;
+	// return ImGui::IsKeyDown( ImGuiKey_LeftShift ) || ImGui::IsKeyDown( ImGuiKey_LeftCtrl );
 }
 
 
 void gallery_view_input_check_clear_multi_select()
 {
-	if ( !ImGui::IsKeyDown( ImGuiKey_LeftShift ) && !ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) )
-	// if ( !gallery_view_input_do_multi_select() )
-	{
-		if ( gallery::selection.size() )
-		{
-			gallery::selection.clear();
-		}
-	}
+	//if ( !ImGui::IsKeyDown( ImGuiKey_LeftShift ) && !ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) )
+	//// if ( !gallery_view_input_do_multi_select() )
+	//{
+	//	if ( gallery::selection.size() )
+	//	{
+	//		gallery::selection.clear();
+	//	}
+	//}
 }
 
 
@@ -276,6 +275,7 @@ void gallery_view_input()
 		empty     = false;
 	}
 
+#if 0
 	if ( ImGui::IsKeyPressed( ImGuiKey_Home ) )
 	{
 		gallery_view_scroll_to_cursor();
@@ -367,6 +367,7 @@ void gallery_view_input()
 	{
 		gallery_view_delete_selection();
 	}
+#endif
 }
 
 
@@ -549,9 +550,6 @@ static job_status_t* g_gallery_sort_job   = nullptr;
 
 // this is actually such a lazy way to do this, it is not good lol
 static bool          g_gallery_sort_block_new_jobs = false;
-
-
-void gallery_view_item_size_calc( ImGuiStyle& style, size_t count );
 
 
 bool gallery_sort_check_if_canceled( job_status_t* status, gallery_sort_dir_data_t* sort_data )
@@ -770,10 +768,7 @@ void gallery_view_sort_dir()
 
 void gallery_view_dir_change( bool keep_selection )
 {
-	gallery_view_update_header_directory();
-
-	//if ( keep_selection )
-	//	gallery_view_set_selection( gallery::cursor );
+	//gallery_view_update_header_directory();
 
 	// TODO: make it work with recursive, so if the selected item is still within the results, use that to snap scroll view to
 	if ( !directory::folder_reload || directory::recursive )
@@ -832,15 +827,16 @@ void gallery_view_reset_text_size()
 
 void gallery_view_draw_scan_state()
 {
+#if 0
 	e_gallery_scan scan_state   = gallery::scan_state;
 
 	ImGuiStyle&    style        = ImGui::GetStyle();
 
 	// center it in the content area
-	ImVec2         region_avail = ImGui::GetContentRegionAvail();
-	ImVec2         region_size  = { region_avail.x + style.WindowPadding.x, region_avail.y + style.WindowPadding.y };
+	vec2         region_avail = ImGui::GetContentRegionAvail();
+	vec2         region_size  = { region_avail.x + style.WindowPadding.x, region_avail.y + style.WindowPadding.y };
 
-	ImVec2         pos          = region_size;
+	vec2         pos          = region_size;
 	pos.x *= 0.5f;
 	pos.y *= 0.5f;
 	pos += ImGui::GetCursorScreenPos();
@@ -881,12 +877,13 @@ void gallery_view_draw_scan_state()
 
 		if ( image )
 		{
-			ImVec2 image_size( image->width, image->height );
+			vec2 image_size( image->width, image->height );
 			ImGui::Image( icon_get_imtexture( e_icon_loading ), image_size );
 		}
 	}
 
 	ImGui::EndChild();
+#endif
 }
 
 
@@ -897,17 +894,19 @@ void gallery_view_draw()
 	int window_width, window_height;
 	SDL_GetWindowSize( app::window, &window_width, &window_height );
 
+#if 0
+
 	//ImGui::SetNextWindowPos( { 0, 0 } );
 	// ImGui::SetCursorPos( { 0, 0 } );
 
 	// Header
 	float header_height = gallery_view_draw_header();
 
-	// ImVec2 region_avail = ImGui::GetWindowContentRegionMax();
+	// vec2 region_avail = ImGui::GetWindowContentRegionMax();
 
 	//ImGui::SetNextWindowPos( { 0, 0 } );
 
-	// ImVec2 cursor_pos = ImGui::GetCursorPos();
+	// vec2 cursor_pos = ImGui::GetCursorPos();
 
 	//ImGui::SetCursorPosX( 0.f );
 	ImGui::SetNextWindowPos( { 0, header_height } );
@@ -982,5 +981,6 @@ void gallery_view_draw()
 			push_notification( "COPY FAILED" );
 		}
 	}
+#endif
 }
 

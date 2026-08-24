@@ -33,6 +33,10 @@ set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 set( CMAKE_CXX_STANDARD 23 )
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
+# set( RMLUI_BUILD_DIR "thirdparty/RmlUi/Bin-Dynamic/Release" )
+# set( RMLUI_BUILD_DIR "thirdparty/RmlUi/build/Debug" )
+set( RMLUI_BUILD_DIR "${THIRDPARTY_DIR}/RmlUi/build/${CMAKE_CFG_INTDIR}" )
+
 # Compiler/Platform specifc options
 if ( MSVC )
 	add_compile_definitions(
@@ -171,6 +175,10 @@ if ( MSVC )
 	message( "Copying kdl" )
 	configure_file( "thirdparty/ckdl/build/Release/kdl.dll" "${PROJ_OUT}/kdl.dll" COPYONLY )
 	
+	message( "Copying RmlUi" )
+	#configure_file( "${RMLUI_BUILD_DIR}/RmlUi.dll" "${PROJ_OUT}/RmlUi.dll" COPYONLY )
+	#configure_file( "${RMLUI_BUILD_DIR}/RmlUi_debugger.dll" "${PROJ_OUT}/RmlUi_debugger.dll" COPYONLY )
+	
 	message( "Copying jxl" )
 	configure_file( "thirdparty/libjxl/build/lib/Release/jxl.dll" "${PROJ_OUT}/jxl.dll" COPYONLY )
 	configure_file( "thirdparty/libjxl/build/lib/Release/jxl_cms.dll" "${PROJ_OUT}/jxl_cms.dll" COPYONLY )
@@ -255,20 +263,28 @@ set(
 
     src/system/system.h
 
-    src/imgui/imconfig.h
-    src/imgui/imgui.cpp
-    src/imgui/imgui_demo.cpp
-    src/imgui/imgui_draw.cpp
-    src/imgui/imgui_impl_opengl3.cpp
-    src/imgui/imgui_impl_sdl3.cpp
-    src/imgui/imgui_tables.cpp
-    src/imgui/imgui_widgets.cpp
-
-    src/imgui/imgui_demez.cpp
+#    src/imgui/imconfig.h
+#    src/imgui/imgui.cpp
+#    src/imgui/imgui_demo.cpp
+#    src/imgui/imgui_draw.cpp
+#    src/imgui/imgui_impl_opengl3.cpp
+#    src/imgui/imgui_impl_sdl3.cpp
+#    src/imgui/imgui_tables.cpp
+#    src/imgui/imgui_widgets.cpp
+#    src/imgui/imgui_demez.cpp
 
 	src/glad/glad.c
 	src/glad/glad.h
 	src/glad/khrplatform.h
+)
+
+
+set(
+    RMLUI_FILES
+	src/rmlui/RmlUi_Platform_SDL.cpp
+	src/rmlui/RmlUi_Platform_SDL.h
+	src/rmlui/RmlUi_Renderer_GL3.cpp
+	src/rmlui/RmlUi_Renderer_GL3.h
 )
 
 
@@ -294,8 +310,8 @@ set( FREETYPE_DIR "thirdparty/freetype" )
 
 set(
 	FREETYPE_IMGUI_SRC
-	src/imgui/imgui_freetype.cpp
-	src/imgui/imgui_freetype.h
+#	src/imgui/imgui_freetype.cpp
+#	src/imgui/imgui_freetype.h
 )
 
 include_directories( "${FREETYPE_DIR}/include" )
@@ -312,6 +328,8 @@ include_directories(
 	"src/imgui"
 	"src/glad"
 	"thirdparty"
+	"thirdparty/RmlUi/Include"
+	"thirdparty/RmlUi/Backends"
 	"thirdparty/nativefiledialog/src/include"
 	"thirdparty/SDL3/include"
 	"thirdparty/libjpeg-turbo/build"
@@ -340,6 +358,8 @@ else()
 endif()
 
 link_libraries(
+	RmlUi
+	RmlUi_debugger
 	freetype
 	nfd
 	SDL3
@@ -381,6 +401,7 @@ link_directories(
 	"thirdparty/mozjpeg/build"
 	"thirdparty/libspng/build"
 	"thirdparty/FreeImageRe/lib"
+	"${RMLUI_BUILD_DIR}"
 	
 	# i don't want to use static, but for some reason, it can't find the lib when using the dll version?
 	"${FREETYPE_DIR}/objs/x64/Release Static"
@@ -397,6 +418,7 @@ if ( WIN32 )
 		"thirdparty/libspng/build/Release"
 		"thirdparty/libjxl/build/lib/Release"
 		"thirdparty/SDL3/lib/x64"
+		# "${RMLUI_BUILD_DIR}"
 	)
 	link_libraries(
 		turbojpeg
@@ -419,10 +441,14 @@ foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	)
 endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 
-add_executable( media_tag_system ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
+add_compile_definitions(
+	RMLUI_SDL_VERSION_MAJOR=3
+)
+
+add_executable( media_tag_system ${SRC_FILES} ${SYSTEM_FILES} ${RMLUI_FILES} ${THIRDPARTY_FILES} )
 
 if ( WIN32 )
-	add_executable( media_tag_system_con ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
+	add_executable( media_tag_system_con ${SRC_FILES} ${SYSTEM_FILES} ${RMLUI_FILES} ${THIRDPARTY_FILES} )
 
 	target_link_options(
 		media_tag_system_con PRIVATE
@@ -440,8 +466,14 @@ endif()
 source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}/src
 	PREFIX "Source Files"
-	FILES ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC}
+	FILES ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${RMLUI_FILES}
 )
+
+#source_group(
+#	TREE ${CMAKE_CURRENT_LIST_DIR}/thirdparty/RmlUi/Backends
+#	PREFIX "RmlUi Backend Files"
+#	FILES ${RMLUI_FILES}
+#)
 
 source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}/thirdparty
@@ -449,3 +481,16 @@ source_group(
 	FILES ${THIRDPARTY_FILES}
 )
 
+add_custom_command(
+        TARGET media_tag_system POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${RMLUI_BUILD_DIR}/RmlUi.dll"
+                "${PROJ_OUT}/RmlUi.dll"
+)
+
+add_custom_command(
+        TARGET media_tag_system POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${RMLUI_BUILD_DIR}/RmlUi_debugger.dll"
+                "${PROJ_OUT}/RmlUi_debugger.dll"
+)

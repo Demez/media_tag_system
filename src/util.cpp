@@ -1,9 +1,6 @@
 #include "main.h"
 #include "util.h"
 
-#include "imgui.h"
-#include "imgui_internal.h"
-
 #include <sys/stat.h>
 #include <time.h>
 #include <math.h>
@@ -11,16 +8,16 @@
 #include <locale>
 
 
-bool point_in_rect( ImVec2 point, ImVec2 min_size, ImVec2 max_size )
+bool point_in_rect( ivec2 point, ivec2 min_size, ivec2 max_size )
 {
 	return point[ 0 ] >= min_size[ 0 ] && point[ 0 ] <= max_size[ 0 ] && point[ 1 ] <= max_size[ 1 ] && point[ 1 ] >= min_size[ 1 ];
 }
 
 
-bool mouse_in_rect( ImVec2 min_size, ImVec2 max_size )
+bool mouse_in_rect( ivec2 min_size, ivec2 max_size )
 {
 	if ( app::mouse_in_window )
-		return point_in_rect( ImVec2( app::mouse_pos[ 0 ], app::mouse_pos[ 1 ] ), min_size, max_size );
+		return point_in_rect( ivec2( app::mouse_pos[ 0 ], app::mouse_pos[ 1 ] ), min_size, max_size );
 
 	return false;
 }

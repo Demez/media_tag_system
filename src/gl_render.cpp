@@ -1,8 +1,7 @@
 #include "main.h"
 
-#include "imgui_impl_sdl3.h"
-#include "imgui_impl_opengl3.h"
-
+constexpr int        DEFAULT_WIDTH  = 1000;
+constexpr int        DEFAULT_HEIGHT = 600;
 
 constexpr float      M_PI   = 3.14159265358979323846f;
 constexpr float      TO_RAD = M_PI / 180.f;
@@ -82,21 +81,31 @@ void frame_draw_start()
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
-	ImGui::GetIO().DisplaySize.x = static_cast< float >( width );
-	ImGui::GetIO().DisplaySize.y = static_cast< float >( height );
-
-	ImGui_ImplSDL3_NewFrame();
-	ImGui_ImplOpenGL3_NewFrame();
-	ImGui::NewFrame();
+	//ImGui::GetIO().DisplaySize.x = static_cast< float >( width );
+	//ImGui::GetIO().DisplaySize.y = static_cast< float >( height );
+	//
+	//ImGui_ImplSDL3_NewFrame();
+	//ImGui_ImplOpenGL3_NewFrame();
+	//ImGui::NewFrame();
 
 	glViewport( 0, 0, width, height );
 
-	if ( g_gallery_view )
-		glClearColor( app::config.header_bg_color.x, app::config.header_bg_color.y, app::config.header_bg_color.z, app::config.header_bg_color.w );
-	else
-		glClearColor( app::config.media_bg_color.x, app::config.media_bg_color.y, app::config.media_bg_color.z, app::config.media_bg_color.w );
+	//if ( g_gallery_view )
+	//	glClearColor( app::config.header_bg_color.x, app::config.header_bg_color.y, app::config.header_bg_color.z, app::config.header_bg_color.w );
+	//else
+	//	glClearColor( app::config.media_bg_color.x, app::config.media_bg_color.y, app::config.media_bg_color.z, app::config.media_bg_color.w );
+
+	glClearColor( 0.1f, 0.1f, 0.1f, 0.5f );
 
 	glClear( GL_COLOR_BUFFER_BIT );
+
+	// Update the context to reflect any changes resulting from input events, animations,
+	// modified and added elements, or changed data in data bindings.
+	app::context->Update();
+
+	// Prepare the application for rendering, such as by clearing the window. This calls
+	// into the RmlUi backend interface, replace with your own procedures as appropriate.
+	app::render->BeginFrame();
 }
 
 
@@ -105,7 +114,13 @@ void frame_draw_end()
 	if ( !g_gallery_view )
 		media_view_draw();
 
-	ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
+	// Render the user interface. All geometry and other rendering commands are now
+	// submitted through the render interface.
+	app::context->Render();
+
+	app::render->EndFrame();
+
+	// ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 	SDL_GL_SwapWindow( app::window );
 
 	if ( g_mpv && g_mpv_gl )
@@ -230,8 +245,8 @@ bool render_window_create()
 	// Create Window
 	SDL_PropertiesID props      = SDL_CreateProperties();
 
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 1000 );
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 600 );
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, DEFAULT_WIDTH );
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, DEFAULT_HEIGHT );
 
 	// for some reason, SDL_WINDOWPOS_UNDEFINED is ALWAYS centering the window in the middle on the primary display
 	// so im trying to make it feel better and hacking it to open the window on the monitor the mouse is currently on
@@ -296,6 +311,7 @@ bool render_window_create()
 
 	SDL_ShowWindow( app::window );
 	SDL_SetWindowMinimumSize( app::window, 200, 200 );
+
 	return true;
 }
 
@@ -450,6 +466,8 @@ bool render_init()
 
 	if ( !render_load_shaders() )
 		return false;
+
+	SDL_GL_SetSwapInterval( app::config.vsync );
 
 	return true;
 }

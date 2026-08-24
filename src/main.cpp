@@ -1,48 +1,68 @@
 #include "main.h"
 
-#include "imgui.h"
-#include "imgui_impl_sdl3.h"
-#include "imgui_impl_opengl3.h"
-#include "imgui_freetype.h"
-#include "imgui_internal.h"
 
-#include <chrono>
+class CoolSystemInterface : public SystemInterface_SDL
+{
+  public:
+
+	CoolSystemInterface( SDL_Window* window ) :
+		SystemInterface_SDL( window )
+	{
+	}
+
+	~CoolSystemInterface() = default;
+	virtual bool LogMessage( Rml::Log::Type type, const Rml::String& message ) override
+	{
+		printf( "RmlUi: %s\n", message.c_str() );
+
+		return true;
+	}
+};
+
+
+struct ApplicationData
+{
+	bool        show_text = true;
+	Rml::String animal    = "dog";
+} my_data;
 
 
 // General App Data
 namespace app
 {
-	bool         running        = true;
+	bool                       running        = true;
 
-	SDL_Window*  window         = nullptr;
-	bool         window_focused = false;
-	bool         window_resized = false;
-	float        dpi            = 1.0;
+	SDL_Window*                window         = nullptr;
+	bool                       window_focused = false;
+	bool                       window_resized = false;
+	float                      dpi            = 1.0;
+
+	TextInputMethodEditor_SDL* ime            = nullptr;
+	SystemInterface_SDL*       system         = nullptr;
+	RenderInterface_GL3*       render         = nullptr;
+	Rml::Context*              context        = nullptr;
 
 	// ImVec4                       clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
 	// ImVec4       clear_color    = ImVec4( 0.05f, 0.05f, 0.05f, 0.0f );
 	// ImVec4       clear_color    = ImVec4( 0.f, 0.f, 0.f, 0.f );
 	// ImVec4       clear_color    = ImVec4( 1.f, 1.f, 0.f, 0.f );
 
-	ImVec2       mouse_delta;
-	ImVec2       mouse_pos;
-	int          mouse_scroll       = 0;
-	bool         mouse_in_window    = false;
+	ivec2                      mouse_delta;
+	ivec2                      mouse_pos;
+	int                        mouse_scroll     = 0;
+	bool                       mouse_in_window  = false;
 
-	u32          draw_frame_count   = 0;
-	bool         in_window_drag     = false;
-	bool         in_drag_drop       = false;
+	u32                        draw_frame_count = 0;
+	bool                       in_window_drag   = false;
+	bool                       in_drag_drop     = false;
 
-	app_config_t config{};
+	app_config_t               config{};
 }
 
 
 // ImGui Fonts
 namespace font
 {
-	ImFont* normal        = nullptr;
-	ImFont* normal_bold   = nullptr;
-	ImFont* normal_italic = nullptr;
 }
 
 
@@ -485,100 +505,6 @@ bool drag_drop_recieve_func( const std::vector< fs::path >& files )
 }
 
 
-void style_imgui()
-{
-	ImGuiStyle& style        = ImGui::GetStyle();
-	ImVec4*     colors       = style.Colors;
-
-	style.WindowPadding.x    = 6;
-	style.WindowPadding.y    = 6;
-	style.ItemSpacing.x      = 6;
-	style.ItemSpacing.y      = 6;
-	style.ItemInnerSpacing.x = 6;
-	style.ItemInnerSpacing.y = 6;
-
-	style.FramePadding.x     = 4;
-	style.FramePadding.y     = 4;
-
-	style.ChildRounding      = 3;
-	style.FrameRounding      = 3;
-	style.GrabRounding       = 3;
-	style.PopupRounding      = 3;
-	// style.ScrollbarRounding = 3;
-
-
-	// TEST
-#if 0
-	style.WindowPadding.x    = 0.f;
-	style.WindowPadding.y    = 0.f;
-	style.ItemSpacing.x      = 0.f;
-	style.ItemSpacing.y      = 0.f;
-	style.ItemInnerSpacing.x = 0.f;
-	style.ItemInnerSpacing.y = 0.f;
-#endif
-
-	colors[ ImGuiCol_FrameBg ]              = ImVec4( 0.00f, 0.21f, 0.52f, 0.54f );
-	// colors[ ImGuiCol_WindowBg ]             = ImVec4( 0.06f, 0.06f, 0.06f, 1.00f );
-	colors[ ImGuiCol_WindowBg ]             = ImVec4( 0.08f, 0.08f, 0.08f, 1.00f );
-
-	colors[ ImGuiCol_ScrollbarBg ]          = ImVec4( 0.02f, 0.02f, 0.02f, 1.00f );
-	colors[ ImGuiCol_ScrollbarGrab ]        = ImVec4( 0.00f, 0.28f, 0.65f, 1.00f );
-	colors[ ImGuiCol_ScrollbarGrabHovered ] = ImVec4( 0.00f, 0.43f, 1.00f, 1.00f );
-	colors[ ImGuiCol_ScrollbarGrabActive ]  = ImVec4( 0.00f, 0.35f, 0.78f, 1.00f );
-
-	colors[ ImGuiCol_TabHovered ]           = ImVec4( 0.00f, 0.43f, 1.00f, 1.00f );
-	colors[ ImGuiCol_Tab ]                  = ImVec4( 0.00f, 0.28f, 0.65f, 1.00f );
-	colors[ ImGuiCol_TabSelected ]          = ImVec4( 0.00f, 0.35f, 0.78f, 1.00f );
-	colors[ ImGuiCol_TabSelectedOverline ]  = ImVec4( 0.00f, 0.35f, 0.78f, 1.00f );
-
-	colors[ ImGuiCol_TabDimmed ]            = ImVec4( 0.00f, 0.07f, 0.16f, 0.97f );
-	colors[ ImGuiCol_TabDimmedSelected ]    = ImVec4( 0.00f, 0.18f, 0.42f, 1.00f );
-
-	colors[ ImGuiCol_Button ]               = ImVec4( 0.00f, 0.35f, 0.77f, 1.00f );
-	colors[ ImGuiCol_ButtonHovered ]        = ImVec4( 0.15f, 0.54f, 1.00f, 1.00f );
-	colors[ ImGuiCol_ButtonActive ]         = ImVec4( 0.00f, 0.24f, 0.55f, 1.00f );
-
-	colors[ ImGuiCol_Header ]               = ImVec4( 0.00f, 0.35f, 0.77f, 0.75f );
-	colors[ ImGuiCol_HeaderHovered ]        = ImVec4( 0.15f, 0.54f, 1.00f, 1.00f );
-	colors[ ImGuiCol_HeaderActive ]         = ImVec4( 0.00f, 0.24f, 0.55f, 1.00f );
-
-	colors[ ImGuiCol_CheckMark ]            = ImVec4( 0.00f, 0.46f, 1.00f, 1.00f );
-}
-
-
-void load_default_font( sys_font_data_t& font_data, ImFont*& dst, ImFontConfig& font_cfg, bool load_symbols )
-{
-	font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-
-	// Main Font
-	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( font_data.font_path, font_data.height, &font_cfg );
-
-	#ifdef _WIN32
-	// All fonts will be merged into this one above
-	font_cfg.MergeMode = true;
-
-	// Japanese Characters
-	dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\YuGothM.ttc", font_data.height, &font_cfg );
-
-	// Symbols/Emoji's
-	if ( load_symbols )
-	{
-		// font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor | ImGuiFreeTypeLoaderFlags_Bitmap;
-		font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_LoadColor;
-
-		// Segoe UI Symbol
-		dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguisym.ttf", font_data.height, &font_cfg );
-
-		//char font_path[ 512 ]{};
-		//snprintf( font_path, 512, "%s/seguiemj.ttf", exe_path );
-
-		// ImGui::GetIO().Fonts->AddFontFromFileTTF( font_path, font_data.height, &font_cfg );
-		dst = ImGui::GetIO().Fonts->AddFontFromFileTTF( "C:\\Windows\\Fonts\\seguiemj.ttf", font_data.height, &font_cfg );
-	}
-	#endif
-}
-
-
 void update_dpi( float dpi_override )
 {
 	float scale = 0.f;
@@ -592,13 +518,7 @@ void update_dpi( float dpi_override )
 		scale = CLAMP( dpi_override, 0.25f, 5.f );
 	}
 
-	app::dpi          = scale;
-	ImGui::GetStyle() = ImGuiStyle();
-
-	style_imgui();
-
-	ImGui::GetStyle().ScaleAllSizes( scale );
-	ImGui::GetStyle().FontScaleDpi = scale;
+	app::dpi = scale;
 
 	gallery_view_reset_text_size();
 	set_frame_draw();
@@ -659,10 +579,6 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 #ifdef _WIN32
 		case SDL_EVENT_WINDOW_EXPOSED:
 		{
-			// clear focusing of any windows
-			ImGui::SetNextFrameWantCaptureKeyboard( false );
-			ImGui::SetWindowFocus( nullptr );
-
 			app::in_window_drag = true;
 			thumbnail_loader_update();
 			window_quick_draw();
@@ -672,11 +588,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 #endif
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
-			// clear focusing of any windows
 			app::window_resized = true;
-			ImGui::SetNextFrameWantCaptureKeyboard( false );
-			ImGui::SetWindowFocus( nullptr );
-
 			thumbnail_loader_update();
 			window_quick_draw();
 			break;
@@ -697,7 +609,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 
 bool handle_event( SDL_Event& event )
 {
-	ImGui_ImplSDL3_ProcessEvent( &event );
+	RmlSDL::InputEventHandler( app::context, app::window, event );
 
 	switch ( event.type )
 	{
@@ -766,12 +678,12 @@ bool handle_event( SDL_Event& event )
 		case SDL_EVENT_WINDOW_RESIZED:
 			int width, height;
 			SDL_GetWindowSize( app::window, &width, &height );
-			ImGui::GetIO().DisplaySize.x = static_cast< float >( width );
-			ImGui::GetIO().DisplaySize.y = static_cast< float >( height );
-
-			// clear focusing of any windows
-			ImGui::SetNextFrameWantCaptureKeyboard( false );
-			ImGui::SetWindowFocus( nullptr );
+			//ImGui::GetIO().DisplaySize.x = static_cast< float >( width );
+			//ImGui::GetIO().DisplaySize.y = static_cast< float >( height );
+			//
+			//// clear focusing of any windows
+			//ImGui::SetNextFrameWantCaptureKeyboard( false );
+			//ImGui::SetWindowFocus( nullptr );
 
 			app::window_focused = true;
 			app::window_resized = true;
@@ -793,8 +705,8 @@ bool handle_event( SDL_Event& event )
 			app::window_focused = false;
 
 			// clear focusing of any windows
-			ImGui::SetNextFrameWantCaptureKeyboard( false );
-			ImGui::SetWindowFocus( nullptr );
+			//ImGui::SetNextFrameWantCaptureKeyboard( false );
+			//ImGui::SetWindowFocus( nullptr );
 			break;
 
 #if !_WIN32
@@ -910,45 +822,6 @@ void check_need_draw( bool playing_back_video )
 		set_frame_draw();
 		return;
 	}
-
-	ImGuiContext* ctx = ImGui::GetCurrentContext();
-	ImGuiIO&      io  = ImGui::GetIO();
-
-	if ( io.MouseDown[ 0 ] || io.MouseDown[ 1 ] )
-	{
-		if ( app::mouse_delta[ 0 ] != 0.f || app::mouse_delta[ 1 ] != 0.f )
-			set_frame_draw();
-	}
-
-	// Check if a popup was opened or closed
-	static bool popup_open_last = false;
-	bool        popup_open      = ImGui::IsPopupOpen( "", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel );
-
-	set_frame_draw( popup_open_last != popup_open );
-
-	popup_open_last = popup_open;
-
-	if ( ctx->ActiveIdHasBeenEditedThisFrame || ctx->NavActivateFlags != 0 || ctx->NavAnyRequest )
-		set_frame_draw();
-
-	if ( ctx->HoveredId != ctx->HoveredIdPreviousFrame )
-		set_frame_draw();
-
-	if ( ctx->ActiveId != ctx->ActiveIdPreviousFrame )
-		set_frame_draw();
-
-	if ( ctx->WantTextInputNextFrame || ctx->WantCaptureKeyboardNextFrame != -1 )
-		set_frame_draw();
-
-	//if ( ctx->WantCaptureMouseNextFrame )
-	//	set_frame_draw();
-
-	//if ( io.WantCaptureMouse != ( ctx->WantCaptureMouseNextFrame == -1 ) )
-	//	set_frame_draw();
-
-	//if ( io.WantTextInput || io.WantCaptureKeyboard /*|| io.WantCaptureMouse || !io.WantCaptureMouseUnlessPopupClose*/ || io.WantSetMousePos )
-	if ( io.WantTextInput /*|| io.WantCaptureKeyboard || io.WantCaptureMouse || !io.WantCaptureMouseUnlessPopupClose*/ || io.WantSetMousePos )
-		set_frame_draw();
 
 	// Always draw on video playback
 	if ( playing_back_video )
@@ -1147,9 +1020,9 @@ void main_loop()
 
 		media_view_update();
 
-		bool want_text_input = ImGui::GetIO().WantTextInput || ImGui::GetCurrentContext()->WantTextInputNextFrame;
+		bool want_text_input = false;
 
-		if ( draw_frame_count )
+		// if ( draw_frame_count )
 			frame_draw_end();
 
 		g_in_draw = false;
@@ -1197,14 +1070,14 @@ void shutdown()
 {
 	config_save();
 
-	if ( ImGui::GetCurrentContext() )
-	{
-		ImGui::GetIO().Fonts->Clear();
+	if ( app::context )
+		Rml::RemoveContext( "main" );
 
-		ImGui_ImplOpenGL3_Shutdown();
-		ImGui_ImplSDL3_Shutdown();
-		ImGui::DestroyContext();
-	}
+	Rml::Shutdown();
+
+	delete app::system;
+	delete app::render;
+	delete app::ime;
 
 	render_shutdown();
 
@@ -1272,11 +1145,20 @@ int startup()
 
 	u64 start_time = sys_get_time_ms();
 
+	// RmlUi can handle IME
+	SDL_SetHint( SDL_HINT_IME_IMPLEMENTED_UI, "composition" );
+
 	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
 	{
 		printf( "Failed to init SDL\n" );
 		return 1;
 	}
+
+	// Submit click events when focusing the window.
+	SDL_SetHint( SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1" );
+
+	// Touch events are handled natively, no need to generate synthetic mouse events for touch devices.
+	SDL_SetHint( SDL_HINT_TOUCH_MOUSE_EVENTS, "0" );
 
 	// ----------------------------------------------------------------
 
@@ -1306,77 +1188,65 @@ int startup()
 	sys_set_receive_drag_drop_func( drag_drop_recieve_func );
 
 	// ----------------------------------------------------------------
-	// ImGui
+	// RmlUi
 
-	IMGUI_CHECKVERSION();
+	app::system = new CoolSystemInterface( app::window );
+	app::render = new RenderInterface_GL3;
+	app::ime    = new TextInputMethodEditor_SDL;
 
-	ImGui::SetAllocatorFunctions( imgui_mem_alloc, imgui_mem_free );
+	Rml::SetSystemInterface( app::system );
+	Rml::SetRenderInterface( app::render );
+	Rml::SetTextInputHandler( app::ime );
 
-	ImGui::CreateContext();
-
-	if ( !ImGui_ImplSDL3_InitForOpenGL( app::window, g_gl_context ) )
+	// RmlUi initialisation.
+	if ( !Rml::Initialise() )
 	{
-		printf( "Failed to init ImGui\n" );
+		printf( "Failed to startup RmlUi\n" );
 		return 1;
 	}
 
-	if ( !ImGui_ImplOpenGL3_Init() )
-	{
-		printf( "Failed to init ImGui OpenGL\n" );
-		return 1;
-	}
+	// Create the main RmlUi context.
 
-	sys_font_data_t font_data = sys_get_font();
-
-	if ( font_data.font_path )
-	{
-		font_data.height = static_cast< float >( app::config.font_size );
-		//char* exe_path = sys_get_exe_folder();
-
-		{
-			ImFontConfig font_cfg{};
-			load_default_font( font_data, font::normal, font_cfg, false );
-		}
-
-		{
-			ImFontConfig font_cfg{};
-			snprintf( font_cfg.Name, 40, "Default - Bold" );
-			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Bold;
-			load_default_font( font_data, font::normal_bold, font_cfg, false );
-		}
-
-		{
-			ImFontConfig font_cfg{};
-			snprintf( font_cfg.Name, 40, "Default - Oblique" );
-			font_cfg.FontLoaderFlags |= ImGuiFreeTypeLoaderFlags_Oblique;
-			load_default_font( font_data, font::normal_italic, font_cfg, false );
-		}
-
-		ImGui_ImplOpenGL3_CreateDeviceObjects();
-	}
-
-	SDL_GL_SetSwapInterval( app::config.vsync );
-
-	// bool gl_ret = SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 0 );
-
-	ImGuiIO& io = ImGui::GetIO();
-
-	int      width, height;
+	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
-	io.DisplaySize.x = static_cast< float >( width );
-	io.DisplaySize.y = static_cast< float >( height );
 
-	// Set imgui.ini path to exe directory
+	app::render->SetViewport( width, height );
+
+	app::context = Rml::CreateContext( "main", Rml::Vector2i( width, height ) );
+	if ( !app::context )
 	{
-		const char* exe_path = sys_get_exe_folder();
-
-		char  imgui_path[ 1024 ];
-		snprintf( imgui_path, 1024, "%s" SEP_S "imgui.ini", exe_path );
-
-		io.IniFilename = util_strdup( imgui_path );
+		Rml::Shutdown();
+		return -1;
 	}
 
-	style_imgui();
+	fs::path_str font_path = sys_get_exe_folder_native_str();
+	font_path += SEP;
+	font_path += PATH_FMT( "ui/assets/LatoLatin-Regular.ttf" );
+
+	std::string font_path_str = sys_path_to_string( font_path );
+
+	// Tell RmlUi to load the given fonts.
+	bool        font_loaded   = Rml::LoadFontFace( font_path_str );
+
+	Rml::Debugger::Initialise( app::context );
+
+	// Set up data bindings to synchronize application data.
+	if ( Rml::DataModelConstructor constructor = app::context->CreateDataModel( "animals" ) )
+	{
+		constructor.Bind( "show_text", &my_data.show_text );
+		constructor.Bind( "animal", &my_data.animal );
+	}
+
+	fs::path_str doc_path = sys_get_exe_folder_native_str();
+	doc_path += SEP;
+	doc_path += PATH_FMT( "ui" SEP_S "data" SEP_S "tutorial.rml" );
+
+	std::string doc_path_str = sys_path_to_string( doc_path );
+
+	// Load and show the tutorial document.
+	Rml::ElementDocument* document     = app::context->LoadDocument( doc_path_str );
+	if ( document )
+		document->Show();
 
 	// ----------------------------------------------------------------
 
@@ -1421,10 +1291,10 @@ int startup()
 
 	// ----------------------------------------------------------------
 
-	if ( !SDL_AddEventWatch( sdl_window_resize_watcher, nullptr ) )
-	{
-		printf( "Failed to add SDL Event Watch\n" );
-	}
+//	if ( !SDL_AddEventWatch( sdl_window_resize_watcher, nullptr ) )
+//	{
+//		printf( "Failed to add SDL Event Watch\n" );
+//	}
 	
 	g_event_draw.type      = SDL_EVENT_USER;
 	g_event_draw.user.code = SDL_RegisterEvents( 1 );

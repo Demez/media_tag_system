@@ -408,6 +408,22 @@ def compile_ckdl():
 # =================================================================================================
 
 
+def compile_rmlui():
+    set_project("RmlUi")
+
+    root_dir = os.getcwd()
+
+    os.chdir("RmlUi")
+
+    if not syscmd(f"cmake -B build -DFREETYPE_LIBRARY=\"{root_dir}/freetype/objs/x64/Release Static/freetype.lib\" -DFREETYPE_INCLUDE_DIRS={root_dir}/freetype/include", "Failed to run cmake"):
+        return
+
+    cmake_built_targets(["RelWithDebInfo", "Release", "Debug"])
+
+
+# =================================================================================================
+
+
 def libjxl_run():
     set_project("jxl")
 
@@ -579,6 +595,13 @@ TASK_LIST = {
             "extracted_folder": "glm",
         },
         {
+            "name": "RmlUi",
+            "url":  "https://github.com/mikke89/RmlUi/archive/refs/tags/6.3.zip",
+            #"extracted_folder": "RmlUi",
+            "file": "RmlUi-6.3.zip",
+            "func": compile_rmlui,
+        },
+        {
             "name": "jxl",
             "func": libjxl_run,
         },
@@ -605,6 +628,12 @@ TASK_LIST = {
             "extract_folder": "FreeImageRe",
             "file": "FreeImageRe-v4.1.1-win64.zip",
         },
+    #    {
+    #        "name": "RmlUi",
+    #        "url":  "https://github.com/mikke89/RmlUi/releases/download/6.3/RmlUi-vs2026-win64.zip",
+    #        "extract_folder": "RmlUi",
+    #        "file": "RmlUi-vs2026-win64.zip",
+    #    },
         {
             "name": "mpv",
             "url":  mpv_url,

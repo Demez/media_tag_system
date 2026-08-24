@@ -1,7 +1,5 @@
 #include "main.h"
 
-#include "imgui_internal.h"
-
 
 // ---------------------------------------------------
 // Settings TODO:
@@ -18,9 +16,11 @@ constexpr int SCALAR_OPTION_WIDTH = 192;
 
 void setting_desc( const char* desc )
 {
-	util_imgui_set_tooltip( desc );
+	//util_imgui_set_tooltip( desc );
 }
 
+
+#if 0
 
 template< typename NUM_TYPE >
 NUM_TYPE setting_scalar_option_base( ImGuiDataType type, const char* format, const char* name, const char* desc, NUM_TYPE base_option, NUM_TYPE range_min, NUM_TYPE range_max, NUM_TYPE step, NUM_TYPE step_fast )
@@ -308,9 +308,12 @@ void settings_draw_debug()
 	setting_desc( "may break things lol" );
 }
 
+#endif
+
 
 void settings_draw()
 {
+#if 0
 	if ( app::config.dev_mode )
 	{
 		ImGui::Text( "%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
@@ -393,5 +396,6 @@ void settings_draw()
 
 		sys_browse_to_path( folder );
 	}
+#endif
 }
 

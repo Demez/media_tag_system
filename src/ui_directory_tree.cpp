@@ -1,7 +1,5 @@
 #include "main.h"
 
-#include "imgui_internal.h"
-
 #include <unordered_map>
 #include <unordered_set>
 
@@ -186,9 +184,6 @@ directory_entry_t* dir_tree_get( fs::path& path )
 static bool g_dir_change_from_dir_tree = false;
 
 
-extern bool TreeNodeBehaviorStupid( ImGuiID id, ImGuiTreeNodeFlags flags, const char* label, const char* label_end, bool& label_pressed );
-
-
 bool is_path_part_of_current_dir( u32 depth, const std::string& current_path, char* folder_name )
 {
 	if ( depth >= directory::path_chunks.size() )
@@ -211,6 +206,7 @@ bool is_path_part_of_current_dir( u32 depth, const std::string& current_path, ch
 // this is shit
 void sidebar_draw_directory_recursive( u32 depth, const std::string& current_path )
 {
+#if 0
 	ImGuiTreeNodeFlags node_flags  = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DrawLinesFull;
 	char*              folder_name = fs_get_filename( current_path.c_str(), current_path.size() );
 
@@ -289,14 +285,16 @@ void sidebar_draw_directory_recursive( u32 depth, const std::string& current_pat
 	}
 
 	ImGui::TreePop();
+#endif
 }
 
 
 extern float g_file_info_height;
 
 
-void dir_tree_draw( ImGuiStyle& style )
+void dir_tree_draw()
 {
+#if 0
 	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
 
 	if ( !ImGui::CollapsingHeader( "Folders", ImGuiTreeNodeFlags_DefaultOpen ) )
@@ -428,5 +426,6 @@ void dir_tree_draw( ImGuiStyle& style )
 
 	if ( reset_dir_change_state )
 		g_dir_change_from_dir_tree = false;
+#endif
 }
 

@@ -8,14 +8,18 @@
 #include "handles.h"
 #include "system/system.h"
 
-#include "imgui.h"
 #include "glad/glad.h"
 #include "SDL3/SDL.h"
+
+#include "RmlUi/Core.h"
+#include "RmlUi/Debugger.h"
+
+#include "RmlUi_Platform_SDL.h"
+#include "RmlUi_Renderer_GL3.h"
 
 #include <cstdio>
 #include <vector>
 #include <atomic>
-
 
 HANDLE_GEN_32( h_thumbnail );
 HANDLE_GEN_32( h_job );
@@ -408,7 +412,7 @@ struct image_load_info_t
 	image_t* image;
 
 	// When not 0, The codec will load the smallest version of an image that's larger than this resolution
-	ImVec2   target_size;
+	ivec2    target_size;
 
 	// leads to a lower quality image if the codec has options for this, otherwise load it in max quality
 	bool     load_quick;
@@ -510,21 +514,21 @@ struct gallery_item_draw_t
 	// current media entry
 	media_entry_t* media         = nullptr;
 
-	ImVec2         text_size{};
-	ImVec2         image_size{};
-	ImVec2         image_bounds{};
+	vec2           text_size{};
+	vec2           image_size{};
+	vec2           image_bounds{};
 
 	// float          item_size_y = 0.f;
 
-	ImVec2         cursor_screen_pos{};
-	ImVec2         item_rect_min{};
-	ImVec2         item_rect_max{};
+	ivec2          cursor_screen_pos{};
+	ivec2          item_rect_min{};
+	ivec2          item_rect_max{};
 
 	bool           selected_item = false;
 	bool           item_hovered  = false;
 	bool           visible       = false;
 
-	float          get_height( ImGuiStyle& style );
+	float          get_height();
 };
 
 
@@ -534,34 +538,36 @@ struct gallery_item_draw_t
 // General App Data
 namespace app
 {
-	extern bool         running;
+	extern bool                       running;
 
-	extern SDL_Window*  window;
-	extern bool         window_focused;
-	extern bool         window_resized;
-	extern float        dpi;
+	extern SDL_Window*                window;
+	extern bool                       window_focused;
+	extern bool                       window_resized;
+	extern float                      dpi;
 
-	extern ImVec2       mouse_delta;
-	extern ImVec2       mouse_pos;
-	extern int          mouse_scroll;
-	extern bool         mouse_in_window;
+	extern TextInputMethodEditor_SDL* ime;
+	extern SystemInterface_SDL*       system;
+	extern RenderInterface_GL3*       render;
+	extern Rml::Context*              context;
+
+	extern ivec2                      mouse_delta;
+	extern ivec2                      mouse_pos;
+	extern int                        mouse_scroll;
+	extern bool                       mouse_in_window;
 
 	// extern ImVec4       clear_color;
 
-	extern app_config_t config;
+	extern app_config_t               config;
 
-	extern u32          draw_frame_count;
-	extern bool         in_window_drag;
-	extern bool         in_drag_drop;
+	extern u32                        draw_frame_count;
+	extern bool                       in_window_drag;
+	extern bool                       in_drag_drop;
 }
 
 
 // ImGui Fonts
 namespace font
 {
-	extern ImFont* normal;
-	extern ImFont* normal_bold;
-	extern ImFont* normal_italic;
 }
 
 
@@ -610,13 +616,13 @@ namespace gallery
 	extern u32                                item_size_max;
 	extern bool                               item_size_changed;
 	extern bool                               item_size_changing;
-	extern std::vector< ImVec2 >              item_text_size;
+	extern std::vector< vec2 >                item_text_size;
 
 	extern std::vector< gallery_item_draw_t > item_layout;
 	extern gallery_item_draw_t**              visible_item;
 	extern size_t                             visible_item_count;
 
-	extern ImVec2                             image_bounds;
+	extern vec2                               image_bounds;
 
 	extern bool                               sidebar_draw;
 	extern bool                               content_area_resized;
@@ -648,8 +654,8 @@ namespace image_draw
 	extern e_zoom_mode zoom_mode;
 	extern double      zoom;
 	extern int         zoom_step;  // 0 = 100% zoom
-	extern ImVec2      pos;
-	extern ImVec2      size;
+	extern vec2        pos;
+	extern vec2        size;
 	extern bool        flip_v;
 	extern bool        flip_h;
 	extern float       rot;
@@ -820,7 +826,6 @@ bool                                 delete_file_window( size_t count );
 bool                                 icon_preload();
 void                                 icon_free();
 image_t*                             icon_get_image( e_icon icon_type );
-ImTextureRef                         icon_get_imtexture( e_icon icon_type );
 
 // GLuint                               gl_upload_texture( image_t* image );
 void                                 gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t frame_count );
@@ -852,7 +857,7 @@ void                                 dir_tree_shutdown();
 void                                 dir_tree_add_folder( fs::path& path );
 directory_entry_t*                   dir_tree_get( fs::path& path );
 
-void                                 dir_tree_draw( ImGuiStyle& style );
+void                                 dir_tree_draw();
 
 // returns an index
 //size_t                               dir_tree_add_folder( fs::path& path );

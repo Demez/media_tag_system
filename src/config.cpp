@@ -321,14 +321,14 @@ void config_handle_registered_option( const config_opt_t* opt_list, const size_t
 			}
 			case e_cfg_vec2:
 			{
-				auto value = reinterpret_cast< ImVec2* >( member_ptr );
+				auto value = reinterpret_cast< vec2* >( member_ptr );
 				config_get_vector_arg( parser, *value, 2 );
 				break;
 			}
 			case e_cfg_vec4:
 			case e_cfg_color:
 			{
-				auto value = reinterpret_cast< ImVec4* >( member_ptr );
+				auto value = reinterpret_cast< vec4* >( member_ptr );
 				config_get_vector_arg( parser, *value, 4 );
 				break;
 			}
@@ -394,8 +394,8 @@ void config_reset()
 	app::config.thumbnail_video_cache_path += SEP;
 	app::config.thumbnail_video_cache_path.append( DEFAULT_VIDEO_THUMBNAIL_CACHE, DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN );
 
-	app::config.gallery_header_padding.x   = 6;
-	app::config.gallery_header_padding.y   = 6;
+//	app::config.gallery_header_padding.x   = 6;
+//	app::config.gallery_header_padding.y   = 6;
 }
 
 
@@ -501,8 +501,8 @@ bool config_load()
 
 	app::config.gallery_zoom_default = std::clamp( app::config.gallery_zoom_default, gallery::item_size_min, gallery::item_size_max );
 	gallery::item_size               = app::config.gallery_zoom_default;
-	gallery::image_bounds.x          = gallery::item_size;
-	gallery::image_bounds.y          = gallery::item_size;
+	gallery::image_bounds[ 0 ]       = gallery::item_size;
+	gallery::image_bounds[ 1 ]       = gallery::item_size;
 
 	app::config.vsync                = std::clamp( app::config.vsync, -1, 1 );
 	app::config.sleep_time_no_focus  = std::min( app::config.sleep_time_no_focus, 1000U );
@@ -592,34 +592,35 @@ void config_emit_registered_option_list( kdl_emitter* emitter, const config_opt_
 				kdl_emit_arg( emitter, &value );
 				break;
 			}
-			case e_cfg_vec2:
-			{
-				const auto& var             = *reinterpret_cast< ImVec2* >( member_ptr );
-				value.type                  = KDL_TYPE_NUMBER;
-				value.number.type           = KDL_NUMBER_TYPE_FLOATING_POINT;
-
-				value.number.floating_point = var.x;
-				kdl_emit_arg( emitter, &value );
-
-				value.number.floating_point = var.y;
-				kdl_emit_arg( emitter, &value );
-				break;
-			}
-			case e_cfg_vec4:
-			case e_cfg_color:
-			{
-				const auto& var   = *reinterpret_cast< ImVec4* >( member_ptr );
-				value.type        = KDL_TYPE_NUMBER;
-				value.number.type = KDL_NUMBER_TYPE_FLOATING_POINT;
-
-				for ( u8 v = 0; v < 4; v++ )
-				{
-					value.number.floating_point = var[ v ];
-					kdl_emit_arg( emitter, &value );
-				}
-
-				break;
-			}
+			//case e_cfg_vec2:
+			//{
+			//	const auto& var             = *reinterpret_cast< vec2* >( member_ptr );
+			//	value.type                  = KDL_TYPE_NUMBER;
+			//	value.number.type           = KDL_NUMBER_TYPE_FLOATING_POINT;
+			//
+			//	for ( u8 v = 0; v < 2; v++ )
+			//	{
+			//		value.number.floating_point = var[ v ];
+			//		kdl_emit_arg( emitter, &value );
+			//	}
+			//
+			//	break;
+			//}
+			//case e_cfg_vec4:
+			//case e_cfg_color:
+			//{
+			//	const auto& var   = *reinterpret_cast< vec4* >( member_ptr );
+			//	value.type        = KDL_TYPE_NUMBER;
+			//	value.number.type = KDL_NUMBER_TYPE_FLOATING_POINT;
+			//
+			//	for ( u8 v = 0; v < 4; v++ )
+			//	{
+			//		value.number.floating_point = var[ v ];
+			//		kdl_emit_arg( emitter, &value );
+			//	}
+			//
+			//	break;
+			//}
 			case e_cfg_stdstring:
 			{
 				const auto& var   = *reinterpret_cast< std::string* >( member_ptr );

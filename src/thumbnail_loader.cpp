@@ -555,12 +555,12 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 		thumbnail->image        = ch_calloc< image_t >( 1, e_mem_category_image );
 
 		image_load_info_t load_info{};
-		load_info.image          = thumbnail->image;
-		load_info.load_quick     = true;
-		load_info.threaded_load  = true;
-		load_info.thumbnail_load = true;
-		load_info.target_size.x  = static_cast< float >( app::config.thumbnail_size );
-		load_info.target_size.y  = static_cast< float >( app::config.thumbnail_size );
+		load_info.image            = thumbnail->image;
+		load_info.load_quick       = true;
+		load_info.threaded_load    = true;
+		load_info.thumbnail_load   = true;
+		load_info.target_size[ 0 ] = static_cast< float >( app::config.thumbnail_size );
+		load_info.target_size[ 1 ] = static_cast< float >( app::config.thumbnail_size );
 
 		if ( !image_load( video_thumbnail_path, load_info ) )
 		{
@@ -578,13 +578,13 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 		thumbnail->image = ch_calloc< image_t >( 1, e_mem_category_image );
 
 		image_load_info_t load_info{};
-		load_info.image          = thumbnail->image;
-		load_info.load_quick     = true;
-		load_info.threaded_load  = true;
-		load_info.thumbnail_load = true;
-		load_info.single_frame   = true;
-		load_info.target_size.x  = static_cast< float >( app::config.thumbnail_size );
-		load_info.target_size.y  = static_cast< float >( app::config.thumbnail_size );
+		load_info.image            = thumbnail->image;
+		load_info.load_quick       = true;
+		load_info.threaded_load    = true;
+		load_info.thumbnail_load   = true;
+		load_info.single_frame     = true;
+		load_info.target_size[ 0 ] = static_cast< float >( app::config.thumbnail_size );
+		load_info.target_size[ 1 ] = static_cast< float >( app::config.thumbnail_size );
 
 		if ( !image_load( thumbnail->path, load_info ) )
 		{
@@ -640,7 +640,7 @@ void thumbnail_loader_worker( u32 thread_id )
 		thumbnail_printf( "[THUMBNAIL %d][THREAD %d] STARTING LOAD OF IMAGE: %s\n", thread_data.thumbnail.index, thread_id, thumbnail->path );
 
 		size_t file_hash      = thumbnail_generate_hash( thread_data.file );
-		u32    thumbnail_size = static_cast< u32 >( gallery::image_bounds.x );
+		u32    thumbnail_size = static_cast< u32 >( gallery::image_bounds[ 0 ] );
 
 		if ( app::config.thumbnail_use_fixed_size )
 			thumbnail_size = app::config.thumbnail_size;
@@ -664,13 +664,13 @@ void thumbnail_loader_worker( u32 thread_id )
 			if ( fs_is_file( thumbnail_path.c_str() ) )
 			{
 				// Load Image Normally
-				jxl_thumbnail.image          = ch_calloc< image_t >( 1, e_mem_category_image );
-				jxl_thumbnail.target_size.x  = static_cast< float >( thumbnail_size );
-				jxl_thumbnail.target_size.y  = static_cast< float >( thumbnail_size );
-				jxl_thumbnail.load_quick     = true;
-				jxl_thumbnail.threaded_load  = true;
-				jxl_thumbnail.thumbnail_load = true;
-				jxl_thumbnail.quiet          = true;
+				jxl_thumbnail.image            = ch_calloc< image_t >( 1, e_mem_category_image );
+				jxl_thumbnail.target_size[ 0 ] = static_cast< float >( thumbnail_size );
+				jxl_thumbnail.target_size[ 1 ] = static_cast< float >( thumbnail_size );
+				jxl_thumbnail.load_quick       = true;
+				jxl_thumbnail.threaded_load    = true;
+				jxl_thumbnail.thumbnail_load   = true;
+				jxl_thumbnail.quiet            = true;
 
 				if ( image_load( thumbnail_path.c_str(), jxl_thumbnail ) )
 				{
@@ -970,11 +970,5 @@ void thumbnail_clear_cache()
 
 void thumbnail_cache_debug_draw()
 {
-	ImGui::SeparatorText( "Thumbnail System" );
-	ImGui::Text( "Thread Count: %u", app::config.thumbnail_threads );
-	ImGui::Text( "Save Thread Count: %u", app::config.thumbnail_save_threads );
-
-	ImGui::Text( "Drawn Image Count: %u", gallery::drawn_image_count );
-	ImGui::Text( "Thumbnail Save Queue Size: %u", g_thumbnail_save.count );
 }
 

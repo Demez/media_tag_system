@@ -67,12 +67,12 @@ struct app_config_t
 	bool                      dwm_extend                     = false;
 	bool                      use_custom_colors              = false;
 
-	ImVec2                    gallery_header_padding{};
-	ImVec4                    header_bg_color{};
-	ImVec4                    sidebar_bg_color{};
-	ImVec4                    content_bg_color{};
-
-	ImVec4                    media_bg_color{};
+	//ImVec2                    gallery_header_padding{};
+	//ImVec4                    header_bg_color{};
+	//ImVec4                    sidebar_bg_color{};
+	//ImVec4                    content_bg_color{};
+	//
+	//ImVec4                    media_bg_color{};
 };
 
 // i don't really like this too much, keeping it for a while, might rework later if i can a better idea on how to handle this
@@ -139,8 +139,8 @@ struct config_opt_t
 		static_assert( std::is_arithmetic_v< VAL >, "Template argument VAL must be an arithmetic type!" );
 		static_assert( !std::is_same_v< bool, VAL >, "Template argument VAL should not be a bool for a ranged option!" );
 		static_assert( !std::is_same_v< std::string, VAL >, "Template argument VAL cannot be a string!" );
-		static_assert( !std::is_same_v< ImVec2, VAL >, "Template argument VAL cannot be a an ImVec2!" );
-		static_assert( !std::is_same_v< ImVec4, VAL >, "Template argument VAL cannot be a an ImVec4!" );
+		static_assert( !std::is_same_v< vec2, VAL >, "Template argument VAL cannot be a an vec2!" );
+		//static_assert( !std::is_same_v< vec4, VAL >, "Template argument VAL cannot be a an ImVec4!" );
 
 		if constexpr ( std::is_same_v< VAL, float > )
 		{
@@ -216,12 +216,12 @@ constexpr config_opt_t g_cfg_opt_theme[] = {
 	CONFIG_OPT( e_cfg_bool, "use_custom_colors", use_custom_colors, "" ),
 	CONFIG_OPT( e_cfg_u32, "font_size", font_size, "" ),
 
-	CONFIG_OPT( e_cfg_color, "gallery_header_background_color", header_bg_color, "" ),
-	CONFIG_OPT( e_cfg_color, "gallery_content_bg_color", content_bg_color, "" ),
-	CONFIG_OPT( e_cfg_color, "gallery_sidebar_bg_color", sidebar_bg_color, "" ),
-	CONFIG_OPT( e_cfg_color, "media_background_color", media_bg_color, "" ),
-
-	CONFIG_OPT( e_cfg_vec2, "gallery_header_padding", gallery_header_padding, "" ),
+//	CONFIG_OPT( e_cfg_color, "gallery_header_background_color", header_bg_color, "" ),
+//	CONFIG_OPT( e_cfg_color, "gallery_content_bg_color", content_bg_color, "" ),
+//	CONFIG_OPT( e_cfg_color, "gallery_sidebar_bg_color", sidebar_bg_color, "" ),
+//	CONFIG_OPT( e_cfg_color, "media_background_color", media_bg_color, "" ),
+//
+//	CONFIG_OPT( e_cfg_vec2, "gallery_header_padding", gallery_header_padding, "" ),
 };
 
 

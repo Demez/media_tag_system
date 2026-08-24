@@ -1,11 +1,10 @@
 #include "main.h"
 
-#include "imgui_internal.h"
-
 
 static char g_folder_buf[ 512 ]{};
 
 
+#if 0
 static void draw_vertical_separator( ImDrawList* draw_list, ImGuiStyle& style, bool add_spacing = true )
 {
 	ImVec2 cursor_pos = ImGui::GetCursorPos();
@@ -1029,10 +1028,11 @@ bool gallery_begin_tab_content()
 {
 	return ImGui::BeginChild( "##sidebar_tab_content", {}, 0, ImGuiWindowFlags_NoScrollbar );
 }
-
+#endif
 
 void gallery_view_draw_sidebar()
 {
+#if 0
 	int window_width, window_height;
 	SDL_GetWindowSize( app::window, &window_width, &window_height );
 
@@ -1134,5 +1134,6 @@ void gallery_view_draw_sidebar()
 	//ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, { 0, 0 } );
 	ImGui::EndChild();
 	//ImGui::PopStyleVar();
+#endif
 }
 
