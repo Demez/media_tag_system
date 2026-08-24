@@ -773,6 +773,7 @@ bool handle_event( SDL_Event& event )
 			ImGui::SetNextFrameWantCaptureKeyboard( false );
 			ImGui::SetWindowFocus( nullptr );
 
+			app::window_focused = true;
 			app::window_resized = true;
 			set_frame_draw();
 			media_view_window_resize();
@@ -781,11 +782,14 @@ bool handle_event( SDL_Event& event )
 			break;
 
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
+		case SDL_EVENT_WINDOW_RESTORED:
+		case SDL_EVENT_WINDOW_MAXIMIZED:
 			app::window_focused = true;
 			set_frame_draw();
 			break;
 
 		case SDL_EVENT_WINDOW_FOCUS_LOST:
+		case SDL_EVENT_WINDOW_MINIMIZED:
 			app::window_focused = false;
 
 			// clear focusing of any windows
@@ -862,8 +866,14 @@ bool handle_events()
 
 	int max_events = SDL_PeepEvents( nullptr, 0, SDL_PEEKEVENT, 0, 0 );
 
+	bool need_draw  = app::config.always_draw || app::draw_frame_count > 0;
+
+	// slam it to false when minimized
+	if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
+		need_draw = false;
+
 	// if there is NOTHING to do, then wait forever until we have a new event, uses basically nothing for cpu usage this way
-	if ( max_events == 0 && !app::config.always_draw && app::draw_frame_count == 0 )
+	if ( max_events == 0 && !need_draw )
 	{
 		//printf( "WAITING %zu\n", app::total_time );
 		if ( SDL_WaitEvent( &event ) )
@@ -888,6 +898,13 @@ bool handle_events()
 
 void check_need_draw( bool playing_back_video )
 {
+	if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
+	{
+		app::window_focused   = false;
+		app::draw_frame_count = 0;
+		return;
+	}
+
 	if ( app::config.always_draw )
 	{
 		set_frame_draw();
@@ -1103,8 +1120,6 @@ void main_loop()
 
 		if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
 		{
-			app::window_focused = false;
-			SDL_Delay( 15 );
 			start_time = current_time;
 			continue;
 		}
