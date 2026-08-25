@@ -538,36 +538,36 @@ struct gallery_item_draw_t
 // General App Data
 namespace app
 {
-	extern bool                       running;
+	extern bool         running;
 
-	extern SDL_Window*                window;
-	extern bool                       window_focused;
-	extern bool                       window_resized;
+	extern SDL_Window*  window;
+	extern bool         window_focused;
+	extern bool         window_resized;
+
+	extern ivec2        mouse_delta;
+	extern ivec2        mouse_pos;
+	extern int          mouse_scroll;
+	extern bool         mouse_in_window;
+
+	// extern ImVec4       clear_color;
+
+	extern app_config_t config;
+
+	extern u32          draw_frame_count;
+	extern bool         in_window_drag;
+	extern bool         in_drag_drop;
+}
+
+
+namespace ui
+{
 	extern float                      dpi;
 
+	extern Rml::FileInterface*        filesys;
 	extern TextInputMethodEditor_SDL* ime;
 	extern SystemInterface_SDL*       system;
 	extern RenderInterface_GL3*       render;
 	extern Rml::Context*              context;
-
-	extern ivec2                      mouse_delta;
-	extern ivec2                      mouse_pos;
-	extern int                        mouse_scroll;
-	extern bool                       mouse_in_window;
-
-	// extern ImVec4       clear_color;
-
-	extern app_config_t               config;
-
-	extern u32                        draw_frame_count;
-	extern bool                       in_window_drag;
-	extern bool                       in_drag_drop;
-}
-
-
-// ImGui Fonts
-namespace font
-{
 }
 
 
@@ -814,6 +814,11 @@ bool                                 folder_history_nav_next();
 void                                 set_view_type_gallery();
 void                                 set_view_type_media( bool force_load_media = false );
 void                                 view_type_toggle();
+
+bool                                 ui_init();
+bool                                 ui_load_documents();
+void                                 ui_close_documents();
+void                                 ui_reload();
 
 void                                 update_window_title();
 void                                 folder_load_media_list();

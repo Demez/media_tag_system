@@ -1,7 +1,34 @@
 #include "main.h"
+#include "ui_main.h"
 
 
-static char g_folder_buf[ 512 ]{};
+namespace data
+{
+	namespace gallery
+	{
+		Rml::String folder_path;
+		Rml::String search_input;
+
+		Rml::String file_count_text;
+		Rml::String selected_text;
+	}
+}
+
+
+bool ui_load_datamodels_gallery()
+{
+	// Set up data bindings to synchronize application data.
+	if ( Rml::DataModelConstructor constructor = ui::context->CreateDataModel( "gallery_header" ) )
+	{
+		constructor.Bind( "folder_path", &data::gallery::folder_path );
+		constructor.Bind( "search_input", &data::gallery::search_input );
+
+		constructor.Bind( "file_count", &data::gallery::file_count_text );
+		constructor.Bind( "selected_text", &data::gallery::selected_text );
+	}
+
+	return true;
+}
 
 
 #if 0

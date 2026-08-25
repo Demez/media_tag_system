@@ -1,68 +1,42 @@
 #include "main.h"
 
 
-class CoolSystemInterface : public SystemInterface_SDL
-{
-  public:
-
-	CoolSystemInterface( SDL_Window* window ) :
-		SystemInterface_SDL( window )
-	{
-	}
-
-	~CoolSystemInterface() = default;
-	virtual bool LogMessage( Rml::Log::Type type, const Rml::String& message ) override
-	{
-		printf( "RmlUi: %s\n", message.c_str() );
-
-		return true;
-	}
-};
-
-
-struct ApplicationData
-{
-	bool        show_text = true;
-	Rml::String animal    = "dog";
-} my_data;
-
-
 // General App Data
 namespace app
 {
-	bool                       running        = true;
+	bool         running        = true;
 
-	SDL_Window*                window         = nullptr;
-	bool                       window_focused = false;
-	bool                       window_resized = false;
-	float                      dpi            = 1.0;
-
-	TextInputMethodEditor_SDL* ime            = nullptr;
-	SystemInterface_SDL*       system         = nullptr;
-	RenderInterface_GL3*       render         = nullptr;
-	Rml::Context*              context        = nullptr;
+	SDL_Window*  window         = nullptr;
+	bool         window_focused = false;
+	bool         window_resized = false;
 
 	// ImVec4                       clear_color = ImVec4( 0.15f, 0.15f, 0.15f, 1.00f );
 	// ImVec4       clear_color    = ImVec4( 0.05f, 0.05f, 0.05f, 0.0f );
 	// ImVec4       clear_color    = ImVec4( 0.f, 0.f, 0.f, 0.f );
 	// ImVec4       clear_color    = ImVec4( 1.f, 1.f, 0.f, 0.f );
 
-	ivec2                      mouse_delta;
-	ivec2                      mouse_pos;
-	int                        mouse_scroll     = 0;
-	bool                       mouse_in_window  = false;
+	ivec2        mouse_delta;
+	ivec2        mouse_pos;
+	int          mouse_scroll     = 0;
+	bool         mouse_in_window  = false;
 
-	u32                        draw_frame_count = 0;
-	bool                       in_window_drag   = false;
-	bool                       in_drag_drop     = false;
+	u32          draw_frame_count = 0;
+	bool         in_window_drag   = false;
+	bool         in_drag_drop     = false;
 
-	app_config_t               config{};
+	app_config_t config{};
 }
 
 
-// ImGui Fonts
-namespace font
+namespace ui
 {
+	float                      dpi     = 1.0;
+
+	Rml::FileInterface*        filesys = nullptr;
+	TextInputMethodEditor_SDL* ime     = nullptr;
+	SystemInterface_SDL*       system  = nullptr;
+	RenderInterface_GL3*       render  = nullptr;
+	Rml::Context*              context = nullptr;
 }
 
 
@@ -518,7 +492,17 @@ void update_dpi( float dpi_override )
 		scale = CLAMP( dpi_override, 0.25f, 5.f );
 	}
 
-	app::dpi = scale;
+	ui::dpi = scale;
+
+	// update RmlUi DPI
+	ui::context->SetDensityIndependentPixelRatio( scale );
+
+	// needed for css vars
+//	Rml::Factory::ClearStyleSheetCache();
+//	Rml::Factory::ClearTemplateCache();
+	
+	// :/
+	ui_reload();
 
 	gallery_view_reset_text_size();
 	set_frame_draw();
@@ -579,6 +563,11 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 #ifdef _WIN32
 		case SDL_EVENT_WINDOW_EXPOSED:
 		{
+			int width, height;
+			SDL_GetWindowSize( app::window, &width, &height );
+			ui::render->SetViewport( width, height );
+			ui::context->SetDimensions( Rml::Vector2i( width, height ) );
+
 			app::in_window_drag = true;
 			thumbnail_loader_update();
 			window_quick_draw();
@@ -588,6 +577,11 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 #endif
 		case SDL_EVENT_WINDOW_RESIZED:
 		{
+			int width, height;
+			SDL_GetWindowSize( app::window, &width, &height );
+			ui::render->SetViewport( width, height );
+			ui::context->SetDimensions( Rml::Vector2i( width, height ) );
+
 			app::window_resized = true;
 			thumbnail_loader_update();
 			window_quick_draw();
@@ -609,7 +603,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 
 bool handle_event( SDL_Event& event )
 {
-	RmlSDL::InputEventHandler( app::context, app::window, event );
+	RmlSDL::InputEventHandler( ui::context, app::window, event );
 
 	switch ( event.type )
 	{
@@ -644,9 +638,37 @@ bool handle_event( SDL_Event& event )
 			break;
 
 		case SDL_EVENT_KEY_DOWN:
-		case SDL_EVENT_KEY_UP:
+		{
+			if ( event.key.scancode == SDL_SCANCODE_F10 )
+			{
+				ui_reload();
+			}
+			else if ( event.key.scancode == SDL_SCANCODE_F8 )
+			{
+				Rml::Debugger::SetVisible( !Rml::Debugger::IsVisible() );
+			}
+			else if ( event.key.scancode == SDL_SCANCODE_F2 )
+			{
+				update_dpi( 0.f );
+			}
+			else if ( event.key.scancode == SDL_SCANCODE_F3 )
+			{
+				update_dpi( ui::dpi - 0.25f );
+			}
+			else if ( event.key.scancode == SDL_SCANCODE_F4 )
+			{
+				update_dpi( ui::dpi + 0.25f );
+			}
+
 			set_frame_draw( 1 );
 			break;
+		}
+
+		case SDL_EVENT_KEY_UP:
+		{
+			set_frame_draw( 1 );
+			break;
+		}
 
 		case SDL_EVENT_MOUSE_WHEEL:
 			set_frame_draw( 2 );
@@ -684,6 +706,9 @@ bool handle_event( SDL_Event& event )
 			//// clear focusing of any windows
 			//ImGui::SetNextFrameWantCaptureKeyboard( false );
 			//ImGui::SetWindowFocus( nullptr );
+
+			ui::render->SetViewport( width, height );
+			ui::context->SetDimensions( Rml::Vector2i( width, height ) );
 
 			app::window_focused = true;
 			app::window_resized = true;
@@ -787,8 +812,10 @@ bool handle_events()
 	// if there is NOTHING to do, then wait forever until we have a new event, uses basically nothing for cpu usage this way
 	if ( max_events == 0 && !need_draw )
 	{
+		double timeout = ui::context->GetNextUpdateDelay() * 1000;
+
 		//printf( "WAITING %zu\n", app::total_time );
-		if ( SDL_WaitEvent( &event ) )
+		if ( SDL_WaitEventTimeout( &event, timeout ) )
 		{
 			//printf( "END WAITING %zu\n", app::total_time );
 			if ( handle_event( event ) )
@@ -956,6 +983,11 @@ void main_loop()
 
 	while ( app::running )
 	{
+		//if ( app::config.always_draw )
+		//	ui::context->RequestNextUpdate( 0.0 );
+		//else
+			ui::context->RequestNextUpdate( DBL_MAX );
+
 		bool playing_back_video = check_mpv_playback();
 
 		// -----------------------------------------------------------------------------------
@@ -1070,14 +1102,15 @@ void shutdown()
 {
 	config_save();
 
-	if ( app::context )
+	if ( ui::context )
 		Rml::RemoveContext( "main" );
 
 	Rml::Shutdown();
 
-	delete app::system;
-	delete app::render;
-	delete app::ime;
+	delete ui::system;
+	delete ui::render;
+	delete ui::ime;
+	delete ui::filesys;
 
 	render_shutdown();
 
@@ -1190,63 +1223,10 @@ int startup()
 	// ----------------------------------------------------------------
 	// RmlUi
 
-	app::system = new CoolSystemInterface( app::window );
-	app::render = new RenderInterface_GL3;
-	app::ime    = new TextInputMethodEditor_SDL;
-
-	Rml::SetSystemInterface( app::system );
-	Rml::SetRenderInterface( app::render );
-	Rml::SetTextInputHandler( app::ime );
-
-	// RmlUi initialisation.
-	if ( !Rml::Initialise() )
+	if ( !ui_init() )
 	{
-		printf( "Failed to startup RmlUi\n" );
-		return 1;
-	}
-
-	// Create the main RmlUi context.
-
-	int width, height;
-	SDL_GetWindowSize( app::window, &width, &height );
-
-	app::render->SetViewport( width, height );
-
-	app::context = Rml::CreateContext( "main", Rml::Vector2i( width, height ) );
-	if ( !app::context )
-	{
-		Rml::Shutdown();
 		return -1;
 	}
-
-	fs::path_str font_path = sys_get_exe_folder_native_str();
-	font_path += SEP;
-	font_path += PATH_FMT( "ui/assets/LatoLatin-Regular.ttf" );
-
-	std::string font_path_str = sys_path_to_string( font_path );
-
-	// Tell RmlUi to load the given fonts.
-	bool        font_loaded   = Rml::LoadFontFace( font_path_str );
-
-	Rml::Debugger::Initialise( app::context );
-
-	// Set up data bindings to synchronize application data.
-	if ( Rml::DataModelConstructor constructor = app::context->CreateDataModel( "animals" ) )
-	{
-		constructor.Bind( "show_text", &my_data.show_text );
-		constructor.Bind( "animal", &my_data.animal );
-	}
-
-	fs::path_str doc_path = sys_get_exe_folder_native_str();
-	doc_path += SEP;
-	doc_path += PATH_FMT( "ui" SEP_S "data" SEP_S "tutorial.rml" );
-
-	std::string doc_path_str = sys_path_to_string( doc_path );
-
-	// Load and show the tutorial document.
-	Rml::ElementDocument* document     = app::context->LoadDocument( doc_path_str );
-	if ( document )
-		document->Show();
 
 	// ----------------------------------------------------------------
 
@@ -1291,10 +1271,10 @@ int startup()
 
 	// ----------------------------------------------------------------
 
-//	if ( !SDL_AddEventWatch( sdl_window_resize_watcher, nullptr ) )
-//	{
-//		printf( "Failed to add SDL Event Watch\n" );
-//	}
+	if ( !SDL_AddEventWatch( sdl_window_resize_watcher, nullptr ) )
+	{
+		printf( "Failed to add SDL Event Watch\n" );
+	}
 	
 	g_event_draw.type      = SDL_EVENT_USER;
 	g_event_draw.user.code = SDL_RegisterEvents( 1 );

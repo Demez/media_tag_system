@@ -95,17 +95,17 @@ void frame_draw_start()
 	//else
 	//	glClearColor( app::config.media_bg_color.x, app::config.media_bg_color.y, app::config.media_bg_color.z, app::config.media_bg_color.w );
 
-	glClearColor( 0.1f, 0.1f, 0.1f, 0.5f );
+	glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
 
 	glClear( GL_COLOR_BUFFER_BIT );
 
 	// Update the context to reflect any changes resulting from input events, animations,
 	// modified and added elements, or changed data in data bindings.
-	app::context->Update();
+	ui::context->Update();
 
 	// Prepare the application for rendering, such as by clearing the window. This calls
 	// into the RmlUi backend interface, replace with your own procedures as appropriate.
-	app::render->BeginFrame();
+	ui::render->BeginFrame();
 }
 
 
@@ -116,9 +116,9 @@ void frame_draw_end()
 
 	// Render the user interface. All geometry and other rendering commands are now
 	// submitted through the render interface.
-	app::context->Render();
+	ui::context->Render();
 
-	app::render->EndFrame();
+	ui::render->EndFrame();
 
 	// ImGui_ImplOpenGL3_RenderDrawData( ImGui::GetDrawData() );
 	SDL_GL_SwapWindow( app::window );

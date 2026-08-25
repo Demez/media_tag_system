@@ -1,0 +1,42 @@
+<rml>
+	<head>
+		<link type="text/css" href="tutorial.rcss"/>
+		<title>Window</title>
+		<style>
+			body
+			{
+				width: 100%;
+				height: 100%;
+
+				margin-top: 0px;
+				margin-bottom: 0px;
+				margin-left: 0px;
+				margin-right: 0px;
+
+			}
+		</style>
+		<title>Gallery</title>
+	</head>
+
+	<body class="window">
+		<div class="header" data-model="gallery_header">
+			<div class="nav_bar">
+				<button id="nav_back"></button>
+				<button id="nav_forward"></button>
+				<button id="nav_refresh">R</button>
+
+				<input class="path_bar" id="folder_path" type="text" data-value="folder_path"/>
+
+				<button id="nav_go"></button>
+
+				<input class="search_box" type="text" data-value="search_input"/>
+			</div>
+		</div>
+
+		<sidebar>
+			<h1>SIDEBAR</h1>
+		</sidebar>
+
+	</body>
+	
+</rml>

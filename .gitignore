@@ -41,8 +41,13 @@
 *.dwo
 
 build/*
-out/*
 thirdparty/*
 !thirdparty/stb
 __tmp/
 .idea/
+
+out/*.dll
+out/*.exe
+out/*.com
+thumbnail_cache/*
+thumbnail_video_cache/*

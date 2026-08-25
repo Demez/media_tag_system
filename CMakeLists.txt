@@ -240,6 +240,7 @@ set(
     src/gl_render.cpp
     
 	src/ui_main.cpp
+	src/ui_main.h
 	src/ui_directory_tree.cpp
 	src/ui_settings_menu.cpp
     src/ui_view_gallery.cpp
