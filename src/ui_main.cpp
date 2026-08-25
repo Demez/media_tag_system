@@ -256,7 +256,7 @@ void set_view_type_media( bool force_load_media )
 // =================================================================================
 
 const char* g_ui_document_paths[] = {
-	"data" SEP_S "tutorial.rml",
+	"data" SEP_S "gallery.rml",
 };
 
 constexpr size_t      g_ui_document_count = ARR_SIZE( g_ui_document_paths );

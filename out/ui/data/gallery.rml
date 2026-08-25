@@ -1,6 +1,6 @@
 <rml>
 	<head>
-		<link type="text/css" href="tutorial.rcss"/>
+		<link type="text/css" href="gallery.rcss"/>
 		<title>Window</title>
 		<style>
 			body
