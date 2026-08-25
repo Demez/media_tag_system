@@ -116,12 +116,17 @@ void job_shutdown()
 	g_job_lock.lock();
 	g_job_queue_size.store( 64 );
 	g_job_lock.unlock();
-
-	for ( u32 i = 0; i < app::config.job_threads; i++ )
+	
+	if ( g_job_threads )
 	{
-		g_job_queue_size.notify_all();
-		g_job_threads[ i ]->join();
-		delete g_job_threads[ i ];
+		for ( u32 i = 0; i < app::config.job_threads; i++ )
+		{
+			g_job_queue_size.notify_all();
+			g_job_threads[ i ]->join();
+			delete g_job_threads[ i ];
+		}
+
+		ch_free( e_mem_category_general, g_job_threads );
 	}
 
 	if ( g_job_worker_data )
