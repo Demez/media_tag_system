@@ -429,7 +429,9 @@ void media_view_clamp_to_bounds()
 
 
 // or DBL_EPSILON ?
-constexpr double             ZOOM_EPSILON = 0.01;
+constexpr double             ZOOM_EPSILON = 0.001;
+// constexpr double             ZOOM_TOO_CLOSE = 0.1;  // media_zoom_scale * 0.5 ?  // 0.05
+constexpr double             ZOOM_TOO_CLOSE = 0.5;
 
 static size_t                g_zoom_snap_0_index;
 static std::vector< double > g_zoom_snap_values;
@@ -457,6 +459,18 @@ bool media_view_is_zoom_level( double snap_level, double new_zoom )
 		return false;
 
 	if ( new_zoom < snap_level - ZOOM_EPSILON )
+		return false;
+
+	return true;
+}
+
+
+bool media_view_same_zoom_level( double zoom_a, double zoom_b )
+{
+	if ( zoom_a > zoom_b + ZOOM_EPSILON )
+		return false;
+
+	if ( zoom_a < zoom_b - ZOOM_EPSILON )
 		return false;
 
 	return true;
@@ -520,6 +534,9 @@ void media_view_build_zoom_steps( double fit_zoom, double fit_scale_up_zoom )
 
 	g_zoom_snap_values.push_back( ZOOM_MAX );
 
+	// keep a list of zoom values we don't want filtered out
+	const std::vector< double > special_zoom_levels = g_zoom_snap_values;
+
 	// build the standard zoom levels now
 
 	// Zooming under 100%
@@ -547,7 +564,7 @@ void media_view_build_zoom_steps( double fit_zoom, double fit_scale_up_zoom )
 	std::qsort( g_zoom_snap_values.data(), g_zoom_snap_values.size(), sizeof( double ), qsort_zoom_values );
 
 	// remove values that are too close to each other
-	for ( size_t zoom_i = 1; zoom_i < g_zoom_snap_values.size() - 1;  )
+	for ( size_t zoom_i = 1; zoom_i < g_zoom_snap_values.size() - 1; )
 	{
 		double zoom_level_prev = g_zoom_snap_values[ zoom_i - 1 ];
 		double zoom_level      = g_zoom_snap_values[ zoom_i ];
@@ -559,8 +576,17 @@ void media_view_build_zoom_steps( double fit_zoom, double fit_scale_up_zoom )
 			continue;
 		}
 
+		bool prev_cant_remove = false;
+		bool cur_cant_remove  = false;
+
+		for ( const double keep_zoom_level : special_zoom_levels )
+		{
+			prev_cant_remove |= media_view_same_zoom_level( zoom_level_prev, keep_zoom_level );
+			cur_cant_remove |= media_view_same_zoom_level( zoom_level, keep_zoom_level );
+		}
+
 		// don't touch these
-		if ( zoom_level == fit_zoom || zoom_level == fit_scale_up_zoom )
+		if ( prev_cant_remove && cur_cant_remove )
 		{
 			zoom_i++;
 			continue;
@@ -568,21 +594,19 @@ void media_view_build_zoom_steps( double fit_zoom, double fit_scale_up_zoom )
 
 		double zoom_diff_a = fabs( zoom_level - zoom_level_prev );
 
-		//double zoom_threshold = 1.0;
-		//
-		//if ( zoom_level > 1.0 )
-		//	zoom_threshold += app::config.media_zoom_scale;
-		//else
-		//	zoom_threshold -= app::config.media_zoom_scale;
-
-		if ( zoom_diff_a < 0.05 * zoom_level )
+		if ( zoom_diff_a < ( ZOOM_TOO_CLOSE * app::config.media_zoom_scale ) * zoom_level )
 		{
-			vec_remove_index( g_zoom_snap_values, zoom_i );
+			// if we can't remove the current zoom step, remove the previous one
+			if ( cur_cant_remove )
+			{
+				vec_remove_index( g_zoom_snap_values, zoom_i - 1 );
+			}
+			// otherwise, remove the current one
+			else
+			{
+				vec_remove_index( g_zoom_snap_values, zoom_i );
+			}
 		}
-		//else if ( zoom_diff_b < 0.05 * zoom_level )
-		//{
-		//	vec_remove_index( g_zoom_snap_values, zoom_i );
-		//}
 		else
 		{
 			zoom_i++;

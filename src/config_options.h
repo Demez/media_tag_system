@@ -49,7 +49,7 @@ struct app_config_t
 	u32                       font_size                      = 17;
 
 	u32                       gallery_zoom_default           = 200;
-	float                     media_zoom_scale               = 0.1f;
+	float                     media_zoom_scale               = 0.2f;
 
 	bool                      no_video                       = false;
 	bool                      gallery_show_filenames         = true;
