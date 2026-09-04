@@ -4,25 +4,6 @@
 #include "sys_win32.h"
 #include "main.h"
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#include <Windows.h>
-#include <ole2.h>
-#include <windowsx.h> // GET_X_LPARAM(), GET_Y_LPARAM()
-#include <direct.h>
-#include <shellapi.h>
-#include <shlwapi.h> 
-#include <shlobj.h>
-#include <shlobj_core.h> 
-#include <time.h>
-#include <atlbase.h>
-#include <psapi.h>
-#include <dwmapi.h>
-#include <strsafe.h>
-#include <sys/stat.h>
-
 #include <profileapi.h>
 #include <stdint.h>
 #include <thread>
@@ -307,6 +288,57 @@ bool sys_set_window( SDL_Window* window )
 	}
 
 	return true;
+}
+
+
+
+
+ImVec2 sys_win32_get_startup_pos()
+{
+	// fallback to mouse position for console app, this is too unreliable
+#ifndef CONSOLE_APP
+	HWND hwnd = nullptr;
+
+#if 0 //def CONSOLE_APP
+	// this is the console version, so this opened and stole focus from the previous window
+	HWND console = GetConsoleWindow();
+
+	if ( console )
+	{
+		// try to get the window focused before the console stole it
+		// this should get file explorer or whatever app opened us
+		// ...except it's a little finicky and unreliable, hmmm
+		hwnd = GetWindow( console, GW_HWNDNEXT );
+	}
+	else
+#endif
+	{
+		hwnd = GetForegroundWindow();
+	}
+
+	//if ( hwnd && IsWindowVisible( hwnd ) )
+	if ( hwnd )
+	{
+		HMONITOR mon = MonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST );
+
+		MONITORINFO mon_info{};
+		mon_info.cbSize = sizeof( MONITORINFO );
+
+		if ( GetMonitorInfo( mon, &mon_info ) )
+		{
+			// use the work area to center on
+			RECT rect    = mon_info.rcWork;
+
+			int  centerX = rect.left + ( rect.right - rect.left ) / 2;
+			int  centerY = rect.top + ( rect.bottom - rect.top ) / 2;
+
+			return ImVec2( centerX, centerY );
+		}
+	}
+#endif
+
+	// default to center on mouse position
+	return { FLT_MIN, FLT_MIN };
 }
 
 

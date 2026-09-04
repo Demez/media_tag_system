@@ -7,6 +7,7 @@
 constexpr float      M_PI   = 3.14159265358979323846f;
 constexpr float      TO_RAD = M_PI / 180.f;
 
+constexpr ImVec2     DEFAULT_WINDOW_SIZE( 1000, 600 );
 
 extern SDL_GLContext g_gl_context;
 extern bool          g_in_draw;
@@ -218,25 +219,45 @@ bool render_window_create()
 		return 1;
 	}
 
-	// Get the global mouse pos
-	float mouse_x, mouse_y;
-	SDL_GetGlobalMouseState( &mouse_x, &mouse_y );
-
-	SDL_Point mouse;
-	mouse.x                     = static_cast< int >( mouse_x );
-	mouse.y                     = static_cast< int >( mouse_y );
-	SDL_DisplayID    display_id = SDL_GetDisplayForPoint( &mouse );
-
 	// Create Window
 	SDL_PropertiesID props      = SDL_CreateProperties();
 
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 1000 );
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 600 );
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, DEFAULT_WINDOW_SIZE.x );
+	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, DEFAULT_WINDOW_SIZE.y );
+
+	bool auto_center = true;
+
+#if _WIN32
+	ImVec2 startup_pos = sys_win32_get_startup_pos();
+
+	if ( startup_pos.x == FLT_MIN )
+	{
+		printf( "No startup pos from windows? defaulting to center on monitor mouse is on\n" );
+	}
+	else
+	{
+		auto_center = false;
+		SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_X_NUMBER, startup_pos.x - ( DEFAULT_WINDOW_SIZE.x / 2 ) );
+		SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, startup_pos.y - ( DEFAULT_WINDOW_SIZE.y / 2 ) );
+	}
+#endif
 
 	// for some reason, SDL_WINDOWPOS_UNDEFINED is ALWAYS centering the window in the middle on the primary display
 	// so im trying to make it feel better and hacking it to open the window on the monitor the mouse is currently on
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
-	SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
+	if ( auto_center )
+	{
+		// Get the global mouse pos
+		float mouse_x, mouse_y;
+		SDL_GetGlobalMouseState( &mouse_x, &mouse_y );
+
+		SDL_Point mouse;
+		mouse.x                  = static_cast< int >( mouse_x );
+		mouse.y                  = static_cast< int >( mouse_y );
+		SDL_DisplayID display_id = SDL_GetDisplayForPoint( &mouse );
+
+		SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
+		SDL_SetNumberProperty( props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_UNDEFINED_DISPLAY( display_id ) );
+	}
 
 	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true );
 	SDL_SetBooleanProperty( props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true );
@@ -295,6 +316,8 @@ bool render_window_create()
 	SDL_DestroyProperties( props );
 
 	SDL_ShowWindow( app::window );
+	SDL_RaiseWindow( app::window );
+
 	SDL_SetWindowMinimumSize( app::window, 200, 200 );
 	return true;
 }

@@ -1276,7 +1276,8 @@ void media_view_input()
 
 	static bool drag_cooldown     = false;
 
-	if ( mouse_middle_down && !mouse_hover_imgui_window && mouse_in_client_area )
+	// if ( mouse_middle_down && !mouse_hover_imgui_window && mouse_in_client_area )
+	if ( mouse_middle_down && !mouse_hover_imgui_window )
 	{
 		if ( !drag_cooldown )
 		{

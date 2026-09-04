@@ -429,6 +429,11 @@ if ( WIN32 )
 		"/SUBSYSTEM:CONSOLE"
 	)
 
+	target_compile_definitions(
+		media_tag_system_con PRIVATE
+		"CONSOLE_APP"
+	)
+
 	set_target_properties(
 		media_tag_system_con PROPERTIES
 		SUFFIX ".com"

@@ -182,6 +182,28 @@ char*                   sys_get_error();
 void                    sys_print_last_error();
 
 // --------------------------------------------------------------------------------------------------------
+// Window creation - WIN32 ONLY
+
+#ifdef _WIN32
+struct window_create_data_t
+{
+	const fs::path_char* window_title;
+
+	ImVec2               size;
+	ImVec2               size_min;
+};
+
+// returns a HWND
+void* sys_window_create( const window_create_data_t& create_data );
+void sys_window_destroy( void* window );
+
+void sys_win32_message( MSG* msg );
+
+ImVec2 sys_win32_get_startup_pos();
+
+#endif
+
+// --------------------------------------------------------------------------------------------------------
 // Filesystem
 
 // get folder exe is stored in

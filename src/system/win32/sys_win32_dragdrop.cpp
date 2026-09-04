@@ -2,36 +2,27 @@
 #include "sys_win32.h"
 
 
-// #include <WinUser.h>
-#include <Windows.h>
-#include <atlbase.h>
-// #include <direct.h>
-//#include <fileapi.h>
-// #include <handleapi.h>
-// #include <io.h>
-// #include <memory>
-#include <shlobj_core.h>
-// #include <shlwapi.h>
-#include <shellapi.h>
-#include <windowsx.h>  // GET_X_LPARAM/GET_Y_LPARAM
-#include <wtypes.h>    // HWND
-
-
 CLIPFORMAT g_drop_formats[] = {
 	// CF_TEXT,   // dragging in a file path/url from discord or your internet browser
 	CF_HDROP,  // file drop
 };
 
 
-constexpr ULONG      g_drop_format_count   = ARR_SIZE( g_drop_formats );
+constexpr ULONG        g_drop_format_count   = ARR_SIZE( g_drop_formats );
 
-f_drag_drop_receive* g_f_drag_drop_receive = nullptr;
+f_drag_drop_receive*   g_f_drag_drop_receive = nullptr;
+
+static bool            TRIED_TO_DROP_ON_SELF = false;
+static bool            DROP_CANCELLED_LAST = false;
 
 
 bool STDMETHODCALLTYPE GetFilesFromDataObject( FORMATETC& fmtetc, IDataObject* pDataObj, std::vector< fs::path >& drop_files )
 {
 	if ( !g_f_drag_drop_receive )
 		return false;
+
+	//if ( app::in_drag_drop )
+	//	return true;
 
 	STGMEDIUM pmedium;
 	HRESULT   ret = pDataObj->GetData( &fmtetc, &pmedium );
@@ -117,9 +108,17 @@ struct window_drop_target : public IDropTarget
 
 	HRESULT STDMETHODCALLTYPE DragEnter( IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect ) override
 	{
+		//if ( app::in_drag_drop )
+		//	S_FALSE;
+
 		// needed?
 		// FORMATETC formats;
 		// pDataObj->EnumFormatEtc( DATADIR_GET, formats );
+
+		TRIED_TO_DROP_ON_SELF = false;
+
+		if ( app::in_drag_drop )
+			TRIED_TO_DROP_ON_SELF = true;
 
 		send_frame_draw_event();
 
@@ -142,6 +141,10 @@ struct window_drop_target : public IDropTarget
 	HRESULT STDMETHODCALLTYPE DragOver( DWORD grfKeyState, POINTL pt, DWORD* pdwEffect ) override
 	{
 		send_frame_draw_event();
+
+		if ( app::in_drag_drop )
+			TRIED_TO_DROP_ON_SELF = true;
+
 		get_drop_effect( pdwEffect );
 
 		return S_OK;
@@ -150,31 +153,47 @@ struct window_drop_target : public IDropTarget
 	HRESULT STDMETHODCALLTYPE DragLeave() override
 	{
 		send_frame_draw_event();
+
+		//if ( app::in_drag_drop )
+		//	S_FALSE;
+
+		if ( app::in_drag_drop )
+		{
+			// TRIED_TO_DROP_ON_SELF = false;
+			return S_OK;
+		}
+
 		return S_OK;
 	}
 
 	HRESULT STDMETHODCALLTYPE Drop( IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect ) override
 	{
+		if ( app::in_drag_drop )
+		{
+			TRIED_TO_DROP_ON_SELF = true;
+			return S_OK;
+		}
+
 		send_frame_draw_event();
 
 		FORMATETC fmtetc = { CF_TEXT, 0, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
 		bool      valid  = IsValidClipboardType( pDataObj, fmtetc );
 		if ( !valid )
-			return S_FALSE;
+			return S_OK;
 
 		std::vector< fs::path > drop_files;
 
 		if ( !GetFilesFromDataObject( fmtetc, pDataObj, drop_files ) )
-			return S_FALSE;
+			return S_OK;
 
 		// TODO: make async/non-blocking
 		// use a new SDL user event instead, at least until we get fullscreen media loading on a job
 
 		if ( drop_files.empty() )
-			return S_FALSE;
+			return S_OK;
 
 		if ( !g_f_drag_drop_receive( drop_files ) )
-			return S_FALSE;
+			return S_OK;
 
 		// this seems to behave weirdly lol
 		// SetFocus( window_hwnd );
@@ -223,7 +242,7 @@ struct window_drop_target : public IDropTarget
 };
 
 
-std::vector< window_drop_target > g_drop_target;
+std::vector< window_drop_target* > g_drop_target;
 
 
 // ------------------------------------------------------------------------------------------------------------------------
@@ -247,9 +266,11 @@ bool drag_drop_register( HWND hwnd )
 
 		printf( "RegisterDragDrop failed\n" );
 		sys_print_last_error();
+		target->Release();
 		return false;
 	}
 
+	g_drop_target.push_back( target );
 	return true;
 }
 
@@ -260,8 +281,9 @@ void drag_drop_remove( HWND hwnd )
 
 	for ( size_t i = 0; i < g_drop_target.size(); i++ )
 	{
-		if ( g_drop_target[ i ].window_hwnd == hwnd )
+		if ( g_drop_target[ i ]->window_hwnd == hwnd )
 		{
+			g_drop_target[ i ]->Release();
 			g_drop_target.erase( g_drop_target.begin() + i );
 			return;
 		}
@@ -277,7 +299,7 @@ void drag_drop_remove( HWND hwnd )
 
 struct DropSourceNotify : public IDropSourceNotify
 {
-	LONG            ref = 0L;
+	LONG            ref = 1L;
 	HWND            hwnd{};
 
 	virtual HRESULT DragEnterTarget( HWND hwndTarget ) override
@@ -285,8 +307,8 @@ struct DropSourceNotify : public IDropSourceNotify
 		hwnd = hwndTarget;
 
 		// does nothing???
-		if ( hwndTarget == g_main_hwnd )
-			return S_FALSE;
+		//if ( hwndTarget == g_main_hwnd )
+		//	return S_FALSE;
 
 		return S_OK;
 	}
@@ -325,6 +347,9 @@ struct DropSourceNotify : public IDropSourceNotify
 
 		ULONG uRet = --ref;
 
+		if ( uRet == 0 )
+			delete this;
+
 		return uRet;
 	}
 };
@@ -332,17 +357,32 @@ struct DropSourceNotify : public IDropSourceNotify
 
 struct DropSource : public IDropSource
 {
-	LONG             ref = 0L;
-	DropSourceNotify notify{};
+	LONG             ref = 1L;
+	DropSourceNotify* notify{};
 	DWORD            key = 0;
+
+	DropSource()
+	{
+		notify = new DropSourceNotify;
+	}
+
+	~DropSource()
+	{
+		notify->Release();
+	}
 
 	virtual HRESULT QueryContinueDrag( BOOL fEscapePressed, DWORD grfKeyState ) override
 	{
 		if ( fEscapePressed )
 			return DRAGDROP_S_CANCEL;
 
-		if ( !(grfKeyState & key) )
+		if ( !( grfKeyState & key ) )
+		{
+			//if ( notify.hwnd == g_main_hwnd )
+			//	return DRAGDROP_S_CANCEL;
+
 			return DRAGDROP_S_DROP;
+		}
 
 		return S_OK;
 	}
@@ -350,10 +390,10 @@ struct DropSource : public IDropSource
 	virtual HRESULT GiveFeedback( DWORD dwEffect ) override
 	{
 		// TODO: use the deny cursor or whatever it's called
-		// if ( notify.hwnd == g_main_hwnd )
-		// {
-		// 	return S_OK;
-		// }
+	//	if ( notify.hwnd == g_main_hwnd )
+	//	{
+	//		return S_OK;
+	//	}
 
 		return DRAGDROP_S_USEDEFAULTCURSORS;
 	}
@@ -377,7 +417,7 @@ struct DropSource : public IDropSource
 		// https://gitlab.com/tortoisegit/tortoisegit/-/blob/master/src/Utils/DragDropImpl.cpp
 		else if ( riid == IID_IDropSourceNotify )
 		{
-			return notify.QueryInterface( riid, ppvObject );
+			return notify->QueryInterface( riid, ppvObject );
 		}
 		else
 		{
@@ -399,6 +439,9 @@ struct DropSource : public IDropSource
 			return 0;
 
 		ULONG uRet = --ref;
+
+		if ( uRet == 0 )
+			delete this;
 
 		return uRet;
 
@@ -424,35 +467,84 @@ void sys_do_drag_drop_files( const std::vector< fs::path >& files, u32 sdl_mouse
 	if ( !sys_get_data_obj_for_files( files, file_obj ) )
 		return;
 
-	DropSource source{};
-	DWORD      out_effect = 0;
+	auto  source     = new DropSource;
+	DWORD out_effect = 0;
 
 	switch ( sdl_mouse_btn )
 	{
 		default:
 		case SDL_BUTTON_LEFT:
-			source.key = MK_LBUTTON;
+			source->key = MK_LBUTTON;
 			break;
 
 		case SDL_BUTTON_RIGHT:
-			source.key = MK_RBUTTON;
+			source->key = MK_RBUTTON;
 			break;
 	}
 
+	if ( DROP_CANCELLED_LAST )
+		printf( "TEMP\n" );
+
 	app::in_drag_drop = true;
+
+	// printf( "DRAG DROP BEGIN\n" );
+
+	printf( "drag and drop started!\n" );
 
 	// SHDoDragDrop adds an IMAGE PREVIEW TO THE DRAG DROP AUTOMATICALLY
 	// though, you may need to implement this yourself with IDragSourceHelper for other image types
-	HRESULT res       = SHDoDragDrop( g_main_hwnd, file_obj, &source, DROPEFFECT_COPY, &out_effect );
+	HRESULT res       = SHDoDragDrop( NULL, file_obj, source, DROPEFFECT_COPY, &out_effect );
 
-	if ( res != DRAGDROP_S_DROP && res != DRAGDROP_S_CANCEL )
+	source->Release();
+
+	app::in_drag_drop = false;  // Reset flag
+
+	// EVIL FUCKING HACK:
+	// if you do a drag and drop, but release the drag button while hovering over this app,
+	// the window stops reciveing a lot of messages, and all hit tests
+	// the titlebar and frame don't react at all, can't drag or resize the window
+	// only user fix is to just click the window once, or unfocus and refocus the window
+	// and i have tried to find a fix for it, but this is the best i can do unless a real, proper fix is done
+	
+//	SetForegroundWindow( GetNextWindow( g_main_hwnd, GW_HWNDNEXT ) );
+//	SetForegroundWindow( g_main_hwnd );
+
+	// better fix that doesn't look visually weird, and still fixes the issue
+	INPUT input       = { 0 };
+	input.type        = INPUT_MOUSE;
+	input.mi.dwFlags  = MOUSEEVENTF_LEFTDOWN;
+	input.mi.dx       = 0;
+	input.mi.dy       = 0;
+	SendInput( 1, &input, sizeof( INPUT ) );
+
+	input.type        = INPUT_MOUSE;
+	input.mi.dwFlags  = MOUSEEVENTF_LEFTUP;
+	input.mi.dx       = 0;
+	input.mi.dy       = 0;
+	SendInput( 1, &input, sizeof( INPUT ) );
+
+	DROP_CANCELLED_LAST = false;
+
+	if ( res == S_OK )
 	{
-		// the page says E_UNSPEC, but that doesn't exist?
-		if ( res == E_UNEXPECTED )
-		{
-			printf( "drag and drop weird error\n" );
-			sys_print_last_error();
-		}
+		printf( "drag and drop returned S_OK!\n" );
+	}
+	else if ( res == DRAGDROP_S_DROP )
+	{
+		printf( "drag and drop returned DRAGDROP_S_DROP!\n" );
+	}
+	else if ( res == DRAGDROP_S_CANCEL )
+	{
+		printf( "drag and drop returned DRAGDROP_S_CANCEL!\n" );
+		DROP_CANCELLED_LAST = true;
+
+		send_frame_draw_event();
+	}
+	// the page says E_UNSPEC, but that doesn't exist?
+	else // if ( res == E_UNEXPECTED )
+	{
+		printf( "drag and drop returned E_UNEXPECTED!\n" );
+		sys_print_last_error();
 	}
 }
 

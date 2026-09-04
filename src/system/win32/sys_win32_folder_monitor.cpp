@@ -1,9 +1,7 @@
 #include "main.h"
 #include "sys_win32.h"
 
-
 #include <thread>
-#include <Windows.h>
 
 
 static bool     g_dir_watcher_running = true;

@@ -3,25 +3,6 @@
 #include "sys_win32.h"
 #include "main.h"
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#include <Windows.h>
-#include <ole2.h>
-#include <windowsx.h> // GET_X_LPARAM(), GET_Y_LPARAM()
-#include <direct.h>
-#include <shellapi.h>
-#include <shlwapi.h> 
-#include <shlobj.h>
-#include <shlobj_core.h> 
-#include <time.h>
-#include <atlbase.h>
-#include <psapi.h>
-#include <dwmapi.h>
-#include <strsafe.h>
-#include <sys/stat.h>
-
 #include <profileapi.h>
 #include <stdint.h>
 #include <thread>
