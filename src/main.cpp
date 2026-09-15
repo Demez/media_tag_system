@@ -282,12 +282,20 @@ void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_t
 	if ( !status )
 		return;
 
-	// was this cancelled?
-	if ( status->job->cancel )
-		return;
-
 	// already handled earlier?
 	if ( !status->thread_userdata )
+		return;
+
+	auto media_entry_list = static_cast< std::vector< media_entry_t >* >( status->thread_userdata );
+
+	if ( status->job->cancel )
+	{
+		delete media_entry_list;
+		status->thread_userdata = nullptr;
+		return;
+	}
+
+	if ( !media_entry_list )
 		return;
 
 	folder_media_list_reset();
@@ -295,11 +303,8 @@ void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_t
 	//media_history_add( status->root );
 	folder_history_add( directory::path );
 
-	auto media_entry_list = static_cast< std::vector< media_entry_t >* >( status->thread_userdata );
-
 	// move this list over we created in the worker thread
-	directory::media_list = *media_entry_list;
-	//directory::media_list = std::move( *media_entry_list );
+	directory::media_list = std::move( *media_entry_list );
 
 	delete media_entry_list;
 	status->thread_userdata = nullptr;
