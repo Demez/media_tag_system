@@ -593,9 +593,9 @@ static bool sys_scandir_internal( const wchar_t* root, std::vector< file_t >& fi
 	scan_dir_wildcard += L"\\\\?\\";
 	scan_dir_wildcard += scan_dir;
 
-	size_t                                  recursive_path_count = 0;
-	std::forward_list< _recursive_depth_t > recursive_paths{};
-	std::wstring                            current_depth{};
+	size_t                            recursive_path_count = 0;
+	std::vector< _recursive_depth_t > recursive_paths{};
+	std::wstring                      current_depth{};
 
 	constexpr ULONG             buffer_count = 4096;
 	constexpr ULONG             buffer_size  = sizeof( FILE_DIRECTORY_INFORMATION ) * buffer_count;
@@ -659,8 +659,8 @@ open_dir_recurse_fail:
 					goto scandir_end;
 
 				recursive_path_count--;
-				_recursive_depth_t new_path = recursive_paths.front();
-				recursive_paths.pop_front();
+				_recursive_depth_t new_path = recursive_paths.back();
+				recursive_paths.pop_back();
 
 				scan_dir_wildcard = L"\\\\?\\";
 				scan_dir_wildcard += scan_dir;
@@ -723,7 +723,7 @@ open_dir_recurse_fail:
 				.root_len = current_depth.size(),
 			};
 
-			recursive_paths.push_front( depth );
+			recursive_paths.push_back( depth );
 			recursive_path_count++;
 		}
 
