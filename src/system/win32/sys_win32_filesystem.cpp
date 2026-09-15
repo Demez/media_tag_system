@@ -583,7 +583,6 @@ static size_t preallocate_vector( FILE_DIRECTORY_INFORMATION* file_dir_info, siz
 }
 
 
-// TODO: increase stack size, and increase size of temp_path_buffer to 32k characters
 static bool sys_scandir_internal( const wchar_t* root, std::vector< file_t >& files, e_scandir_flags flags, bool& cancel )
 {
 	std::wstring scan_dir = root, scan_dir_wildcard{};
@@ -607,7 +606,7 @@ static bool sys_scandir_internal( const wchar_t* root, std::vector< file_t >& fi
 
 	HANDLE dirHandle{};
 
-	wchar_t                      temp_path_buffer[ 1024 ]{};
+	wchar_t*                     temp_path_buffer = ch_calloc< wchar_t >( MAX_PATH_EXT, e_mem_category_string );
 	size_t                       file_count = 0;
 	//size_t                       file_index = 0;
 	size_t file_index = files.size();
@@ -615,18 +614,21 @@ static bool sys_scandir_internal( const wchar_t* root, std::vector< file_t >& fi
 	if ( !_open_dir( scan_dir_wildcard, dirHandle, statusBlock, buffer, buffer_size ) )
 	{
 		wprintf( L"Failed to search directory: %s\n", scan_dir.c_str() );
+		ch_free( e_mem_category_general, temp_path_buffer );
 		ch_free( e_mem_category_general, buffer );
 		return false;
 	}
 
+	FILE_DIRECTORY_INFORMATION* file_dir_info = nullptr;
+
 	if ( cancel )
-		return true;
+		goto scandir_end;
 
 	// allocate more memory
 	preallocate_vector( buffer, file_index, files );
 
 	// file dir info pointer gets offset as this loop goes on, so keep the starting memory pointer to free it later
-	FILE_DIRECTORY_INFORMATION* file_dir_info = buffer;
+	file_dir_info = buffer;
 
 	while ( true )
 	{
@@ -654,7 +656,7 @@ open_dir_recurse_fail:
 					break;
 
 				if ( cancel )
-					return true;
+					goto scandir_end;
 
 				recursive_path_count--;
 				_recursive_depth_t new_path = recursive_paths.front();
@@ -691,17 +693,17 @@ open_dir_recurse_fail:
 				}
 
 				if ( cancel )
-					return true;
+					goto scandir_end;
 			}
 
 			file_dir_info = buffer;
 			preallocate_vector( file_dir_info, file_index, files );
 
 			if ( cancel )
-				return true;
+				goto scandir_end;
 		}
 
-		// Do something with the file here!
+		// Skip the first directory of "."
 		file_dir_info = (FILE_DIRECTORY_INFORMATION*)( ( (uint8_t*)file_dir_info ) + file_dir_info->NextEntryOffset );
 
 		bool is_dir   = file_dir_info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY;
@@ -802,7 +804,10 @@ open_dir_recurse_fail:
 	// not really needed since this will be freed shortly later anyway
 	// files.shrink_to_fit();
 
+scandir_end:
+	ch_free( e_mem_category_string, temp_path_buffer );
 	ch_free( e_mem_category_general, buffer );
+	recursive_paths.clear();
 	return true;
 }
 
