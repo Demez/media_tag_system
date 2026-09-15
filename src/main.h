@@ -720,7 +720,7 @@ struct render_draw_texture_t
 	bool   flip_h     = false;
 
 	// draw a specific channel of the image
-	int    channel    = -1;
+	bool   hide_channel[ 4 ];
 	bool   hide_alpha = false;
 };
 

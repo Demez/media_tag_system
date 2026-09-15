@@ -55,22 +55,48 @@ static u32 indices[] = {
 // Shaders
 // TODO: maybe read this from a file instead, to allow users to do fancy things if they really wanted to?
 
-const fs::path_char*   g_shader_vert_path   = PATH_FMT( "shaders/image.vert" );
-const fs::path_char*   g_shader_frag_path   = PATH_FMT( "shaders/image.frag" );
+const fs::path_char* g_shader_vert_path        = PATH_FMT( "shaders/image.vert" );
+const fs::path_char* g_shader_frag_path        = PATH_FMT( "shaders/image.frag" );
 
-static GLuint g_shader_vert        = 0;
-static GLuint g_shader_frag        = 0;
+static GLuint        g_shader_vert             = 0;
+static GLuint        g_shader_frag             = 0;
 
-static GLuint g_shader_program     = 0;
+static GLuint        g_shader_program          = 0;
 
 // Shader Info
-static GLint  g_shader_projection  = 0;
-static GLint  g_shader_view        = 0;
+static GLint         g_shader_projection       = 0;
+static GLint         g_shader_view             = 0;
 
-static GLint  g_shader_window_size = 0;
-static GLint  g_shader_image_size  = 0;
-static GLint  g_shader_image_pos   = 0;
-static GLint  g_shader_image_rot   = 0;
+static GLint         g_shader_window_size      = 0;
+static GLint         g_shader_image_size       = 0;
+static GLint         g_shader_image_pos        = 0;
+static GLint         g_shader_image_rot        = 0;
+static GLint         g_shader_visible_channels = 0;
+
+
+// ================================================================================================
+
+
+#define CHECK_GL_ERROR( val )                      \
+	if ( err == val ) \
+		printf( "GL Error: %d - " #val "\n", err )
+
+
+void gl_check_error()
+{
+	GLenum err = glGetError();
+
+	if ( err == GL_NO_ERROR )
+		return;
+
+	CHECK_GL_ERROR( GL_INVALID_VALUE );
+	else CHECK_GL_ERROR( GL_INVALID_OPERATION );
+	else CHECK_GL_ERROR( GL_INVALID_FRAMEBUFFER_OPERATION );
+	else CHECK_GL_ERROR( GL_OUT_OF_MEMORY );
+	else printf( "Unknown GL Error - %d", err );
+}
+
+#undef CHECK_GL_ERROR
 
 
 // ================================================================================================
@@ -394,13 +420,14 @@ bool render_load_shaders()
 	glDeleteShader( g_shader_vert );
 	glDeleteShader( g_shader_frag );
 
-	g_shader_projection  = glGetUniformLocation( g_shader_program, "projection" );
-	g_shader_view        = glGetUniformLocation( g_shader_program, "view" );
+	g_shader_projection       = glGetUniformLocation( g_shader_program, "projection" );
+	g_shader_view             = glGetUniformLocation( g_shader_program, "view" );
 
-	g_shader_window_size = glGetUniformLocation( g_shader_program, "window_size" );
-	g_shader_image_size  = glGetUniformLocation( g_shader_program, "image_size" );
-	g_shader_image_pos   = glGetUniformLocation( g_shader_program, "image_pos" );
-	g_shader_image_rot   = glGetUniformLocation( g_shader_program, "image_rotation" );
+	g_shader_window_size      = glGetUniformLocation( g_shader_program, "window_size" );
+	g_shader_image_size       = glGetUniformLocation( g_shader_program, "image_size" );
+	g_shader_image_pos        = glGetUniformLocation( g_shader_program, "image_pos" );
+	g_shader_image_rot        = glGetUniformLocation( g_shader_program, "image_rotation" );
+	g_shader_visible_channels = glGetUniformLocation( g_shader_program, "in_visible_channels" );
 
 	return true;
 }
@@ -534,6 +561,16 @@ void render_draw_texture( render_draw_texture_t draw_info )
 	glUniform2f( g_shader_image_size, draw_info.width, draw_info.height );
 	glUniform2f( g_shader_image_pos, draw_info.x, draw_info.y );
 	glUniform1f( g_shader_image_rot, draw_info.rotation * TO_RAD );
+
+	glUniform4i(
+		g_shader_visible_channels,
+		!draw_info.hide_channel[ 0 ],
+		!draw_info.hide_channel[ 1 ],
+		!draw_info.hide_channel[ 2 ],
+		!draw_info.hide_channel[ 3 ]
+	);
+
+	gl_check_error();
 
 	glBindTexture( GL_TEXTURE_2D, draw_info.texture );
 

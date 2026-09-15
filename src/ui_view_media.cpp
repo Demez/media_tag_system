@@ -10,25 +10,26 @@
 // Image Draw Data
 namespace image_draw
 {
-	e_zoom_mode zoom_mode     = e_zoom_mode_fit;
-	double      zoom          = 1.f;
-	int         zoom_step     = 0;  // 0 = 100% zoom
+	e_zoom_mode zoom_mode = e_zoom_mode_fit;
+	double      zoom      = 1.f;
+	int         zoom_step = 0;  // 0 = 100% zoom
 
 	ImVec2      pos{};
 	ImVec2      size{};
-	bool        flip_v = false;
-	bool        flip_h = false;
-	float       rot              = 0.f;
+	bool        flip_v             = false;
+	bool        flip_h             = false;
+	float       rot                = 0.f;
 
 	// Animated image playback information
-	u64         last_frame_time  = 0;  // time in system time
-	u64         next_frame_time  = 0;  // time until next frame, add to last_frame_time
-	size_t      frame            = 0;
-	double      playback_speed   = 1.0;
-	bool        pause            = false;
-	bool        scaling          = true;
+	u64         last_frame_time    = 0;  // time in system time
+	u64         next_frame_time    = 0;  // time until next frame, add to last_frame_time
+	size_t      frame              = 0;
+	double      playback_speed     = 1.0;
+	bool        pause              = false;
+	bool        scaling            = true;
 
-	bool        hide_alpha       = false;
+	bool        hide_alpha         = false;
+	bool        show_channels[ 4 ] = { true, true, true, true };
 
 	// index into gallery::sorted_media
 	//size_t      media_index      = 0;
@@ -1013,6 +1014,26 @@ void media_view_context_menu()
 
 		ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
 		ImGui::MenuItem( "Hide Alpha Channel", nullptr, &image_draw::hide_alpha, true );
+
+		ImGui::Separator();
+		ImGui::Text( "Channels" );
+
+		constexpr const char* channel_str[ 4 ] = { "Red", "Green", "Blue", "Alpha" };
+		
+		for ( u8 i = 0; i < 4; i++ )
+		{
+			ImVec2 text_size = ImGui::CalcTextSize( channel_str[ i ] );
+			text_size.x += style.FramePadding.x;
+
+			ImGui::Selectable( channel_str[ i ], &image_draw::show_channels[ i ], 0, text_size );
+
+			if ( i < 3 )
+			{
+				ImGui::SameLine( 0, style.ItemInnerSpacing.x );
+			}
+		}
+
+		ImGui::MenuItem( "Disable Transparency", nullptr, &image_draw::hide_alpha, true );
 
 		if ( app::config.dev_mode )
 		{
@@ -2068,6 +2089,9 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 	draw_info.y          = draw_y;
 	draw_info.rotation   = image_draw::rot;
 	draw_info.hide_alpha = image_draw::hide_alpha;
+
+	for ( u8 i = 0; i < 4; i++ )
+		draw_info.hide_channel[ i ] = !image_draw::show_channels[ i ];
 
 	draw_info.flip_h     = image_draw::flip_h;
 	draw_info.flip_v     = image_draw::flip_v;
