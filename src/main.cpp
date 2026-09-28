@@ -1094,7 +1094,11 @@ void main_loop()
 		// Update Frame Time
 
 		current_time            = sys_get_time_ms();
-		frame_time              = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
+
+		if ( current_time > start_time )
+			frame_time = static_cast< double >( current_time - start_time ) / 1000.0;
+		else
+			frame_time = 0.1;  // edge case potentially lol, did a time zone change?
 
 		sys_update();
 
