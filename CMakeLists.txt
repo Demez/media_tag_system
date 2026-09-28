@@ -219,19 +219,28 @@ set(
     SRC_FILES
     src/main.cpp
     src/main.h
+	src/core.h
     src/thumbnail_loader.cpp
     src/thumbnail_jxl.cpp
     src/mpv_interface.cpp
     src/mpv_interface.h
     src/image_loader.cpp
+    src/image.h
     src/memory.cpp
     src/config.cpp
     src/config_options.h
     src/folder_scan.cpp
     src/job_system.cpp
+    src/job_system.h
     src/gl_render.cpp
+
+	src/input.cpp
+	src/input.h
+	src/input_pc.cpp
+	src/input_gamepad.cpp
     
 	src/ui_main.cpp
+	src/ui_main.h
 	src/ui_directory_tree.cpp
 	src/ui_settings_menu.cpp
     src/ui_view_gallery.cpp

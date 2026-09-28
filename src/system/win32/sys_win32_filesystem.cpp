@@ -730,7 +730,6 @@ open_dir_recurse_fail:
 		if ( ( flags & e_scandir_no_dirs ) && is_dir )
 			continue;
 
-		// if ( ( flags & e_scandir_no_files ) && fs_is_file( relative_path.data() ) )
 		if ( ( flags & e_scandir_no_files ) && !is_dir )
 			continue;
 
