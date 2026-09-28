@@ -77,7 +77,7 @@ struct CodecJPEG: public IImageLoader
 			return false;
 		}
 
-		int              pixelFmt = TJPF_RGBX;
+		int              pixelFmt = TJPF_RGB;
 
 		int              scaling_factor_count;
 		tjscalingfactor* scaling_factor = tjGetScalingFactors( &scaling_factor_count );
@@ -180,10 +180,10 @@ struct CodecJPEG: public IImageLoader
 		image->width           = best_width;
 		image->height          = best_height;
 
-		image->format          = GL_RGBA;
-		image->bit_depth       = 32;  // uhhhh
+		image->format          = GL_RGB;
 		image->pitch           = pitch;
-		image->channels        = 4;
+		image->channels        = 3;
+		image->bit_depth       = 8 * image->channels;
 
 		return true;
 	}

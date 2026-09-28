@@ -138,6 +138,11 @@ struct LoaderJXL: public IImageLoader
 
 				load_info.image->width  = info.xsize;
 				load_info.image->height = info.ysize;
+				//format.num_channels     = info.num_color_channels;
+
+				// check for an alpha channel
+				//if ( info.alpha_bits > 0 )
+				//	format.num_channels++;
 
 				if ( info.have_animation )
 					printf( "ANIMATED JXL\n" );
@@ -207,9 +212,15 @@ struct LoaderJXL: public IImageLoader
 			}
 		}
 
-		load_info.image->format            = GL_RGBA;
 		load_info.image->bytes_per_pixel   = 4;
-		load_info.image->channels          = 4;
+		load_info.image->channels          = format.num_channels;
+
+		//if ( load_info.image->channels == 3 )
+		//	load_info.image->format = GL_RGB;
+		//else if ( load_info.image->channels == 1 )
+		//	load_info.image->format = GL_R8;
+		//else
+			load_info.image->format = GL_RGBA;
 
 		// ?
 		load_info.image->bit_depth         = 4;

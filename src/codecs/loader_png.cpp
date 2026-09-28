@@ -71,7 +71,8 @@ struct LoaderPNG: public IImageLoader
             return false;
         }
 
-        struct spng_ihdr ihdr;
+        struct spng_ihdr ihdr{};
+		struct spng_trns trns{};
 		int              err = 0;
 
         err = spng_set_png_buffer( ctx, data, data_len );
@@ -85,22 +86,56 @@ struct LoaderPNG: public IImageLoader
         err = spng_get_ihdr( ctx, &ihdr );
 		if ( err != 0 )
 		{
-			printf( "LOADER_PNG: Failed to get ihdr: %s\n", spng_strerror( err ) );
+			printf( "LOADER_PNG: Failed to get header information: %s\n", spng_strerror( err ) );
 			spng_ctx_free( ctx );
 			return false;
 		}
 
+		spng_format pngFmt = SPNG_FMT_RGB8;
+
+		// https://libspng.org/docs/migrate-libpng/
+
+		if ( ihdr.color_type == SPNG_COLOR_TYPE_INDEXED )
+			pngFmt = SPNG_FMT_RGB8;
+
+		//else if ( ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE && ihdr.bit_depth < 8 )
+		//	pngFmt = SPNG_FMT_G8;
+
+		int have_trns = spng_get_trns( ctx, &trns );
+
+		if ( have_trns == 0 )
+		{
+			// if ( ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR )
+			if ( ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR || ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE )
+			{
+				if ( ihdr.bit_depth == 16 )
+					pngFmt = SPNG_FMT_RGBA16;
+				else
+					pngFmt = SPNG_FMT_RGBA8;
+			}
+			//else if ( ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE )
+			//{
+			//	if ( ihdr.bit_depth == 16 )
+			//		pngFmt = SPNG_FMT_GA16;
+			//	else
+			//		pngFmt = SPNG_FMT_GA8;
+			//}
+			else if ( ihdr.color_type == SPNG_COLOR_TYPE_INDEXED )
+			{
+				pngFmt = SPNG_FMT_RGBA8;
+			}
+		}
+
 		// look into RGBA16?
         //spng_format pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGB8;
-        // spng_format pngFmt = SPNG_FMT_RGB8;
-		spng_format pngFmt = SPNG_FMT_RGBA8;
+		// spng_format pngFmt = SPNG_FMT_RGBA8;
 		int         decode_flags{};
 		decode_flags |= SPNG_DECODE_TRNS;
 
         if ( ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR_ALPHA || ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE_ALPHA )
 		{
 			pngFmt = ihdr.bit_depth == 16 ? SPNG_FMT_RGBA16 : SPNG_FMT_RGBA8;
-			//pngFmt = SPNG_FMT_RGBA8;
+			pngFmt = SPNG_FMT_RGBA8;
 		}
 
         size_t size;

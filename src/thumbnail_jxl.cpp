@@ -52,7 +52,7 @@ bool thumbnail_save( image_t& image, const fs::path_str& output )
 	JxlEncoderInitBasicInfo( &basic_info );
 	basic_info.xsize                    = image.width;
 	basic_info.ysize                    = image.height;
-	basic_info.bits_per_sample          = 4;
+	basic_info.bits_per_sample          = 8;
 	basic_info.exponent_bits_per_sample = 0;
 	basic_info.uses_original_profile    = JXL_FALSE;
 
@@ -75,7 +75,7 @@ bool thumbnail_save( image_t& image, const fs::path_str& output )
 	{
 		JxlExtraChannelInfo extra_info{};
 		JxlEncoderInitExtraChannelInfo( JXL_CHANNEL_ALPHA, &extra_info );
-		extra_info.bits_per_sample = 4;
+		extra_info.bits_per_sample = 8;
 
 		status = JxlEncoderSetExtraChannelInfo( enc.get(), 0, &extra_info );
 	
@@ -107,6 +107,9 @@ bool thumbnail_save( image_t& image, const fs::path_str& output )
 
 	status = JxlEncoderSetFrameDistance( frame_settings, app::config.thumbnail_jxl_distance );
 	status = JxlEncoderFrameSettingsSetOption( frame_settings, JXL_ENC_FRAME_SETTING_EFFORT, app::config.thumbnail_jxl_effort );
+
+	// might be useful for if i decide to stream in thumbnails from a tag system server
+	//status = JxlEncoderFrameSettingsSetOption( frame_settings, JXL_ENC_FRAME_SETTING_RESPONSIVE, 1 );  // force progressive decode enabled
 
 	status = JxlEncoderAddImageFrame( frame_settings, &pixel_format, image.frame[ 0 ].data, image.frame[ 0 ].size );
 

@@ -49,6 +49,25 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	//glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
 	//glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 
+	// ------------------------------------------------------------------------------------------------------
+	// https://stackoverflow.com/a/58927549
+	// 
+	// The jpg image consists of 3 color channels (GL_RGB) and stbi_load returns a tightly packed image.
+	// The number of bytes of the of the image buffer (img) is w * h * 3.
+	// 
+	// By default OpenGL assumes that the start of each row of an image is aligned 4 bytes.
+	// This is because the GL_UNPACK_ALIGNMENT parameter by default is 4.
+	// Since the image has 3 color channels, and is tightly packed the start of a row is possibly misaligned.
+	// So the size of the image buffer is assumed to by aligne(w*3, 4) * h.
+	// 
+	// The crash is caused, because glTexImage2D. access the buffer out of bounds.
+	// 
+	// Change the the GL_UNPACK_ALIGNMENT parameter to 1, before specifying the two-dimensional texture image (glTexImage2D):
+	// 
+	// ------------------------------------------------------------------------------------------------------
+
+	glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
+
 	int width  = image->frame[ frame_i ].width;
 	int height = image->frame[ frame_i ].height;
 
@@ -57,6 +76,9 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 
 	if ( height == 0 )
 		height = image->height;
+
+	// GL_RGB  - 6407
+	// GL_RGBA - 6408
 
 	if ( image->format == GL_RGBA16 )
 	{
