@@ -2077,8 +2077,8 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 {
 	image_frame_t&        frame       = g_image_data.image.frame[ frame_i ];
 
-	int                   draw_width  = frame.width * image_draw::zoom;
-	int                   draw_height = frame.height * image_draw::zoom;
+	int                   draw_width  = static_cast< int >( std::max( 1.0, frame.width * image_draw::zoom ) );
+	int                   draw_height = static_cast< int >( std::max( 1.0, frame.height * image_draw::zoom ) );
 	int                   draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
 	int                   draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
 
