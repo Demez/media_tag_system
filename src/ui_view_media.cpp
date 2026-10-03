@@ -137,6 +137,15 @@ void media_view_scale_thread_run()
 
 		g_scale_lock.lock();
 
+		// don't scale animated images
+		if ( g_scale_src.frame.size() > 1 )
+		{
+			g_scale_state = e_scale_state_idle;
+			g_scale_signal.store( false );
+			g_scale_lock.unlock();
+			continue;
+		}
+
 		image_copy_data( g_scale_src, g_image_scaled_data.image );
 
 		g_image_scaled_data.image.frame.clear();
@@ -255,6 +264,10 @@ void media_view_scale_set_image()
 
 	// ????
 	if ( !g_image_data.image.frame[ 0 ].data )
+		return;
+
+	// don't scale animated images
+	if ( g_image_data.image.frame.size() > 1 )
 		return;
 
 	g_scale_lock.lock();
@@ -2077,10 +2090,10 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 {
 	image_frame_t&        frame       = g_image_data.image.frame[ frame_i ];
 
-	int                   draw_width  = static_cast< int >( std::max( 1.0, frame.width * image_draw::zoom ) );
-	int                   draw_height = static_cast< int >( std::max( 1.0, frame.height * image_draw::zoom ) );
-	int                   draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
-	int                   draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
+	float                 draw_width  = static_cast< float >( std::max( 0.01, frame.width * image_draw::zoom ) );
+	float                 draw_height = static_cast< float >( std::max( 0.01, frame.height * image_draw::zoom ) );
+	float                 draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
+	float                 draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
 
 	render_draw_texture_t draw_info{};
 	draw_info.width      = draw_width;
@@ -2089,12 +2102,11 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 	draw_info.y          = draw_y;
 	draw_info.rotation   = image_draw::rot;
 	draw_info.hide_alpha = image_draw::hide_alpha;
+	draw_info.flip_h     = image_draw::flip_h;
+	draw_info.flip_v     = image_draw::flip_v;
 
 	for ( u8 i = 0; i < 4; i++ )
 		draw_info.hide_channel[ i ] = !image_draw::show_channels[ i ];
-
-	draw_info.flip_h     = image_draw::flip_h;
-	draw_info.flip_v     = image_draw::flip_v;
 
 	if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
 		draw_info.texture = g_image_scaled_data.textures.frame[ frame_i ];

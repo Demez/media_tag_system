@@ -346,10 +346,10 @@ extern SDL_Event g_event_folder_scan_finish;
 
 struct render_draw_texture_t
 {
-	int    width;
-	int    height;
-	int    x;
-	int    y;
+	float  width;
+	float  height;
+	float  x;
+	float  y;
 	float  rotation;
 
 	GLuint texture;
