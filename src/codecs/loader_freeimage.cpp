@@ -235,8 +235,11 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 				if ( value == 2 )
 					load_info.image->frame[ page ].frame_disposal = e_frame_disposal_background;
 
-				if ( value == 3 )
+				else if ( value == 3 )
 					load_info.image->frame[ page ].frame_disposal = e_frame_disposal_previous;
+
+				else
+					load_info.image->frame[ page ].frame_disposal = e_frame_disposal_keep;
 			}
 		}
 	}
