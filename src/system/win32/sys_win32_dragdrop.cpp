@@ -505,10 +505,12 @@ void sys_do_drag_drop_files( const std::vector< fs::path >& files, u32 sdl_mouse
 	// the titlebar and frame don't react at all, can't drag or resize the window
 	// only user fix is to just click the window once, or unfocus and refocus the window
 	// and i have tried to find a fix for it, but this is the best i can do unless a real, proper fix is done
-	
-//	SetForegroundWindow( GetNextWindow( g_main_hwnd, GW_HWNDNEXT ) );
-//	SetForegroundWindow( g_main_hwnd );
 
+#if 1
+	// the input sending hack is problematic, since it can trigger playback toggles in the media view
+	SetForegroundWindow( GetNextWindow( g_main_hwnd, GW_HWNDNEXT ) );
+	SetForegroundWindow( g_main_hwnd );
+#else
 	// better fix that doesn't look visually weird, and still fixes the issue
 	INPUT input       = { 0 };
 	input.type        = INPUT_MOUSE;
@@ -522,6 +524,7 @@ void sys_do_drag_drop_files( const std::vector< fs::path >& files, u32 sdl_mouse
 	input.mi.dx       = 0;
 	input.mi.dy       = 0;
 	SendInput( 1, &input, sizeof( INPUT ) );
+#endif
 
 	DROP_CANCELLED_LAST = false;
 
