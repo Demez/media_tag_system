@@ -442,8 +442,7 @@ void media_view_clamp_to_bounds()
 }
 
 
-// or DBL_EPSILON ?
-constexpr double             ZOOM_EPSILON = 0.001;
+constexpr double             ZOOM_EPSILON = DBL_EPSILON;
 // constexpr double             ZOOM_TOO_CLOSE = 0.1;  // media_zoom_scale * 0.5 ?  // 0.05
 constexpr double             ZOOM_TOO_CLOSE = 0.5;
 
@@ -463,19 +462,6 @@ int qsort_zoom_values( const void* left, const void* right )
 		return 1;
 
 	return 0;
-}
-
-
-bool media_view_is_zoom_level( double snap_level, double new_zoom )
-{
-	// is this zoom close enough to the snap level?
-	if ( new_zoom > snap_level + ZOOM_EPSILON )
-		return false;
-
-	if ( new_zoom < snap_level - ZOOM_EPSILON )
-		return false;
-
-	return true;
 }
 
 
@@ -499,7 +485,7 @@ int media_view_find_closest_zoom_step( double zoom )
 	{
 		double zoom_level = g_zoom_snap_values[ zoom_i ];
 
-		if ( media_view_is_zoom_level( zoom, zoom_level ) )
+		if ( media_view_same_zoom_level( zoom, zoom_level ) )
 			return zoom_step;
 	}
 
@@ -780,14 +766,14 @@ void media_view_scroll_zoom( int scroll )
 	image_draw::zoom = media_view_get_zoom_level( image_draw::zoom_step );
 
 	// Special case for fit zoom levels
-	if ( media_view_is_zoom_level( fit_zoom, image_draw::zoom ) )
+	if ( media_view_same_zoom_level( fit_zoom, image_draw::zoom ) )
 	{
 		image_draw::zoom_mode = e_zoom_mode_fit;
 		media_view_fit_in_view();
 		return;
 	}
 
-	if ( media_view_is_zoom_level( fit_scale_up_zoom, image_draw::zoom ) )
+	if ( media_view_same_zoom_level( fit_scale_up_zoom, image_draw::zoom ) )
 	{
 		image_draw::zoom_mode = e_zoom_mode_fit_window;
 		media_view_fit_in_view();
