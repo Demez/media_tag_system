@@ -512,7 +512,7 @@ float gallery_view_draw_header()
 		xl_size.y + style.FramePadding.y * 2.0f
 	};
 
-	if ( ImGui::Button( "S", button_size ) )
+	if ( ImGui::Button( "XS", button_size ) )
 	{
 		zoom_changed = true;
 		gallery::item_size = gallery::item_size_min;
@@ -520,10 +520,18 @@ float gallery_view_draw_header()
 
 	ImGui::SameLine();
 
+	if ( ImGui::Button( "S", button_size ) )
+	{
+		zoom_changed = true;
+		gallery::item_size = 150;
+	}
+
+	ImGui::SameLine();
+
 	if ( ImGui::Button( "M", button_size ) )
 	{
 		zoom_changed       = true;
-		gallery::item_size = 150;
+		gallery::item_size = 300;
 	}
 
 	ImGui::SameLine();
@@ -531,7 +539,7 @@ float gallery_view_draw_header()
 	if ( ImGui::Button( "L", button_size ) )
 	{
 		zoom_changed       = true;
-		gallery::item_size = 300;
+		gallery::item_size = 450;
 	}
 
 	ImGui::SameLine();
