@@ -538,7 +538,19 @@ void render_draw_texture( render_draw_texture_t draw_info )
 	}
 
 	int window_width, window_height;
-	SDL_GetWindowSizeInPixels( app::window, &window_width, &window_height );
+
+	if ( draw_info.target )
+	{
+		window_width  = draw_info.target_width;
+		window_height = draw_info.target_height;
+
+		glBindFramebuffer( GL_FRAMEBUFFER, draw_info.target );
+	}
+	else
+	{
+		SDL_GetWindowSizeInPixels( app::window, &window_width, &window_height );
+		glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	}
 
 	glViewport( 0, 0, window_width, window_height );
 

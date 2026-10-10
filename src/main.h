@@ -354,6 +354,10 @@ struct render_draw_texture_t
 
 	GLuint texture;
 
+	GLuint target;
+	int    target_width;
+	int    target_height;
+
 	// draw settings
 	bool   flip_v     = false;
 	bool   flip_h     = false;

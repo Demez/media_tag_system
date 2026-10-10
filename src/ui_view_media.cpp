@@ -94,6 +94,9 @@ static image_t             g_scale_src{};
 
 std::mutex                 g_scale_lock;
 
+static GLuint              g_main_image_anim_fbo = 0;
+static GLuint              g_main_image_anim_tex = 0;
+
 
 // wait X amount of time before scaling the image, the user may be in the middle of changing zoom level quickly, like currently scrolling the mouse wheel
 // so it's wasteful to constantly keep scaling it if the scaled image isn't even what the user zoom level is at now
@@ -359,6 +362,9 @@ void media_view_update()
 void media_view_init()
 {
 	g_scale_thread = new std::thread( media_view_scale_thread_run );
+
+	glGenFramebuffers( 1, &g_main_image_anim_fbo );
+	glGenTextures( 1, &g_main_image_anim_tex );
 }
 
 
@@ -384,6 +390,30 @@ e_media_type get_media_type()
 		return e_media_type_none;
 
 	return gallery_item_get_media_entry( g_image_data.index ).type;
+}
+
+
+// creates framebuffer object to draw animated images onto before scaling it down
+// https://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
+void media_view_create_animated_image_fbo()
+{
+	glBindFramebuffer( GL_FRAMEBUFFER, g_main_image_anim_fbo );
+	glBindTexture( GL_TEXTURE_2D, g_main_image_anim_tex );
+
+	// create an empty image
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, g_image_data.image.width, g_image_data.image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0 );
+
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+
+	glFramebufferTexture( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, g_main_image_anim_tex, 0 );
+
+	// Set the list of draw buffers.
+	GLenum DrawBuffers[ 1 ] = { GL_COLOR_ATTACHMENT0 };
+	glDrawBuffers( 1, DrawBuffers );  // "1" is the size of DrawBuffers
+
+	if ( glCheckFramebufferStatus( GL_FRAMEBUFFER ) != GL_FRAMEBUFFER_COMPLETE )
+		printf( "FAILED TO MAKE ANIMATED IMAGE FBO!\n" );
 }
 
 
@@ -1434,6 +1464,8 @@ void media_view_load()
 	media_view_scale_reset_timer();
 	media_view_scale_set_image();
 
+	media_view_create_animated_image_fbo();
+
 	set_frame_draw();
 }
 
@@ -2075,41 +2107,69 @@ void media_view_draw_imgui()
 }
 
 
-static void media_view_draw_frame( int width, int height, size_t frame_i )
+static void media_view_draw_animated_fbo()
 {
-	image_frame_t& frame = g_image_data.image.frame[ frame_i ];
-
-	int                 draw_width  = static_cast< int >( round( std::max( 0.01, frame.width * image_draw::zoom ) ) );
-	int                 draw_height = static_cast< int >( round( std::max( 0.01, frame.height * image_draw::zoom ) ) );
-	int                 draw_x      = static_cast< int >( round( image_draw::pos.x + ( frame.pos_x * image_draw::zoom ) ) );
-	int                 draw_y      = static_cast< int >( round( image_draw::pos.y + ( frame.pos_y * image_draw::zoom ) ) );
-
-	if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
-	{
-		//draw_width  = g_image_scaled_data.image.width;
-		//draw_height = g_image_scaled_data.image.height;
-	}
-
-	//if ( draw_width != image_draw::size.x || draw_height != image_draw::size.y )
-	//	printf( "IMAGE SIZE != RENDER SIZE" );
-
 	render_draw_texture_t draw_info{};
-	draw_info.width      = draw_width;
-	draw_info.height     = draw_height;
-	draw_info.x          = draw_x;
-	draw_info.y          = draw_y;
+	draw_info.width      = roundf( image_draw::size.x );
+	draw_info.height     = roundf( image_draw::size.y );
+	draw_info.x          = roundf( image_draw::pos.x );
+	draw_info.y          = roundf( image_draw::pos.y );
 	draw_info.rotation   = image_draw::rot;
 	draw_info.hide_alpha = image_draw::hide_alpha;
 	draw_info.flip_h     = image_draw::flip_h;
-	draw_info.flip_v     = image_draw::flip_v;
+	draw_info.flip_v     = !image_draw::flip_v;
+	draw_info.texture    = g_main_image_anim_tex;
 
 	for ( u8 i = 0; i < 4; i++ )
 		draw_info.hide_channel[ i ] = !image_draw::show_channels[ i ];
 
-	if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
-		draw_info.texture = g_image_scaled_data.textures.frame[ frame_i ];
+	render_draw_texture( draw_info );
+}
+
+
+static void media_view_draw_frame( int width, int height, size_t frame_i )
+{
+	bool                  animated = g_image_data.textures.count > 1;
+	image_frame_t&        frame    = g_image_data.image.frame[ frame_i ];
+
+	render_draw_texture_t draw_info{};
+	draw_info.target_width  = g_image_data.image.width;
+	draw_info.target_height = g_image_data.image.height;
+
+	if ( animated )
+	{
+		draw_info.width      = frame.width;
+		draw_info.height     = frame.height;
+		draw_info.x          = frame.pos_x;
+		draw_info.y          = frame.pos_y;
+		draw_info.rotation   = 0.f;
+		draw_info.hide_alpha = false;
+		draw_info.flip_h     = false;
+		draw_info.flip_v     = false;
+		draw_info.texture    = g_image_data.textures.frame[ frame_i ];
+	}
 	else
-		draw_info.texture = g_image_data.textures.frame[ frame_i ];
+	{
+		draw_info.width      = static_cast< int >( round( std::max( 0.01, frame.width * image_draw::zoom ) ) );
+		draw_info.height     = static_cast< int >( round( std::max( 0.01, frame.height * image_draw::zoom ) ) );
+		draw_info.x          = static_cast< int >( round( image_draw::pos.x + ( frame.pos_x * image_draw::zoom ) ) );
+		draw_info.y          = static_cast< int >( round( image_draw::pos.y + ( frame.pos_y * image_draw::zoom ) ) );
+		draw_info.rotation   = image_draw::rot;
+		draw_info.hide_alpha = image_draw::hide_alpha;
+		draw_info.flip_h     = image_draw::flip_h;
+		draw_info.flip_v     = image_draw::flip_v;
+
+		if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
+			draw_info.texture = g_image_scaled_data.textures.frame[ frame_i ];
+		else
+			draw_info.texture = g_image_data.textures.frame[ frame_i ];
+	}
+
+	if ( animated )
+		draw_info.target = g_main_image_anim_fbo;
+
+	for ( u8 i = 0; i < 4; i++ )
+		draw_info.hide_channel[ i ] = !image_draw::show_channels[ i ];
 
 	render_draw_texture( draw_info );
 }
@@ -2197,6 +2257,12 @@ static void media_view_draw_image()
 	else // e_frame_disposal_background ?
 	{
 		media_view_draw_frame( width, height, image_draw::frame );
+	}
+
+	if ( g_image_data.image.frame.size() > 1 )
+	{
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+		media_view_draw_animated_fbo();
 	}
 }
 
