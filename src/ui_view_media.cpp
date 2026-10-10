@@ -153,10 +153,13 @@ void media_view_scale_thread_run()
 
 		image_copy_frame_data( g_scale_src.frame[ 0 ], g_image_scaled_data.image.frame[ 0 ] );
 
+		int draw_width  = static_cast< int >( roundf( image_draw::size.x ) );
+		int draw_height = static_cast< int >( roundf( image_draw::size.y ) );
+
 		// Downscale image if size is larger than target size
 		if ( image_draw::size.x < ( g_scale_src.width * UPSCALE_LIMIT ) && image_draw::size.x != g_image_data.image.width )
 		{
-			if ( image_scale( &g_scale_src, &g_image_scaled_data.image, image_draw::size.x, image_draw::size.y ) )
+			if ( image_scale( &g_scale_src, &g_image_scaled_data.image, draw_width, draw_height ) )
 			{
 				g_scale_state = e_scale_state_upload;
 				send_frame_draw_event();
@@ -238,10 +241,10 @@ bool media_view_scale_handle_finished()
 	g_scale_time = UINT64_MAX;
 
 	// Are we drawing the image smaller than native size?
-	if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) || round( image_draw::size.x ) != g_image_data.image.width )
+	if ( image_draw::size.x < ( g_image_data.image.width * UPSCALE_LIMIT ) || roundf( image_draw::size.x ) != g_image_data.image.width )
 	{
 		// Does the scaled image size match the size we draw it as?
-		if ( int( image_draw::size.x ) == g_image_scaled_data.image.width )
+		if ( roundf( image_draw::size.x ) == g_image_scaled_data.image.width )
 			return false;
 
 		// it does not, scale again
@@ -2074,12 +2077,21 @@ void media_view_draw_imgui()
 
 static void media_view_draw_frame( int width, int height, size_t frame_i )
 {
-	image_frame_t&        frame       = g_image_data.image.frame[ frame_i ];
+	image_frame_t& frame = g_image_data.image.frame[ frame_i ];
 
-	float                 draw_width  = static_cast< float >( std::max( 0.01, frame.width * image_draw::zoom ) );
-	float                 draw_height = static_cast< float >( std::max( 0.01, frame.height * image_draw::zoom ) );
-	float                 draw_x      = image_draw::pos.x + ( frame.pos_x * image_draw::zoom );
-	float                 draw_y      = image_draw::pos.y + ( frame.pos_y * image_draw::zoom );
+	int                 draw_width  = static_cast< int >( round( std::max( 0.01, frame.width * image_draw::zoom ) ) );
+	int                 draw_height = static_cast< int >( round( std::max( 0.01, frame.height * image_draw::zoom ) ) );
+	int                 draw_x      = static_cast< int >( round( image_draw::pos.x + ( frame.pos_x * image_draw::zoom ) ) );
+	int                 draw_y      = static_cast< int >( round( image_draw::pos.y + ( frame.pos_y * image_draw::zoom ) ) );
+
+	if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
+	{
+		//draw_width  = g_image_scaled_data.image.width;
+		//draw_height = g_image_scaled_data.image.height;
+	}
+
+	//if ( draw_width != image_draw::size.x || draw_height != image_draw::size.y )
+	//	printf( "IMAGE SIZE != RENDER SIZE" );
 
 	render_draw_texture_t draw_info{};
 	draw_info.width      = draw_width;

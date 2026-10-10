@@ -557,9 +557,9 @@ void render_draw_texture( render_draw_texture_t draw_info )
 
 	glUniformMatrix4fv( g_shader_projection, 1, GL_FALSE, &ortho_projection[ 0 ][ 0 ] );
 
-	glUniform2f( g_shader_window_size, static_cast< float >( window_width ), static_cast< float >( window_height ) );
-	glUniform2f( g_shader_image_size, draw_info.width, draw_info.height );
-	glUniform2f( g_shader_image_pos, draw_info.x, draw_info.y );
+	glUniform2i( g_shader_window_size, window_width, window_height );
+	glUniform2i( g_shader_image_size, draw_info.width, draw_info.height );
+	glUniform2i( g_shader_image_pos, draw_info.x, draw_info.y );
 	glUniform1f( g_shader_image_rot, draw_info.rotation * TO_RAD );
 
 	glUniform4i(

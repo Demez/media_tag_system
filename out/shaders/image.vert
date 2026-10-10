@@ -3,9 +3,9 @@ layout (location = 0) in vec2 in_tex_coord;
 
 uniform mat4 projection;
 
-uniform vec2  window_size;
-uniform vec2  image_size;
-uniform vec2  image_pos;
+uniform ivec2 window_size;
+uniform ivec2 image_size;
+uniform ivec2 image_pos;
 uniform float image_rotation;
 
 out vec2 frag_tex_coord;
@@ -26,12 +26,11 @@ void main()
 
     mat2 rot_mat = rotate_mat2( image_rotation );
 
-
-    vec2 pos_arr[4] = vec2[4](
+    ivec2 pos_arr[4] = ivec2[4](
         image_pos,
-        vec2( image_pos.x + image_size.x, image_pos.y ),
-        vec2( image_pos.x + image_size.x, image_pos.y + image_size.y ),
-        vec2( image_pos.x, image_pos.y + image_size.y )
+        ivec2( image_pos.x + image_size.x, image_pos.y ),
+        ivec2( image_pos.x + image_size.x, image_pos.y + image_size.y ),
+        ivec2( image_pos.x, image_pos.y + image_size.y )
     );
 
     //const vec2 tex_coord_arr[4] = vec2[4](
@@ -41,7 +40,7 @@ void main()
     //    vec2( 0, 1 )
     //);
 
-    vec2 base_pos  = pos_arr[ gl_VertexID ];
+    ivec2 base_pos  = pos_arr[ gl_VertexID ];
     //frag_tex_coord = tex_coord_arr[ gl_VertexID ];
 
     // get the center of the image
