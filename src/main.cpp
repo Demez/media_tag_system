@@ -703,6 +703,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 bool handle_event( SDL_Event& event )
 {
 	ImGui_ImplSDL3_ProcessEvent( &event );
+	input_handle_event( event );
 
 	switch ( event.type )
 	{
@@ -1204,6 +1205,7 @@ void main_loop()
 
 void shutdown()
 {
+	input_shutdown();
 	config_save();
 
 	if ( ImGui::GetCurrentContext() )
@@ -1281,7 +1283,7 @@ int startup()
 
 	u64 start_time = sys_get_time_ms();
 
-	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO ) )
+	if ( !SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD ) )
 	{
 		printf( "Failed to init SDL\n" );
 		return 1;
@@ -1386,6 +1388,12 @@ int startup()
 	}
 
 	style_imgui();
+	
+	if ( !input_init() )
+	{
+		printf( "Failed to start input system\n" );
+		return 1;
+	}
 
 	// ----------------------------------------------------------------
 
