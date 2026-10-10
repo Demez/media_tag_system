@@ -1462,26 +1462,36 @@ int startup()
 	return 0;
 }
 
-
 #if _WIN32
-int wmain( int argc, wchar_t* argv[] )
+  #define DLL_EXPORT __declspec( dllexport )
+#elif __unix__
+  #define DLL_EXPORT
 #else
-int main( int argc, char* argv[] )
+  #error unsupported platform
 #endif
+
+extern "C"
 {
-	args_init( argc, argv );
-
-	int ret = startup();
-
-	if ( ret != 0 )
+#if _WIN32
+	DLL_EXPORT int entry( int argc, wchar_t* argv[] )
+#else
+	DLL_EXPORT int entry( int argc, char* argv[] )
+#endif
 	{
+		args_init( argc, argv );
+
+		int ret = startup();
+
+		if ( ret != 0 )
+		{
+			shutdown();
+			return ret;
+		}
+
+		main_loop();
 		shutdown();
-		return ret;
+
+		return 0;
 	}
-
-	main_loop();
-	shutdown();
-
-	return 0;
 }
 

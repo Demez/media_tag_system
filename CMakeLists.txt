@@ -143,7 +143,6 @@ if ( MSVC )
 	
 	add_link_options(
 		"/SUBSYSTEM:WINDOWS"
-		"/ENTRY:wmainCRTStartup"
 		# "/INCREMENTAL"
 	)
 
@@ -210,6 +209,61 @@ else()  # linux
 	configure_file( "thirdparty/libjxl/build/third_party/brotli/libbrotlicommon.so" "${PROJ_OUT}/libbrotlicommon.so" COPYONLY )
 	configure_file( "thirdparty/libjxl/build/third_party/brotli/libbrotlidec.so" "${PROJ_OUT}/libbrotlidec.so" COPYONLY )
 	configure_file( "thirdparty/libjxl/build/third_party/brotli/libbrotlienc.so" "${PROJ_OUT}/libbrotlienc.so" COPYONLY )
+endif()
+
+
+# ========================================================================================================
+# Launchers
+
+include_directories(
+	"src/"
+	"thirdparty/SDL3/include"
+)
+
+if( LINUX )
+	include_directories( "/usr/include/SDL3" )
+endif()
+
+link_libraries(	SDL3 )
+
+if ( WIN32 )
+	link_directories( "thirdparty/SDL3/lib/x64"	)
+endif()
+
+add_executable( media_tag_system_launcher src/launcher.cpp )
+
+set_target_properties(
+	media_tag_system_launcher PROPERTIES
+	SUFFIX ".exe"
+	RUNTIME_OUTPUT_NAME "media_tag_system"
+	PDB_NAME "media_tag_system"
+)
+
+if ( WIN32 )
+	add_executable( media_tag_system_con src/launcher.cpp )
+
+	target_link_options(
+		media_tag_system_con PRIVATE
+		"/SUBSYSTEM:CONSOLE"
+		"/ENTRY:wmainCRTStartup"
+	)
+
+	target_link_options(
+		media_tag_system_launcher PRIVATE
+		"/ENTRY:wmainCRTStartup"
+	)
+
+	target_compile_definitions(
+		media_tag_system_con PRIVATE
+		"CONSOLE_APP"
+	)
+
+	set_target_properties(
+		media_tag_system_con PROPERTIES
+		SUFFIX ".com"
+		RUNTIME_OUTPUT_NAME "media_tag_system"
+		PDB_NAME "media_tag_system_con"
+	)
 endif()
 
 
@@ -428,28 +482,7 @@ foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	)
 endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 
-add_executable( media_tag_system ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
-
-if ( WIN32 )
-	add_executable( media_tag_system_con ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
-
-	target_link_options(
-		media_tag_system_con PRIVATE
-		"/SUBSYSTEM:CONSOLE"
-	)
-
-	target_compile_definitions(
-		media_tag_system_con PRIVATE
-		"CONSOLE_APP"
-	)
-
-	set_target_properties(
-		media_tag_system_con PROPERTIES
-		SUFFIX ".com"
-		RUNTIME_OUTPUT_NAME "media_tag_system"
-		PDB_NAME "media_tag_system_con"
-	)
-endif()
+add_library( media_tag_system SHARED ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
 
 source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}/src
