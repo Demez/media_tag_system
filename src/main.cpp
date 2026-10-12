@@ -452,28 +452,8 @@ bool folder_history_nav_next()
 
 bool on_new_file( const fs::path& file_path )
 {
-	fs::path    clean_path = fs_path_clean( file_path );
-	std::string path_str   = sys_path_to_string( clean_path );
-	bool        is_file    = fs_is_file( file_path.c_str() );
-
-	if ( is_file )
-	{
-		// can we open this file?
-		e_media_type type = e_media_type_none;
-
-		if ( !media_check_extension( fs_get_extension( path_str ), type ) )
-			return false;
-
-		directory::queued = clean_path;
-		return true;
-	}
-	else if ( fs_is_dir( file_path.c_str() ) )
-	{
-		directory::queued = clean_path;
-		return true;
-	}
-
-	return false;
+	directory::queued = fs_path_clean( file_path );
+	return true;
 }
 
 
@@ -482,9 +462,7 @@ bool drag_drop_recieve_func( const std::vector< fs::path >& files )
 	if ( files.empty() )
 		return false;
 
-	if ( !on_new_file( files[ 0 ] ) )
-		return false;
-
+	directory::queued = fs_path_clean( files[ 0 ] );
 	SDL_RaiseWindow( app::window );
 	return true;
 }
@@ -987,34 +965,38 @@ static void handle_queued_file()
 
 	if ( path != directory::path || directory::folder_reload )
 	{
-		directory::path = path;
-
-		if ( !directory::folder_reload )
-			gallery_view_clear_selection();
-
 		// create a temporary media entry for showing the image first
 		// then, we can scan the directory next frame
 		media_entry_t entry{};
 		entry.file.path = directory::queued.filename();
 		entry.file.name = sys_path_to_string( entry.file.path );
 
-		if ( media_check_extension( fs_get_extension( entry.file.name ), entry.type ) )
+		// don't do anything if this is an invalid file
+		if ( !media_check_extension( fs_get_extension( entry.file.name ), entry.type ) )
 		{
-			folder_media_list_reset();
-
-			directory::media_list.push_back( entry );
-			gallery::sorted_media.push_back( 0 );
-
-			g_image_data.index        = 0;
-			g_image_scaled_data.index = 0;
-
-			set_view_type_media( true );
-
-			directory::folder_loading = true;
-
-			// draw the window to show the image NOW
-			window_quick_draw();
+			directory::queued.clear();
+			return;
 		}
+
+		directory::path = path;
+
+		if ( !directory::folder_reload )
+			gallery_view_clear_selection();
+
+		folder_media_list_reset();
+
+		directory::media_list.push_back( entry );
+		gallery::sorted_media.push_back( 0 );
+
+		g_image_data.index        = 0;
+		g_image_scaled_data.index = 0;
+
+		set_view_type_media( true );
+
+		directory::folder_loading = true;
+
+		// draw the window to show the image NOW
+		window_quick_draw();
 
 		// now we can load the files in the directory
 		folder_load_media_list();
