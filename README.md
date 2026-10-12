@@ -1,8 +1,7 @@
 # Media Tag System
 
 ## Usage
-- Copy config_default.yaml to config.yaml, change anything if needed
-- Bookmarks are stored in config.yaml, the program does not write and added bookmarks or config changes, you need to add it yourself for now
+- Bookmarks are stored in config.kdl
 - Enter toggles between gallery view and media/fullscreen view when selected on an image or video
 - Files or folders can be dragged in to enter them or look at the file
 

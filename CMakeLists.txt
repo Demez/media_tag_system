@@ -408,7 +408,7 @@ endif()
 
 link_libraries(
 	freetype
-	nfd
+	# nfd
 	SDL3
 	kdl
 	spng
@@ -471,6 +471,8 @@ if ( WIN32 )
 elseif( LINUX )
 	link_directories(
 		"${THIRDPARTY_DIR}/ckdl/build"
+		"thirdparty/libjxl/build/lib"
+		"thirdparty/libjpeg-turbo/build"
 	)
 	link_libraries(
 		turbojpeg
