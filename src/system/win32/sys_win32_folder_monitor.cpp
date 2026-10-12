@@ -123,7 +123,7 @@ void WatchDirectory( fs::path watch_path )
 
 static void folder_monitor_worker()
 {
-	//SDL_Delay( 1000 );
+	SDL_Delay( 1000 );
 
 	//fs::path current_path = directory::path;
 
