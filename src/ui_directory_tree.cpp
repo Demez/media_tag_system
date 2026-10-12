@@ -66,6 +66,12 @@ void dir_tree_add_folder( fs::path& path )
 			path_i++;
 			continue;
 		}
+#elif 0 // __unix__
+		if ( path_i == 0 )
+		{
+			path_i++;
+			continue;
+		}
 #endif
 
 		const fs::path_str& filename = *it;
@@ -78,7 +84,8 @@ void dir_tree_add_folder( fs::path& path )
 		}
 
 		current_scan += filename;
-		current_scan += SEP;
+		if ( Linux() && filename != "/" )
+			current_scan += SEP;
 
 		auto dir_it = g_directory_entries.find( current_scan );
 
@@ -246,7 +253,10 @@ void sidebar_draw_directory_recursive( u32 depth, const std::string& current_pat
 		return;
 
 	std::string tmp_path = current_path;
-	tmp_path += SEP;
+
+	if ( tmp_path != "/" )
+		tmp_path += SEP;
+
 	fs::path           evil  = sys_string_to_path( tmp_path );
 	directory_entry_t* entry = dir_tree_get( evil );
 
@@ -418,9 +428,16 @@ void dir_tree_draw( ImGuiStyle& style )
 	}
 	else
 	{
-		for ( const std::string& drive : drives )
+		if ( Win32() )
 		{
-			sidebar_draw_directory_recursive( 0, drive );
+			for ( const std::string& drive : drives )
+			{
+				sidebar_draw_directory_recursive( 0, drive );
+			}
+		}
+		else
+		{
+			sidebar_draw_directory_recursive( 0, "/" );
 		}
 	}
 

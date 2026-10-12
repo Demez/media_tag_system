@@ -15,6 +15,13 @@
 #include <ftw.h>
 
 
+static char*  g_exe_path       = nullptr;
+static size_t g_exe_path_len   = 0;
+
+static char*  g_exe_folder     = nullptr;
+static size_t g_exe_folder_len = 0;
+
+
 // ----------------------------------------------------------------------------------------
 
 
@@ -57,7 +64,31 @@ bool fs_is_file( const char* path )
 // ----------------------------------------------------------------------------------------
 
 
-e_sys_init sys_init( int argc, char* argv[] )
+bool sys_setup_exe_path_vars()
+{
+
+	// setup exe path/folder
+	char output[ 4096 ];
+	size_t ret = readlink( "/proc/self/exe", output, 4096 );
+
+	if ( ret <= 0 )
+	{
+		printf("Failed to get exe folder!\n" );
+		sys_print_last_error();
+		return false;
+	}
+
+	// find index of last path separator
+	char*  sep    = strrchr( output, '/' );
+	size_t path_i = sep - output;
+
+	g_exe_path   = util_strdup( output );
+	g_exe_folder = util_strndup( output, path_i );
+	return true;
+}
+
+
+e_sys_init sys_init()
 {
 	// TODO: add single instance support
 	return e_sys_init_success;
@@ -80,7 +111,7 @@ bool sys_set_window( SDL_Window* window )
 }
 
 
-void sys_do_window_drag( ImVec2 last_mouse_pos, ImVec2 new_mouse_pos )
+void sys_do_window_drag()
 {
 
 }
@@ -138,45 +169,38 @@ void sys_print_last_error()
 // Filesystem
 
 
-char* sys_get_exe_folder( size_t* len )
+const char* sys_get_exe_folder( size_t* len )
 {
-	char output[ 4096 ];
-	size_t ret = readlink( "/proc/self/exe", output, 4096 );
-
-	if ( ret <= 0 )
-	{
-		printf("Failed to get exe folder!\n" );
-		sys_print_last_error();
-		return util_strdup( "" );
-	}
-
-	// find index of last path separator
-	char*  sep    = strrchr( output, '/' );
-	size_t path_i = sep - output;
-
 	if ( len )
-		*len = path_i;
+		*len = g_exe_folder_len;
 
-	return util_strndup( output, path_i );
+	return g_exe_folder;
 }
 
 
-char* sys_get_exe_path( size_t* len )
+fs::path sys_get_exe_folder_fspath()
 {
-	char output[ 4096 ];
-	size_t ret = readlink( "/proc/self/exe", output, 4096 );
+	return fs::path::string_type( g_exe_folder );
+}
 
-	if ( ret <= 0 )
-	{
-		printf("Failed to get exe folder!\n" );
-		sys_print_last_error();
-		return util_strdup( "" );
-	}
 
+fs::path::string_type sys_get_exe_folder_native_str()
+{
+	return fs::path::string_type( g_exe_folder );
+}
+
+
+const fs::path_char* sys_get_exe_folder_native_char()
+{
+	return static_cast< fs::path_char* >( g_exe_folder );
+}
+
+const char* sys_get_exe_path( size_t* len )
+{
 	if ( len )
-		*len = strlen( output );
+		*len = g_exe_path_len;
 
-	return util_strdup( output );
+	return g_exe_path;
 }
 
 
@@ -300,7 +324,7 @@ static void set_file_attributes( file_t &file, const dirent64 &ent, const struct
 
 
 // TODO: look at getdents64()?
-bool sys_scandir( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags )
+bool sys_scandir_internal( const char* root, const char* path, std::vector< file_t >& files, e_scandir_flags flags, bool* cancel )
 {
 	std::string scan_dir = root;
 
@@ -312,25 +336,6 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 
 	scan_dir += SEP_S;
 
-	// Failed experiment lol
-#if 0
-
-	nftw_data.root       = root;
-	nftw_data.files_ptr  = &files;
-	nftw_data.flags      = flags;
-	nftw_data.found_root = false;
-
-	if ( nftw64( scan_dir.c_str(), ftw_callback, 100, FTW_ACTIONRETVAL | FTW_PHYS ) != 0)
-	{
-		perror("ftw");
-	}
-
-	nftw_data.root       = nullptr;
-	nftw_data.files_ptr  = nullptr;
-	nftw_data.flags      = e_scandir_none;
-	nftw_data.found_root = false;
-
-#else
 	DIR* dir = opendir( scan_dir.c_str() );
 
 	if ( !dir )
@@ -361,7 +366,7 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 		if ( ent->d_type == DT_DIR )
 		{
 			if ( flags & e_scandir_recursive )
-				sys_scandir( root, relative_path.data(), files, flags );
+				sys_scandir_internal( root, relative_path.data(), files, flags, cancel );
 
 			if ( flags & e_scandir_no_dirs )
 				continue;
@@ -381,6 +386,8 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 		else
 			file.path = relative_path;
 
+		file.name = ent->d_name;
+
 		struct statx s{};
 
 		const int statx_mask = STATX_TYPE | STATX_BTIME | STATX_MTIME | STATX_SIZE;
@@ -396,8 +403,13 @@ bool sys_scandir( const char* root, const char* path, std::vector< file_t >& fil
 	}
 
 	closedir( dir );
-#endif
 	return true;
+}
+
+
+bool sys_scandir( const char* root, std::vector< file_t >& files, e_scandir_flags flags, bool* cancel )
+{
+	return sys_scandir_internal( root, nullptr, files, flags, cancel );
 }
 
 
@@ -653,9 +665,27 @@ std::string sys_path_to_string( const fs::path& path )
 }
 
 
+void sys_path_to_string( fs::path&& path, std::string& output )
+{
+	output = path.native();
+}
+
+
+void sys_path_to_string( const fs::path_char* path, std::string& output )
+{
+	output = path;
+}
+
+
 fs::path sys_string_to_path( const std::string& path_str )
 {
 	fs::path path = path_str;
 	return path;
+}
+
+
+fs::path_str sys_string_to_path_str( const std::string& path_str )
+{
+	return path_str;
 }
 

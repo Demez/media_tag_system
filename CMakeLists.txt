@@ -27,6 +27,8 @@ foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
     set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${PROJ_OUT} )
 endforeach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
 
+# set( CMAKE_SHARED_LIBRARY_PREFIX "" )
+
 set_property( GLOBAL PROPERTY PREFIX "" )
 set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 
@@ -194,12 +196,15 @@ else()  # linux
 	message( "Copying SPNG" )
 	configure_file( "thirdparty/libspng/build/libspng.so" "${PROJ_OUT}/libspng.so" COPYONLY )
 
+	message( "Copying turbojpeg" )
+	configure_file( "thirdparty/libjpeg-turbo/build/libturbojpeg.so" "${PROJ_OUT}/libturbojpeg.dll" COPYONLY )
+
 	message( "Copying FreeImage" )
 	configure_file( "thirdparty/FreeImageRe/lib/libFreeImage.so" "${PROJ_OUT}/libFreeImage.so" COPYONLY )
 	configure_file( "thirdparty/FreeImageRe/lib/libheif.so" "${PROJ_OUT}/libheif.so" COPYONLY )
 
 	message( "Copying kdl" )
-	configure_file( "thirdparty/libfyaml/build/kdl.so" "${PROJ_OUT}/kdl.so" COPYONLY )
+	configure_file( "thirdparty/ckdl/build/libkdl.so" "${PROJ_OUT}/libkdl.so" COPYONLY )
 
 	message( "Copying jxl" )
 	configure_file( "thirdparty/libjxl/build/lib/libjxl.so" "${PROJ_OUT}/libjxl.so" COPYONLY )
@@ -215,31 +220,30 @@ endif()
 # ========================================================================================================
 # Launchers
 
-include_directories(
-	"src/"
-	"thirdparty/SDL3/include"
-)
+if (WIN32)
+	include_directories(
+		"src/"
+		"thirdparty/SDL3/include"
+	)
 
-if( LINUX )
-	include_directories( "/usr/include/SDL3" )
-endif()
+	if( LINUX )
+		include_directories( "/usr/include/SDL3" )
+	endif()
 
-link_libraries(	SDL3 )
+	link_libraries(	SDL3 )
 
-if ( WIN32 )
-	link_directories( "thirdparty/SDL3/lib/x64"	)
-endif()
+	if ( WIN32 )
+		link_directories( "thirdparty/SDL3/lib/x64"	)
+	endif()
 
-add_executable( media_tag_system_launcher src/launcher.cpp )
+	add_executable( media_tag_system_launcher src/launcher.cpp )
 
-set_target_properties(
-	media_tag_system_launcher PROPERTIES
-	SUFFIX ".exe"
-	RUNTIME_OUTPUT_NAME "media_tag_system"
-	PDB_NAME "media_tag_system"
-)
+	set_target_properties(
+		media_tag_system_launcher PROPERTIES
+		RUNTIME_OUTPUT_NAME "media_tag_system"
+		PDB_NAME "media_tag_system"
+	)
 
-if ( WIN32 )
 	add_executable( media_tag_system_con src/launcher.cpp )
 
 	target_link_options(
@@ -466,6 +470,7 @@ if ( WIN32 )
 	)
 elseif( LINUX )
 	link_directories(
+		"${THIRDPARTY_DIR}/ckdl/build"
 	)
 	link_libraries(
 		turbojpeg
@@ -482,7 +487,18 @@ foreach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 	)
 endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 
-add_library( media_tag_system SHARED ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
+set( ALL_FILES ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
+
+if (WIN32)
+	add_library( media_tag_system SHARED ${ALL_FILES} )
+else()
+	add_executable( media_tag_system ${ALL_FILES} )
+endif()
+
+set_target_properties(
+	media_tag_system PROPERTIES
+	PREFIX ""
+)
 
 source_group(
 	TREE ${CMAKE_CURRENT_LIST_DIR}/src

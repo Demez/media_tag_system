@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <atomic>
 
 namespace fs
 {

@@ -1020,7 +1020,7 @@ void gallery_view_handle_scroll_event( float mouse_y )
 	float  scroll_amount   = 0.f;
 	size_t i               = gallery::first_visible_item;
 	size_t row_i           = 0;
-	s64    scroll_step_add = ( mouse_y < 0 ) ? 1i64 : -1i64;
+	s64    scroll_step_add = ( mouse_y < 0 ) ? 1 : -1;
 	s64    scroll_step     = 0;
 	s64    scroll_end      = -static_cast< s64 >( mouse_y );
 

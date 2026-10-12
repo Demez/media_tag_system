@@ -107,7 +107,7 @@ fs::path fs_path_clean( const fs::path& path )
 	std::vector< fs::path::string_type > path_segments;
 
 #ifdef __unix__
-	if ( fs_is_absolute( path, path_len ) )
+	if ( fs_is_absolute( path.c_str(), path.string().size() ) )
 	{
 		path_segments.push_back( "/" );
 	}
