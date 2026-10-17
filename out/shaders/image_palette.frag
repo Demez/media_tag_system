@@ -16,9 +16,8 @@ void main()
 
     FragColor.a = 1;
 
-    //if ( in_palette_trans < 256 )
-        if ( in_palette_trans == int(palette_index * 255.0) )
-            FragColor.a = 0;
+    if ( in_palette_trans == int(palette_index * 255.0) )
+        FragColor.a = 0;
 
     //FragColor = texture(in_texture, frag_tex_coord);
 
