@@ -84,7 +84,6 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 
 	image_frame_t& frame                  = load_info.image->frame[ page ];
 
-#if 1
 	switch ( color_type )
 	{
 		default:
@@ -92,81 +91,79 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 		case FIC_RGBALPHA:
 			break;
 
-	#if 1
 		case FIC_PALETTE:
 		{
-			//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
-			FIRGBA8* palette = FreeImage_GetPalette( bitmap );
-			FIBOOL   trans   = FreeImage_IsTransparent( bitmap );
-
-			load_info.image->flags |= e_image_flag_has_local_palettes;
-			frame.flags |= e_image_frame_f_local_palette;
-			frame.palette.elem  = ch_calloc< image_palette_elem_t >( 256, e_mem_category_image_data );
-			frame.palette.count = 256;
-
-			if ( trans )
-				frame.palette.trans_index = FreeImage_GetTransparentIndex( bitmap );
-			else
-				frame.palette.trans_index = 256;
-
-			for ( u32 p = 0; p < 256; p++ )
+			if ( load_info.thumbnail_load )
 			{
-				frame.palette.elem[ p ].r = palette[ p ].red;
-				frame.palette.elem[ p ].g = palette[ p ].green;
-				frame.palette.elem[ p ].b = palette[ p ].blue;
-				frame.palette.elem[ p ].a = palette[ p ].alpha;
-			}
+				//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
+				FIRGBA8*  palette     = FreeImage_GetPalette( bitmap );
 
-			break;
-		}
+				FIBOOL    trans       = FreeImage_IsTransparent( bitmap );
+				int       trans_index = FreeImage_GetTransparentIndex( bitmap );
 
-	#else
-		case FIC_PALETTE:
-		{
-			//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
-			FIRGBA8*  palette     = FreeImage_GetPalette( bitmap );
+				// FreeImage_ApplyPaletteIndexMapping
+				// FIBITMAP* tmp         = FreeImage_Allocate( load_info.image->width, load_info.image->height, trans ? 32 : 24 );
+				FIBITMAP* tmp         = FreeImage_Allocate( load_info.image->frame[ page ].width, load_info.image->frame[ page ].height, 32 );
+				u8*       tmp_bits    = FreeImage_GetBits( tmp );
+				u8*       image_bits  = FreeImage_GetBits( bitmap );
 
-			FIBOOL    trans       = FreeImage_IsTransparent( bitmap );
-			int       trans_index = FreeImage_GetTransparentIndex( bitmap );
-
-			// FreeImage_ApplyPaletteIndexMapping
-			// FIBITMAP* tmp         = FreeImage_Allocate( load_info.image->width, load_info.image->height, trans ? 32 : 24 );
-			FIBITMAP* tmp        = FreeImage_Allocate( load_info.image->frame[ page ].width, load_info.image->frame[ page ].height, 32 );
-			u8*       tmp_bits   = FreeImage_GetBits( tmp );
-			u8*       image_bits = FreeImage_GetBits( bitmap );
-
-  #if 01
-			// https://stackoverflow.com/questions/42084727/reading-gif-color-image-with-freeimage-library-and-convert-it-to-opencv-mat
-			for ( int x = 0; x < load_info.image->frame[ page ].width; x++ )
-			{
-				for ( int y = 0; y < load_info.image->frame[ page ].height; y++ )
+	#if 01
+				// https://stackoverflow.com/questions/42084727/reading-gif-color-image-with-freeimage-library-and-convert-it-to-opencv-mat
+				for ( int x = 0; x < load_info.image->frame[ page ].width; x++ )
 				{
-					u8     palette_index = 0;
-					FIBOOL ret           = FreeImage_GetPixelIndex( bitmap, x, y, &palette_index );
-
-					if ( !ret )
+					for ( int y = 0; y < load_info.image->frame[ page ].height; y++ )
 					{
-						printf( "failed to get pixel index for palette\n" );
+						u8     palette_index = 0;
+						FIBOOL ret           = FreeImage_GetPixelIndex( bitmap, x, y, &palette_index );
+
+						if ( !ret )
+						{
+							printf( "failed to get pixel index for palette\n" );
+						}
+
+
+						FIRGBA8 color = palette[ palette_index ];
+						color.alpha   = 255;
+
+						if ( trans && palette_index == trans_index )
+							color.alpha = 0;
+
+						FreeImage_SetPixelColor( tmp, x, y, &color );
 					}
-
-
-					FIRGBA8 color = palette[ palette_index ];
-					color.alpha   = 255;
-
-					if ( trans && palette_index == trans_index )
-						color.alpha = 0;
-
-					FreeImage_SetPixelColor( tmp, x, y, &color );
 				}
+	#endif
+
+				if ( new_bitmap )
+					FreeImage_Unload( bitmap );
+
+				bitmap     = tmp;
+				new_bitmap = true;
 			}
-  #endif
+			else
+			{
+				//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
+				FIRGBA8* palette = FreeImage_GetPalette( bitmap );
+				FIBOOL   trans   = FreeImage_IsTransparent( bitmap );
 
-			if ( new_bitmap )
-				FreeImage_Unload( bitmap );
+				load_info.image->flags |= e_image_flag_has_local_palettes;
+				frame.flags |= e_image_frame_f_local_palette;
+				frame.palette.elem  = ch_calloc< image_palette_elem_t >( 256, e_mem_category_image_data );
+				frame.palette.count = 256;
 
-			bitmap     = tmp;
-			new_bitmap = true;
+				if ( trans )
+					frame.palette.trans_index = FreeImage_GetTransparentIndex( bitmap );
+				else
+					frame.palette.trans_index = 256;
 
+				for ( u32 p = 0; p < 256; p++ )
+				{
+					frame.palette.elem[ p ].r = palette[ p ].red;
+					frame.palette.elem[ p ].g = palette[ p ].green;
+					frame.palette.elem[ p ].b = palette[ p ].blue;
+					frame.palette.elem[ p ].a = palette[ p ].alpha;
+				}
+
+			}
 			break;
 		}
   #endif
@@ -220,6 +217,8 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 
 	memset( load_info.image->frame[ page ].data, 0, image_size * sizeof( u8 ) );
 	memcpy( load_info.image->frame[ page ].data, image_bits, image_size );
+
+	load_info.image->frame[ page ].pitch = pitch;
 
 	// Get Frame Time
 	{
