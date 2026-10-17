@@ -680,6 +680,13 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 
 bool handle_event( SDL_Event& event )
 {
+	// eat events
+	if ( app::in_drag_drop )
+	{
+		if ( event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP )
+			return false;
+	}
+
 	ImGui_ImplSDL3_ProcessEvent( &event );
 	input_handle_event( event );
 

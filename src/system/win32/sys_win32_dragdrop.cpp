@@ -497,8 +497,6 @@ void sys_do_drag_drop_files( const std::vector< fs::path >& files, u32 sdl_mouse
 
 	source->Release();
 
-	app::in_drag_drop = false;  // Reset flag
-
 	// EVIL FUCKING HACK:
 	// if you do a drag and drop, but release the drag button while hovering over this app,
 	// the window stops reciveing a lot of messages, and all hit tests
@@ -506,7 +504,7 @@ void sys_do_drag_drop_files( const std::vector< fs::path >& files, u32 sdl_mouse
 	// only user fix is to just click the window once, or unfocus and refocus the window
 	// and i have tried to find a fix for it, but this is the best i can do unless a real, proper fix is done
 
-#if 1
+#if 0
 	if ( GetForegroundWindow() == g_main_hwnd )
 	{
 		// the input sending hack is problematic, since it can trigger playback toggles in the media view
