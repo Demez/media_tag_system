@@ -124,7 +124,7 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	// number of pixels in a row
 	//glPixelStorei( GL_UNPACK_ROW_LENGTH, width );
 	if ( image->frame[ frame_i ].pitch > 0 )
-		glPixelStorei( GL_UNPACK_ROW_LENGTH, image->frame[ frame_i ].pitch );
+		glPixelStorei( GL_UNPACK_ROW_LENGTH, image->frame[ frame_i ].pitch / image->channels );
 
 	// GL_RGB  - 6407
 	// GL_RGBA - 6408
@@ -151,6 +151,14 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	else if ( image->format == GL_RGBA32F )
 	{
 		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, image->frame[ frame_i ].data );
+	}
+	else if ( image->format == GL_RGBA )
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
+	}
+	else if ( image->format == GL_RGB )
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
 	}
 	else
 	{

@@ -78,6 +78,8 @@ struct shader_base_t
 	GLint                image_rot        = 0;
 	GLint                visible_channels = 0;
 
+	GLint                in_texture       = 0;
+
 	virtual bool         init()
 	{
 		return true;
@@ -177,6 +179,33 @@ void gl_check_error()
 #undef CHECK_GL_ERROR
 
 
+#define GL_DEBUG_TYPE_STR( find, str ) if ( type == find ) return str
+
+
+const char* gl_debug_type_str( GLenum type )
+{
+	GL_DEBUG_TYPE_STR( GL_DEBUG_TYPE_ERROR, "Error" );
+	GL_DEBUG_TYPE_STR( GL_DEBUG_TYPE_PORTABILITY, "Portability" );
+	GL_DEBUG_TYPE_STR( GL_DEBUG_TYPE_PERFORMANCE, "Perf" );
+	GL_DEBUG_TYPE_STR( GL_DEBUG_TYPE_OTHER, "Other" );
+	GL_DEBUG_TYPE_STR( GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR, "Deprecated" );
+	GL_DEBUG_TYPE_STR( GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR, "Undefined" );
+
+	return "Unknown";
+}
+
+
+void gl_msg_callback( GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam )
+{
+	if ( type == GL_DEBUG_TYPE_OTHER ) return;
+
+	if ( type == GL_DEBUG_TYPE_ERROR )
+		(void)0;  // breakpoint lol
+
+	printf( "[GL - %s] - %s\n", gl_debug_type_str( type ), message );
+}
+
+
 // ================================================================================================
 
 
@@ -193,6 +222,9 @@ void frame_draw_start()
 	ImGui_ImplSDL3_NewFrame();
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui::NewFrame();
+
+	// reset framebuffer
+	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 
 	glViewport( 0, 0, width, height );
 
@@ -509,6 +541,8 @@ bool render_load_shader( shader_base_t* shader )
 	shader->image_rot        = glGetUniformLocation( shader->program, "image_rotation" );
 	shader->visible_channels = glGetUniformLocation( shader->program, "in_visible_channels" );
 
+	shader->in_texture       = glGetUniformLocation( shader->program, "in_texture" );
+
 	return shader->init();
 }
 
@@ -595,6 +629,12 @@ bool render_init()
 
 	if ( !render_load_shaders() )
 		return false;
+
+	glEnable( GL_DEBUG_OUTPUT );
+	glEnable( GL_DEBUG_OUTPUT_SYNCHRONOUS );
+	gl_check_error();
+
+	glDebugMessageCallback( gl_msg_callback, nullptr );
 
 	return true;
 }
@@ -683,7 +723,7 @@ void render_draw_texture( render_draw_texture_t draw_info )
 
 	glActiveTexture( GL_TEXTURE0 );
 	glBindTexture( GL_TEXTURE_2D, draw_info.texture );
-	glUniform1i( glGetUniformLocation( shader->program, "in_texture" ), 0 );
+	glUniform1i( shader->in_texture, 0 );
 
 	shader->draw( draw_info );
 

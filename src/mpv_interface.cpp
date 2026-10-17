@@ -270,7 +270,6 @@ bool mpv_init_render_context()
 
 	// Create Framebuffer to draw on
 	glGenFramebuffers( 1, &g_mpv_fbo );
-	glBindFramebuffer( GL_FRAMEBUFFER, g_mpv_fbo );
 
 	mpv_create_texture();
 	return true;
@@ -429,6 +428,7 @@ void mpv_update_texture()
 		new_height = static_cast< float >( g_video_height ) * zoom_level;
 	}
 
+	glBindFramebuffer( GL_FRAMEBUFFER, g_mpv_fbo );
 	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, new_width, new_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
 	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0, GL_RGBA16, GL_UNSIGNED_INT_10_10_10_2, nullptr );

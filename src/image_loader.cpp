@@ -111,6 +111,9 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 		allocated_image = true;
 	}
 
+	// reset flags
+	load_info.image->flags = 0;
+
 	if ( file_data && !file_len )
 		return false;
 
