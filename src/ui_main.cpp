@@ -198,9 +198,9 @@ void set_view_type_gallery()
 	// pause video if playing one back
 	if ( mpv_get_current_video() )
 	{
-		s32 paused = 0;
-		p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
-		g_mpv_resume_on_focus = !paused;
+		//s32 paused = 0;
+		//p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
+		g_mpv_resume_on_focus = !g_mpv_data.pause;
 
 		const char* cmd[]     = { "set", "pause", "yes", NULL };
 		int         cmd_ret   = p_mpv_command_async( g_mpv, 0, cmd );

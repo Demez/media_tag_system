@@ -11,11 +11,59 @@
 // --------------------------------------------------------------------------------------------------------
 // MPV
 
+enum e_mpv_cmd
+{
+	e_mpv_cmd_invalid,
+	e_mpv_cmd_observe,
+
+	e_mpv_cmd_loadfile,
+	e_mpv_cmd_seek,
+
+	e_mpv_cmd_audio_track,
+	e_mpv_cmd_audio_title,
+	e_mpv_cmd_track_type,
+
+	e_mpv_cmd_count,
+};
+
+
+struct mpv_data_t
+{
+	mpv_handle*         mpv               = nullptr;
+	mpv_render_context* gl                = nullptr;
+
+	// metadata grabbed from mpv
+	s64                 track_count       = 0;
+	s64                 track_count_video = 0;
+	s64                 track_count_audio = 0;
+
+	u64                 seek_queued_time  = 0;
+
+	double              time_pos          = 0;
+	double              duration          = 0;
+	s32                 pause             = 0;
+	s32                 mute              = 0;
+	bool                loaded_file       = false;
+	bool                seek_queued       = false;
+
+	s64                 dwidth            = 0;
+	s64                 dheight           = 0;
+
+	double              volume            = 0.0;
+	char*               audio_track       = nullptr;
+	char*               audio_track_title = nullptr;
+};
+
+
+extern mpv_data_t          g_mpv_data;
+
+
 bool                       load_mpv_dll();
 void                       unload_mpv_dll();
 
 bool                       start_mpv();
 void                       stop_mpv();
+void                       mpv_update();
 
 bool                       mpv_supports_ext( std::string_view ext );
 

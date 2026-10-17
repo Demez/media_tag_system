@@ -310,6 +310,7 @@ namespace image_draw
 	extern double      playback_speed;
 	extern bool        pause;
 	extern bool        scaling;
+	extern float       volume;  // for mpv
 
 	// index into gallery::sorted_media
 	//extern size_t media_index;

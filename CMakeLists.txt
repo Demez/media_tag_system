@@ -290,6 +290,7 @@ set(
     src/folder_scan.cpp
     src/job_system.cpp
     src/job_system.h
+    src/gl_main.cpp
     src/gl_render.cpp
     src/gl_image.cpp
 

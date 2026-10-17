@@ -949,20 +949,17 @@ void check_need_draw( bool playing_back_video )
 
 static bool check_mpv_playback()
 {
-	if ( g_gallery_view || gallery::sorted_media.empty() )
-		return false;
-
-	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
-
-	// if ( entry.type == e_media_type_video /*&& g_mpv_video_ready*/ )
-	if ( entry.type != e_media_type_video )
-		return false;
+//	if ( g_gallery_view || gallery::sorted_media.empty() )
+//		return false;
+//
+//	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
+//
+//	// if ( entry.type == e_media_type_video /*&& g_mpv_video_ready*/ )
+//	if ( entry.type != e_media_type_video )
+//		return false;
 
 	// check mpv state (SHOULD PROBABLY TRY USING OBSERVE PROPERTY)
-	s32 paused = 0;
-	p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
-
-	return !paused;
+	return !g_mpv_data.pause;
 }
 
 
@@ -1134,6 +1131,8 @@ void main_loop()
 		// }
 
 		// -----------------------------------------------------------------------------------
+		
+		mpv_update();
 
 		u32 draw_frame_count = app::draw_frame_count;
 
