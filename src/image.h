@@ -99,7 +99,19 @@ enum e_image_frame_list
 };
 
 
-enum e_image_frame_f
+using e_image_frame_f = u8;
+using e_image_flag = u8;
+
+
+enum : e_image_flag
+{
+	e_image_flag_none               = 0,
+	e_image_flag_has_palette        = 1 << 0,
+	e_image_flag_has_local_palettes = 1 << 1,
+};
+
+
+enum : e_image_frame_f
 {
 	e_image_frame_f_none          = 0,
 	e_image_frame_f_local_palette = 1 << 0,
@@ -108,10 +120,18 @@ enum e_image_frame_f
 
 struct image_palette_elem_t
 {
-	int r;
-	int g;
-	int b;
-	int a;
+	u8 r;
+	u8 g;
+	u8 b;
+	u8 a;
+};
+
+
+struct image_palette_t
+{
+	image_palette_elem_t* elem;
+	u32                   count;
+	u32                   trans_index;
 };
 
 
@@ -130,6 +150,7 @@ struct image_frame_t
 	// frame width and height
 	int                  width;
 	int                  height;
+	u32                  pitch = 0;
 
 	// frame draw position relative to image draw position
 	int                  pos_x;
@@ -139,7 +160,7 @@ struct image_frame_t
 
 	e_image_frame_f      flags;
 
-	image_palette_elem_t palette;
+	image_palette_t      palette;
 
 	// animation_format_frame_data_base_t* frame_data;
 
@@ -173,19 +194,23 @@ struct image_t
 	int                          pitch;
 	int                          bytes_per_pixel;  // actually bits per pixel i think lol
 
-	int                          channels;
+	e_image_flag                 flags;
+	u8                           channels;
 	GLint                        format;
 
 	// add channels_source - for the source channel count, would be used for jxl thumbnails
 
 	int                          loop_count;
 
+	// REPLACE WITH INDEX INTO IMAGE FORMAT STRING LIST
 	char*                        image_format;
 
 	//e_animation_format           animation_format;
 
 	std::vector< image_frame_t > frame;
 	// image_frame_list_t frame;
+
+	image_palette_t              palette;
 
 	image_t() {
 	};
@@ -218,6 +243,7 @@ struct image_t
 		channels        = other.channels;
 		format          = other.format;
 		loop_count      = other.loop_count;
+		palette         = other.palette;
 
 		if ( other.image_format )
 			image_format = util_strdup( other.image_format );
@@ -227,6 +253,7 @@ struct image_t
 	void assign( image_t&& other ) noexcept
 	{
 		frame              = std::move( other.frame );
+		palette            = std::move( other.palette );
 
 		width              = other.width;
 		height             = other.height;
@@ -296,8 +323,12 @@ struct image_load_info_t
 
 struct uploaded_textures_t
 {
-	GLuint* frame = nullptr;
-	size_t  count = 0;
+	GLuint* frame         = nullptr;
+	size_t  count         = 0;
+
+	GLuint* palette       = nullptr;
+	GLuint* palette_trans = nullptr;
+	size_t  palette_count = 0;
 };
 
 

@@ -29,6 +29,7 @@ const char* mem_category_str[] = {
     "thread_data",
     "image_data",
     "image",
+    "gl",
     "gl_texture_data",
     "string",
     "file_data",

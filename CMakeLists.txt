@@ -291,6 +291,7 @@ set(
     src/job_system.cpp
     src/job_system.h
     src/gl_render.cpp
+    src/gl_image.cpp
 
 	src/input.cpp
 	src/input.h

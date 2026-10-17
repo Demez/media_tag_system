@@ -82,6 +82,8 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 
 	// ----------------------------------------------------------------------------------------
 
+	image_frame_t& frame                  = load_info.image->frame[ page ];
+
 #if 1
 	switch ( color_type )
 	{
@@ -90,13 +92,31 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 		case FIC_RGBALPHA:
 			break;
 
-	#if 0
+	#if 1
 		case FIC_PALETTE:
 		{
 			//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
-			FIRGBA8* palette     = FreeImage_GetPalette( bitmap );
-			FIBOOL   trans       = FreeImage_IsTransparent( bitmap );
-			int      trans_index = FreeImage_GetTransparentIndex( bitmap );
+			FIRGBA8* palette = FreeImage_GetPalette( bitmap );
+			FIBOOL   trans   = FreeImage_IsTransparent( bitmap );
+
+			load_info.image->flags |= e_image_flag_has_local_palettes;
+			frame.flags |= e_image_frame_f_local_palette;
+			frame.palette.elem  = ch_calloc< image_palette_elem_t >( 256, e_mem_category_image_data );
+			frame.palette.count = 256;
+
+			if ( trans )
+				frame.palette.trans_index = FreeImage_GetTransparentIndex( bitmap );
+			else
+				frame.palette.trans_index = 256;
+
+			for ( u32 p = 0; p < 256; p++ )
+			{
+				frame.palette.elem[ p ].r = palette[ p ].red;
+				frame.palette.elem[ p ].g = palette[ p ].green;
+				frame.palette.elem[ p ].b = palette[ p ].blue;
+				frame.palette.elem[ p ].a = palette[ p ].alpha;
+			}
+
 			break;
 		}
 
@@ -161,7 +181,7 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	if ( page == 0 )
 		load_info.image->pitch = FreeImage_GetPitch( bitmap );
 
-	unsigned pitch                   = FreeImage_GetPitch( bitmap );
+	unsigned int pitch               = FreeImage_GetPitch( bitmap );
 
 	load_info.image->bit_depth       = FreeImage_GetBPP( bitmap );
 	load_info.image->channels        = FreeImage_GetChannelsNumber( bitmap );
@@ -173,14 +193,14 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	// load_info.image->bytes_per_pixel = bpp / bit_depth2;
 	load_info.image->bytes_per_pixel = bit_depth;
 
-	if ( load_info.image->bytes_per_pixel == 0 )
-	{
-		// huh????
-		if ( new_bitmap )
-			FreeImage_Unload( bitmap );
-
-		return false;
-	}
+//	if ( load_info.image->bytes_per_pixel == 0 )
+//	{
+//		// huh????
+//		if ( new_bitmap )
+//			FreeImage_Unload( bitmap );
+//
+//		return false;
+//	}
 
 	u8*    image_bits                   = FreeImage_GetBits( bitmap );
 

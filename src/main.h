@@ -22,6 +22,15 @@
 // ---------------------------------------------------------
 
 
+enum e_shader : u8
+{
+	e_shader_main,
+	e_shader_palette,
+
+	e_shader_count,
+};
+
+
 enum e_icon : u8
 {
 	e_icon_none,
@@ -346,25 +355,30 @@ extern SDL_Event g_event_folder_scan_finish;
 
 struct render_draw_texture_t
 {
-	int    width;
-	int    height;
-	int    x;
-	int    y;
-	float  rotation;
+	int                 width;
+	int                 height;
+	int                 x;
+	int                 y;
+	float               rotation;
 
-	GLuint texture;
+	GLuint              texture       = 0;
+	GLuint              palette       = 0;
+	GLuint              palette_trans = 0;
 
-	GLuint target;
-	int    target_width;
-	int    target_height;
+	// draw target
+	GLuint              target;
+	int                 target_width;
+	int                 target_height;
+
+	e_shader            shader = e_shader_main;
 
 	// draw settings
-	bool   flip_v     = false;
-	bool   flip_h     = false;
+	bool                flip_v = false;
+	bool                flip_h = false;
 
 	// draw a specific channel of the image
-	bool   hide_channel[ 4 ];
-	bool   hide_alpha = false;
+	bool                hide_channel[ 4 ];
+	bool                hide_alpha = false;
 };
 
 
@@ -375,6 +389,8 @@ extern bool                          g_mpv_video_ready;
 // Main Image
 extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
+
+#define GL_DBG_NAME( str ) sizeof( str ), str
 
 void                                 set_frame_draw( u32 count = 1 );
 void                                 send_frame_draw_event();

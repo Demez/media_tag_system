@@ -52,26 +52,104 @@ static u32 indices[] = {
 };
 
 
-// Shaders
-// TODO: maybe read this from a file instead, to allow users to do fancy things if they really wanted to?
+const char*          shader_str[]              = {
+	"Main",
+	"Palette",
+};
 
-const fs::path_char* g_shader_vert_path        = PATH_FMT( "shaders/image.vert" );
-const fs::path_char* g_shader_frag_path        = PATH_FMT( "shaders/image.frag" );
 
-static GLuint        g_shader_vert             = 0;
-static GLuint        g_shader_frag             = 0;
-
-static GLuint        g_shader_program          = 0;
+static_assert( ARR_SIZE( shader_str ) == e_shader_count );
 
 // Shader Info
-static GLint         g_shader_projection       = 0;
-static GLint         g_shader_view             = 0;
+struct shader_base_t
+{
+	const char*          name             = nullptr;
+	const fs::path_char* vert_path        = nullptr;
+	const fs::path_char* frag_path        = nullptr;
 
-static GLint         g_shader_window_size      = 0;
-static GLint         g_shader_image_size       = 0;
-static GLint         g_shader_image_pos        = 0;
-static GLint         g_shader_image_rot        = 0;
-static GLint         g_shader_visible_channels = 0;
+	GLuint               program          = 0;
+
+	GLint                projection       = 0;
+	GLint                view             = 0;
+
+	GLint                window_size      = 0;
+	GLint                image_size       = 0;
+	GLint                image_pos        = 0;
+	GLint                image_rot        = 0;
+	GLint                visible_channels = 0;
+
+	virtual bool         init()
+	{
+		return true;
+	}
+
+	virtual void draw( const render_draw_texture_t& draw_info )
+	{
+
+	}
+};
+
+
+shader_base_t* shader_list[ e_shader_count ] = {};
+
+
+//using shader_list_t = std::vector< shader_base_t& >;
+//
+//
+//shader_list_t& get_shader_list()
+//{
+//	static shader_list_t shader_list;
+//	return shader_list;
+//}
+
+
+struct shader_main_t : public shader_base_t
+{
+};
+
+
+// Shader Info - Palette
+struct shader_palette_t : public shader_base_t
+{
+	GLint        in_palette       = 0;
+	GLint        in_palette_trans = 0;
+
+	virtual bool init()
+	{
+		in_palette       = glGetUniformLocation( program, "in_palette" );
+		in_palette_trans = glGetUniformLocation( program, "in_palette_trans" );
+		return true;
+	}
+
+	virtual void draw( const render_draw_texture_t& draw_info )
+	{
+		glActiveTexture( GL_TEXTURE1 );
+		glBindTexture( GL_TEXTURE_1D, draw_info.palette );
+		glUniform1i( in_palette, 1 );
+		glUniform1i( in_palette_trans, draw_info.palette_trans );
+	}
+};
+
+
+struct register_shader_t
+{
+	register_shader_t( e_shader shader_enum, shader_base_t* shader_base, const fs::path_char* vert_path, const fs::path_char* frag_path )
+	{
+		shader_base->name          = shader_str[ shader_enum ];
+		shader_base->vert_path     = vert_path;
+		shader_base->frag_path     = frag_path;
+
+		shader_list[ shader_enum ] = shader_base;
+	}
+};
+
+#define REGISTER_SHADER( shader_enum, type, vert_path, frag_path ) \
+	register_shader_t __reg_##type( shader_enum, new type, PATH_FMT( vert_path ), PATH_FMT( frag_path ) )
+
+
+REGISTER_SHADER( e_shader_main, shader_main_t, "shaders/image.vert", "shaders/image.frag" );
+REGISTER_SHADER( e_shader_palette, shader_palette_t, "shaders/image.vert", "shaders/image_palette.frag" );
+
 
 
 // ================================================================================================
@@ -182,7 +260,7 @@ bool render_window_prepare_for_creation()
 	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE ) )
 		return false;
 
-	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 ) )
+	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 4 ) )
 		return false;
 
 	if ( !SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 ) )
@@ -381,53 +459,70 @@ bool render_load_shader( GLuint& shader, const fs::path_char* shader_path, GLenu
 }
 
 
-bool render_load_shaders()
+bool render_load_shader( shader_base_t* shader )
 {
-	if ( !render_load_shader( g_shader_vert, g_shader_vert_path, GL_VERTEX_SHADER ) )
+	GLuint vert, frag;
+
+	if ( !render_load_shader( vert, shader->vert_path, GL_VERTEX_SHADER ) )
 	{
 		printf( "Failed to load vertex shader\n" );
 		return false;
 	}
 
-	if ( !render_load_shader( g_shader_frag, g_shader_frag_path, GL_FRAGMENT_SHADER ) )
+	if ( !render_load_shader( frag, shader->frag_path, GL_FRAGMENT_SHADER ) )
 	{
 		printf( "Failed to load vertex shader\n" );
 		return false;
 	}
 
 	// create a program and attach shaders
-	g_shader_program = glCreateProgram();
-	glAttachShader( g_shader_program, g_shader_vert );
-	glAttachShader( g_shader_program, g_shader_frag );
-	glLinkProgram( g_shader_program );
+	shader->program = glCreateProgram();
+	glAttachShader( shader->program, vert );
+	glAttachShader( shader->program, frag );
+	glLinkProgram( shader->program );
 
 	GLint success = 0;
-	glGetProgramiv( g_shader_program, GL_LINK_STATUS, &success );
+	glGetProgramiv( shader->program, GL_LINK_STATUS, &success );
 	if ( !success )
 	{
 		printf( "Failed to compile shader program\n" );
 
 		GLchar log_buf[ 512 ];
-		glGetProgramInfoLog( g_shader_program, 512, NULL, log_buf );
+		glGetProgramInfoLog( shader->program, 512, NULL, log_buf );
 
 		printf( "GL Log:\n%s\n", log_buf );
 		return false;
 	}
 
-	glUseProgram( g_shader_program );
+	glUseProgram( shader->program );
 
 	// shaders are linked into program, can free these objects now
-	glDeleteShader( g_shader_vert );
-	glDeleteShader( g_shader_frag );
+	glDeleteShader( vert );
+	glDeleteShader( frag );
 
-	g_shader_projection       = glGetUniformLocation( g_shader_program, "projection" );
-	g_shader_view             = glGetUniformLocation( g_shader_program, "view" );
+	shader->projection       = glGetUniformLocation( shader->program, "projection" );
+	shader->view             = glGetUniformLocation( shader->program, "view" );
 
-	g_shader_window_size      = glGetUniformLocation( g_shader_program, "window_size" );
-	g_shader_image_size       = glGetUniformLocation( g_shader_program, "image_size" );
-	g_shader_image_pos        = glGetUniformLocation( g_shader_program, "image_pos" );
-	g_shader_image_rot        = glGetUniformLocation( g_shader_program, "image_rotation" );
-	g_shader_visible_channels = glGetUniformLocation( g_shader_program, "in_visible_channels" );
+	shader->window_size      = glGetUniformLocation( shader->program, "window_size" );
+	shader->image_size       = glGetUniformLocation( shader->program, "image_size" );
+	shader->image_pos        = glGetUniformLocation( shader->program, "image_pos" );
+	shader->image_rot        = glGetUniformLocation( shader->program, "image_rotation" );
+	shader->visible_channels = glGetUniformLocation( shader->program, "in_visible_channels" );
+
+	return shader->init();
+}
+
+
+bool render_load_shaders()
+{
+	for ( u8 i = 0; i < e_shader_count; i++ )
+	{
+		if ( render_load_shader( shader_list[ i ] ) )
+			continue;
+
+		printf( "Failed to load shader - %s\n", shader_str[ i ] );
+		return false;
+	}
 
 	return true;
 }
@@ -529,7 +624,10 @@ void render_draw_texture( render_draw_texture_t draw_info )
 	}
 
 	glBindVertexArray( g_image_vao );
-	glUseProgram( g_shader_program );
+
+	shader_base_t* shader = shader_list[ draw_info.shader ];
+	
+	glUseProgram( shader->program );
 
 	if ( !draw_info.hide_alpha )
 	{
@@ -567,24 +665,27 @@ void render_draw_texture( render_draw_texture_t draw_info )
 		{ ( R + L ) / ( L - R ), ( T + B ) / ( B - T ), 0.0f, 1.0f },
 	};
 
-	glUniformMatrix4fv( g_shader_projection, 1, GL_FALSE, &ortho_projection[ 0 ][ 0 ] );
+	glUniformMatrix4fv( shader->projection, 1, GL_FALSE, &ortho_projection[ 0 ][ 0 ] );
 
-	glUniform2i( g_shader_window_size, window_width, window_height );
-	glUniform2i( g_shader_image_size, draw_info.width, draw_info.height );
-	glUniform2i( g_shader_image_pos, draw_info.x, draw_info.y );
-	glUniform1f( g_shader_image_rot, draw_info.rotation * TO_RAD );
+	glUniform2i( shader->window_size, window_width, window_height );
+	glUniform2i( shader->image_size, draw_info.width, draw_info.height );
+	glUniform2i( shader->image_pos, draw_info.x, draw_info.y );
+	glUniform1f( shader->image_rot, draw_info.rotation * TO_RAD );
 
 	glUniform4i(
-		g_shader_visible_channels,
-		!draw_info.hide_channel[ 0 ],
-		!draw_info.hide_channel[ 1 ],
-		!draw_info.hide_channel[ 2 ],
-		!draw_info.hide_channel[ 3 ]
-	);
+	  shader->visible_channels,
+	  !draw_info.hide_channel[ 0 ],
+	  !draw_info.hide_channel[ 1 ],
+	  !draw_info.hide_channel[ 2 ],
+	  !draw_info.hide_channel[ 3 ] );
 
 	gl_check_error();
 
+	glActiveTexture( GL_TEXTURE0 );
 	glBindTexture( GL_TEXTURE_2D, draw_info.texture );
+	glUniform1i( glGetUniformLocation( shader->program, "in_texture" ), 0 );
+
+	shader->draw( draw_info );
 
 	glDrawElements( GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 );
 

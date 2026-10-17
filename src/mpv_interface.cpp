@@ -347,31 +347,35 @@ void mpv_draw_frame()
 	// Fit image in window size
 	float factor[ 2 ] = { 1.f, 1.f };
 
-	if ( g_scale_up_video || g_video_width > g_mpv_framebuffer_size[ 0 ] )
-		factor[ 0 ] = (float)g_mpv_framebuffer_size[ 0 ] / (float)g_video_width;
+	ivec2 area_size{ width, height };
 
-	if ( g_scale_up_video || g_video_height > g_mpv_framebuffer_size[ 1 ] )
-		factor[ 1 ] = (float)g_mpv_framebuffer_size[ 1 ] / (float)g_video_height;
+	// printf( "FRAMEBUFFER %dx%d\n", g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
+
+	if ( g_scale_up_video || g_video_width > area_size[ 0 ] )
+		factor[ 0 ] = (float)area_size[ 0 ] / (float)g_video_width;
+
+	if ( g_scale_up_video || g_video_height > area_size[ 1 ] )
+		factor[ 1 ] = (float)area_size[ 1 ] / (float)g_video_height;
 
 	float     zoom_level        = std::min( factor[ 0 ], factor[ 1 ] );
 
 	float     new_width         = static_cast< float >( g_video_width ) * zoom_level;
 	float     new_height        = static_cast< float >( g_video_height ) * zoom_level;
 
-	float     pos_x             = static_cast< float >( g_mpv_framebuffer_size[ 0 ] ) / 2.f - ( new_width / 2.f );
-	float     pos_y             = static_cast< float >( g_mpv_framebuffer_size[ 1 ] ) / 2.f - ( new_height / 2.f );
+	float     pos_x             = static_cast< float >( area_size[ 0 ] ) / 2.f - ( new_width / 2.f );
+	float     pos_y             = static_cast< float >( area_size[ 1 ] ) / 2.f - ( new_height / 2.f );
 
-	int       viewport_offset_x = ( g_mpv_framebuffer_size[ 0 ] - width ) / 2;
-	int       viewport_offset_y = ( g_mpv_framebuffer_size[ 1 ] - height ) / 2;
+	int                   viewport_offset_x = ( area_size[ 0 ] - width ) / 2;
+	int                   viewport_offset_y = ( area_size[ 1 ] - height ) / 2;
 
 	int       clamped_width     = g_mpv_framebuffer_size[ 0 ];
 	int       clamped_height    = g_mpv_framebuffer_size[ 1 ];
 
 	render_draw_texture_t draw_info{};
-	draw_info.width    = static_cast< float >( width );
-	draw_info.height   = static_cast< float >( height );
-	draw_info.x        = 0;
-	draw_info.y        = 0;
+	draw_info.width    = static_cast< float >( new_width );
+	draw_info.height   = static_cast< float >( new_height );
+	draw_info.x        = pos_x;
+	draw_info.y        = pos_y;
 	draw_info.rotation = 0;
 	draw_info.texture  = g_mpv_fbo_tex;
 
@@ -398,8 +402,35 @@ void mpv_update_texture()
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
+	p_mpv_get_property( g_mpv, "width", MPV_FORMAT_INT64, &g_video_width );
+	p_mpv_get_property( g_mpv, "height", MPV_FORMAT_INT64, &g_video_height );
+
+	float new_width  = width;
+	float new_height = height;
+
+	if ( g_video_width != 0 && g_video_height != 0 )
+	{
+		// Fit image in window size
+		float factor[ 2 ] = { 1.f, 1.f };
+
+		ivec2 area_size{ width, height };
+
+		// printf( "FRAMEBUFFER %dx%d\n", g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ] );
+
+		if ( g_scale_up_video || g_video_width > area_size[ 0 ] )
+			factor[ 0 ] = (float)area_size[ 0 ] / (float)g_video_width;
+
+		if ( g_scale_up_video || g_video_height > area_size[ 1 ] )
+			factor[ 1 ] = (float)area_size[ 1 ] / (float)g_video_height;
+
+		float zoom_level = std::min( factor[ 0 ], factor[ 1 ] );
+
+		new_width  = static_cast< float >( g_video_width ) * zoom_level;
+		new_height = static_cast< float >( g_video_height ) * zoom_level;
+	}
+
 	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, new_width, new_height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
 	//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0, GL_RGBA16, GL_UNSIGNED_INT_10_10_10_2, nullptr );
 
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
@@ -412,8 +443,8 @@ void mpv_update_texture()
 	glBindTexture( GL_TEXTURE_2D, 0 );
 	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
 
-	g_mpv_framebuffer_size[ 0 ] = width;
-	g_mpv_framebuffer_size[ 1 ] = height;
+	g_mpv_framebuffer_size[ 0 ] = new_width;
+	g_mpv_framebuffer_size[ 1 ] = new_height;
 }
 
 
@@ -422,6 +453,10 @@ void mpv_create_texture()
 	if ( !g_mpv )
 		return;
 
+	glGenTextures( 1, &g_mpv_fbo_tex );
+
+//	mpv_update_texture();
+#if 0
 	//glDeleteTextures( 1, &g_mpv_fbo_tex );
 	//g_mpv_fbo_tex = 0;
 
@@ -429,7 +464,6 @@ void mpv_create_texture()
 	SDL_GetWindowSize( app::window, &width, &height );
 
 	//glGenRenderbuffers( 1, &g_mpv_rbo );
-	glGenTextures( 1, &g_mpv_fbo_tex );
 	glBindTexture( GL_TEXTURE_2D, g_mpv_fbo_tex );
 
 	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr );
@@ -450,6 +484,7 @@ void mpv_create_texture()
 
 	g_mpv_framebuffer_size[ 0 ] = width;
 	g_mpv_framebuffer_size[ 1 ] = height;
+#endif
 }
 
 
@@ -791,6 +826,8 @@ void mpv_cmd_loadfile( const char* file )
 	g_current_video = util_strdup( file );
 
 	set_frame_draw();
+
+	mpv_update_texture();
 
 	// or use video-params?
 //	p_mpv_get_property( g_mpv, "width", MPV_FORMAT_INT64, &g_video_width );

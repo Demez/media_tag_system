@@ -2136,6 +2136,17 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 	draw_info.target_width  = g_image_data.image.width;
 	draw_info.target_height = g_image_data.image.height;
 
+	if ( g_image_data.image.flags & e_image_flag_has_palette || g_image_data.image.flags & e_image_flag_has_local_palettes )
+	{
+		draw_info.shader = e_shader_palette;
+
+		if ( g_image_data.image.flags & e_image_flag_has_local_palettes )
+		{
+			draw_info.palette       = g_image_data.textures.palette[ frame_i ];
+			draw_info.palette_trans = g_image_data.textures.palette_trans[ frame_i ];
+		}
+	}
+
 	if ( animated )
 	{
 		draw_info.width      = frame.width;
@@ -2198,6 +2209,9 @@ static void media_view_draw_image()
 	if ( g_image_data.image.frame.size() > 1 )
 	{
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+
+		glBindFramebuffer( GL_FRAMEBUFFER, g_main_image_anim_fbo );
+		glClear( GL_COLOR_BUFFER_BIT );
 	}
 	else
 	{
