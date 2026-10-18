@@ -224,8 +224,6 @@ void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
 	send_frame_draw_event();
 	set_frame_draw( 2 );
 
-	u64  start_time = sys_get_time_ms();
-
 	auto media_list = new std::vector< media_entry_t >;
 	media_list->resize( status->files.size() );
 
@@ -265,10 +263,6 @@ void* folder_load_media_list_thread_finish( folder_scan_status_t* status )
 	}
 
 	media_list->resize( i );
-
-	u64 end_time = sys_get_time_ms();
-
-	printf( "FILE LIST CHECK TIME: %.4f\n", (float)( end_time - start_time ) / 1000.f );
 
 	return media_list;
 }

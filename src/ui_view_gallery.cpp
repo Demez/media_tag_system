@@ -598,8 +598,6 @@ void gallery_view_sort_dir_func( job_status_t* status )
 	if ( gallery_sort_check_if_canceled( status, sort_data ) )
 		return;
 
-	printf( "FILTERING - %p\n", status );
-
 	// Split up lists
 	for ( size_t i = 0; i < directory::media_list.size(); i++ )
 	{
@@ -639,8 +637,6 @@ void gallery_view_sort_dir_func( job_status_t* status )
 			files.push_back( i );
 	}
 
-	printf( "SORTING - %p\n", status );
-
 	// Sort data
 	if ( sort_data->sort_mode != e_gallery_sort_mode_size_large_to_small && sort_data->sort_mode != e_gallery_sort_mode_size_small_to_large )
 		gallery_view_sort_list( folders, sort_data->sort_mode );
@@ -662,8 +658,6 @@ void gallery_view_sort_dir_func( job_status_t* status )
 	// Add Files next
 	//std::copy( files.begin(), files.end(), sort_data->sorted_media.begin() + folders.size() );
 	std::move( files.begin(), files.end(), sort_data->sorted_media.begin() + folders.size() );
-
-	printf( "DONE SORTING - %p\n", status );
 }
 
 
@@ -680,8 +674,6 @@ void gallery_view_sort_dir_finish( job_status_t* status, bool in_main_thread )
 	// TODO: it would be nice for this to not be on the main thread when in a resize or something, but that's too tricky atm
 	if ( !in_main_thread )
 		return;
-
-	printf( "SORT FINISH FUNC - %p\n", status );
 
 	//g_gallery_sort_block_new_jobs = false;
 
@@ -722,13 +714,6 @@ void gallery_view_sort_dir_free( job_status_t* status )
 		gallery_view_sort_dir();
 
 	delete sort_data;
-
-	//if ( g_gallery_sort_job == status )
-	//	printf( "FREEING CURRENT STATUS !!!!\n" );
-	//else if ( g_gallery_sort_job )
-	//	printf( "FREE SORT DATA - g_gallery_sort_job EXISTS\n" );
-	//else
-		printf( "FREE SORT DATA - %p\n", status );
 }
 
 
@@ -760,8 +745,6 @@ void gallery_view_sort_dir()
 	sort_data->resort     = false;
 
 	g_gallery_sort_job    = job_push( gallery_view_sort_dir_finish, gallery_view_sort_dir_func, gallery_view_sort_dir_free, sort_data );
-
-	printf( "SORT JOB PUSHED - %p\n", g_gallery_sort_job );
 }
 
 

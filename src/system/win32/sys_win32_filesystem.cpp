@@ -822,7 +822,7 @@ bool sys_scandir( const fs::path_char* root, std::vector< file_t >& files, e_sca
 	bool     ret        = sys_scandir_internal( root, files, flags, *cancel );
 
 	u64      end_time   = sys_get_time_ms();
-	printf( "SCANDIR TIME: %.4f\n", (float)( end_time - start_time ) / 1000.f );
+	printf( "Scandir Time: %.4f\n", (float)( end_time - start_time ) / 1000.f );
 
 	return ret;
 }

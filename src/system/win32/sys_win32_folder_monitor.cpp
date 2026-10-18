@@ -84,7 +84,7 @@ void WatchDirectory( fs::path watch_path )
 
 				// A file was created, renamed, or deleted in the directory.
 				// Refresh this directory and restart the notification.
-				printf( "FolderMonitor: File was created, renamed, or deleted\n" );
+				//printf( "FolderMonitor: File was created, renamed, or deleted\n" );
 
 				// RefreshDirectory( lpDir );
 				g_dir_changed = true;
@@ -99,7 +99,7 @@ void WatchDirectory( fs::path watch_path )
 
 				// A directory was created, renamed, or deleted.
 				// Refresh the tree and restart the notification.
-				printf( "FolderMonitor: Directory was created, renamed, or deleted\n" );
+				//printf( "FolderMonitor: Directory was created, renamed, or deleted\n" );
 
 				// RefreshTree( lpDrive );
 				// g_dir_changed = true;
