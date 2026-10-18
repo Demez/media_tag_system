@@ -29,6 +29,7 @@ namespace image_draw
 	bool        scaling            = true;
 	float       volume             = 100.0;
 
+	bool        show_raw_frames    = false;
 	bool        hide_alpha         = false;
 	bool        show_channels[ 4 ] = { true, true, true, true };
 
@@ -1046,6 +1047,7 @@ void media_view_context_menu()
 		}
 
 		ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
+		ImGui::MenuItem( "Draw Raw Frames", nullptr, &image_draw::show_raw_frames, true );
 		ImGui::MenuItem( "Hide Alpha Channel", nullptr, &image_draw::hide_alpha, true );
 
 		ImGui::Separator();
@@ -1507,20 +1509,18 @@ advance:
 //constexpr float MEDIA_CONTROLS_PADDING = 20.f;
 
 
-void media_view_draw_video_controls( bool mouse_hover_imgui_window )
+// this should be elsewhere
+void media_view_handle_inputs( bool mouse_hover_imgui_window, bool video )
 {
-	if ( !g_mpv )
-		return;
-
-	//if ( !g_mpv_video_ready )
-	//	return;
-
 	if ( ImGui::IsKeyReleased( ImGuiKey_Space, false ) || ( !mouse_hover_imgui_window && ImGui::IsKeyReleased( ImGuiKey_MouseLeft, false ) ) )
 	{
-		const char* cmd[]   = { "cycle", "pause", NULL };
-		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+		if ( video )
+		{
+			const char* cmd[]   = { "cycle", "pause", NULL };
+			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 
-		set_frame_draw();
+			set_frame_draw();
+		}
 	}
 
 	// Seeking
@@ -1528,127 +1528,60 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 	{
 		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
 		{
-			const char* cmd[]   = { "seek", "-5", NULL };
-			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+			if ( video )
+			{
+				const char* cmd[]   = { "seek", "-5", NULL };
+				int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+			}
+			else
+			{
+				media_view_frame_advance();
+			}
 		}
 		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
 		{
-			const char* cmd[]   = { "seek", "5", NULL };
-			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+			if ( video )
+			{
+				const char* cmd[]   = { "seek", "5", NULL };
+				int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+			}
+			else
+			{
+				media_view_frame_advance( true );
+			}
 		}
 	}
+}
 
-	int width, height;
-	SDL_GetWindowSize( app::window, &width, &height );
 
-	ImGui::PushFont( font::normal, app::config.font_size * 1.5 );
+bool media_view_has_video()
+{
+	if ( get_media_type() != e_media_type_video )
+		return false;
 
-	// check if mouse in rectangle
-	ImGuiStyle& style                = ImGui::GetStyle();
+	return g_mpv_data.loaded_file;
+}
 
-	ImVec2      window_height        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
-	ImGui::PopFont();
 
-	//ImVec2          play_btn_size        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
+void media_view_set_playback_pause( bool pause )
+{
+	image_draw::pause = pause;
 
-	const ImVec2 POS_OFFSET( style.WindowPadding.x * 3.f, style.WindowPadding.y * 3.f );
-
-	ImVec2       playback_control_pos{};
-	playback_control_pos.x            = POS_OFFSET.x;  // width / 2;
-	//playback_control_pos.y = ( height - 75.f );
-	playback_control_pos.y            = ( height - POS_OFFSET.y );
-
-	// check if mouse in rectangle
-
-	static bool  was_drawing_controls = false;
-
-	static float controls_height = 80.f;
-	if ( !mouse_in_rect( { 0.f, height - ( 80.f + ( controls_height * 2 ) ) }, { (float)width, (float)height } ) )
+	if ( media_view_has_video() )
 	{
-		if ( was_drawing_controls )
-			set_frame_draw();
-
-		was_drawing_controls = false;
-		return;
-	}
-
-	if ( !was_drawing_controls )
-		set_frame_draw();
-
-	was_drawing_controls = true;
-
-	// ----------------------------------------
-
-	// pivot aligns it to the center and the bottom of the window
-	//ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.5f, 1.0f ) );
-	ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.0f, 1.0f ) );
-
-
-	float max_controls_width = width - ( ( ( POS_OFFSET.x * 1.f ) + window_height.x + style.ItemSpacing.x ) * 2.f + ( style.WindowPadding.x + style.ItemSpacing.x ) );
-
-	//ImGui::SetNextWindowSizeConstraints( { width - 80.f, -1.f }, { width - 80.f, -1.f } );
-	ImGui::SetNextWindowSizeConstraints( { max_controls_width, -1 }, { max_controls_width, -1 } );
-
-	if ( !ImGui::Begin( "##video_controls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
-	{
-		ImGui::End();
-		return;
-	}
-
-//	double time_pos = 0;
-//	double duration = 0;
-//	s32    paused   = 0;
-//	p_mpv_get_property( g_mpv, "time-pos", MPV_FORMAT_DOUBLE, &time_pos );
-//	p_mpv_get_property( g_mpv, "duration", MPV_FORMAT_DOUBLE, &duration );
-//	p_mpv_get_property( g_mpv, "pause", MPV_FORMAT_FLAG, &paused );
-
-	const ImVec2 label_size    = ImGui::CalcTextSize( "Pause", NULL, true );
-	ImVec2       play_btn_size = ImGui::CalcItemSize( { 0, 0 }, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f );
-
-	if ( g_mpv_data.pause )
-	{
-		if ( ImGui::Button( "Play", play_btn_size ) )
-		{
-			const char* cmd[]   = { "set", "pause", "no", NULL };
-			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-		}
-	}
-	else
-	{
-		if ( ImGui::Button( "Pause", play_btn_size ) )
-		{
-			const char* cmd[]   = { "set", "pause", "yes", NULL };
-			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-		}
-	}
-
-#if 0
-	ImGui::SameLine();
-	ImGui::Spacing();
-
-	ImGui::SameLine();
-	if ( ImGui::Button( "<|" ) )
-	{
-		const char* cmd[]   = { "seek", "0", "absolute", NULL };
+		const char* cmd[]   = { "set", "pause", pause ? "yes" : "no", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 	}
+}
 
-	ImGui::SameLine();
-	if ( ImGui::Button( "|>" ) )
-	{
-		char duration_str[ 16 ];
-		gcvt( duration, 4, duration_str );
 
-		// const char* cmd[]   = { "seek", duration_str, "absolute", NULL };
-		const char* cmd[]   = { "seek", "100", "absolute-percent+exact", NULL };
-		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-	}
-#endif
+void media_view_draw_video_controls( bool mouse_hover_imgui_window, float right_side_area, ImVec2& play_btn_size, int window_width, int window_height )
+{
+	ImGuiStyle& style = ImGui::GetStyle();
 
-	ImGui::SameLine();
 	//ImGui::Spacing();
+	//ImGui::SameLine();
 
-	ImGui::SameLine();
 	if ( ImGui::Button( "<" ) )
 	{
 		const char* cmd[]   = { "frame-back-step", NULL };
@@ -1661,7 +1594,7 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 		const char* cmd[]   = { "frame-step", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 	}
-	
+
 	ImGui::SameLine();
 
 	// https://stackoverflow.com/questions/3673226/how-to-print-time-in-format-2009-08-10-181754-811
@@ -1672,20 +1605,21 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 	util_format_time( str_time_pos, g_mpv_data.time_pos );
 	util_format_time( str_duration, g_mpv_data.duration );
 
-	char         str_time[ TIME_BUFFER + TIME_BUFFER + 4 ]{};
+	char str_time[ TIME_BUFFER + TIME_BUFFER + 4 ]{};
 
 	snprintf( str_time, TIME_BUFFER + TIME_BUFFER + 4, "%s / %s", str_time_pos, str_duration );
 
 	const ImVec2 time_size       = ImGui::CalcTextSize( str_time, NULL, true );
-	const ImVec2 other_text_size       = ImGui::CalcTextSize( "Mute", NULL, true );
+	const ImVec2 other_text_size = ImGui::CalcTextSize( "Mute", NULL, true );
 
-	float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 2 );
+	float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 0 + right_side_area );
 	// float        avaliable_width = 500.f - ( style.ItemSpacing.x * 2 );
-	float        vol_bar_width         = 96.f;
-	ImVec2       other_text_area       = ImGui::CalcItemSize( { 0, 0 }, other_text_size.x + style.FramePadding.x * 2.0f, other_text_size.y + style.FramePadding.y * 2.0f );
+	float        vol_bar_width   = 96.f;
+	ImVec2       other_text_area = ImGui::CalcItemSize( { 0, 0 }, other_text_size.x + style.FramePadding.x * 2.0f, other_text_size.y + style.FramePadding.y * 2.0f );
 
-	float        seek_bar_width        = width - 96.f;
-	seek_bar_width -= ( play_btn_size.x + vol_bar_width + time_size.x + ( other_text_area.x * 3 ) + ( style.ItemSpacing.x * 7 ) );
+	float        seek_bar_width  = avaliable_width - vol_bar_width;
+	// seek_bar_width -= ( play_btn_size.x + vol_bar_width + time_size.x + ( other_text_area.x * 3 ) + ( style.ItemSpacing.x * 6 ) );
+	seek_bar_width -= ( time_size.x + ( other_text_area.x * 1 ) + ( style.ItemSpacing.x * 4 ) );
 	// seek_bar_width -= ( play_btn_size.x + vol_bar_width + time_size.x + ( style.ItemSpacing.x * 2 ) );
 
 	ImGui::SetNextItemWidth( seek_bar_width );
@@ -1706,8 +1640,8 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 
 	ImGui::SameLine();
 
-//	int muted = 0;
-//	p_mpv_get_property( g_mpv, "mute", MPV_FORMAT_FLAG, &muted );
+	//	int muted = 0;
+	//	p_mpv_get_property( g_mpv, "mute", MPV_FORMAT_FLAG, &muted );
 
 	if ( g_mpv_data.mute )
 	{
@@ -1725,8 +1659,8 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 		ImGui::PopStyleColor();
 	}
 
-//	double volume = 0;
-//	p_mpv_get_property( g_mpv, "volume", MPV_FORMAT_DOUBLE, &volume );
+	//	double volume = 0;
+	//	p_mpv_get_property( g_mpv, "volume", MPV_FORMAT_DOUBLE, &volume );
 
 	ImGui::SameLine();
 	ImGui::SetNextItemWidth( vol_bar_width );
@@ -1745,106 +1679,16 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window )
 
 	// ImGui::Text( "%s / %s", str_time_pos, str_duration );
 	// ImGui::ProgressBar( time_pos / duration );
-
-	controls_height = ImGui::GetWindowContentRegionMax().y;
-
-	ImGui::End();
 }
 
 
-void media_view_draw_animated_image_controls( bool mouse_hover_imgui_window )
+void media_view_draw_animated_image_controls( float right_side_area )
 {
-	// Seeking
-	if ( !mouse_hover_imgui_window )
-	{
-		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
-		{
-			media_view_frame_advance();
-		}
-		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
-		{
-			media_view_frame_advance( true );
-		}
-	}
+	ImGuiStyle& style = ImGui::GetStyle();
 
-	int width, height;
-	SDL_GetWindowSize( app::window, &width, &height );
+	//ImGui::Spacing();
+	//ImGui::SameLine();
 
-	ImGui::PushFont( font::normal, app::config.font_size * 1.5 );
-
-	// check if mouse in rectangle
-	ImGuiStyle&     style                = ImGui::GetStyle();
-
-	static bool     was_drawing_controls = false;
-	ImVec2          window_height        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
-	ImGui::PopFont();
-
-	//ImVec2          play_btn_size        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
-
-	const ImVec2 POS_OFFSET( style.WindowPadding.x * 3.f, style.WindowPadding.y * 3.f );
-
-	ImVec2          playback_control_pos{};
-	playback_control_pos.x            = POS_OFFSET.x;  // width / 2;
-	//playback_control_pos.y = ( height - 75.f );
-	playback_control_pos.y            = ( height - POS_OFFSET.y );
-
-	// check if mouse in rectangle
-
-	//static float controls_height = 50.f;
-	static float controls_height      = window_height.y;
-	if ( !mouse_in_rect( { 0.f, height - ( 80.f + ( controls_height * 2 ) ) }, { (float)width, (float)height } ) )
-	{
-		if ( was_drawing_controls )
-			set_frame_draw();
-
-		was_drawing_controls = false;
-		return;
-	}
-
-	if ( !was_drawing_controls )
-		set_frame_draw();
-
-	was_drawing_controls = true;
-
-	// ----------------------------------------
-
-	// pivot aligns it to the center and the bottom of the window
-	ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.0f, 1.0f ) );
-
-	//ImGui::SetNextWindowSizeConstraints( { width - POS_OFFSET.x, -1.f }, { width - POS_OFFSET.y, -1.f } );
-
-	float max_controls_width = width - ( ( ( POS_OFFSET.x * 1.f ) + window_height.x + style.ItemSpacing.x ) * 2.f + ( style.WindowPadding.x + style.ItemSpacing.x ) );
-
-	ImGui::SetNextWindowSizeConstraints( { max_controls_width, -1 }, { max_controls_width, -1 } );
-
-	if ( !ImGui::Begin( "##image_controls", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing ) )
-	{
-		ImGui::End();
-		return;
-	}
-
-	const ImVec2 label_size    = ImGui::CalcTextSize( "Pause", NULL, true );
-	ImVec2       play_btn_size = ImGui::CalcItemSize( { 0, 0 }, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f );
-
-	if ( image_draw::pause )
-	{
-		if ( ImGui::Button( "Play", play_btn_size ) )
-		{
-			image_draw::pause = false;
-		}
-	}
-	else
-	{
-		if ( ImGui::Button( "Pause", play_btn_size ) )
-		{
-			image_draw::pause = true;
-		}
-	}
-
-	ImGui::SameLine();
-	ImGui::Spacing();
-
-	ImGui::SameLine();
 	if ( ImGui::Button( "<|" ) )
 	{
 		media_view_frame_set( 0 );
@@ -1872,7 +1716,7 @@ void media_view_draw_animated_image_controls( bool mouse_hover_imgui_window )
 		image_draw::pause = true;
 		media_view_frame_advance();
 	}
-	
+
 	ImGui::SameLine();
 
 	// https://stackoverflow.com/questions/3673226/how-to-print-time-in-format-2009-08-10-181754-811
@@ -1881,12 +1725,12 @@ void media_view_draw_animated_image_controls( bool mouse_hover_imgui_window )
 
 	snprintf( str_position, 256, "%zu / %zu", image_draw::frame + 1, g_image_data.image.frame.size() );
 
-	const ImVec2 time_size             = ImGui::CalcTextSize( str_position, NULL, true );
+	const ImVec2 time_size       = ImGui::CalcTextSize( str_position, NULL, true );
 
-	float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 2 );
+	float        avaliable_width = ImGui::GetContentRegionAvail()[ 0 ] - ( style.ItemSpacing.x * 1 + right_side_area );
 	// float        avaliable_width = 500.f - ( style.ItemSpacing.x * 2 );
 
-	float        seek_bar_width        = avaliable_width;
+	float        seek_bar_width  = avaliable_width;
 	seek_bar_width -= ( time_size.x + ( style.ItemSpacing.x * 1 ) );
 	// seek_bar_width -= ( play_btn_size.x + vol_bar_width + time_size.x + ( style.ItemSpacing.x * 2 ) );
 
@@ -1900,10 +1744,171 @@ void media_view_draw_animated_image_controls( bool mouse_hover_imgui_window )
 
 	ImGui::SameLine();
 	ImGui::TextUnformatted( str_position );
+}
 
-	controls_height = ImGui::GetWindowContentRegionMax().y;
+
+void media_view_draw_media_controls( bool mouse_hover_imgui_window )
+{
+	int width, height;
+	SDL_GetWindowSize( app::window, &width, &height );
+
+	bool video      = get_media_type() == e_media_type_video;
+	bool anim_image = ( get_media_type() == e_media_type_image && g_image_data.image.frame.size() > 1 );
+
+	media_view_handle_inputs( mouse_hover_imgui_window, video );
+
+	ImGui::PushFont( font::normal, app::config.font_size * 1.25f );
+
+	// check if mouse in rectangle
+	ImGuiStyle& style                = ImGui::GetStyle();
+
+	//ImVec2      window_height        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
+	ImVec2      content_height( ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFrameHeight() );
+	ImVec2       window_height( ImGui::GetFontSize() + style.FramePadding.x * 2.0f + style.ItemSpacing.x, ImGui::GetFrameHeightWithSpacing() );
+
+	const ImVec2 POS_OFFSET( style.WindowPadding.x * 3.f, style.WindowPadding.y * 3.f );
+
+	ImVec2       playback_control_pos{};
+	playback_control_pos.y            = ( height - POS_OFFSET.y );
+
+	// check if mouse in rectangle
+
+#if 1
+	static bool  was_drawing_controls = false;
+	bool        mouse_in_area        = mouse_in_rect( { 0.f, height - ( POS_OFFSET.y + window_height.y * 3.f ) }, { (float)width, (float)height } );
+
+	if ( !mouse_in_area )
+	{
+		if ( was_drawing_controls )
+			set_frame_draw();
+
+		was_drawing_controls = false;
+		// return;
+	}
+
+	if ( !was_drawing_controls )
+		set_frame_draw();
+
+	was_drawing_controls = true;
+#endif
+
+	float nav_button_area        = content_height.x * 2 + style.ItemSpacing.x;
+
+	// ----------------------------------------
+
+	// float max_controls_width = width - ( ( ( POS_OFFSET.x * 1.f ) + window_height.x + style.ItemSpacing.x ) * 2.f + ( style.WindowPadding.x + style.ItemSpacing.x ) );
+	float max_controls_width = width - ( POS_OFFSET.x * 2.f );
+
+	bool  draw_playback_controls = mouse_in_area && ( video || anim_image );
+	
+	if ( draw_playback_controls )
+	{
+		nav_button_area  += style.ItemSpacing.x + 1.f;  // 1.f for separator
+		playback_control_pos.x = POS_OFFSET.x;  // width / 2;
+		//playback_control_pos.y = ( height - 75.f );
+	//ImGui::SetNextWindowSizeConstraints( { width - 80.f, -1.f }, { width - 80.f, -1.f } );
+		ImGui::SetNextWindowSizeConstraints( { max_controls_width, -1 }, { max_controls_width, -1 } );
+	}
+	else
+	{
+		playback_control_pos.x = width - POS_OFFSET.x;
+		//playback_control_pos.y = ( height - 75.f );
+		max_controls_width = nav_button_area;
+	}
+
+	// pivot aligns it to the center and the bottom of the window
+	//ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.5f, 1.0f ) );
+	if ( draw_playback_controls )
+		ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 0.0f, 1.0f ) );
+	else
+		ImGui::SetNextWindowPos( playback_control_pos, 0, ImVec2( 1.0f, 1.0f ) );
+
+	// ImGuiWindowFlags_NoBackground
+
+	ImGuiWindowFlags win_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing;
+
+	if ( !draw_playback_controls )
+		win_flags |= ImGuiWindowFlags_NoBackground;
+
+	if ( mouse_in_area )
+	{
+		ImGui::SetNextWindowBgAlpha( 0.5f );
+	}
+	else
+	{
+		ImGui::SetNextWindowBgAlpha( 0.0f );
+
+		ImVec4 btn_color  = ImGui::GetStyleColorVec4( ImGuiCol_Button );
+		ImVec4 text_color = ImGui::GetStyleColorVec4( ImGuiCol_Text );
+		btn_color.w       = 0.25f;
+		text_color.w      = 0.25f;
+
+		ImGui::PushStyleColor( ImGuiCol_Button, btn_color );
+		ImGui::PushStyleColor( ImGuiCol_Text, text_color );
+	}
+
+	if ( ImGui::Begin( "##media_controls", 0, win_flags ) )
+	{
+		const ImVec2 label_size    = ImGui::CalcTextSize( "Pause", NULL, true );
+		ImVec2       play_btn_size = ImGui::CalcItemSize( { 0, 0 }, label_size.x + style.FramePadding.x * 2.0f, label_size.y + style.FramePadding.y * 2.0f );
+
+		if ( draw_playback_controls )
+		{
+			bool is_paused = image_draw::pause;
+
+			if ( video )
+				is_paused = g_mpv_data.pause;
+
+			if ( is_paused )
+			{
+				if ( ImGui::Button( "Play", play_btn_size ) )
+				{
+					media_view_set_playback_pause( false );
+				}
+			}
+			else
+			{
+				if ( ImGui::Button( "Pause", play_btn_size ) )
+				{
+					media_view_set_playback_pause( true );
+				}
+			}
+		}
+
+		if ( draw_playback_controls )
+		{
+			ImGui::SameLine();
+
+			if ( video )
+				media_view_draw_video_controls( mouse_hover_imgui_window, nav_button_area, play_btn_size, width, height );
+			else
+				media_view_draw_animated_image_controls( nav_button_area );
+
+			ImGui::SameLine();
+			ImGui::SeparatorEx( ImGuiSeparatorFlags_Vertical );
+			ImGui::SameLine();
+		}
+
+		if ( ImGui::ArrowButtonEx( "##view_nav_btn_prev", ImGuiDir_Left, content_height ) )
+		{
+			media_view_advance( true );
+		}
+
+		ImGui::SameLine();
+
+		if ( ImGui::ArrowButtonEx( "##view_nav_btn_next", ImGuiDir_Right, content_height ) )
+		{
+			media_view_advance();
+		}
+	}
 
 	ImGui::End();
+	ImGui::PopFont();
+
+	if ( !mouse_in_area )
+	{
+		ImGui::PopStyleColor( 2 );
+	}
 }
 
 
@@ -1914,7 +1919,7 @@ void media_view_draw_close_button()
 
 	ImGuiStyle& style = ImGui::GetStyle();
 
-	ImGui::PushFont( font::normal, app::config.font_size * 1.5 );
+	ImGui::PushFont( font::normal, app::config.font_size * 1.25f );
 
 	// ImVec2 button_pos{
 	// 	width - ( ImGui::GetFrameHeight() + style.WindowPadding.x * 4 ),
@@ -1992,111 +1997,10 @@ void media_view_draw_close_button()
 }
 
 
-void media_view_draw_nav_buttons()
+void media_view_draw_imgui_controls( bool mouse_hover_imgui_window )
 {
-	int width, height;
-	SDL_GetWindowSize( app::window, &width, &height );
-
-	ImGuiStyle& style = ImGui::GetStyle();
-
-	ImGui::PushFont( font::normal, app::config.font_size * 1.5 );
-
-	// ImVec2 button_pos{
-	// 	width - ( ImGui::GetFrameHeight() + style.WindowPadding.x * 4 ),
-	// 	( style.WindowPadding.x * 4 )
-	// };
-
-	// check if mouse in rectangle
-
-	static bool was_drawing_controls = false;
-	ImVec2      play_btn_size        = ImGui::CalcItemSize( { 0, 0 }, ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFontSize() + style.FramePadding.y * 2.0f );
-	bool        area_focused         = true;
-
-	float       btn_total_width     = play_btn_size.x;
-	float       btn_total_height     = play_btn_size.y;
-
-	if ( app::config.media_vertical_nav_buttons )
-	{
-		btn_total_height = play_btn_size.y * 2 + style.ItemSpacing.y;
-	}
-	else
-	{
-		btn_total_width = play_btn_size.x * 2 + style.ItemSpacing.x;
-	}
-
-	ImVec2      button_pos{
-		width - ( style.WindowPadding.x * 2 ),
-		height - ( ( style.WindowPadding.y * 2 ) )
-	};
-
-	ImVec2 area_rect_min = { button_pos.x - ( ( style.WindowPadding.x * 10 ) + btn_total_width ), button_pos.y - ( ( style.WindowPadding.y * 12 ) + btn_total_height ) };
-	ImVec2 area_rect_max = { static_cast< float >( width ), static_cast< float >( height ) };
-
-	//if ( !mouse_in_rect( { button_pos.x - ( ( style.WindowPadding.x * 4 ) + play_btn_size.x ), 0.f }, { (float)width, ( ( style.WindowPadding.y * 6 ) + play_btn_size.y ) } ) )
-	if ( !mouse_in_rect( area_rect_min, area_rect_max ) )
-	{
-		area_focused = false;
-
-		//if ( was_drawing_controls )
-		//	set_frame_draw();
-	
-		//was_drawing_controls = false;
-		//ImGui::PopFont();
-		//return;
-	}
-	
-	//if ( !was_drawing_controls )
-	if ( was_drawing_controls != area_focused )
-		set_frame_draw();
-	
-	was_drawing_controls = area_focused;
-
-	// ----------------------------------------
-
-	// ImGui::SetNextWindowPos( button_pos, 0, ImVec2( 0.0f, 1.0f ) );
-	ImGui::SetNextWindowPos( button_pos, 0, ImVec2( 1.0f, 1.0f ) );
-	// ImGui::SetNextWindowPos( button_pos );
-
-	//ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, { 0, 0 } );
-	//ImGui::PushStyleVar( ImGuiStyleVar_WindowBorderSize, 0.f );
-	 
-	if ( !area_focused )
-	{
-		ImVec4 btn_color  = ImGui::GetStyleColorVec4( ImGuiCol_Button );
-		ImVec4 text_color = ImGui::GetStyleColorVec4( ImGuiCol_Text );
-		btn_color.w       = 0.25f;
-		text_color.w      = 0.25f;
-
-		ImGui::PushStyleColor( ImGuiCol_Button, btn_color );
-		ImGui::PushStyleColor( ImGuiCol_Text, text_color );
-	}
-		//ImGui::SetNextWindowBgAlpha( 0.25f );
-
-	if ( ImGui::Begin( "##view_nav_btn_frame", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBackground ) )
-	{
-		if ( ImGui::ArrowButtonEx( "##view_nav_btn_prev", ImGuiDir_Left, play_btn_size ) )
-		{
-			media_view_advance( true );
-		}
-		
-		if ( !app::config.media_vertical_nav_buttons )
-			ImGui::SameLine();
-
-		if ( ImGui::ArrowButtonEx( "##view_nav_btn_next", ImGuiDir_Right, play_btn_size ) )
-		{
-			media_view_advance();
-		}
-	}
-
-	if ( !area_focused )
-	{
-		ImGui::PopStyleColor( 2 );
-	}
-
-	//ImGui::PopStyleVar();
-
-	ImGui::End();
-	ImGui::PopFont();
+	media_view_draw_close_button();
+	media_view_draw_media_controls( mouse_hover_imgui_window );
 }
 
 
@@ -2105,9 +2009,6 @@ void media_view_draw_imgui()
 	media_view_input();
 
 	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
-
-	media_view_draw_close_button();
-	media_view_draw_nav_buttons();
 
 	if ( g_draw_media_info )
 		media_view_draw_media_info();
@@ -2123,17 +2024,10 @@ void media_view_draw_imgui()
 		ImGui::End();
 	}
 
-	if ( get_media_type() == e_media_type_video )
-	{
-		media_view_draw_video_controls( mouse_hover_imgui_window );
-	}
-	else
-	{
-		if ( get_media_type() == e_media_type_image && g_image_data.image.frame.size() > 1 )
-		{
-			media_view_draw_animated_image_controls( mouse_hover_imgui_window );
-		}
+	media_view_draw_imgui_controls( mouse_hover_imgui_window );
 
+	if ( get_media_type() == e_media_type_image )
+	{
 		if ( g_draw_zoom_level )
 		{
 			ImGui::Begin( "##zoom_level", 0, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration );
@@ -2274,7 +2168,7 @@ static void media_view_draw_image()
 	{
 		size_t last_frame_to_keep = image_draw::frame;
 
-		if ( image_draw::frame > 0 )
+		if ( !image_draw::show_raw_frames && image_draw::frame > 0 )
 		{
 			for ( last_frame_to_keep--;; last_frame_to_keep-- )
 			{
@@ -2286,6 +2180,10 @@ static void media_view_draw_image()
 				if ( last_frame_to_keep == 0 )
 					break;
 			}
+		}
+		else if ( image_draw::show_raw_frames )
+		{
+			last_frame_to_keep = image_draw::frame;
 		}
 		else
 		{

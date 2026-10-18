@@ -143,9 +143,6 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	}
 	else if ( image->format == GL_R8 )
 	{
-
-		//glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
-		//glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
 		glTexImage2D( GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
 	}
 	else if ( image->format == GL_RGBA32F )
