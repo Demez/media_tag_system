@@ -990,38 +990,41 @@ void sidebar_draw_file_information( ImGuiStyle& style )
 				find  = strchr( start, '—' );
 			}
 
-			const char* check = find + 11;
-
-			std::string artist_name( start, ( find - 2 ) - start );
-
-			start = find + 14;  // offset the date and — character
-
-			// find the end of the url string
-			find  = strchr( start, '—' );
-
-			// std::string artist_name( start, ( find - 2 ) - start );
-			//
-			// start = find + 14; // offset the date and — character
-			//
-			// // find the end of the url string
-			// find  = strchr( start, '—' );
-
 			if ( find )
 			{
-				// length of 19, is it always like that?
-				std::string post_id( start, ( find - 2 ) - start );
+				const char* check = find + 11;
 
-				char        post_url[ 512 ]{};
-				snprintf( post_url, 512, "https://x.com/%s/status/%s", artist_name.c_str(), post_id.c_str() );
+				std::string artist_name( start, ( find - 2 ) - start );
 
-				ImGui::Separator();
+				start = find + 14;  // offset the date and — character
 
-				ImGui::TextLinkOpenURL( post_url, post_url );
+				// find the end of the url string
+				find  = strchr( start, '—' );
 
-				if ( ImGui::Button( "Copy URL" ) )
+				// std::string artist_name( start, ( find - 2 ) - start );
+				//
+				// start = find + 14; // offset the date and — character
+				//
+				// // find the end of the url string
+				// find  = strchr( start, '—' );
+
+				if ( find )
 				{
-					ImGui::SetClipboardText( post_url );
-					push_notification( "URL Copied" );
+					// length of 19, is it always like that?
+					std::string post_id( start, ( find - 2 ) - start );
+
+					char        post_url[ 512 ]{};
+					snprintf( post_url, 512, "https://x.com/%s/status/%s", artist_name.c_str(), post_id.c_str() );
+
+					ImGui::Separator();
+
+					ImGui::TextLinkOpenURL( post_url, post_url );
+
+					if ( ImGui::Button( "Copy URL" ) )
+					{
+						ImGui::SetClipboardText( post_url );
+						push_notification( "URL Copied" );
+					}
 				}
 			}
 		}
