@@ -111,8 +111,17 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 		allocated_image = true;
 	}
 
+	// TODO: this data should probably not be reset here, have a dedicated reset function for it
+
 	// reset flags
 	load_info.image->flags = 0;
+
+	// reset data in frames
+	for ( auto& frame : load_info.image->frame )
+	{
+		frame.flags = 0;
+		frame.pitch = 0;
+	}
 
 	if ( file_data && !file_len )
 		return false;
