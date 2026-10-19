@@ -21,6 +21,19 @@ enum e_pixfmt
 };
 
 
+enum e_colortype : u8
+{
+	e_colortype_invalid,
+
+	e_colortype_bitmap,
+	e_colortype_palette,
+	e_colortype_min_is_white,
+	e_colortype_min_is_black,
+
+	e_colortype_count,
+};
+
+
 // https://www.theimage.com/animation/pages/disposal.html
 // https://www.theimage.com/animation/pages/disposal2.html
 // GIF
@@ -159,6 +172,7 @@ struct image_frame_t
 	e_frame_disposal     frame_disposal;
 
 	e_image_frame_f      flags;
+	e_colortype          color_type = e_colortype_bitmap;
 
 	image_palette_t      palette;
 
@@ -192,7 +206,7 @@ struct image_t
 	// TODO: probably remove these, bits per pixel you can get with the format option
 	int                          bit_depth;
 	int                          pitch;
-	int                          bytes_per_pixel;  // actually bits per pixel i think lol
+	//int                          bytes_per_pixel;  // actually bits per pixel i think lol
 
 	e_image_flag                 flags;
 	u8                           channels;
@@ -239,7 +253,6 @@ struct image_t
 		height          = other.height;
 		bit_depth       = other.bit_depth;
 		pitch           = other.pitch;
-		bytes_per_pixel = other.bytes_per_pixel;
 		channels        = other.channels;
 		format          = other.format;
 		loop_count      = other.loop_count;
@@ -259,7 +272,6 @@ struct image_t
 		height             = other.height;
 		bit_depth          = other.bit_depth;
 		pitch              = other.pitch;
-		bytes_per_pixel    = other.bytes_per_pixel;
 		channels           = other.channels;
 		format             = other.format;
 		loop_count         = other.loop_count;

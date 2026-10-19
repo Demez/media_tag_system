@@ -2078,6 +2078,12 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 		}
 	}
 
+	if ( frame.color_type == e_colortype_min_is_white )
+		draw_info.shader = e_shader_min_is_white;
+
+	else if ( frame.color_type == e_colortype_min_is_black )
+		draw_info.shader = e_shader_min_is_black;
+
 	if ( animated )
 	{
 		draw_info.width      = frame.width;

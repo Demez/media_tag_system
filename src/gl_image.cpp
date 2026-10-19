@@ -18,16 +18,19 @@ void render_upload_palette( GLuint& palette_texture, GLuint& palette_trans, imag
 	palette_trans = palette.trans_index;
 
 	glBindTexture( GL_TEXTURE_1D, palette_texture );
-	glTexImage1D( GL_TEXTURE_1D, 0, GL_RGBA8, palette.count, 0, GL_RGBA, GL_UNSIGNED_BYTE, palette.elem );
 
-	gl_check_error();
+	// disable wrapping
+	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+
+	glTexImage1D( GL_TEXTURE_1D, 0, GL_RGBA8, palette.count, 0, GL_RGBA, GL_UNSIGNED_BYTE, palette.elem );
 
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
 }
 
 
-void render_upload_palettes( uploaded_textures_t& textures, image_t* image, size_t frame_count )
+size_t get_palette_count( image_t* image, size_t frame_count )
 {
 	size_t palette_count = 0;
 
@@ -36,6 +39,14 @@ void render_upload_palettes( uploaded_textures_t& textures, image_t* image, size
 
 	if ( image->flags & e_image_flag_has_local_palettes )
 		palette_count += frame_count;
+
+	return palette_count;
+}
+
+
+void render_upload_palettes( uploaded_textures_t& textures, image_t* image, size_t frame_count )
+{
+	size_t palette_count = get_palette_count( image, frame_count );
 
 	textures.palette       = ch_calloc< GLuint >( palette_count, e_mem_category_gl_texture_data );
 	textures.palette_trans = ch_calloc< GLuint >( palette_count, e_mem_category_gl_texture_data );
@@ -81,16 +92,6 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );  // downscaling image
 	// glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );  // upscaling image
-
-	// Upload pixels into texture
-	// glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
-
-	//if ( image->bytes_per_pixel > 1 )
-	//glPixelStorei( GL_UNPACK_ROW_LENGTH, image->pitch / image->bytes_per_pixel );
-	//glPixelStorei( GL_UNPACK_ROW_LENGTH, image->width );
-
-	//glPixelStorei( GL_UNPACK_ROW_LENGTH, 0 );
-	//glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 
 	// ------------------------------------------------------------------------------------------------------
 	// https://stackoverflow.com/a/58927549
@@ -176,14 +177,26 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 
 void gl_update_textures( uploaded_textures_t& textures, image_t* image, size_t frame_count )
 {
-	if ( !image )
-		return;
+	// free resources
+	size_t palette_count = get_palette_count( image, frame_count );
+
+	if ( palette_count > 0 != textures.palette_count && textures.palette )
+		glDeleteTextures( static_cast< int >( textures.palette_count ), textures.palette );
+	
+	ch_free( e_mem_category_gl_texture_data, textures.palette );
+	ch_free( e_mem_category_gl_texture_data, textures.palette_trans );
 
 	if ( textures.count != frame_count )
 	{
 		if ( textures.frame )
 			glDeleteTextures( static_cast< int >( textures.count ), textures.frame );
+	}
 
+	if ( !image )
+		return;
+
+	if ( textures.count != frame_count )
+	{
 		textures.frame = ch_realloc< GLuint >( textures.frame, frame_count, e_mem_category_gl_texture_data, 2 );
 		memset( textures.frame, 0, sizeof( GLuint ) * frame_count );
 

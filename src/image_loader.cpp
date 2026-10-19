@@ -186,14 +186,13 @@ void image_free( image_t& image )
 {
 	image_free_alloc( image );
 	// memset( &image, 0, sizeof( image_t ) );
-	
-	image.width           = 0;
-	image.height          = 0;
-	image.bit_depth       = 0;
-	image.pitch           = 0;
-	image.bytes_per_pixel = 0;
-	image.format          = 0;
-	image.loop_count      = 0;
+
+	image.width      = 0;
+	image.height     = 0;
+	image.bit_depth  = 0;
+	image.pitch      = 0;
+	image.format     = 0;
+	image.loop_count = 0;
 }
 
 
@@ -248,15 +247,14 @@ void image_copy_all( image_t& src, image_t& dst, size_t frame_count = 0 )
 
 void image_copy_data( image_t& src, image_t& dst )
 {
-	dst.width           = src.width;
-	dst.height          = src.height;
-	dst.bit_depth       = src.bit_depth;
-	dst.pitch           = src.pitch;
-	dst.bytes_per_pixel = src.bytes_per_pixel;
-	dst.channels        = src.channels;
-	dst.format          = src.format;
-	dst.loop_count      = src.loop_count;
-	dst.image_format    = src.image_format;
+	dst.width        = src.width;
+	dst.height       = src.height;
+	dst.bit_depth    = src.bit_depth;
+	dst.pitch        = src.pitch;
+	dst.channels     = src.channels;
+	dst.format       = src.format;
+	dst.loop_count   = src.loop_count;
+	dst.image_format = src.image_format;
 }
 
 
@@ -399,7 +397,6 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 	new_image->height          = new_height;
 	new_image->pitch           = new_width * old_image->channels;
 	new_image->bit_depth       = 4;
-	new_image->bytes_per_pixel = 4;
 	new_image->channels        = old_image->channels;
 
 	switch ( old_image->channels )

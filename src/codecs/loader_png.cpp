@@ -172,21 +172,18 @@ struct LoaderPNG: public IImageLoader
 		switch ( pngFmt )
 		{
 			case SPNG_FMT_RGB8:
-				load_info.image->format          = GL_RGB;
-				load_info.image->bytes_per_pixel = 3;
-				load_info.image->channels        = 3;
+				load_info.image->format   = GL_RGB;
+				load_info.image->channels = 3;
 				break;
 
 			case SPNG_FMT_RGBA8:
-				load_info.image->format          = GL_RGBA;
-				load_info.image->bytes_per_pixel = 4;
-				load_info.image->channels        = 4;
+				load_info.image->format   = GL_RGBA;
+				load_info.image->channels = 4;
 				break;
 
 			case SPNG_FMT_RGBA16:
-				load_info.image->format          = GL_RGBA16;
-				load_info.image->bytes_per_pixel = 8; // ??
-				load_info.image->channels        = 4;
+				load_info.image->format   = GL_RGBA16;
+				load_info.image->channels = 4;
 				break;
 		}
 

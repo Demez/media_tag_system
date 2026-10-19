@@ -21,5 +21,5 @@ void main()
         FragColor.b = 0;
 
     if (in_visible_channels.a == 0)
-        FragColor.a = 0;
+        FragColor.a = 1;
 }

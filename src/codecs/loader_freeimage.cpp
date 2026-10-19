@@ -28,7 +28,8 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	FIBITMAP* bitmap     = base_bitmap;
 
 	// HACK, some 24 bit images appear diagonal and i don't know why yet
-	if ( bpp == 24 )
+	// if ( bpp == 24 )
+	if ( false )
 	{
 		//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
 
@@ -89,18 +90,28 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 		default:
 		case FIC_RGB:
 		case FIC_RGBALPHA:
+			frame.color_type = e_colortype_bitmap;
+			break;
+
+		case FIC_MINISWHITE:
+			frame.color_type = e_colortype_min_is_white;
+			break;
+
+		case FIC_MINISBLACK:
+			frame.color_type = e_colortype_min_is_black;
 			break;
 
 		case FIC_PALETTE:
 		{
+			frame.color_type     = e_colortype_palette;
+
+			FIRGBA8* palette     = FreeImage_GetPalette( bitmap );
+			FIBOOL   trans       = FreeImage_IsTransparent( bitmap );
+			int      trans_index = FreeImage_GetTransparentIndex( bitmap );
+
 			if ( load_info.thumbnail_load )
 			{
 				//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
-				FIRGBA8*  palette     = FreeImage_GetPalette( bitmap );
-
-				FIBOOL    trans       = FreeImage_IsTransparent( bitmap );
-				int       trans_index = FreeImage_GetTransparentIndex( bitmap );
-
 				// FreeImage_ApplyPaletteIndexMapping
 				// FIBITMAP* tmp         = FreeImage_Allocate( load_info.image->width, load_info.image->height, trans ? 32 : 24 );
 				FIBITMAP* tmp         = FreeImage_Allocate( load_info.image->frame[ page ].width, load_info.image->frame[ page ].height, 32 );
@@ -141,34 +152,28 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 			}
 			else
 			{
-				//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
-				FIRGBA8* palette = FreeImage_GetPalette( bitmap );
-				FIBOOL   trans   = FreeImage_IsTransparent( bitmap );
-
 				load_info.image->flags |= e_image_flag_has_local_palettes;
 				frame.flags |= e_image_frame_f_local_palette;
 				frame.palette.elem  = ch_calloc< image_palette_elem_t >( 256, e_mem_category_image_data );
-				frame.palette.count = 256;
+				//frame.palette.count = 256;
+				frame.palette.count = FreeImage_GetColorsUsed( bitmap );
 
 				if ( trans )
-					frame.palette.trans_index = FreeImage_GetTransparentIndex( bitmap );
+					frame.palette.trans_index = trans_index;
 				else
-					frame.palette.trans_index = 256;
+					frame.palette.trans_index = frame.palette.count;
 
-				for ( u32 p = 0; p < 256; p++ )
+				for ( u32 p = 0; p < frame.palette.count; p++ )
 				{
 					frame.palette.elem[ p ].r = palette[ p ].red;
 					frame.palette.elem[ p ].g = palette[ p ].green;
 					frame.palette.elem[ p ].b = palette[ p ].blue;
 					frame.palette.elem[ p ].a = palette[ p ].alpha;
 				}
-
 			}
 			break;
 		}
-  #endif
 	}
-#endif
 
 	FreeImage_FlipVertical( bitmap );
 
@@ -188,7 +193,7 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	int bit_depth                    = pitch / load_info.image->frame[ page ].width;
 
 	// load_info.image->bytes_per_pixel = bpp / bit_depth2;
-	load_info.image->bytes_per_pixel = bit_depth;
+	//load_info.image->bytes_per_pixel = bit_depth;
 
 //	if ( load_info.image->bytes_per_pixel == 0 )
 //	{

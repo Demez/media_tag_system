@@ -212,7 +212,6 @@ struct LoaderJXL: public IImageLoader
 			}
 		}
 
-		load_info.image->bytes_per_pixel   = 4;
 		load_info.image->channels          = format.num_channels;
 
 		//if ( load_info.image->channels == 3 )
@@ -224,7 +223,7 @@ struct LoaderJXL: public IImageLoader
 
 		// ?
 		load_info.image->bit_depth         = 4;
-		load_info.image->pitch             = load_info.image->width * load_info.image->bytes_per_pixel;
+		//load_info.image->pitch             = load_info.image->width * load_info.image->bytes_per_pixel;
 
 		load_info.image->frame[ 0 ].width  = load_info.image->width;
 		load_info.image->frame[ 0 ].height = load_info.image->height;

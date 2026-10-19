@@ -176,7 +176,7 @@ struct CodecJPEG: public IImageLoader
 			return false;
 		}
 
-		image->bytes_per_pixel = tjPixelSize[ pixelFmt ];
+		//image->bytes_per_pixel = tjPixelSize[ pixelFmt ];
 		image->width           = best_width;
 		image->height          = best_height;
 

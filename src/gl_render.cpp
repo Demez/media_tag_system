@@ -50,9 +50,11 @@ static u32 indices[] = {
 };
 
 
-const char*          shader_str[]              = {
+const char* shader_str[] = {
 	"Main",
 	"Palette",
+	"MinIsWhite",
+	"MinIsBlack",
 };
 
 
@@ -103,11 +105,13 @@ struct shader_palette_t : public shader_base_t
 {
 	GLint        in_palette       = 0;
 	GLint        in_palette_trans = 0;
+	GLint        in_palette_count = 0;
 
 	virtual bool init()
 	{
 		in_palette       = glGetUniformLocation( program, "in_palette" );
 		in_palette_trans = glGetUniformLocation( program, "in_palette_trans" );
+		in_palette_count = glGetUniformLocation( program, "in_palette_count" );
 		return true;
 	}
 
@@ -117,6 +121,35 @@ struct shader_palette_t : public shader_base_t
 		glBindTexture( GL_TEXTURE_1D, draw_info.palette );
 		glUniform1i( in_palette, 1 );
 		glUniform1i( in_palette_trans, draw_info.palette_trans );
+		glUniform1i( in_palette_count, draw_info.palette_count );
+	}
+};
+
+
+// Shader Info - Min Greyscale
+struct shader_min_white_t : public shader_base_t
+{
+	GLint        in_min_is_white = 0;
+
+	virtual bool init()
+	{
+		in_min_is_white = glGetUniformLocation( program, "in_min_is_white" );
+		return true;
+	}
+
+	virtual void draw( const render_draw_texture_t& draw_info )
+	{
+		glUniform1i( in_min_is_white, 1 );
+	}
+};
+
+
+// Shader Info - Min Greyscale
+struct shader_min_black_t : public shader_min_white_t
+{
+	virtual void draw( const render_draw_texture_t& draw_info )
+	{
+		glUniform1i( in_min_is_white, 0 );
 	}
 };
 
@@ -139,6 +172,8 @@ struct register_shader_t
 
 REGISTER_SHADER( e_shader_main, shader_main_t, "shaders/image.vert", "shaders/image.frag" );
 REGISTER_SHADER( e_shader_palette, shader_palette_t, "shaders/image.vert", "shaders/image_palette.frag" );
+REGISTER_SHADER( e_shader_min_is_black, shader_min_black_t, "shaders/image.vert", "shaders/image_min_grey.frag" );
+REGISTER_SHADER( e_shader_min_is_white, shader_min_white_t, "shaders/image.vert", "shaders/image_min_grey.frag" );
 
 
 

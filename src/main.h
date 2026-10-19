@@ -26,6 +26,8 @@ enum e_shader : u8
 {
 	e_shader_main,
 	e_shader_palette,
+	e_shader_min_is_black,
+	e_shader_min_is_white,
 
 	e_shader_count,
 };
@@ -365,6 +367,7 @@ struct render_draw_texture_t
 	GLuint              texture       = 0;
 	GLuint              palette       = 0;
 	GLuint              palette_trans = 0;
+	GLuint              palette_count = 0;
 
 	// draw target
 	GLuint              target;
