@@ -1441,7 +1441,7 @@ void media_view_load()
 
 	if ( entry.type == e_media_type_image )
 	{
-		if ( image_load_info.image->frame.size() > 0 && image_load_info.image->bytes_per_pixel > 0 )
+		if ( image_load_info.image->frame.size() > 0 )
 		{
 			gl_update_textures( g_image_data.textures, &g_image_data.image, g_image_data.image.frame.size() );
 			media_view_fit_in_view();
@@ -1452,6 +1452,8 @@ void media_view_load()
 		else
 		{
 			path_printf( "%f FAILED Load - %s\n", load_time, full_path.c_str() );
+			image_free( g_image_data.image );
+			gl_free_textures( g_image_data.textures );
 		}
 	}
 
@@ -2127,7 +2129,7 @@ static void media_view_draw_image()
 {
 	if ( g_image_data.textures.frame == nullptr )
 	{
-		printf( "NULLPTR IMAGE\n" );
+		// printf( "NULLPTR IMAGE\n" );
 		return;
 	}
 
