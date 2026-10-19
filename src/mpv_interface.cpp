@@ -451,6 +451,8 @@ void mpv_update_texture()
 
 	g_mpv_framebuffer_size[ 0 ] = new_width;
 	g_mpv_framebuffer_size[ 1 ] = new_height;
+
+	set_frame_draw( 2 );
 }
 
 
