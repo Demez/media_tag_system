@@ -957,7 +957,7 @@ void media_view_context_menu()
 		media_view_fit_in_view();
 	}
 
-	util_imgui_set_tooltip( "Fits the Image within the window up to 100% zoom" );
+	util_imgui_set_tooltip( "Fits the Image within the window up to 100%% zoom" );
 
 	ImGui::SameLine();
 
