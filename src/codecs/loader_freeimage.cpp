@@ -3,7 +3,7 @@
 #include "FreeImage.h"
 
 
-bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size_t page )
+bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size_t page, FREE_IMAGE_COLOR_TYPE& out_color_type, FREE_IMAGE_TYPE& out_image_type )
 {
 	if ( base_bitmap == nullptr )
 	{
@@ -76,6 +76,9 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	{
 		load_info.image->width  = FreeImage_GetWidth( bitmap );
 		load_info.image->height = FreeImage_GetHeight( bitmap );
+
+		out_color_type          = color_type;
+		out_image_type          = image_type;
 	}
 
 	load_info.image->frame[ page ].width  = FreeImage_GetWidth( bitmap );
@@ -154,9 +157,8 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 			{
 				load_info.image->flags |= e_image_flag_has_local_palettes;
 				frame.flags |= e_image_frame_f_local_palette;
-				frame.palette.elem  = ch_calloc< image_palette_elem_t >( 256, e_mem_category_image_data );
-				//frame.palette.count = 256;
 				frame.palette.count = FreeImage_GetColorsUsed( bitmap );
+				frame.palette.elem  = ch_calloc< image_palette_elem_t >( frame.palette.count, e_mem_category_image_data );
 
 				if ( trans )
 					frame.palette.trans_index = trans_index;
@@ -180,33 +182,12 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	// ----------------------------------------------------------------------------------------
 	// Copy Image Data
 
-	if ( page == 0 )
-		load_info.image->pitch = FreeImage_GetPitch( bitmap );
+	unsigned int pitch        = FreeImage_GetPitch( bitmap );
+	load_info.image->channels = FreeImage_GetChannelsNumber( bitmap );
 
-	unsigned int pitch               = FreeImage_GetPitch( bitmap );
+	u8*    image_bits         = FreeImage_GetBits( bitmap );
 
-	load_info.image->bit_depth       = FreeImage_GetBPP( bitmap );
-	load_info.image->channels        = FreeImage_GetChannelsNumber( bitmap );
-
-	//load_info.image->pitch           = load_info.image->width * channel_num;
-
-	int bit_depth                    = pitch / load_info.image->frame[ page ].width;
-
-	// load_info.image->bytes_per_pixel = bpp / bit_depth2;
-	//load_info.image->bytes_per_pixel = bit_depth;
-
-//	if ( load_info.image->bytes_per_pixel == 0 )
-//	{
-//		// huh????
-//		if ( new_bitmap )
-//			FreeImage_Unload( bitmap );
-//
-//		return false;
-//	}
-
-	u8*    image_bits                   = FreeImage_GetBits( bitmap );
-
-	size_t image_size                   = (size_t)pitch * (size_t)load_info.image->frame[ page ].height;
+	size_t image_size         = (size_t)pitch * (size_t)load_info.image->frame[ page ].height;
 	// size_t image_size           = load_info.image->width * load_info.image->height * load_info.image->bytes_per_pixel;
 
 	// MEM LEAK TEST
@@ -481,12 +462,9 @@ struct LoaderFreeImage : public IImageLoader
 
 		switch ( format )
 		{
-			case FIF_GIF:
-			{
-				// 'Play' the GIF to generate each frame (as 32bpp) instead of returning raw frame data when loading 
-				// load_flags = GIF_PLAYBACK;
+			default:
 				break;
-			}
+
 			case FIF_JPEG:
 			{
 				if ( load_info.load_quick )
@@ -548,14 +526,8 @@ struct LoaderFreeImage : public IImageLoader
 						multi_bitmap = nullptr;
 						break;
 					}
-
-					if ( page == 0 )
-					{
-						color_type = FreeImage_GetColorType( base_bitmap );
-						image_type = FreeImage_GetImageType( base_bitmap );
-					}
 			
-					if ( !image_load_frame( base_bitmap, load_info, page ) )
+					if ( !image_load_frame( base_bitmap, load_info, page, color_type, image_type ) )
 					{
 						printf( "Failed to load Image Frame!\n" );
 						FreeImage_UnlockPage( multi_bitmap, base_bitmap, false );
@@ -586,7 +558,7 @@ struct LoaderFreeImage : public IImageLoader
 			// load_info.image->frame.clear();
 			load_info.image->frame.resize( 1 );
 
-			if ( !image_load_frame( single_bitmap, load_info, 0 ) )
+			if ( !image_load_frame( single_bitmap, load_info, 0, color_type, image_type ) )
 			{
 				printf( "Failed to load Image!\n" );
 				FreeImage_Unload( single_bitmap );
@@ -608,17 +580,11 @@ struct LoaderFreeImage : public IImageLoader
 			switch ( load_info.image->channels )
 			{
 				case 4:
-					if ( load_info.image->bit_depth != 32 )
-						printf( "different bit depth?\n" );
-
 					load_info.image->format = GL_RGBA;
 					break;
 
 				default:
 				case 3:
-					if ( load_info.image->bit_depth != 24 )
-						printf( "different bit depth?\n" );
-
 					load_info.image->format = GL_RGB;
 					break;
 
@@ -654,8 +620,26 @@ struct LoaderFreeImage : public IImageLoader
 					break;
 
 				case FIT_RGBAF:
-					load_info.image->format = GL_RGBA32F;
+				{
+					// we have FIT_RGBF, but i have an image that loads as FIT_RGBAF with 3 channels ???
+					switch ( load_info.image->channels )
+					{
+						default:
+						case 4:
+							load_info.image->format = GL_RGBA32F;
+							break;
+
+						case 3:
+							load_info.image->format = GL_RGB32F;
+							break;
+
+						case 1:
+							// GL_R8I
+							load_info.image->format = GL_R8;
+							break;
+					}
 					break;
+				}
 			}
 		}
 
@@ -665,7 +649,6 @@ struct LoaderFreeImage : public IImageLoader
 			FreeImage_Unload( single_bitmap );
 
 		FreeImage_CloseMemory( memory );
-
 		return true;
 	}
 };
