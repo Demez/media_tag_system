@@ -31,6 +31,7 @@ namespace image_draw
 
 	bool        show_raw_frames    = false;
 	bool        hide_alpha         = false;
+	bool        invert_color       = false;
 	bool        show_channels[ 4 ] = { true, true, true, true };
 
 	// index into gallery::sorted_media
@@ -284,7 +285,7 @@ void media_view_scale_set_image()
 	// TODO: ref count image_t, so we can avoid copying
 	// so when the user switches images during scaling, it still holds on to the previous one thanks to the ref count
 	// plus it uses less memory, unless image switching is happening during scaling, but that's a short time frame
-	image_free( g_scale_src );
+	image_free_data( g_scale_src );
 
 	image_copy_data( g_image_data.image, g_scale_src );
 
@@ -382,7 +383,7 @@ void media_view_shutdown()
 
 	delete g_scale_thread;
 
-	image_free( g_scale_src );
+	image_free_data( g_scale_src );
 }
 
 
@@ -1042,10 +1043,7 @@ void media_view_context_menu()
 
 		ImGui::Separator();
 
-		if ( ImGui::MenuItem( "Invert Colors", nullptr, false, false ) )
-		{
-		}
-
+		ImGui::MenuItem( "Invert Colors", nullptr, &image_draw::invert_color, true );
 		ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
 		ImGui::MenuItem( "Draw Raw Frames", nullptr, &image_draw::show_raw_frames, true );
 		ImGui::MenuItem( "Hide Alpha Channel", nullptr, &image_draw::hide_alpha, true );
@@ -1405,6 +1403,9 @@ void media_view_window_resize()
 
 void media_view_load()
 {
+	image_reset_data( g_image_data.image );
+	image_reset_data( g_image_scaled_data.image );
+
 	if ( gallery::sorted_media.empty() )
 		return;
 
@@ -1428,7 +1429,7 @@ void media_view_load()
 	}
 	else
 	{
-		image_free( g_image_data.image );
+		image_free_data( g_image_data.image );
 		mpv_cmd_loadfile( path_str.c_str() );
 	}
 		
@@ -1452,7 +1453,7 @@ void media_view_load()
 		else
 		{
 			path_printf( "%f FAILED Load - %s\n", load_time, full_path.c_str() );
-			image_free( g_image_data.image );
+			image_free_data( g_image_data.image );
 			gl_free_textures( g_image_data.textures );
 		}
 	}
@@ -1774,26 +1775,13 @@ void media_view_draw_media_controls( bool mouse_hover_imgui_window )
 	playback_control_pos.y            = ( height - POS_OFFSET.y );
 
 	// check if mouse in rectangle
+	static bool was_drawing_controls  = false;
+	bool        mouse_in_area         = mouse_in_rect( { 0.f, height - ( POS_OFFSET.y + window_height.y * 3.f ) }, { (float)width, (float)height } );
 
-#if 1
-	static bool  was_drawing_controls = false;
-	bool        mouse_in_area        = mouse_in_rect( { 0.f, height - ( POS_OFFSET.y + window_height.y * 3.f ) }, { (float)width, (float)height } );
-
-	if ( !mouse_in_area )
-	{
-		if ( was_drawing_controls )
-			set_frame_draw();
-
-		was_drawing_controls = false;
-		// return;
-	}
-
-	if ( !was_drawing_controls )
+	if ( mouse_in_area != was_drawing_controls )
 		set_frame_draw();
 
-	was_drawing_controls = true;
-#endif
-
+	was_drawing_controls         = mouse_in_area;
 	float nav_button_area        = content_height.x * 2 + style.ItemSpacing.x;
 
 	// ----------------------------------------
@@ -2043,15 +2031,16 @@ void media_view_draw_imgui()
 static void media_view_draw_animated_fbo()
 {
 	render_draw_texture_t draw_info{};
-	draw_info.width      = roundf( image_draw::size.x );
-	draw_info.height     = roundf( image_draw::size.y );
-	draw_info.x          = roundf( image_draw::pos.x );
-	draw_info.y          = roundf( image_draw::pos.y );
-	draw_info.rotation   = image_draw::rot;
-	draw_info.hide_alpha = image_draw::hide_alpha;
-	draw_info.flip_h     = image_draw::flip_h;
-	draw_info.flip_v     = !image_draw::flip_v;
-	draw_info.texture    = g_main_image_anim_tex;
+	draw_info.width         = roundf( image_draw::size.x );
+	draw_info.height        = roundf( image_draw::size.y );
+	draw_info.x             = roundf( image_draw::pos.x );
+	draw_info.y             = roundf( image_draw::pos.y );
+	draw_info.rotation      = image_draw::rot;
+	draw_info.hide_alpha    = image_draw::hide_alpha;
+	draw_info.flip_h        = image_draw::flip_h;
+	draw_info.flip_v        = !image_draw::flip_v;
+	draw_info.texture       = g_main_image_anim_tex;
+	draw_info.invert_colors = image_draw::invert_color;
 
 	for ( u8 i = 0; i < 4; i++ )
 		draw_info.hide_channel[ i ] = !image_draw::show_channels[ i ];
@@ -2077,6 +2066,7 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 		{
 			draw_info.palette       = g_image_data.textures.palette[ frame_i ];
 			draw_info.palette_trans = g_image_data.textures.palette_trans[ frame_i ];
+			draw_info.palette_count = g_image_data.image.frame[ frame_i ].palette.count;
 		}
 	}
 
@@ -2088,38 +2078,33 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 
 	if ( animated )
 	{
-		draw_info.width      = frame.width;
-		draw_info.height     = frame.height;
-		draw_info.x          = frame.pos_x;
-		draw_info.y          = frame.pos_y;
-		draw_info.rotation   = 0.f;
-		draw_info.hide_alpha = false;
-		draw_info.flip_h     = false;
-		draw_info.flip_v     = false;
-		draw_info.texture    = g_image_data.textures.frame[ frame_i ];
+		draw_info.width   = frame.width;
+		draw_info.height  = frame.height;
+		draw_info.x       = frame.pos_x;
+		draw_info.y       = frame.pos_y;
+		draw_info.texture = g_image_data.textures.frame[ frame_i ];
+		draw_info.target  = g_main_image_anim_fbo;
 	}
 	else
 	{
-		draw_info.width      = static_cast< int >( round( std::max( 0.01, frame.width * image_draw::zoom ) ) );
-		draw_info.height     = static_cast< int >( round( std::max( 0.01, frame.height * image_draw::zoom ) ) );
-		draw_info.x          = static_cast< int >( round( image_draw::pos.x + ( frame.pos_x * image_draw::zoom ) ) );
-		draw_info.y          = static_cast< int >( round( image_draw::pos.y + ( frame.pos_y * image_draw::zoom ) ) );
-		draw_info.rotation   = image_draw::rot;
-		draw_info.hide_alpha = image_draw::hide_alpha;
-		draw_info.flip_h     = image_draw::flip_h;
-		draw_info.flip_v     = image_draw::flip_v;
+		draw_info.width         = static_cast< int >( round( std::max( 0.01, frame.width * image_draw::zoom ) ) );
+		draw_info.height        = static_cast< int >( round( std::max( 0.01, frame.height * image_draw::zoom ) ) );
+		draw_info.x             = static_cast< int >( round( image_draw::pos.x + ( frame.pos_x * image_draw::zoom ) ) );
+		draw_info.y             = static_cast< int >( round( image_draw::pos.y + ( frame.pos_y * image_draw::zoom ) ) );
+		draw_info.rotation      = image_draw::rot;
+		draw_info.hide_alpha    = image_draw::hide_alpha;
+		draw_info.flip_h        = image_draw::flip_h;
+		draw_info.flip_v        = image_draw::flip_v;
+		draw_info.invert_colors = image_draw::invert_color;
 
 		if ( g_scale_state == e_scale_state_finished && image_draw::scaling )
 			draw_info.texture = g_image_scaled_data.textures.frame[ frame_i ];
 		else
 			draw_info.texture = g_image_data.textures.frame[ frame_i ];
+
+		for ( u8 i = 0; i < 4; i++ )
+			draw_info.hide_channel[ i ] = !image_draw::show_channels[ i ];
 	}
-
-	if ( animated )
-		draw_info.target = g_main_image_anim_fbo;
-
-	for ( u8 i = 0; i < 4; i++ )
-		draw_info.hide_channel[ i ] = !image_draw::show_channels[ i ];
 
 	render_draw_texture( draw_info );
 }

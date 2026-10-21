@@ -1215,8 +1215,8 @@ void shutdown()
 	media_view_shutdown();
 	icon_free();
 
-	image_free( g_image_data.image );
-	image_free( g_image_scaled_data.image );
+	image_free_data( g_image_data.image );
+	image_free_data( g_image_scaled_data.image );
 
 	args_free();
 	sys_shutdown();

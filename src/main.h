@@ -382,7 +382,8 @@ struct render_draw_texture_t
 
 	// draw a specific channel of the image
 	bool                hide_channel[ 4 ];
-	bool                hide_alpha = false;
+	bool                hide_alpha    = false;
+	bool                invert_colors = false;
 };
 
 

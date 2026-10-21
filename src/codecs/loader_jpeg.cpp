@@ -177,13 +177,10 @@ struct CodecJPEG: public IImageLoader
 		}
 
 		//image->bytes_per_pixel = tjPixelSize[ pixelFmt ];
-		image->width           = best_width;
-		image->height          = best_height;
-
-		image->format          = GL_RGB;
-		image->pitch           = pitch;
-		image->channels        = 3;
-		image->bit_depth       = 8 * image->channels;
+		image->width    = best_width;
+		image->height   = best_height;
+		image->format   = GL_RGB;
+		image->channels = 3;
 
 		return true;
 	}

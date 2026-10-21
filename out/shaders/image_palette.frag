@@ -11,16 +11,13 @@ uniform int       in_palette_count;
 
 void main()
 {
-    float palette_index = texture(in_texture, frag_tex_coord).r;
-    //float palette_index_fl  = texture(in_texture, frag_tex_coord).r;
-    //int palette_index_255 = palette_index_fl * 255;
-    //float palette_index = in_palette_count / in_palette_count;
+    float color_scale     = 256.f / float(in_palette_count);
+    float palette_index   = texture(in_texture, frag_tex_coord).r * color_scale;
+    int palette_index_int = int(ceil(palette_index * (in_palette_count - 1)));
 
     FragColor = texture( in_palette, palette_index );
     FragColor.a = 1;
 
-    if ( in_palette_trans == int(palette_index * 255.0) )
+    if ( in_palette_trans == palette_index_int )
         FragColor.a = 0;
-
-    //FragColor = texture(in_texture, frag_tex_coord);
 }

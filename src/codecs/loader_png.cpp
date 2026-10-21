@@ -194,7 +194,7 @@ struct LoaderPNG: public IImageLoader
 		load_info.image->frame[ 0 ].height = ihdr.height;
 
 		// load_info.image->format    = GL_RGBA;
-		load_info.image->bit_depth         = ihdr.bit_depth;
+		//load_info.image->bit_depth         = ihdr.bit_depth;
 		// load_info.image->pitch             = load_info.image->width * load_info.image->bytes_per_pixel;
 
 		// the strdup is stupid lol

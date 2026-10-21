@@ -105,8 +105,8 @@ void thumbnail_loader_free_data( u32 index )
 		gl_free_textures( thumbnail.textures );
 	}
 
-	ch_free( e_mem_category_image, thumbnail.image );
-	ch_free( e_mem_category_image, thumbnail.image_scaled );
+	image_free( thumbnail.image );
+	image_free( thumbnail.image_scaled );
 
 	ch_free_str( thumbnail.path );
 
@@ -552,7 +552,7 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 		cmd_ret                 = p_mpv_command_async( local_mpv, NULL, cmd_clear );
 
 		// Load Image Normally
-		thumbnail->image        = ch_calloc< image_t >( 1, e_mem_category_image );
+		thumbnail->image        = image_create();
 
 		image_load_info_t load_info{};
 		load_info.image          = thumbnail->image;
@@ -575,7 +575,7 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 	else
 	{
 		// Load Image Normally
-		thumbnail->image = ch_calloc< image_t >( 1, e_mem_category_image );
+		thumbnail->image = image_create();
 
 		image_load_info_t load_info{};
 		load_info.image          = thumbnail->image;
@@ -664,7 +664,8 @@ void thumbnail_loader_worker( u32 thread_id )
 			if ( fs_is_file( thumbnail_path.c_str() ) )
 			{
 				// Load Image Normally
-				jxl_thumbnail.image          = ch_calloc< image_t >( 1, e_mem_category_image );
+				jxl_thumbnail.image          = image_create();
+
 				jxl_thumbnail.target_size.x  = static_cast< float >( thumbnail_size );
 				jxl_thumbnail.target_size.y  = static_cast< float >( thumbnail_size );
 				jxl_thumbnail.load_quick     = true;
@@ -677,7 +678,7 @@ void thumbnail_loader_worker( u32 thread_id )
 					thumbnail_found_on_disk = true;
 
 					if ( thumbnail->image )
-						ch_free( e_mem_category_image, thumbnail->image );
+						image_free( thumbnail->image );
 
 					thumbnail->image        = jxl_thumbnail.image;
 					jxl_thumbnail.image     = nullptr;
@@ -687,7 +688,7 @@ void thumbnail_loader_worker( u32 thread_id )
 				}
 				else
 				{
-					ch_free( e_mem_category_image, jxl_thumbnail.image );
+					image_free( jxl_thumbnail.image );
 				}
 			}
 		}
@@ -792,7 +793,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			u8* old_frame           = thumbnail->image->frame[ 0 ].data;
 
-			thumbnail->image_scaled = ch_calloc< image_t >( 1, e_mem_category_image );
+			thumbnail->image_scaled = image_create();
 
 			if ( image_scale( thumbnail->image, thumbnail->image_scaled, new_width, new_height ) )
 			{

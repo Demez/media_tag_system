@@ -142,9 +142,10 @@ struct image_palette_elem_t
 
 struct image_palette_t
 {
-	image_palette_elem_t* elem;
+	image_palette_elem_t* elem = nullptr;
 	u32                   count;
-	u32                   trans_index;
+	int                   bg_index;
+	int                   trans_index;
 };
 
 
@@ -174,7 +175,7 @@ struct image_frame_t
 	e_image_frame_f      flags;
 	e_colortype          color_type = e_colortype_bitmap;
 
-	image_palette_t      palette;
+	image_palette_t      palette{};
 
 	// animation_format_frame_data_base_t* frame_data;
 
@@ -198,23 +199,21 @@ struct image_frame_t
 };
 
 
+// IDEA: split this into image_data_t and image_info_t, this becoming image_info_t
+// then image_frame_data_t contains a list of frames with JUST the raw pixel data and size
 struct image_t
 {
 	int                          width;
 	int                          height;
 
-	// TODO: probably remove these, bits per pixel you can get with the format option
-	int                          bit_depth;
-	int                          pitch;
-	//int                          bytes_per_pixel;  // actually bits per pixel i think lol
-
+	GLint                        format;
+	
 	e_image_flag                 flags;
 	u8                           channels;
-	GLint                        format;
 
 	// add channels_source - for the source channel count, would be used for jxl thumbnails
 
-	int                          loop_count;
+	u16                          loop_count;
 
 	// REPLACE WITH INDEX INTO IMAGE FORMAT STRING LIST
 	char*                        image_format;
@@ -233,17 +232,6 @@ struct image_t
 	{
 	}
 
-	//image_frame_t* get_frame( size_t i )
-	//{
-	//	if ( !frame.data )
-	//		return nullptr;
-	//
-	//	if ( frame.data->frame.size() >= i )
-	//		return nullptr;
-	//
-	//	return &frame.data->frame[ i ];
-	//}
-
 	// copying
 	void assign( const image_t& other ) noexcept
 	{
@@ -251,8 +239,6 @@ struct image_t
 
 		width           = other.width;
 		height          = other.height;
-		bit_depth       = other.bit_depth;
-		pitch           = other.pitch;
 		channels        = other.channels;
 		format          = other.format;
 		loop_count      = other.loop_count;
@@ -270,8 +256,6 @@ struct image_t
 
 		width              = other.width;
 		height             = other.height;
-		bit_depth          = other.bit_depth;
-		pitch              = other.pitch;
 		channels           = other.channels;
 		format             = other.format;
 		loop_count         = other.loop_count;
@@ -395,6 +379,10 @@ struct IImageLoader
 
 	// NEW INTERFACE WIP
 	// Allow for background image loading ideally and trying to stream in data
+	// Some libraries aren't setup in a nice way to allow this though
+	// so what if we just sent a signal to the main thread that "hey, we loaded the first frame, you can upload this!"
+	// along with when it finishes too? an event each frame *sounds* like it would hog the event queue, but probably not,
+	// considering 8000hz mice and the amount of events that can send in a frame lol
 #if 0
 
 	virtual image_loader_handle_t open( image_load_info_t& load_info, char* data, size_t data_len )                    = 0;
@@ -433,6 +421,11 @@ struct image_queue_data_t
 image_queue_data_t image_load_queue( const std::string& path, image_load_info_t* load_info );
 void               image_load_cancel( image_queue_data_t& queue_data );
 
+image_t*           image_create();
+void               image_free( image_t*& image );
+
+// verify an image is valid and can be uploaded
+bool               image_verify( image_t* image, bool check_pixel_data = true );
 
 void               image_register_codec( IImageLoader* codec, bool fallback );
 
@@ -441,13 +434,17 @@ void               image_register_codec( IImageLoader* codec, bool fallback );
 bool               image_load( const fs::path& path, image_load_info_t& load_info, char* file_data = nullptr, size_t data_len = 0 );
 
 // Free all image data
-void               image_free( image_t& image );
+void               image_free_data( image_t& image );
 
 // Free only frames
 void               image_free_frames( image_t& image );
 
 // Free only frames and allocations
 void               image_free_alloc( image_t& image );
+
+// Resets data, but doesn't free allocations, good for realloc for new images
+void               image_reset_data( image_t& image );
+void               image_reset_frame_data( image_frame_t& frame );
 
 bool               media_check_extension( std::string ext, e_media_type& type );
 bool               media_check_extension_fast( std::string& ext, e_media_type& type );

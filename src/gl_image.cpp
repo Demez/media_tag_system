@@ -120,12 +120,18 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	if ( height == 0 )
 		height = image->height;
 
-	glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 
 	// number of pixels in a row
 	//glPixelStorei( GL_UNPACK_ROW_LENGTH, width );
 	if ( image->frame[ frame_i ].pitch > 0 )
+	{
 		glPixelStorei( GL_UNPACK_ROW_LENGTH, image->frame[ frame_i ].pitch / image->channels );
+		glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+	}
+	else
+	{
+		glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
+	}
 
 	// GL_RGB  - 6407
 	// GL_RGBA - 6408
@@ -145,6 +151,10 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	else if ( image->format == GL_R8 )
 	{
 		glTexImage2D( GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
+	}
+	else if ( image->format == GL_RGB32F )
+	{
+		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image->frame[ frame_i ].data );
 	}
 	else if ( image->format == GL_RGBA32F )
 	{

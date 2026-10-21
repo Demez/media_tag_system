@@ -26,8 +26,20 @@ std::vector< IImageLoader* > g_codecs_backup;
 // Image Loading
 
 
-static std::unordered_map< std::string, IImageLoader* > g_ext_loader_map{};
-static std::unordered_set< std::string >                g_ext_loader_set{};
+static std::unordered_map< std::string, IImageLoader* >& get_ext_loader_map()
+{
+	static std::unordered_map< std::string, IImageLoader* > ext_loader_map;
+	return ext_loader_map;
+}
+
+static std::unordered_set< std::string >& get_ext_loader_set()
+{
+	static std::unordered_set< std::string > ext_loader_set;
+	return ext_loader_set;
+}
+
+//static std::unordered_map< std::string, IImageLoader* > g_ext_loader_map{};
+//static std::unordered_set< std::string >                g_ext_loader_set{};
 
 void image_register_codec( IImageLoader* codec, bool fallback )
 {
@@ -50,18 +62,18 @@ void image_register_codec( IImageLoader* codec, bool fallback )
 
 	for ( const std::string& ext : exts )
 	{
-		auto it = g_ext_loader_map.find( ext );
+		auto it = get_ext_loader_map().find( ext );
 
 		// Already here
-		if ( it != g_ext_loader_map.end() )
+		if ( it != get_ext_loader_map().end() )
 		{
 			if ( fallback )
 				continue;
 		}
 		
 		// Add it
-		g_ext_loader_map[ ext ] = codec;
-		g_ext_loader_set.insert( ext );
+		get_ext_loader_map()[ ext ] = codec;
+		get_ext_loader_set().insert( ext );
 	}
 }
 
@@ -98,7 +110,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 	if ( !load_info.image )
 	{
-		load_info.image = ch_calloc< image_t >( 1, e_mem_category_image );
+		load_info.image = image_create();
 
 		if ( !load_info.image )
 		{
@@ -108,19 +120,10 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 			return false;
 		}
 
+		// construct in place
+		load_info.image = new ( load_info.image ) image_t();
+
 		allocated_image = true;
-	}
-
-	// TODO: this data should probably not be reset here, have a dedicated reset function for it
-
-	// reset flags
-	load_info.image->flags = 0;
-
-	// reset data in frames
-	for ( auto& frame : load_info.image->frame )
-	{
-		frame.flags = 0;
-		frame.pitch = 0;
 	}
 
 	if ( file_data && !file_len )
@@ -137,6 +140,8 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 	if ( !file_data || file_len == 0 )
 		return false;
 
+	image_free_data( *load_info.image );
+
 	bool loaded_image = loader->image_load( path, load_info, file_data, file_len );
 
 	if ( !loaded_image )
@@ -146,6 +151,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 			if ( _loader == loader )
 				continue;
 
+			image_free_data( *load_info.image );
 			loaded_image = _loader->image_load( path, load_info, file_data, file_len );
 
 			if ( loaded_image )
@@ -155,11 +161,14 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 	if ( !loaded_image )
 	{
+		printf( "*** Faling to backup codec\n" );
+
 		for ( IImageLoader* _loader : g_codecs_backup )
 		{
 			if ( _loader == loader )
 				continue;
 
+			image_free_data( *load_info.image );
 			loaded_image = _loader->image_load( path, load_info, file_data, file_len );
 
 			if ( loaded_image )
@@ -167,32 +176,99 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 		}
 	}
 
+	if ( internal_file_ptr )
+		ch_free( e_mem_category_file_data, file_data );
+
 	if ( !loaded_image && allocated_image )
 	{
-		ch_free( e_mem_category_image, load_info.image );
-		load_info.image = nullptr;
+		image_free( load_info.image );
 		return false;
 	}
 
-	if ( internal_file_ptr )
-		ch_free( e_mem_category_file_data, file_data );
+	if ( loaded_image && !image_verify( load_info.image ) )
+	{
+		printf( "Image is invalid !!!\n" );
+		image_free( load_info.image );
+		return false;
+	}
 
 	return loaded_image;
 }
 
 
-// Free all image data
-void image_free( image_t& image )
+void image_free_palette( image_palette_t& palette )
 {
-	image_free_alloc( image );
-	// memset( &image, 0, sizeof( image_t ) );
+	palette.count       = 0;
+	palette.trans_index = 0;
 
+	ch_free( e_mem_category_image_data, palette.elem );
+}
+
+
+void image_reset_frame_data( image_frame_t& frame )
+{
+	frame.time           = 0.f;
+	frame.width          = 0;
+	frame.height         = 0;
+	frame.pitch          = 0;
+	frame.pos_x          = 0;
+	frame.pos_y          = 0;
+	frame.flags          = 0;
+
+	frame.frame_disposal = e_frame_disposal_keep;
+	frame.color_type     = e_colortype_bitmap;
+
+	image_free_palette( frame.palette );
+}
+
+
+void image_reset_data( image_t& image )
+{
 	image.width      = 0;
 	image.height     = 0;
-	image.bit_depth  = 0;
-	image.pitch      = 0;
 	image.format     = 0;
+	image.channels   = 0;
 	image.loop_count = 0;
+	image.flags      = 0;
+
+	image_free_palette( image.palette );
+
+	for ( auto& frame : image.frame )
+	{
+		image_reset_frame_data( frame );
+	}
+}
+
+
+image_t* image_create()
+{
+	auto image = ch_calloc< image_t >( 1, e_mem_category_image );
+
+	// construct in place
+	image = new ( image ) image_t();
+	return image;
+}
+
+
+void image_free( image_t*& image )
+{
+	if ( !image )
+		return;
+
+	image_reset_data( *image );
+	image_free_alloc( *image );
+
+	image->~image_t();
+
+	ch_free( e_mem_category_image, image );
+}
+
+
+// Free all image data
+void image_free_data( image_t& image )
+{
+	image_reset_data( image );
+	image_free_alloc( image );
 }
 
 
@@ -245,16 +321,33 @@ void image_copy_all( image_t& src, image_t& dst, size_t frame_count = 0 )
 #endif
 
 
+// all of this should be ref counted probably, ugh
+void image_copy_palette( image_palette_t& src, image_palette_t& dst )
+{
+	dst.count        = src.count;
+	dst.trans_index  = src.trans_index;
+	dst.elem         = ch_calloc< image_palette_elem_t >( src.count, e_mem_category_image_data );
+
+	for ( u32 i = 0; i < src.count; i++ )
+	{
+		dst.elem[ i ].r = src.elem[ i ].r;
+		dst.elem[ i ].g = src.elem[ i ].g;
+		dst.elem[ i ].b = src.elem[ i ].b;
+		dst.elem[ i ].a = src.elem[ i ].a;
+	}
+}
+
+
 void image_copy_data( image_t& src, image_t& dst )
 {
 	dst.width        = src.width;
 	dst.height       = src.height;
-	dst.bit_depth    = src.bit_depth;
-	dst.pitch        = src.pitch;
 	dst.channels     = src.channels;
 	dst.format       = src.format;
 	dst.loop_count   = src.loop_count;
 	dst.image_format = src.image_format;
+
+	image_copy_palette( src.palette, dst.palette );
 }
 
 
@@ -262,10 +355,15 @@ void image_copy_frame_data( image_frame_t& src, image_frame_t& dst )
 {
 	dst.width          = src.width;
 	dst.height         = src.height;
+	dst.pitch          = src.pitch;
 	dst.pos_x          = src.pos_x;
 	dst.pos_x          = src.pos_y;
 	dst.time           = src.time;
 	dst.frame_disposal = src.frame_disposal;
+	dst.flags          = src.flags;
+	dst.color_type     = src.color_type;
+
+	image_copy_palette( src.palette, dst.palette );
 }
 
 
@@ -279,17 +377,54 @@ bool image_copy_frame_data( image_t& src, image_t& dst, size_t frame_i )
 }
 
 
+// verify an image is valid and can be uploaded
+bool image_verify( image_t* image, bool check_pixel_data )
+{
+	if ( !image )
+		return false;
+
+	bool field_missing = false;
+
+	field_missing |= image->width == 0;
+	field_missing |= image->height == 0;
+	field_missing |= image->format == 0;
+	field_missing |= image->channels == 0;
+	field_missing |= image->frame.empty();
+
+	for ( auto& frame : image->frame )
+	{
+		field_missing |= frame.width == 0;
+		field_missing |= frame.height == 0;
+		field_missing |= frame.color_type == e_colortype_invalid;
+
+		if ( check_pixel_data )
+		{
+			field_missing |= frame.data == nullptr;
+			field_missing |= frame.size == 0;
+		}
+
+		if ( field_missing )
+			break;
+	}
+
+	return !field_missing;
+}
+
+
+// ===================================================================================================
+
+
 bool image_check_extension_fast( const std::string& ext )
 {
-	return g_ext_loader_set.contains( ext );
+	return get_ext_loader_set().contains( ext );
 }
 
 
 IImageLoader* image_check_extension( const std::string& ext )
 {
-	auto it = g_ext_loader_map.find( ext );
+	auto it = get_ext_loader_map().find( ext );
 
-	if ( it == g_ext_loader_map.end() )
+	if ( it == get_ext_loader_map().end() )
 		return nullptr;
 
 	return it->second;
@@ -367,6 +502,9 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 
 	new_image->frame.resize( old_image->frame.size() );
 
+	if ( old_image != new_image )
+		image_reset_data( *new_image );
+
 	for ( size_t i = 0; i < old_image->frame.size(); i++ )
 	{
 		u8* old_frame = old_image->frame[ i ].data;
@@ -379,8 +517,15 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 
 		// u8* new_frame     = ch_calloc< u8 >( new_width * new_height * old_image->channels, e_mem_category_image_data );
 
+		// what am i doing wrong here? is pitch not the same as stride? it works just fine for single channel images from freeimage
+		// but then when it comes to webp, or probably just 24 bpp images, it crashes
+		int input_stride_in_bytes = 0;
+
+		if ( old_image->channels == 1 )
+			input_stride_in_bytes = old_image->frame[ i ].pitch;
+
 		u8* resized_frame = (u8*)stbir_resize(
-		  old_frame, old_image->frame[ i ].width, old_image->frame[ i ].height, old_image->frame[ i ].pitch,
+		  old_frame, old_image->frame[ i ].width, old_image->frame[ i ].height, input_stride_in_bytes,
 		  nullptr, new_width, new_height, 0,
 		  pixel_layout, datatype, STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT );
 
@@ -391,13 +536,12 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 		new_image->frame[ i ].size   = new_width * new_height * old_image->channels;
 		new_image->frame[ i ].width  = new_width;
 		new_image->frame[ i ].height = new_height;
+		new_image->frame[ i ].pitch  = 0;
 	}
 
-	new_image->width           = new_width;
-	new_image->height          = new_height;
-	new_image->pitch           = new_width * old_image->channels;
-	new_image->bit_depth       = 4;
-	new_image->channels        = old_image->channels;
+	new_image->width    = new_width;
+	new_image->height   = new_height;
+	new_image->channels = old_image->channels;
 
 	switch ( old_image->channels )
 	{

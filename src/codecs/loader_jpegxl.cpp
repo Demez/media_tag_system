@@ -221,9 +221,6 @@ struct LoaderJXL: public IImageLoader
 		//else
 			load_info.image->format = GL_RGBA;
 
-		// ?
-		load_info.image->bit_depth         = 4;
-		//load_info.image->pitch             = load_info.image->width * load_info.image->bytes_per_pixel;
 
 		load_info.image->frame[ 0 ].width  = load_info.image->width;
 		load_info.image->frame[ 0 ].height = load_info.image->height;
