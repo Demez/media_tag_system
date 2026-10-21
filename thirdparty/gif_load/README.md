@@ -10,7 +10,7 @@ blah blah. See the header file for details.
 
 There are no strict dependencies on the standard C library. The only external
 function used by default is `realloc()` (both for freeing and allocation), but
-it\`s possible to override it by defining a macro called `GIF_MGET(m,s,a,c)`
+it's possible to override it by defining a macro called `GIF_MGET(m,s,a,c)`
 prior to including the header; `m` stands for a `uint8_t*`-typed pointer to
 the memory block being allocated or freed, `s` is the target block size, typed
 `unsigned long`, `a` is the value of the fifth parameter passed to `GIF_Load()`
@@ -49,7 +49,11 @@ proxy that is discarded after every call):
   * `GIF_WHDR::ydim` - global GIF height, ACAF; [0; 65535]
   * `GIF_WHDR::clrs` - number of colors in the current palette (local palettes
                        are not that rare so it may vary across frames, further
-                       referred to as 'MVAF'); {2; 4; 8; 16; 32; 64; 128; 256}
+                       referred to as 'MVAF'); {2; 4; 8; 16; 32; 64; 128; 256},
+                       or 0 when the GIF carries no palette at all, which the
+                       standard permits: such frames still decode, and what
+                       to make of bare pixel indices is then entirely up to
+                       the caller
   * `GIF_WHDR::bkgd` - 0-based background color index for the current palette,
                        ACAF (sic ACAF, as this index is set globally)
   * `GIF_WHDR::tran` - 0-based transparent color index for the current palette
@@ -88,22 +92,30 @@ proxy that is discarded after every call):
                        across frames (further referred to as 'AVAF')
   * `GIF_WHDR::nfrm` - total frame count, negative if the GIF data supplied
                        is incomplete, ACAF during a single `GIF_Load()` call
-                       but may vary across `GIF_Load()` calls
+                       but may vary across `GIF_Load()` calls; *N.B.:* when
+                       negative it is an upper bound rather than a promise,
+                       as it counts the frame headers the loader could find
+                       while scanning, and a GIF cut short inside a frame's
+                       pixel data still contributes its header to that count
+                       while never reaching the frame writer. What did get
+                       decoded is what `GIF_Load()` returns
   * `GIF_WHDR::bptr` - [frame writer:] pixel indices for the current frame,
                        ACAF (it is only the pointer address that is constant;
                        the pixel indices stored inside = MVAF); [metadata
                        callback:] app metadata header (8+3 bytes) followed by
                        a GIF chunk (1 byte designating length L, then L bytes
-                       of metadata, and so forth; L = 0 means end of chunk),
-                       AVAF
+                       of metadata, and so forth, L = 0 means end of chunk;
+                       it is the callback's responsibility to avoid reading out
+                       of bounds if a partial GIF ends within the chunk), AVAF
   * `GIF_WHDR::cpal` - the current palette containing 3 `uint8_t` values for
                        each of the colors: `R` for the red channel, `G` for
-                       green and `B` for blue; this pointer is guaranteed
-                       to be the same across frames if and only if the global
-                       palette is used for those frames (local palettes are
-                       strictly frame-specific, even when they contain the
-                       same number of identical colors in identical order),
-                       MVAF
+                       green and `B` for blue (can be 0 when the GIF carries no
+                       palette, in which case `GIF_WHDR::clrs` is 0 too); this
+                       pointer is guaranteed to be the same across frames if
+                       and only if the global palette is used for those frames
+                       (local palettes are strictly frame-specific, even when
+                       they contain the same number of identical colors in
+                       identical order), MVAF
 
 Neither of the two callbacks needs to return a value, thus having `void` for
 a return type.
@@ -133,11 +145,15 @@ of frames in the animation and indicates that the GIF data stream ended with
 a proper termination mark. Negative return value is the number of frames
 loaded per current call multiplied by −1, suggesting that the GIF data stream
 being decoded is still incomplete. Zero, in its turn, means that the call
-could not decode any more frames.
+could not decode any more frames. It is also what gets returned when `GIF_MGET`
+fails to hand out the frame buffer, which holds the largest single frame of the
+animation and can therefore be asked to be as large as 65535 × 65535 bytes: no
+cap of its own is imposed on that size, so what can be decoded is limited by
+the available memory alone, even with 32-bit builds.
 
 `gif_load` is endian-aware. If the target machine can be big-endian the user
 has to determine that manually and add `#define GIF_BIGE 1` to the source
-prior to the header being included if that\`s the case, or otherwise define
+prior to the header being included if that's the case, or otherwise define
 the endianness to be used (0 = little, 1 = big), e.g. by declaring a helper
 function and setting `GIF_BIGE` to expand into its call, or by passing it as a
 compiler parameter (e.g. `-DGIF_BIGE=1` for GCC / Clang). Although GIF data is
@@ -147,8 +163,8 @@ the target machine, provided that `GIF_BIGE` is set correctly. Most other
 data, e.g. pixel indices of a frame, consists of single bytes and thus does
 not require endianness correction. One notable exception is GIF application
 metadata which is passed as the raw chunk of bytes (for details see the
-description of `GIF_WHDR::bptr` provided above), and then it\`s the
-callback\`s job to parse it and decide whether to decode and how to do that.
+description of `GIF_WHDR::bptr` provided above), and then it's the
+callback's job to parse it and decide whether to decode and how to do that.
 
 There is a possibility to build `gif_load` as a shared library. `GIF_EXTR` is
 a convenience macro to be defined so that the `GIF_Load()` function gets an
@@ -197,7 +213,7 @@ void Frame(void *data, struct GIF_WHDR *whdr) {
          | (uint32_t)(whdr->cpal[whdr->bptr[i]].B << ((GIF_BIGE)? 24 : 0)) \
          | ((GIF_BIGE)? 0xFF : 0xFF000000)))
     if (!whdr->ifrm) {
-        /** TGA doesn`t support heights over 0xFFFF, so we have to trim: **/
+        /** TGA doesn't support heights over 0xFFFF, so we have to trim: **/
         whdr->nfrm = ((whdr->nfrm < 0)? -whdr->nfrm : whdr->nfrm) * whdr->ydim;
         whdr->nfrm = (whdr->nfrm < 0xFFFF)? whdr->nfrm : 0xFFFF;
         /** this is the very first frame, so we must write the header **/
@@ -372,3 +388,111 @@ def GIF_Save(file, fext):
 
 GIF_Save("insert_gif_name_here_without_extension", "png")
 ```
+
+
+
+# Performance
+*Take everything below with a grain of salt.*
+
+The GIFs participating in these measurements are synthetic; 3 are flat shapes
+that compress roughly like a real GIF would, the other 3 incompressible noise
+which is the worst possible case, never found in the wild but useful for
+establishing a performance baseline. Basically, these cases compare different
+parts of the decoder: shapes mostly compare un-LZW speed, noise mostly compares
+I/O efficiency. The tables name GIFs by size and type (S = shapes, N = noise):
+
+* 320x240, 100 frames: shapes 0.7 MB, noise 10 MB
+* 640x480, 200 frames: shapes 6 MB, noise 81 MB
+* 1920x1080, 150 frames: shapes 50 MB, noise 408 MB
+
+The harness that produced the numbers is not published, so none of this is
+reproducible from this repository. The specs of the machine are as follows:
+
+* OS: Linux 6.4
+* Compiler: GCC 11.5 at `-O2`
+* RAM access latency: 128 ns
+* Single-core sequential RAM read: 8 GB/s
+* Single-core sequential RAM copy: 1.8 GB/s
+* EXT4 cold-cache disk read: 342 MB/s
+
+Compared against [giflib](https://giflib.sourceforge.net/) 5.2.2 and
+[stb_image](https://github.com/nothings/stb), decoding every frame. As
+`GIF_Load()` takes a pointer, the file must be in memory first, by `read()`
+or `mmap()`; both are shown. `+RGBA` also composites, as `stb_image` always
+does. The outputs of other libraries agreed with that of `gif_load` bit for
+bit, though only because none of the GIFs were interlaced, which `DGifSlurp()`
+straightens but `gif_load` considers the caller's responsibility.
+
+Peak resident memory, and how much of it is anonymous, in MB:
+
+|case         | 240p S| 240p N|   480p S|   480p N|    1080p S|    1080p N|
+|:------------|------:|------:|--------:|--------:|----------:|----------:|
+|`read`       |  0 / 0|  9 / 9|    6 / 6|  81 / 81|    52 / 51|  409 / 409|
+|`mmap`       |  2 / 0| 11 / 0|    8 / 0|   81 / 0|     52 / 2|    411 / 2|
+|`read` +RGBA |  0 / 0|  9 / 9|    8 / 8|  81 / 81|    60 / 60|  416 / 416|
+|`mmap` +RGBA |  2 / 0| 11 / 0|    8 / 0|   81 / 0|     60 / 9|    418 / 9|
+|giflib stream|  0 / 0|  0 / 0|    0 / 0|    0 / 0|      0 / 0|      0 / 0|
+|giflib slurp |  8 / 8|  8 / 8|  58 / 58|  58 / 58|  296 / 296|  296 / 296|
+|stb_image    |30 / 30|39 / 39|242 / 242|317 / 317|1254 / 1239|1611 / 1595|
+
+The second figure is what costs something: anonymous pages need swap to go
+anywhere, file-backed ones can just be dropped. Sampling is quantized to about
+1.9 MB, hence the zeroes; the page cache is in none of these numbers.
+
+`gif_load` asks `GIF_MGET` for one frame plus the 16 KB code table, in the same
+manner for all GIFs, regardless of frame count. The pairs show what the others
+keep: `giflib slurp` needs as much for noise as for shapes, holding pixels but
+not the file data, `stb_image` holds both, `giflib stream` holds a single row —
+which is optimal memory-wise, there's no beating it. Also `gif_load` keeps the
+file twice with `read()` (kernel pages + anonymous), which an `mmap()` avoids.
+
+Wall time in milliseconds, best of two runs, same order:
+
+|case (cold)  |240p S|240p N|480p S|480p N|1080p S|1080p N|
+|:------------|-----:|-----:|-----:|-----:|------:|------:|
+|`read`       |    26|    64|   176|   512|    767|   2554|
+|`mmap`       |    27|    77|   182|   583|    812|   2929|
+|`read` +RGBA |    28|    66|   194|   513|    856|   2614|
+|`mmap` +RGBA |    29|    78|   199|   596|    896|   3006|
+|giflib stream|    37|    58|   266|   457|   1157|   2302|
+|giflib slurp |    39|    60|   286|   485|   1277|   2439|
+|stb_image    |    54|    84|   409|   675|   1922|   3453|
+
+|case (warm)  |240p S|240p N|480p S|480p N|1080p S|1080p N|
+|:------------|-----:|-----:|-----:|-----:|------:|------:|
+|`read`       |    23|    42|   163|   350|    668|   1756|
+|`mmap`       |    23|    38|   161|   315|    645|   1609|
+|`read` +RGBA |    25|    44|   178|   359|    756|   1888|
+|`mmap` +RGBA |    25|    41|   178|   332|    732|   1795|
+|giflib stream|    36|    55|   263|   447|   1149|   2295|
+|giflib slurp |    38|    58|   282|   471|   1269|   2396|
+|stb_image    |    50|    61|   391|   520|   1829|   2688|
+
+Timing starts before the file is acquired, so whoever reads it pays here.
+`giflib` hardly notices the cache, ±2% at every size, as it reads the GIF while
+decoding which hides I/O latency behind compute. `gif_load` is architecturally
+incapable of that: the GIF must be read in full before the first pixel (see how
+the frame-counting step is 100% I/O and 0% compute), making the read additive.
+
+With the kernel file cache warm, `gif_load` wins everywhere: 1.3x–1.7x against
+`giflib`, and 1.4x–2.5x against `stb_image` (but re-reading GIFs while cached
+is not common in day-to-day use). With the cache cold, it's 1.3x–1.5x for all 3
+shapes (closest thing to a real GIF) and 0.83x–0.85x with the 3 noisy ones —
+both figures vs `giflib`, as `stb_image` is slower than `gif_load` even here.
+
+Warm `mmap()` wins overall, as `read()` still copies out of the page cache.
+`madvise()` doesn't make cold `mmap()` warm, hence the cold / warm distinction.
+Cold `read()` wins on readahead.
+
+P.S.: The 1.3x–1.5x cold-cache performance claim vs `giflib` holds pretty well
+on real images from https://giphy.com/ — which looks like a good enough source
+of GIF samples for performance benchmarking.
+
+
+
+# Accuracy tests
+`tests/run.sh` decodes a handful of real GIFs and hand-crafted synthetic GIFs,
+and then compares the result with a known-good one, then rechecks the same
+files under valgrind if it is installed. It needs nothing but a C compiler and
+a POSIX shell; see [tests/README.md](tests/README.md) for more info on what
+each of the synthetic GIFs is there for.

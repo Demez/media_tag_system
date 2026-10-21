@@ -318,7 +318,7 @@ set(
 
     src/codecs/loader_jpeg.cpp
     src/codecs/loader_png.cpp
-    # src/codecs/format_gif.cpp
+    src/codecs/loader_gif.cpp
     src/codecs/loader_freeimage.cpp
     src/codecs/loader_jpegxl.cpp
 
@@ -387,7 +387,6 @@ include_directories(
 	"thirdparty/libjpeg-turbo/src"
 	"thirdparty/libspng/spng"
 	"thirdparty/mpv/include"
-	"thirdparty/gif_load"
 	"thirdparty/FreeImageRe/include"
 	"thirdparty/stb"
 	"thirdparty/ckdl/include"
