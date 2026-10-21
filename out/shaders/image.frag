@@ -5,6 +5,7 @@ in vec2 frag_tex_coord;
 
 uniform ivec4     in_visible_channels;
 uniform sampler2D in_texture;
+uniform int       in_invert_colors;
 
 void main()
 {
@@ -22,4 +23,7 @@ void main()
 
     if (in_visible_channels.a == 0)
         FragColor.a = 1;
+
+    if ( in_invert_colors == 1 )
+        FragColor.rgb = vec3( 1.f - FragColor.r, 1.f - FragColor.g, 1.f - FragColor.b );
 }

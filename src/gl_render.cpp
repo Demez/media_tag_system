@@ -72,11 +72,10 @@ struct shader_base_t
 	GLint                projection       = 0;
 	GLint                view             = 0;
 
-	GLint                window_size      = 0;
+	//GLint                window_size      = 0;
 	GLint                image_size       = 0;
 	GLint                image_pos        = 0;
 	GLint                image_rot        = 0;
-	GLint                visible_channels = 0;
 
 	GLint                in_texture       = 0;
 
@@ -97,6 +96,27 @@ shader_base_t* shader_list[ e_shader_count ] = {};
 
 struct shader_main_t : public shader_base_t
 {
+	GLint        visible_channels = 0;
+	GLint        in_invert_colors = 0;
+
+	virtual bool init()
+	{
+		visible_channels = glGetUniformLocation( program, "in_visible_channels" );
+		in_invert_colors = glGetUniformLocation( program, "in_invert_colors" );
+		return true;
+	}
+
+	virtual void draw( const render_draw_texture_t& draw_info )
+	{
+		glUniform4i(
+		  visible_channels,
+		  !draw_info.hide_channel[ 0 ],
+		  !draw_info.hide_channel[ 1 ],
+		  !draw_info.hide_channel[ 2 ],
+		  !draw_info.hide_channel[ 3 ] );
+
+		glUniform1i( in_invert_colors, draw_info.invert_colors );
+	}
 };
 
 
@@ -129,17 +149,22 @@ struct shader_palette_t : public shader_base_t
 // Shader Info - Min Greyscale
 struct shader_min_white_t : public shader_base_t
 {
-	GLint        in_min_is_white = 0;
+	GLint        in_min_is_white  = 0;
+	GLint        in_invert_colors = 0;
 
 	virtual bool init()
 	{
-		in_min_is_white = glGetUniformLocation( program, "in_min_is_white" );
+		in_min_is_white  = glGetUniformLocation( program, "in_min_is_white" );
+		in_invert_colors = glGetUniformLocation( program, "in_invert_colors" );
 		return true;
 	}
 
 	virtual void draw( const render_draw_texture_t& draw_info )
 	{
 		glUniform1i( in_min_is_white, 1 );
+		glUniform1i( in_invert_colors, draw_info.invert_colors );
+
+		shader_base_t::draw( draw_info );
 	}
 };
 
@@ -150,6 +175,9 @@ struct shader_min_black_t : public shader_min_white_t
 	virtual void draw( const render_draw_texture_t& draw_info )
 	{
 		glUniform1i( in_min_is_white, 0 );
+		glUniform1i( in_invert_colors, draw_info.invert_colors );
+
+		shader_base_t::draw( draw_info );
 	}
 };
 
@@ -306,11 +334,9 @@ bool render_load_shader( shader_base_t* shader )
 	shader->projection       = glGetUniformLocation( shader->program, "projection" );
 	shader->view             = glGetUniformLocation( shader->program, "view" );
 
-	shader->window_size      = glGetUniformLocation( shader->program, "window_size" );
 	shader->image_size       = glGetUniformLocation( shader->program, "image_size" );
 	shader->image_pos        = glGetUniformLocation( shader->program, "image_pos" );
 	shader->image_rot        = glGetUniformLocation( shader->program, "image_rotation" );
-	shader->visible_channels = glGetUniformLocation( shader->program, "in_visible_channels" );
 
 	shader->in_texture       = glGetUniformLocation( shader->program, "in_texture" );
 
@@ -482,17 +508,9 @@ void render_draw_texture( render_draw_texture_t draw_info )
 
 	glUniformMatrix4fv( shader->projection, 1, GL_FALSE, &ortho_projection[ 0 ][ 0 ] );
 
-	glUniform2i( shader->window_size, window_width, window_height );
 	glUniform2i( shader->image_size, draw_info.width, draw_info.height );
 	glUniform2i( shader->image_pos, draw_info.x, draw_info.y );
 	glUniform1f( shader->image_rot, draw_info.rotation * TO_RAD );
-
-	glUniform4i(
-	  shader->visible_channels,
-	  !draw_info.hide_channel[ 0 ],
-	  !draw_info.hide_channel[ 1 ],
-	  !draw_info.hide_channel[ 2 ],
-	  !draw_info.hide_channel[ 3 ] );
 
 	gl_check_error();
 
