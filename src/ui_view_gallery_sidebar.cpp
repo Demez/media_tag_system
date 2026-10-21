@@ -13,7 +13,7 @@ static void draw_vertical_separator( ImDrawList* draw_list, ImGuiStyle& style, b
 	// TEMP DISABLE
 	if ( style.WindowBorderSize > 0 )
 	{
-		ImColor border_col   = style.Colors[ ImGuiCol_Border ];
+		ImColor border_col   = style.Colors[ ImGuiCol_Separator ];
 		ImVec2  region_avail = ImGui::GetContentRegionAvail();
 		// float  window_height = ImGui::GetWindowHeight();
 		float  window_height = ImGui::GetFrameHeight();
