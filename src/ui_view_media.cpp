@@ -179,6 +179,7 @@ void media_view_scale_thread_run()
 			g_scale_state = e_scale_state_idle;
 		}
 
+		g_scale_time = UINT64_MAX;
 		g_scale_signal.store( false );
 		g_scale_lock.unlock();
 	}
