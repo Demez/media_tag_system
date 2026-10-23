@@ -1081,7 +1081,7 @@ void media_view_context_menu()
 
 	ImGui::Separator();
 
-	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.textures.count ) )
+	if ( ImGui::MenuItem( "Open File Location", nullptr, false, g_image_data.index != SIZE_MAX ) )
 	{
 		sys_browse_to_path( gallery_item_get_path( g_image_data.index ) );
 	}
