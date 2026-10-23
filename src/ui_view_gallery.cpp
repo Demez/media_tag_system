@@ -524,6 +524,10 @@ void gallery_find_selected_file()
 
 			selection_copy.erase( selection_copy.begin() + s );
 			gallery_view_scroll_to_cursor();
+
+			if ( !g_gallery_view )
+				g_image_data.index = selection.index;
+
 			break;
 		}
 	}

@@ -1037,7 +1037,8 @@ static void handle_queued_folder()
 	}
 
 	// gallery_view_scroll_to_cursor();
-	set_view_type_gallery();
+	if ( !directory::folder_reload )
+		set_view_type_gallery();
 
 	directory::queued.clear();
 }
