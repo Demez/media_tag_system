@@ -84,7 +84,10 @@ void dir_tree_add_folder( fs::path& path )
 		}
 
 		current_scan += filename;
-		if ( Linux() && filename != PATH_FMT( "/" ) )
+
+#if __unix__
+		if ( filename != PATH_FMT( "/" ) )
+#endif
 			current_scan += SEP;
 
 		auto dir_it = g_directory_entries.find( current_scan );
