@@ -599,7 +599,7 @@ bool sys_execute( const fs::path_char* command )
 	PROCESS_INFORMATION pi      = { 0 };
 	STARTUPINFOW        si      = { sizeof( STARTUPINFOW ) };
 
-	BOOL                success = CreateProcessW( NULL, const_cast< wchar_t* >( command ), NULL, NULL, TRUE, BELOW_NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi );
+	BOOL                success = CreateProcessW( NULL, const_cast< wchar_t* >( command ), NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi );
 
 	if ( !success )
 	{
