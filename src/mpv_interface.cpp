@@ -14,15 +14,15 @@ static ivec2                      g_mpv_framebuffer_size{};
 
 mpv_data_t                        g_mpv_data;
 
-u32                               g_wakeup_on_mpv_render_update, g_wakeup_on_mpv_events;
 static bool                       g_mpv_redraw    = false;
 
 static char*                      g_current_video = nullptr;
 
 //s64                               g_mpv_data.dwidth = 0, g_mpv_data.dheight = 0;
 
-bool                              g_scale_up_video  = true;
-bool                              g_mpv_video_ready = false;
+bool                              g_scale_up_video             = true;
+bool                              g_mpv_video_ready            = false;
+bool                              g_mpv_event_sending          = false;
 
 bool                              g_mpv_texture_updated_needed = false;
 
@@ -201,6 +201,22 @@ bool load_mpv_dll()
 void mpv_create_texture();
 
 
+static void on_mpv_render_update( void* ctx )
+{
+	//g_mpv_event_sending = true;
+	send_user_event( e_user_event_mpv_render, nullptr, nullptr );
+	//g_mpv_event_sending = false;
+}
+
+
+static void on_mpv_events( void* ctx )
+{
+	g_mpv_event_sending = true;
+	send_user_event( e_user_event_mpv_event, nullptr, nullptr );
+	g_mpv_event_sending = false;
+}
+
+
 bool mpv_init_render_context()
 {
 	// create render context
@@ -253,9 +269,6 @@ bool mpv_init_render_context()
 	//	return false;
 	//}
 
-	// When normal mpv events are available.
-	//p_mpv_set_wakeup_callback( g_mpv, on_mpv_events, nullptr );
-
 	// When there is a need to call mpv_render_context_update(), which can
 	// request a new frame to be rendered.
 	// (Separate from the normal event handling mechanism for the sake of
@@ -307,6 +320,9 @@ void mpv_update_frame()
 	if ( !g_mpv_gl )
 		mpv_init_render_context();
 
+	//if ( !g_mpv_redraw )
+	//	return;
+
 	//mpv_opengl_fbo fbo{ static_cast< int >( g_mpv_fbo ), g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGBA16 };
 	mpv_opengl_fbo fbo{ static_cast< int >( g_mpv_fbo ), g_mpv_framebuffer_size[ 0 ], g_mpv_framebuffer_size[ 1 ], GL_RGB };
 	int            yes  = 1;
@@ -334,9 +350,6 @@ void mpv_draw_frame()
 {
 	if ( !g_mpv )
 		return;
-
-	//if ( !g_mpv_video_ready )
-	//	return;
 
 	if ( !g_mpv_data.loaded_file )
 		return;
@@ -496,69 +509,25 @@ void mpv_create_texture()
 }
 
 
-// TODO: try reimplementing this again, now that i use wait event instead of running normally
-#if 0
-static void on_mpv_render_update( void* ctx )
-{
-	SDL_Event event = { .type = g_wakeup_on_mpv_render_update };
-	SDL_PushEvent( &event );
-}
-
-static void on_mpv_events( void* ctx )
-{
-	SDL_Event event = { .type = g_wakeup_on_mpv_events };
-	SDL_PushEvent( &event );
-}
-#endif
-
-
-void mpv_sdl_event( SDL_Event& event )
+void mpv_sdl_event( SDL_Event& sdl_event )
 {
 #if 1
-	if ( event.type == g_wakeup_on_mpv_render_update )
+	if ( sdl_event.user.code == e_user_event_mpv_render )
 	{
 		u64 flags = p_mpv_render_context_update( g_mpv_gl );
 		if ( flags & MPV_RENDER_UPDATE_FRAME )
 			g_mpv_redraw = true;
+
+		// mpv_update();
 	}
 #endif
-#if 0
-	if ( event.type == g_wakeup_on_mpv_events )
+#if 1
+	if ( sdl_event.user.code == e_user_event_mpv_event )
 	{
-		// Handle all remaining mpv events.
+		if ( g_mpv_event_sending )
+			return;
 
-		mpv_event* event = p_mpv_wait_event( g_mpv, 0 );
-
-		while ( event->event_id != MPV_EVENT_NONE )
-		{
-			if ( event->event_id == MPV_EVENT_NONE )
-				break;
-
-			if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
-			{
-				mpv_event_log_message* msg = (mpv_event_log_message*)event->data;
-				// Print log messages about DR allocations, just to
-				// test whether it works. If there is more than 1 of
-				// these, it works. (The log message can actually change
-				// any time, so it's possible this logging stops working
-				// in the future.)
-				if (strstr(msg->text, "DR image"))
-					printf("MPV: %s", msg->text);
-				continue;
-			}
-
-			else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
-			{
-				// Video Loaded
-				set_frame_draw();
-				g_mpv_video_ready = true;
-				continue;
-			}
-
-			event = p_mpv_wait_event( g_mpv, 0 );
-
-			printf( "MPV EVENT: %s\n", p_mpv_event_name( event->event_id ) );
-		}
+		mpv_update();
 	}
 #endif
 }
@@ -624,6 +593,9 @@ bool start_mpv()
 	observe_ret     = p_mpv_observe_property( g_mpv, e_mpv_cmd_observe, "current-tracks/audio/title", MPV_FORMAT_STRING );
 
 	p_mpv_observe_property( g_mpv, e_mpv_cmd_observe, "track-list/count", MPV_FORMAT_INT64 );
+
+	// When normal mpv events are available.
+	p_mpv_set_wakeup_callback( g_mpv, on_mpv_events, nullptr );
 
 	// let mpv finish startup
 	// mpv_handle_wait_event( g_mpv, 0.1 );
@@ -769,7 +741,12 @@ void mpv_update( mpv_data_t& data )
 		if ( mpv_event->event_id == MPV_EVENT_NONE )
 			return;
 
-		if ( mpv_event->event_id == MPV_EVENT_PROPERTY_CHANGE )
+		if ( mpv_event->event_id == MPV_EVENT_LOG_MESSAGE )
+		{
+			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)mpv_event->data;
+			printf( "MPV: [%s] %s: %s", msg->prefix, msg->level, msg->text );
+		}
+		else if ( mpv_event->event_id == MPV_EVENT_PROPERTY_CHANGE )
 		{
 			struct mpv_event_property* property = (struct mpv_event_property*)mpv_event->data;
 

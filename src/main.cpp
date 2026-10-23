@@ -606,6 +606,9 @@ void handle_user_event( SDL_Event& event, bool in_main_thread )
 
 		case e_user_event_job_finish:
 		{
+			if ( !in_main_thread )
+				return;
+
 			auto status = static_cast< job_status_t* >( event.user.data1 );
 
 			if ( !status )
@@ -629,11 +632,25 @@ void handle_user_event( SDL_Event& event, bool in_main_thread )
 
 		case e_user_event_mpv_event:
 		{
+			if ( in_main_thread )
+			{
+				mpv_sdl_event( event );
+				break;
+			}
+
+			if ( app::window_resized || app::in_window_drag )
+			{
+				mpv_sdl_event( event );
+			}
+			
 			break;
 		}
-
 		case e_user_event_mpv_render:
 		{
+			//if ( !in_main_thread )
+			//	break;
+
+			mpv_sdl_event( event );
 			break;
 		}
 	}
@@ -686,7 +703,7 @@ bool sdl_window_resize_watcher( void* userdata, SDL_Event* event )
 		}
 
 		case SDL_EVENT_USER:
-			// handle_user_event( *event, false );
+			handle_user_event( *event, false );
 			break;
 
 		default:
@@ -1153,7 +1170,7 @@ void main_loop()
 
 		// -----------------------------------------------------------------------------------
 		
-		mpv_update();
+		//mpv_update();
 
 		u32 draw_frame_count = app::draw_frame_count;
 
