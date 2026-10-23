@@ -898,9 +898,15 @@ void gallery_view_handle_context_menu()
 			// Open folder and select files
 			std::vector< fs::path > paths;
 			fs::path                base_path = directory::path;
+			fs::path                parent_path{};
 
+			// if in recursive search, use the directory of the last selected file
 			if ( directory::recursive )
-				base_path = media_entry.file.path.parent_path();
+			{
+				parent_path = media_entry.file.path.parent_path();
+				if ( !parent_path.empty() )
+					base_path /= parent_path;
+			}
 
 			for ( selection_t& selection : gallery::selection )
 			{
@@ -910,7 +916,7 @@ void gallery_view_handle_context_menu()
 					fs::path::string_type path_str        = selection.entry.file.path.native();
 					fs::path::string_type path_parent_str = selection.entry.file.path.parent_path().native();
 
-					if ( base_path == path_parent_str )
+					if ( parent_path == path_parent_str )
 						paths.push_back( directory::path / selection.entry.file.path );
 				}
 				else
