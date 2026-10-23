@@ -964,37 +964,6 @@ void mpv_handle_wait_event( mpv_handle* mpv, double timeout, const char* prefix 
 }
 
 
-void mpv_handle_wait_event_2( mpv_handle* mpv, double timeout, const char* prefix )
-{
-	if ( !mpv )
-		return;
-
-	mpv_event* event = p_mpv_wait_event( mpv, timeout );
-
-	if ( !event )
-		return;
-
-	while ( event->event_id != MPV_EVENT_NONE )
-	{
-		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
-		{
-			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
-
-			if ( prefix )
-			{
-				printf( "%s: [%s] %s: %s", prefix, msg->prefix, msg->level, msg->text );
-			}
-			else
-			{
-				printf( "MPV: [%s] %s: %s", msg->prefix, msg->level, msg->text );
-			}
-		}
-
-		event = p_mpv_wait_event( mpv, timeout );
-	}
-}
-
-
 // ----------------------------------------------------
 
 

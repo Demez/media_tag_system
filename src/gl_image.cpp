@@ -8,11 +8,6 @@ void gl_check_error();
 // Palette Creation
 
 
-void render_upload_palette( image_palette_t& palette, uploaded_textures_t& textures, u32 frame )
-{
-}
-
-
 void render_upload_palette( GLuint& palette_texture, GLuint& palette_trans, image_palette_t& palette )
 {
 	palette_trans = palette.trans_index;

@@ -36,9 +36,6 @@ struct job_status_t
 };
 
 
-extern SDL_Event g_event_job_finish;
-
-
 job_status_t*    job_push( job_finish_t* finish_callback, job_function_t* function, job_function_t* free_func, void* userdata );
 
 // call this when finished doing work

@@ -74,6 +74,7 @@ namespace directory
 
 // =================================================================================
 
+
 bool                         g_gallery_view = false;
 std::vector< fs::path >      g_drag_drop_files;
 
@@ -87,10 +88,12 @@ bool                         g_in_draw = false;
 folder_scan_status_t*        g_main_dir_scan_status = nullptr;
 
 bool                         g_mpv_resume_on_focus  = false;
+u32                          g_user_event           = 0;
 
 void                         frame_draw_start();
 void                         frame_draw_end();
 void                         window_quick_draw();
+
 
 // =================================================================================
 
@@ -144,8 +147,20 @@ void set_frame_draw( u32 count )
 }
 
 
-static bool      g_pushed_draw_event = false;
-static SDL_Event g_event_draw{};
+void send_user_event( e_user_event event, void* data1, void* data2 )
+{
+	SDL_Event sdl_event{};
+	sdl_event.type       = SDL_EVENT_USER;
+	sdl_event.user.code  = event;
+	sdl_event.user.data1 = data1;
+	sdl_event.user.data2 = data2;
+
+	if ( !SDL_PushEvent( &sdl_event ) )
+		printf( "FAILED TO PUSH USER EVENT\n" );
+}
+
+
+static bool g_pushed_draw_event = false;
 
 
 void send_frame_draw_event()
@@ -153,9 +168,7 @@ void send_frame_draw_event()
 	if ( g_pushed_draw_event )
 		return;
 
-	if ( !SDL_PushEvent( &g_event_draw ) )
-		printf( "FAILED TO PUSH DRAW EVENT\n" );
-
+	send_user_event( e_user_event_draw, nullptr, nullptr );
 	set_frame_draw();
 }
 
@@ -586,30 +599,43 @@ void handle_user_event( SDL_Event& event, bool in_main_thread )
 {
 	set_frame_draw();
 
-	// just a draw event, something finished
-	if ( event.user.code == g_event_draw.user.code )
+	switch ( event.user.code )
 	{
-		return;
-	}
-	else if ( event.user.code == g_event_job_finish.user.code )
-	{
-		auto status = static_cast< job_status_t* >( event.user.data1 );
-
-		if ( !status )
+		case e_user_event_draw:
 			return;
 
-		//printf( "JOB FINISH EVENT - %p\n", status );
-
-		if ( !status->cancel )
+		case e_user_event_job_finish:
 		{
-			if ( status->callback )
-				status->callback( status, in_main_thread );
-			else
-				printf( "JOB DOES NOT HAVE CALLBACK?\n" );
+			auto status = static_cast< job_status_t* >( event.user.data1 );
+
+			if ( !status )
+				return;
+
+			//printf( "JOB FINISH EVENT - %p\n", status );
+
+			if ( !status->cancel )
+			{
+				if ( status->callback )
+					status->callback( status, in_main_thread );
+				else
+					printf( "JOB DOES NOT HAVE CALLBACK?\n" );
+			}
+
+			if ( in_main_thread )
+				job_free( status );
+
+			break;
 		}
 
-		if ( in_main_thread )
-			job_free( status );
+		case e_user_event_mpv_event:
+		{
+			break;
+		}
+
+		case e_user_event_mpv_render:
+		{
+			break;
+		}
 	}
 }
 
@@ -1426,8 +1452,7 @@ int startup()
 		printf( "Failed to add SDL Event Watch\n" );
 	}
 	
-	g_event_draw.type      = SDL_EVENT_USER;
-	g_event_draw.user.code = SDL_RegisterEvents( 1 );
+	g_user_event = SDL_RegisterEvents( 1 );
 
 	SDL_ShowWindow( app::window );
 

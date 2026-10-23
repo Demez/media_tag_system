@@ -22,6 +22,17 @@
 // ---------------------------------------------------------
 
 
+enum e_user_event : u8
+{
+	e_user_event_draw,
+	e_user_event_job_finish,
+	e_user_event_mpv_event,
+	e_user_event_mpv_render,
+
+	e_user_event_count,
+};
+
+
 enum e_shader : u8
 {
 	e_shader_main,
@@ -397,6 +408,7 @@ extern main_image_data_t             g_image_scaled_data;
 
 #define GL_DBG_NAME( str ) sizeof( str ), str
 
+void                                 send_user_event( e_user_event event, void* data1, void* data2 );
 void                                 set_frame_draw( u32 count = 1 );
 void                                 send_frame_draw_event();
 void                                 update_dpi( float dpi_override = 0.f );

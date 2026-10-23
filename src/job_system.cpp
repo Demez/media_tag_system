@@ -20,8 +20,6 @@ static std::mutex                          g_job_lock;
 
 static std::unordered_set< job_status_t* > g_job_free_queue;
 
-SDL_Event                                  g_event_job_finish{};
-
 
 bool job_check_cancel_and_free( job_status_t* status )
 {
@@ -80,12 +78,7 @@ void job_worker( u32 thread )
 		//if ( job_check_cancel_and_free( status ) )
 		//	continue;
 
-		// base event
-		SDL_Event event  = g_event_job_finish;
-		event.user.data1 = status;
-
-		SDL_PushEvent( &event );
-
+		send_user_event( e_user_event_job_finish, status, nullptr );
 		status->finished = true;
 	}
 }
@@ -103,9 +96,6 @@ bool job_init()
 	{
 		g_job_threads[ i ] = new std::thread( job_worker, i );
 	}
-
-	g_event_job_finish.type      = SDL_EVENT_USER;
-	g_event_job_finish.user.code = SDL_RegisterEvents( 1 );
 
 	return true;
 }
