@@ -13,6 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <ftw.h>
+#include <spawn.h>
 
 
 static char*  g_exe_path       = nullptr;
@@ -195,11 +196,18 @@ const fs::path_char* sys_get_exe_folder_native_char()
 	return static_cast< fs::path_char* >( g_exe_folder );
 }
 
+
 const char* sys_get_exe_path( size_t* len )
 {
 	if ( len )
 		*len = g_exe_path_len;
 
+	return g_exe_path;
+}
+
+
+const fs::path_char* sys_get_exe_path_native_char()
+{
 	return g_exe_path;
 }
 
@@ -428,7 +436,7 @@ bool sys_recycle_file( const char* path )
 	{
 		char buffer[ 1024 ]{};
 		snprintf( buffer, 1024, "gio trash %s", path );
-		sys_execute( buffer );
+		sys_execute_wait( buffer );
 		return true;
 	}
 
@@ -483,24 +491,24 @@ void sys_browse_to_path( const fs::path& path )
 		return;
 
 	// Check if we have xdg-open
-	int xdg_check = sys_execute( "xdg-open" );
+	int xdg_check = sys_execute_wait( "xdg-open" );
 
 	if ( xdg_check == 0 )
 	{
 		char buffer[ 1024 ]{};
 		snprintf( buffer, 1024, "xdg-open %s", path.c_str() );
-		sys_execute( buffer );
+		sys_execute_wait( buffer );
 		return;
 	}
 
 	// Check if we have gio
-	int gio_check = sys_execute( "gio" );
+	int gio_check = sys_execute_wait( "gio" );
 
 	if ( gio_check == 0 )
 	{
 		char buffer[ 1024 ]{};
 		snprintf( buffer, 1024, "gio open %s", path.c_str() );
-		sys_execute( buffer );
+		sys_execute_wait( buffer );
 		return;
 	}
 
@@ -548,8 +556,16 @@ bool sys_execute_read_callback( const char* command, std::string& output, f_exec
 }
 
 
-int sys_execute( const char* command )
+int sys_execute_wait( const char* command )
 {
+	return std::system( command );
+}
+
+
+// https://stackoverflow.com/a/5884588
+bool sys_execute( const char* command )
+{
+	// posix_spawn()
 	return std::system( command );
 }
 

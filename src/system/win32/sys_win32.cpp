@@ -569,15 +569,12 @@ bool sys_execute_read_callback( const char* command, std::string& output, f_exec
 }
 
 
-int sys_execute( const char* command )
+int sys_execute_wait( const fs::path_char* command )
 {
-	PROCESS_INFORMATION pi        = { 0 };
-	wchar_t*            command_w = sys_to_wchar( command );
-	STARTUPINFOW        si        = { sizeof( STARTUPINFOW ) };
+	PROCESS_INFORMATION pi      = { 0 };
+	STARTUPINFOW        si      = { sizeof( STARTUPINFOW ) };
 
-	BOOL                success   = CreateProcessW( NULL, command_w, NULL, NULL, TRUE, BELOW_NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi );
-
-	ch_free_str( command_w );
+	BOOL                success = CreateProcessW( NULL, const_cast< wchar_t* >( command ), NULL, NULL, TRUE, BELOW_NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi );
 
 	if ( !success )
 	{
@@ -594,6 +591,23 @@ int sys_execute( const char* command )
 	CloseHandle( pi.hThread );
 
 	return (int)exit_code;
+}
+
+
+bool sys_execute( const fs::path_char* command )
+{
+	PROCESS_INFORMATION pi      = { 0 };
+	STARTUPINFOW        si      = { sizeof( STARTUPINFOW ) };
+
+	BOOL                success = CreateProcessW( NULL, const_cast< wchar_t* >( command ), NULL, NULL, TRUE, BELOW_NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi );
+
+	if ( !success )
+	{
+		sys_print_last_error();
+		return false;
+	}
+
+	return true;
 }
 
 

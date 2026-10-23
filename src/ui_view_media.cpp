@@ -1088,6 +1088,11 @@ void media_view_context_menu()
 
 	if ( ImGui::BeginMenu( "Open With" ) )
 	{
+		if ( ImGui::MenuItem( "Open in New Window" ) )
+		{
+			util_open_in_new_window( gallery_item_get_path( g_image_data.index ).c_str() );
+		}
+
 		// TODO: list programs to open the file with, like fragment image viewer
 		// how would this work on linux actually? hmm
 		ImGui::MenuItem( "nothing lol", nullptr, false, false );

@@ -537,6 +537,7 @@ void  util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool ap
 
 bool  util_mouse_hovering_imgui_window();
 void  util_imgui_set_tooltip( const char* value );
+void  util_open_in_new_window( const fs::path_char* path );
 
 
 template< typename CHAR >

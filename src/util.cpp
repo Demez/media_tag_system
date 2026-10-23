@@ -232,3 +232,14 @@ void util_format_date_time( char* buffer, size_t buffer_size, u64 time, bool app
 	buffer[ buffer_size - 1 ] = '0';
 }
 
+
+void util_open_in_new_window( const fs::path_char* path )
+{
+	fs::path_str command = sys_get_exe_path_native_char();
+	command += PATH_FMT( " \"" );
+	command += path;
+	command += PATH_FMT( "\"" );
+
+	int ret = sys_execute( command.c_str() );
+}
+

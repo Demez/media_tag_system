@@ -931,6 +931,22 @@ void gallery_view_handle_context_menu()
 
 	if ( ImGui::BeginMenu( "Open With" ) )
 	{
+		if ( ImGui::MenuItem( "Open in New Window" ) )
+		{
+			if ( folder )
+			{
+				// Open folder
+				util_open_in_new_window( directory::path.c_str() );
+			}
+			else
+			{
+				const fs::path& path = gallery_view_get_last_selected_entry().file.path;
+				fs::path        full_path = directory::path / path;
+
+				util_open_in_new_window( full_path.c_str() );
+			}
+		}
+
 		// TODO: list programs to open the file with, like fragment image viewer
 		// how would this work on linux actually? hmm
 		ImGui::MenuItem( "nothing lol", nullptr, false, false );

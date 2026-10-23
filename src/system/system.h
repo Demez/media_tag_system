@@ -216,6 +216,7 @@ const fs::path_char*    sys_get_exe_folder_native_char();
 // get the full path of the exe
 // pass in a ref to a size_t to get the length of the path
 const char*             sys_get_exe_path( size_t* len = nullptr );
+const fs::path_char*    sys_get_exe_path_native_char();
 
 // get current working directory
 char*                   sys_get_cwd();
@@ -261,8 +262,11 @@ bool                    sys_execute_read( const char* command, std::string& outp
 // execute a command and read it's output, with a callback function everytime more output is read from the file
 bool                    sys_execute_read_callback( const char* command, std::string& output, f_exec_callback* p_exec_callback );
 
-// execute a command and return the commands return value
-int                     sys_execute( const char* command );
+// execute a command, waits for it to exit, and return the commands return value
+int                     sys_execute_wait( const fs::path_char* command );
+
+// execute a command, returns true or false if it executed correctly
+bool                    sys_execute( const fs::path_char* command );
 
 // --------------------------------------------------------------------------------------------------------
 // Drag and Drop Interface

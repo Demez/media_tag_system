@@ -357,6 +357,12 @@ const char* sys_get_exe_path( size_t* len )
 }
 
 
+const fs::path_char* sys_get_exe_path_native_char()
+{
+	return g_exe_path_w;
+}
+
+
 char* sys_get_cwd()
 {
 	return _getcwd( 0, 0 );
