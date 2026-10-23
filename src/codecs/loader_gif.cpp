@@ -90,12 +90,12 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 	image_frame_t& frame = image->frame[ frame_i ];
 	image_reset_frame_data( frame );
 
-	frame.time           = static_cast< float >( gif_whdr->time ) * 0.01;
+	frame.time   = static_cast< float >( gif_whdr->time ) * 0.01;
 
-	frame.pos_x          = gif_whdr->frxo;
-	frame.pos_y          = gif_whdr->fryo;
-	frame.width          = gif_whdr->frxd;
-	frame.height         = gif_whdr->fryd;
+	frame.pos_x  = gif_whdr->frxo;
+	frame.pos_y  = gif_whdr->fryo;
+	frame.width  = gif_whdr->frxd;
+	frame.height = gif_whdr->fryd;
 
 	switch ( gif_whdr->mode )
 	{

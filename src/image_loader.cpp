@@ -161,7 +161,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 	if ( !loaded_image )
 	{
-		printf( "*** Faling to backup codec\n" );
+		printf( "*** Falling to backup codec\n" );
 
 		for ( IImageLoader* _loader : g_codecs_backup )
 		{

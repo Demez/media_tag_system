@@ -23,7 +23,8 @@ void render_upload_palette( GLuint& palette_texture, GLuint& palette_trans, imag
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 
-	glTexImage1D( GL_TEXTURE_1D, 0, GL_RGBA8, palette.count, 0, GL_RGBA, GL_UNSIGNED_BYTE, palette.elem );
+	//glTexImage1D( GL_TEXTURE_1D, 0, GL_RGBA8, palette.count, 0, GL_RGBA, GL_UNSIGNED_BYTE, palette.elem );
+	glTexImage1D( GL_TEXTURE_1D, 0, GL_RGBA8UI, palette.count, 0, GL_RGBA_INTEGER, GL_UNSIGNED_BYTE, palette.elem );
 
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
@@ -133,45 +134,83 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 		glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 	}
 
+	GLint  internal_format = image->format;
+	GLint  format          = image->format;
+	GLenum type            = GL_UNSIGNED_BYTE;
+
+	bool   use_unsigned    = image->flags & e_image_flag_has_palette || image->flags & e_image_flag_has_local_palettes;
+
 	// GL_RGB  - 6407
 	// GL_RGBA - 6408
 
-	if ( image->format == GL_RGBA16 )
+	switch ( image->format )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA16, width, height, 0, GL_RGBA, GL_UNSIGNED_SHORT, (u16*)image->frame[ frame_i ].data );
+		default:
+			break;
+
+		case GL_RGBA16:
+			internal_format = format = GL_RGBA16;
+			break;
+
+		case GL_R16UI:
+			internal_format = GL_RGB16;
+			format          = GL_RED;
+			break;
+
+		case GL_R16I:
+			internal_format = GL_RGB16;
+			format          = GL_RED;
+			break;
+
+		case GL_RGB32F:
+			internal_format = GL_RGB32F;
+			format          = GL_RGB;
+			break;
+
+		case GL_RGBA32F:
+			internal_format = GL_RGBA32F;
+			format          = GL_RGBA;
+			break;
+
+		case GL_R8:
+		{
+			if ( use_unsigned )
+			{
+				internal_format = GL_R8UI;
+				format = GL_RED_INTEGER;
+			}
+			else
+			{
+				internal_format = GL_R8;
+				format          = GL_RED;
+			}
+
+			break;
+		}
 	}
-	else if ( image->format == GL_R16UI )
+
+	switch ( image->format )
 	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, width, height, 0, GL_ALPHA, GL_UNSIGNED_SHORT, (u16*)image->frame[ frame_i ].data );
+		default:
+			type = GL_UNSIGNED_BYTE;
+			break;
+
+		case GL_RGBA16:
+		case GL_R16UI:
+			type = GL_UNSIGNED_SHORT;
+			break;
+
+		case GL_R16I:
+			type = GL_SHORT;
+			break;
+
+		case GL_RGB32F:
+		case GL_RGBA32F:
+			type = GL_FLOAT;
+			break;
 	}
-	else if ( image->format == GL_R16I )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB16, width, height, 0, GL_ALPHA, GL_SHORT, (s16*)image->frame[ frame_i ].data );
-	}
-	else if ( image->format == GL_R8 )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
-	}
-	else if ( image->format == GL_RGB32F )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image->frame[ frame_i ].data );
-	}
-	else if ( image->format == GL_RGBA32F )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, image->frame[ frame_i ].data );
-	}
-	else if ( image->format == GL_RGBA )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
-	}
-	else if ( image->format == GL_RGB )
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
-	}
-	else
-	{
-		glTexImage2D( GL_TEXTURE_2D, 0, image->format, width, height, 0, image->format, GL_UNSIGNED_BYTE, image->frame[ frame_i ].data );
-	}
+
+	glTexImage2D( GL_TEXTURE_2D, 0, internal_format, width, height, 0, format, type, image->frame[ frame_i ].data );
 
 	auto err = glGetError();
 
