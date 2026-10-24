@@ -2238,6 +2238,7 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 
 bool media_view_draw_load_status( int width, int height )
 {
+#if 0
 	//if ( g_media_load_status )
 	if ( g_media_load_start_time > 0 )
 	{
@@ -2250,6 +2251,7 @@ bool media_view_draw_load_status( int width, int height )
 			return true;
 		}
 	}
+#endif
 
 	// if ( g_image_data.index == UINT32_MAX || g_image_data.textures.frame == nullptr )
 	if ( g_media_load_from_gallery )
