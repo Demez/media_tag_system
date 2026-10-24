@@ -194,7 +194,63 @@ struct image_frame_t
 	~image_frame_t()
 	{
 		ch_free( e_mem_category_image_data, data );
-		data = nullptr;
+		ch_free( e_mem_category_image_data, palette.elem );
+	}
+
+	// copying
+	void assign( const image_frame_t& other ) noexcept
+	{
+		data       = other.data;
+		width      = other.width;
+		height     = other.height;
+		pos_x      = other.pos_x;
+		pos_y      = other.pos_y;
+		time       = other.time;
+		size       = other.size;
+		palette    = other.palette;
+	}
+
+	// moving
+	void assign( image_frame_t&& other ) noexcept
+	{
+		palette            = std::move( other.palette );
+
+		data               = other.data;
+		width              = other.width;
+		height             = other.height;
+		pos_x              = other.pos_x;
+		pos_y              = other.pos_y;
+		time               = other.time;
+		size               = other.size;
+
+		other.data         = nullptr;
+		other.palette.elem = nullptr;
+	}
+
+	image_frame_t& operator=( image_frame_t&& other ) noexcept
+	{
+		assign( other );
+		return *this;
+	}
+
+	// moving
+	image_frame_t( image_frame_t&& other ) noexcept
+	{
+		assign( std::move( other ) );
+	}
+
+	//private:
+	// copying
+	image_frame_t& operator=( const image_frame_t& other ) noexcept
+	{
+		assign( other );
+		return *this;
+	}
+
+	// copying
+	image_frame_t( const image_frame_t& other ) noexcept
+	{
+		assign( other );
 	}
 };
 

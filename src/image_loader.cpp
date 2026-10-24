@@ -255,11 +255,8 @@ void image_free( image_t*& image )
 	if ( !image )
 		return;
 
-	image_reset_data( *image );
-	image_free_alloc( *image );
-
+	image_free_data( *image );
 	image->~image_t();
-
 	ch_free( e_mem_category_image, image );
 }
 
@@ -324,9 +321,16 @@ void image_copy_all( image_t& src, image_t& dst, size_t frame_count = 0 )
 // all of this should be ref counted probably, ugh
 void image_copy_palette( image_palette_t& src, image_palette_t& dst )
 {
-	dst.count        = src.count;
-	dst.trans_index  = src.trans_index;
-	dst.elem         = ch_calloc< image_palette_elem_t >( src.count, e_mem_category_image_data );
+	dst.count       = src.count;
+	dst.trans_index = src.trans_index;
+
+	if ( src.count == 0 )
+	{
+		dst.elem = nullptr;
+		return;
+	}
+
+	dst.elem = ch_calloc< image_palette_elem_t >( src.count, e_mem_category_image_data );
 
 	for ( u32 i = 0; i < src.count; i++ )
 	{
@@ -345,7 +349,8 @@ void image_copy_data( image_t& src, image_t& dst )
 	dst.channels     = src.channels;
 	dst.format       = src.format;
 	dst.loop_count   = src.loop_count;
-	dst.image_format = src.image_format;
+	dst.flags        = src.flags;
+	// dst.image_format = src.image_format;
 
 	image_copy_palette( src.palette, dst.palette );
 }
@@ -650,11 +655,17 @@ image_t* icon_get_image( e_icon icon_type )
 }
 
 
-ImTextureRef icon_get_imtexture( e_icon icon_type )
+GLuint icon_get_texture( e_icon icon_type )
 {
 	if ( icon_type >= e_icon_count )
-		return static_cast< ImTextureRef >( g_icon_texture[ e_icon_invalid ] );
+		return g_icon_texture[ e_icon_invalid ];
 
-	return static_cast< ImTextureRef >( g_icon_texture[ icon_type ] );
+	return g_icon_texture[ icon_type ];
+}
+
+
+ImTextureRef icon_get_imtexture( e_icon icon_type )
+{
+	return static_cast< ImTextureRef >( icon_get_texture( icon_type ) );
 }
 

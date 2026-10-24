@@ -405,6 +405,13 @@ extern bool                          g_mpv_video_ready;
 // Main Image
 extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
+extern u64                           g_media_load_start_time;
+extern u32                           g_media_load_index;  // index of file currently loading
+extern bool                          g_media_load_from_gallery;  // are we loading a file selected from the gallery?
+
+// TODO: put these in the config
+constexpr u64                        SCALE_WAIT_TIME      = 100;  // in ms
+constexpr u64                        IMAGE_LOAD_WAIT_TIME = 150;
 
 #define GL_DBG_NAME( str ) sizeof( str ), str
 
@@ -431,7 +438,8 @@ void                                 media_view_update();
 e_media_type                         get_media_type();
 
 // Load currently selected file, does not change view type though
-void                                 media_view_load();
+void                                 media_view_load( u32 index );
+void                                 media_load_on_finish();
 void                                 media_view_input();
 void                                 media_view_draw_imgui();
 void                                 media_view_draw();
@@ -496,6 +504,7 @@ bool                                 delete_file_window( size_t count );
 bool                                 icon_preload();
 void                                 icon_free();
 image_t*                             icon_get_image( e_icon icon_type );
+GLuint                               icon_get_texture( e_icon icon_type );
 ImTextureRef                         icon_get_imtexture( e_icon icon_type );
 
 // GLuint                               gl_upload_texture( image_t* image );

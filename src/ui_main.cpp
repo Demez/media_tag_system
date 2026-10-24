@@ -190,10 +190,18 @@ void view_type_toggle()
 }
 
 
+extern job_status_t* g_media_load_status ;
+
+
 void set_view_type_gallery()
 {
 	if ( g_gallery_view )
 		return;
+
+	if ( g_media_load_start_time > 0 )
+	{
+		return;
+	}
 
 	// pause video if playing one back
 	if ( mpv_get_current_video() )
@@ -231,8 +239,11 @@ void set_view_type_media( bool force_load_media )
 
 	if ( reload_image )
 	{
-		g_image_data.index = selected;
-		media_view_load();
+		if ( g_image_data.index != selected )
+			g_media_load_from_gallery = true;
+		//	g_image_data.index = UINT32_MAX;
+
+		media_view_load( selected );
 	}
 
 	if ( g_mpv_resume_on_focus )

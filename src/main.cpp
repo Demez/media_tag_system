@@ -81,6 +81,9 @@ std::vector< fs::path >      g_drag_drop_files;
 // Main Image
 main_image_data_t            g_image_data;
 main_image_data_t            g_image_scaled_data;
+u64                          g_media_load_start_time   = 0;
+u32                          g_media_load_index        = UINT32_MAX;
+bool                         g_media_load_from_gallery = false;
 
 SDL_GLContext                g_gl_context;
 bool                         g_in_draw = false;
@@ -900,11 +903,32 @@ bool handle_events()
 	if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
 		need_draw = false;
 
+	static u64 last_image_load_start_time = g_media_load_start_time;
+
 	// if there is NOTHING to do, then wait forever until we have a new event, uses basically nothing for cpu usage this way
 	if ( max_events == 0 && !need_draw )
 	{
+		s32 timeout = INT32_MAX;
+
+		if ( g_media_load_start_time > 0 && last_image_load_start_time != g_media_load_start_time )
+		{
+			u64 end_time = g_media_load_start_time + IMAGE_LOAD_WAIT_TIME;
+			u64 cur_time = sys_get_time_ms();
+
+			if ( end_time > cur_time )
+			{
+				timeout = static_cast< s32 >( end_time - cur_time );
+			}
+			else
+			{
+				timeout = 0;
+				set_frame_draw( 2 );
+				last_image_load_start_time = g_media_load_start_time;
+			}
+		}
+
 		//printf( "WAITING %zu\n", app::total_time );
-		if ( SDL_WaitEvent( &event ) )
+		if ( SDL_WaitEventTimeout( &event, timeout ) )
 		{
 			//printf( "END WAITING %zu\n", app::total_time );
 			if ( handle_event( event ) )

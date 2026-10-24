@@ -351,8 +351,8 @@ void mpv_draw_frame()
 	if ( !g_mpv )
 		return;
 
-	if ( !g_mpv_data.loaded_file )
-		return;
+//	if ( !g_mpv_data.loaded_file )
+//		return;
 
 	mpv_update_frame();
 
@@ -849,6 +849,9 @@ void mpv_update( mpv_data_t& data )
 
 			// this may be called on new video creation to set to specific time
 			// p_mpv_set_option_string( data.mpv, "start", "0" );
+
+			if ( g_media_load_index < UINT32_MAX )
+				media_load_on_finish();
 
 			send_frame_draw_event();
 		}

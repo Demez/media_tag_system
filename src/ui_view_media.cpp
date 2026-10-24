@@ -85,8 +85,6 @@ static_assert( ARR_SIZE( g_scale_state_str ) == e_scale_state_count );
 
 
 // TODO: put these in the config
-// constexpr float                     SCALE_WAIT_TIME = 0.1f;
-constexpr u32              SCALE_WAIT_TIME = 100;  // in ms
 constexpr float            UPSCALE_LIMIT   = 2.f;
 
 static std::thread*        g_scale_thread;
@@ -113,7 +111,7 @@ timer_wait:
 
 	if ( cur_time < g_scale_time )
 	{
-		u32 diff = static_cast< u32 >( g_scale_time - cur_time );
+		u64 diff = g_scale_time - cur_time;
 		g_scale_lock.unlock();
 		//printf( "SCALE WAIT %d\n", ++recheck_time );
 
@@ -144,7 +142,7 @@ void media_view_scale_thread_run()
 		g_scale_lock.lock();
 
 		// don't scale animated images
-		if ( g_scale_src.frame.size() > 1 )
+		if ( g_scale_src.frame.size() != 1 )
 		{
 			g_scale_state = e_scale_state_idle;
 			g_scale_signal.store( false );
@@ -1225,8 +1223,7 @@ void media_view_input()
 		if ( g_image_scaled_data.index == g_image_data.index )
 		{
 			gl_update_textures( g_image_scaled_data.textures, &g_image_scaled_data.image, 1 );
-			printf( "Scaled Main Image\n" );
-			g_scale_state   = e_scale_state_finished;
+			g_scale_state = e_scale_state_finished;
 			set_frame_draw();
 
 		}
@@ -1407,78 +1404,176 @@ void media_view_window_resize()
 }
 
 
-void media_view_load()
+job_status_t* g_media_load_status = nullptr;
+
+
+struct media_load_data_t
 {
-	image_reset_data( g_image_data.image );
-	image_reset_data( g_image_scaled_data.image );
+	double            load_time      = 0.0;
+	bool              image_load_ret = false;
+	u32               file_index     = 0;
+	fs::path_str      full_path{};
+	media_entry_t     entry{};
+	image_load_info_t load_info{};
+};
 
-	if ( gallery::sorted_media.empty() )
-		return;
 
-	if ( g_image_data.index >= gallery::sorted_media.size() )
-		return;
+void media_load_on_finish()
+{
+	g_image_data.index        = g_media_load_index;
+	g_media_load_start_time   = 0;
+	g_media_load_index        = UINT32_MAX;
+	g_media_load_from_gallery = false;
 
-	double            load_time = 0.0;
-	media_entry_t     entry     = gallery_item_get_media_entry( g_image_data.index );
-	fs::path          full_path = directory::path / entry.file.path;
-	std::string       path_str  = sys_path_to_string( full_path );
+	gallery_view_set_selection( g_image_data.index );
 
-	image_load_info_t image_load_info{};
-	image_load_info.image = &g_image_data.image;
-
-	u64 start_time = sys_get_time_ms();
-
-	if ( entry.type == e_media_type_image )
-	{
-		mpv_cmd_close_video();
-		image_load( full_path, image_load_info );
-	}
-	else
+	if ( get_media_type() == e_media_type_video )
 	{
 		image_free_data( g_image_data.image );
-		mpv_cmd_loadfile( path_str.c_str() );
+		image_free_data( g_image_scaled_data.image );
 	}
-		
-	media_history_add( path_str );
+}
 
-	auto current_time = sys_get_time_ms();
-	load_time         = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
+
+void media_load_job_finish( job_status_t* status, bool in_main_thread )
+{
+	g_media_load_status     = nullptr;
+
+	set_frame_draw();
+
+	auto load_data     = static_cast< media_load_data_t* >( status->userdata );
+
+	// g_image_data.index = load_data->file_index;
+	// gallery_view_set_selection( g_image_data.index );
+
+	path_printf( "%f Load - %s\n", load_data->load_time, load_data->full_path.c_str() );
 
 	// auto startTime       = std::chrono::high_resolution_clock::now();
 
-	if ( entry.type == e_media_type_image )
+	if ( load_data->entry.type == e_media_type_image )
 	{
-		if ( image_load_info.image->frame.size() > 0 )
+		media_load_on_finish();
+		mpv_cmd_close_video();
+
+		if ( !load_data->image_load_ret )
+		{
+			path_printf( "%f FAILED Load - %s\n", load_data->load_time, load_data->full_path.c_str() );
+			gl_free_textures( g_image_data.textures );
+			return;
+		}
+
+		// wait for any image scale to finish before freeing this data
+		g_scale_lock.lock();
+
+		media_view_scale_reset_timer();
+		g_scale_time = UINT64_MAX;
+
+		image_free_data( g_image_data.image );
+		image_free_data( g_scale_src );
+		image_free_data( g_image_scaled_data.image );
+
+		g_scale_lock.unlock();
+
+		image_copy_data( *load_data->load_info.image, g_image_data.image );
+
+		g_image_data.image.frame.resize( load_data->load_info.image->frame.size() );
+
+		for ( size_t i = 0; i < g_image_data.image.frame.size(); i++ )
+		{
+			image_copy_frame_data( load_data->load_info.image->frame[ i ], g_image_data.image.frame[ i ] );
+			g_image_data.image.frame[ i ].data = load_data->load_info.image->frame[ i ].data;
+			g_image_data.image.frame[ i ].size = load_data->load_info.image->frame[ i ].size;
+
+			// clear the pointer
+			load_data->load_info.image->frame[ i ].data         = nullptr;
+			load_data->load_info.image->frame[ i ].palette.elem = nullptr;
+		}
+
+		// free the original image data
+		image_free( load_data->load_info.image );
+
+		if ( g_image_data.image.frame.size() > 0 )
 		{
 			gl_update_textures( g_image_data.textures, &g_image_data.image, g_image_data.image.frame.size() );
 			media_view_fit_in_view();
 
 			image_draw::frame = 0;
 			media_view_frame_update_timer();
+
+			if ( g_image_data.image.frame.size() > 1 )
+				media_view_create_animated_image_fbo();
 		}
-		else
-		{
-			path_printf( "%f FAILED Load - %s\n", load_time, full_path.c_str() );
-			image_free_data( g_image_data.image );
-			gl_free_textures( g_image_data.textures );
-		}
+	}
+	else if ( load_data->entry.type == e_media_type_video )
+	{
+	//	image_free_data( g_image_data.image );
+	//	image_free_data( g_image_scaled_data.image );
 	}
 
 	// auto  currentTime    = std::chrono::high_resolution_clock::now();
 	// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
 	//printf( "%f Load - %f Up - %s\n", load_time, up_time, directory::media_list[ g_folder_index ].string().c_str() );
-	path_printf( "%f Load - %s\n", load_time, full_path.c_str() );
-
-	// g_image_data.index = image_draw::media_index;
 
 	update_window_title();
-	
+
 	media_view_scale_reset_timer();
 	media_view_scale_set_image();
+}
 
-	media_view_create_animated_image_fbo();
 
-	set_frame_draw();
+void media_load_job_run( job_status_t* status )
+{
+	auto load_data  = static_cast< media_load_data_t* >( status->userdata );
+	u64  start_time = sys_get_time_ms();
+
+	// TODO: what if this is not an image and a video?
+	// we need to correct the media type
+
+	if ( load_data->entry.type == e_media_type_image )
+	{
+		load_data->image_load_ret = image_load( load_data->full_path, load_data->load_info );
+	}
+	else
+	{
+		std::string path_str = sys_path_to_string( load_data->full_path );
+		mpv_cmd_loadfile( path_str.c_str() );
+	}
+
+	auto current_time    = sys_get_time_ms();
+	load_data->load_time = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
+}
+
+
+void media_load_job_free( job_status_t* status )
+{
+	if ( !status )
+		return;
+
+	auto load_data = static_cast< media_load_data_t* >( status->userdata );
+	delete load_data;
+}
+
+
+void media_view_load( u32 index )
+{
+	if ( g_media_load_status || g_media_load_index != UINT32_MAX )
+		return;
+
+	if ( gallery::sorted_media.empty() )
+		return;
+
+	if ( index >= gallery::sorted_media.size() )
+		return;
+
+	g_media_load_start_time     = sys_get_time_ms();
+	g_media_load_index          = index;
+
+	auto load_data              = new media_load_data_t;
+	load_data->file_index       = index;
+	load_data->entry            = gallery_item_get_media_entry( index );
+	load_data->full_path        = directory::path / load_data->entry.file.path;
+
+	g_media_load_status         = job_push( media_load_job_finish, media_load_job_run, media_load_job_free, load_data );
 }
 
 
@@ -1487,31 +1582,28 @@ void media_view_advance( bool prev )
 	if ( gallery::sorted_media.size() <= 1 )
 		return;
 
-	if ( get_media_type() == e_media_type_video )
-		mpv_cmd_close_video();
+	u32 next_image = g_image_data.index;
 
 advance:
 	if ( prev )
 	{
-		if ( g_image_data.index == 0 )
-			g_image_data.index = gallery::sorted_media.size();
+		if ( next_image == 0 )
+			next_image = gallery::sorted_media.size();
 
-		g_image_data.index--;
+		next_image--;
 	}
 	else
 	{
-		g_image_data.index++;
+		next_image++;
 
-		if ( g_image_data.index == gallery::sorted_media.size() )
-			g_image_data.index = 0;
+		if ( next_image == gallery::sorted_media.size() )
+			next_image = 0;
 	}
 
-	gallery_view_set_selection( g_image_data.index );
-
-	if ( gallery_item_get_media_entry( g_image_data.index ).type == e_media_type_directory )
+	if ( gallery_item_get_media_entry( next_image ).type == e_media_type_directory )
 		goto advance;
 
-	media_view_load();
+	media_view_load( next_image );
 }
 
 
@@ -2034,6 +2126,34 @@ void media_view_draw_imgui()
 }
 
 
+static void media_view_draw_icon( e_icon icon_value, int window_width, int window_height, bool center = true )
+{
+	image_t*              icon = icon_get_image( icon_value );
+	render_draw_texture_t draw_info{};
+
+	if ( center )
+	{
+		draw_info.x = window_width / 2 - ( icon->width / 2 );
+		draw_info.y = window_height / 2 - ( icon->height / 2 );
+	}
+	else
+	{
+		ImGuiStyle& style = ImGui::GetStyle();
+		float       padding = ( style.WindowPadding.x + style.FramePadding.x ) * 3.f + ( style.ItemSpacing.x * 2.f ) + ImGui::GetFontSize();
+
+		draw_info.x         = window_width - ( padding + icon->width );
+		draw_info.y         = style.WindowPadding.y * 2.f + style.FramePadding.y;
+	}
+
+	draw_info.width    = icon->width;
+	draw_info.height   = icon->height;
+	draw_info.rotation = 0.f;
+	draw_info.texture  = icon_get_texture( icon_value );
+
+	render_draw_texture( draw_info );
+}
+
+
 static void media_view_draw_animated_fbo()
 {
 	render_draw_texture_t draw_info{};
@@ -2116,11 +2236,51 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 }
 
 
-static void media_view_draw_image()
+bool media_view_draw_load_status( int width, int height )
+{
+	//if ( g_media_load_status )
+	if ( g_media_load_start_time > 0 )
+	{
+		u64 cur_time = sys_get_time_ms();
+		u64 diff = cur_time - g_media_load_start_time;
+
+		if ( diff > IMAGE_LOAD_WAIT_TIME )
+		{
+			media_view_draw_icon( e_icon_loading, width, height );
+			return true;
+		}
+	}
+
+	// if ( g_image_data.index == UINT32_MAX || g_image_data.textures.frame == nullptr )
+	if ( g_media_load_from_gallery )
+	{
+		// printf( "NULLPTR IMAGE\n" );
+		if ( g_media_load_start_time > 0 )
+		{
+			media_view_draw_icon( e_icon_loading, width, height );
+		}
+		else
+		{
+			media_view_draw_icon( e_icon_invalid, width, height );
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+
+static void media_view_draw_image( int width, int height )
 {
 	if ( g_image_data.textures.frame == nullptr )
 	{
-		// printf( "NULLPTR IMAGE\n" );
+		if ( g_media_load_start_time > 0 )
+			media_view_draw_icon( e_icon_loading, width, height );
+
+		else
+			media_view_draw_icon( e_icon_invalid, width, height );
+
 		return;
 	}
 
@@ -2153,10 +2313,6 @@ static void media_view_draw_image()
 	// frame disposal seems to be how to handle THIS frame for the next frame drawn
 	// so here, the current frame will use the last frame's disposal method for how to draw it
 	// if it's keep, look for all previous frames to draw, until we hit 0 or one that's not keep
-
-	int              width, height;
-	// SDL_GetWindowSize( app::window, &width, &height );
-	SDL_GetWindowSizeInPixels( app::window, &width, &height );
 
 	if ( image_draw::frame > 0 )
 	{
@@ -2217,13 +2373,23 @@ static void media_view_draw_image()
 
 void media_view_draw()
 {
+	int width, height;
+	SDL_GetWindowSizeInPixels( app::window, &width, &height );
+
+	if ( media_view_draw_load_status( width, height ) )
+		return;
+
 	if ( get_media_type() == e_media_type_video )
 	{
 		mpv_draw_frame();
 	}
 	else
 	{
-		media_view_draw_image();
+		media_view_draw_image( width, height );
 	}
+
+	// show loading icon in corner
+	if ( g_media_load_start_time > 0 )
+		media_view_draw_icon( e_icon_loading, width, height, false );
 }
 

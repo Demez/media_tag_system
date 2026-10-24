@@ -68,6 +68,8 @@ struct scandir_status_t
 
 struct file_t
 {
+	// TODO: these string values take up 40 bytes each, why?
+	// for 200,000 files, that's 8 MB around of data!
 	fs::path    path{};
 	std::string name{};
 	u64         size         = 0;
