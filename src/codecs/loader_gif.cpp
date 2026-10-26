@@ -13,7 +13,7 @@ struct ff_gif_data_t
 {
 	image_load_info_t& load_info;
 
-	bool               incomplete_frame_count = false;
+	bool               incomplete_frame_count = true;
 	bool               loaded_metadata        = false;
 };
 
@@ -35,20 +35,23 @@ static void gif_write_palette( image_palette_t& palette, struct GIF_WHDR* gif_wh
 		palette.elem[ p ].r = gif_whdr->cpal[ p ].R;
 		palette.elem[ p ].g = gif_whdr->cpal[ p ].G;
 		palette.elem[ p ].b = gif_whdr->cpal[ p ].B;
-		palette.elem[ p ].a = 255;
+		// palette.elem[ p ].a = 255;
 	}
 }
 
 
 static void gif_setup_image( ff_gif_data_t* ff_gif_data, struct GIF_WHDR* gif_whdr )
 {
+	// uhh
+	//if ( gif_whdr->ifrm != -1 )
+	if ( ff_gif_data->loaded_metadata )
+		return;
+
 	image_load_info_t& load_info = ff_gif_data->load_info;
 	image_t*           image     = load_info.image;
 
 	image->width                 = gif_whdr->xdim;
 	image->height                = gif_whdr->ydim;
-	image->format                = GL_R8;
-	image->channels              = 1;
 
 	image->palette.count         = gif_whdr->clrs;
 	image->palette.bg_index      = gif_whdr->bkgd;
@@ -61,9 +64,10 @@ static void gif_setup_image( ff_gif_data_t* ff_gif_data, struct GIF_WHDR* gif_wh
 	}
 
 	if ( gif_whdr->nfrm > 0 )
+	{
+		ff_gif_data->incomplete_frame_count = false;
 		image->frame.resize( load_info.single_frame ? 1 : gif_whdr->nfrm );
-	else
-		ff_gif_data->incomplete_frame_count = true;
+	}
 
 	ff_gif_data->loaded_metadata = true;
 }
@@ -90,7 +94,10 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 	image_frame_t& frame = image->frame[ frame_i ];
 	image_reset_frame_data( frame );
 
-	frame.time   = static_cast< float >( gif_whdr->time ) * 0.01;
+	if ( gif_whdr->time == 0 )
+		frame.time = 0.1;
+	else
+		frame.time = static_cast< float >( gif_whdr->time ) * 0.01;
 
 	frame.pos_x  = gif_whdr->frxo;
 	frame.pos_y  = gif_whdr->fryo;
@@ -123,7 +130,7 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 		image->channels = 4;
 
 		size_t og_size = frame.width * frame.height;
-		size_t size    = og_size * 4;  // 4 channels
+		size_t size     = og_size * image->channels;
 		frame.data     = ch_calloc< u8 >( size, e_mem_category_image_data );
 		frame.size     = size;
 
@@ -143,7 +150,11 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 			*start = gif_whdr->cpal[ palette_index ].B;
 			start++;
 
-			*start = 255;
+			if ( palette_index == gif_whdr->tran )
+				*start = 0;
+			else
+				*start = 255;
+
 			start++;
 		}
 	}
@@ -155,6 +166,9 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 
 		memset( frame.data, 0, size * sizeof( u8 ) );
 		memcpy( frame.data, gif_whdr->bptr, size );
+
+		image->format             = GL_R8;
+		image->channels           = 1;
 
 		frame.color_type          = e_colortype_palette;
 		frame.palette.count       = gif_whdr->clrs;
@@ -206,12 +220,14 @@ struct LoaderGIF : public IImageLoader
 	{
 		ff_gif_data_t ff_gif_data{ load_info };
 
+		long          first_frame = load_info.thumbnail_load ? 1 : 0;
+
 		long          ret = GIF_Load( data, data_len,
 		                              &gif_frame_writer,
 		                              &gif_metadata_reader,
-		                              &ff_gif_data, 0 );
+		                              &ff_gif_data, 0, first_frame );
 
-		return ret;
+		return ret > 0;
 	}
 };
 

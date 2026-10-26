@@ -19,7 +19,8 @@ void render_upload_palette( GLuint& palette_texture, GLuint& palette_trans, imag
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 
 	//glTexImage1D( GL_TEXTURE_1D, 0, GL_RGBA8, palette.count, 0, GL_RGBA, GL_UNSIGNED_BYTE, palette.elem );
-	glTexImage1D( GL_TEXTURE_1D, 0, GL_RGBA8UI, palette.count, 0, GL_RGBA_INTEGER, GL_UNSIGNED_BYTE, palette.elem );
+	//glTexImage1D( GL_TEXTURE_1D, 0, GL_RGBA8UI, palette.count, 0, GL_RGBA_INTEGER, GL_UNSIGNED_BYTE, palette.elem );
+	glTexImage1D( GL_TEXTURE_1D, 0, GL_RGB8UI, palette.count, 0, GL_RGB_INTEGER, GL_UNSIGNED_BYTE, palette.elem );
 
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 	glTexParameteri( GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );

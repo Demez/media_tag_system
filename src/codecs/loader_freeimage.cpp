@@ -170,7 +170,7 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 					frame.palette.elem[ p ].r = palette[ p ].red;
 					frame.palette.elem[ p ].g = palette[ p ].green;
 					frame.palette.elem[ p ].b = palette[ p ].blue;
-					frame.palette.elem[ p ].a = palette[ p ].alpha;
+					//frame.palette.elem[ p ].a = palette[ p ].alpha;
 				}
 			}
 			break;

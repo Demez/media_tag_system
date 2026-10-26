@@ -323,6 +323,7 @@ void image_copy_palette( image_palette_t& src, image_palette_t& dst )
 {
 	dst.count       = src.count;
 	dst.trans_index = src.trans_index;
+	dst.bg_index    = src.bg_index;
 
 	if ( src.count == 0 )
 	{
@@ -337,7 +338,7 @@ void image_copy_palette( image_palette_t& src, image_palette_t& dst )
 		dst.elem[ i ].r = src.elem[ i ].r;
 		dst.elem[ i ].g = src.elem[ i ].g;
 		dst.elem[ i ].b = src.elem[ i ].b;
-		dst.elem[ i ].a = src.elem[ i ].a;
+		//dst.elem[ i ].a = src.elem[ i ].a;
 	}
 }
 
@@ -362,7 +363,7 @@ void image_copy_frame_data( image_frame_t& src, image_frame_t& dst )
 	dst.height         = src.height;
 	dst.pitch          = src.pitch;
 	dst.pos_x          = src.pos_x;
-	dst.pos_x          = src.pos_y;
+	dst.pos_y          = src.pos_y;
 	dst.time           = src.time;
 	dst.frame_disposal = src.frame_disposal;
 	dst.flags          = src.flags;
@@ -526,7 +527,7 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 		// but then when it comes to webp, or probably just 24 bpp images, it crashes
 		int input_stride_in_bytes = 0;
 
-		if ( old_image->channels == 1 )
+		//if ( old_image->channels == 1 )
 			input_stride_in_bytes = old_image->frame[ i ].pitch;
 
 		u8* resized_frame = (u8*)stbir_resize(
