@@ -1098,12 +1098,9 @@ static void handle_queued_folder()
 	else
 	{
 		directory::folder_reload = true;
-		// gallery::keep_scroll_pos = true;
-		// gallery_view_scroll_to_cursor();
 		folder_load_media_list();
 	}
 
-	// gallery_view_scroll_to_cursor();
 	if ( !directory::folder_reload )
 		set_view_type_gallery();
 
@@ -1114,9 +1111,6 @@ static void handle_queued_folder()
 static void check_queued_path()
 {
 	bool is_file = fs_is_file( directory::queued.c_str() );
-
-	// Reset search string
-	memset( gallery::search, 0, 512 * sizeof( char ) );
 
 	if ( is_file )
 		handle_queued_file();
@@ -1550,5 +1544,11 @@ int main( int argc, char* argv[] )
 {
 	return entry( argc, argv );
 }
+#endif
+
+
+#if 1 // __ADDRESS_FUZZER__
+extern "C" int LLVMFuzzerInitialize( int* argc, char*** argv ) { return 0; }
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t * Data, size_t Size) { return 0; }
 #endif
 
