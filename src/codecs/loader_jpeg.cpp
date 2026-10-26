@@ -57,7 +57,7 @@ struct CodecJPEG: public IImageLoader
 
 		image_t* image = load_info.image;
 
-		int subSamp, colorSpace;
+		int subSamp, colorSpaceInt;
 
 		int ret = tjDecompressHeader3(
 		  local_tjpg,
@@ -66,7 +66,7 @@ struct CodecJPEG: public IImageLoader
 		  &image->width,
 		  &image->height,
 		  &subSamp,
-		  &colorSpace );
+		  &colorSpaceInt );
 
 		if ( ret != 0 )
 		{
@@ -77,7 +77,9 @@ struct CodecJPEG: public IImageLoader
 			return false;
 		}
 
-		int              pixelFmt = TJPF_RGB;
+		int              pixelFmt   = TJPF_BGR;
+
+		TJCS             colorSpace = (TJCS)colorSpaceInt;
 
 		int              scaling_factor_count;
 		tjscalingfactor* scaling_factor = tjGetScalingFactors( &scaling_factor_count );
@@ -179,7 +181,7 @@ struct CodecJPEG: public IImageLoader
 		//image->bytes_per_pixel = tjPixelSize[ pixelFmt ];
 		image->width    = best_width;
 		image->height   = best_height;
-		image->format   = GL_RGB;
+		image->format   = GL_BGR;
 		image->channels = 3;
 
 		return true;

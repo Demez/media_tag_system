@@ -144,6 +144,14 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 		default:
 			break;
 
+		case GL_BGR:
+			internal_format = GL_RGB8;
+			break;
+
+		case GL_BGRA:
+			internal_format = GL_RGBA8;
+			break;
+
 		case GL_RGBA16:
 			internal_format = format = GL_RGBA16;
 			break;

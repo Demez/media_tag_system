@@ -160,10 +160,11 @@ static long _GIF_LoadFrame(
     EAMF: metadata reader function, set to 0 if not needed
     ANIM: implementation-specific data (e.g. a structure or a pointer to it)
     SKIP: number of frames to skip before resuming
+    FRMC: max number of frames to load, set to 0 for all
  **/
 GIF_EXTR long GIF_Load(void *data, long size,
         void (*gwfr)(void*, struct GIF_WHDR*),
-        void (*eamf)(void*, struct GIF_WHDR*), void *anim, long skip) {
+        void (*eamf)(void*, struct GIF_WHDR*), void *anim, long skip, long frmc) {
     const uint32_t GIF_BLEN = (1 << 12) * sizeof(uint32_t);
     const uint8_t  GIF_EHDM = 0x21, /** extension header mark             **/
                    GIF_FHDM = 0x2C, /** frame header mark                 **/
@@ -277,6 +278,8 @@ GIF_EXTR long GIF_Load(void *data, long size,
                 egch = 0;
                 wtmp = whdr;
                 gwfr(anim, &wtmp); /** passing the frame to the caller **/
+				if (frmc > 0 && frmc - 1 == whdr.ifrm) /* only load the first x frames */
+                    break;
             }
         } else if ((mark == GIF_EHDM) && (size > 0)) { /** found an ext. **/
             if (*buff == GIF_EGCM) { /** graphics control ext. **/

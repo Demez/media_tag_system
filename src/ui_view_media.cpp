@@ -397,13 +397,13 @@ e_media_type get_media_type()
 
 // creates framebuffer object to draw animated images onto before scaling it down
 // https://www.opengl-tutorial.org/intermediate-tutorials/tutorial-14-render-to-texture/
-void media_view_create_animated_image_fbo()
+void media_view_create_animated_image_fbo( GLenum format )
 {
 	glBindFramebuffer( GL_FRAMEBUFFER, g_main_image_anim_fbo );
 	glBindTexture( GL_TEXTURE_2D, g_main_image_anim_tex );
 
 	// create an empty image
-	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, g_image_data.image.width, g_image_data.image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0 );
+	glTexImage2D( GL_TEXTURE_2D, 0, format, g_image_data.image.width, g_image_data.image.height, 0, format, GL_UNSIGNED_BYTE, 0 );
 
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
@@ -1501,7 +1501,12 @@ void media_load_job_finish( job_status_t* status, bool in_main_thread )
 			media_view_frame_update_timer();
 
 			if ( g_image_data.image.frame.size() > 1 )
-				media_view_create_animated_image_fbo();
+			{
+				if ( g_image_data.image.flags & e_image_flag_has_palette_trans )
+					media_view_create_animated_image_fbo( GL_RGBA );
+				else
+					media_view_create_animated_image_fbo( GL_RGB );
+			}
 		}
 	}
 	else if ( load_data->entry.type == e_media_type_video )

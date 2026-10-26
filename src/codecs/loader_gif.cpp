@@ -126,7 +126,7 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 	// and then draw the image proper there, so i have to apply it here in software
 	if ( load_info.thumbnail_load )
 	{
-		image->format   = GL_RGBA;
+		image->format   = GL_BGRA;
 		image->channels = 4;
 
 		size_t og_size = frame.width * frame.height;
@@ -141,13 +141,13 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 		{
 			auto palette_index = gif_whdr->bptr[ s ];
 
-			*start = gif_whdr->cpal[ palette_index ].R;
+			*start = gif_whdr->cpal[ palette_index ].B;
 			start++;
 
 			*start = gif_whdr->cpal[ palette_index ].G;
 			start++;
 
-			*start = gif_whdr->cpal[ palette_index ].B;
+			*start = gif_whdr->cpal[ palette_index ].R;
 			start++;
 
 			if ( palette_index == gif_whdr->tran )

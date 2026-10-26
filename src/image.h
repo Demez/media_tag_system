@@ -120,14 +120,17 @@ enum : e_image_flag
 {
 	e_image_flag_none               = 0,
 	e_image_flag_has_palette        = 1 << 0,
-	e_image_flag_has_local_palettes = 1 << 1,
+	e_image_flag_has_palette_trans  = 1 << 1,  // palette has transparancy
+	e_image_flag_has_local_palettes = 1 << 2,
+	//e_image_flag_scaling_use_fbo    = 1 << 3,  // draw image to fbo before scaling it back
 };
 
 
 enum : e_image_frame_f
 {
-	e_image_frame_f_none          = 0,
-	e_image_frame_f_local_palette = 1 << 0,
+	e_image_frame_f_none                = 0,
+	e_image_frame_f_local_palette       = 1 << 0,
+	e_image_frame_f_local_palette_trans = 1 << 1,  // palette has transparancy
 };
 
 
@@ -142,10 +145,10 @@ struct image_palette_elem_t
 
 struct image_palette_t
 {
-	image_palette_elem_t* elem = nullptr;
-	u32                   count;
-	int                   bg_index;
-	int                   trans_index;
+	image_palette_elem_t* elem        = nullptr;
+	u32                   count       = 0;
+	int                   bg_index    = INT32_MAX;
+	int                   trans_index = INT32_MAX;
 };
 
 

@@ -192,6 +192,33 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 		return false;
 	}
 
+	// apply flags
+	if ( load_info.image->palette.count > 0 && load_info.image->palette.elem )
+	{
+		load_info.image->flags |= e_image_flag_has_palette;
+
+		if ( load_info.image->palette.trans_index < INT32_MAX )
+			load_info.image->flags |= e_image_flag_has_palette_trans;
+
+		//if ( load_info.image->frame.size() == 1 )
+		//	load_info.image->flags |= e_image_flag_scaling_use_fbo;
+	}
+
+	for ( auto& frame : load_info.image->frame )
+	{
+		if ( frame.palette.count > 0 && frame.palette.elem )
+		{
+			load_info.image->flags |= e_image_flag_has_local_palettes;
+			frame.flags |= e_image_frame_f_local_palette;
+
+			if ( frame.palette.trans_index < INT32_MAX )
+			{
+				load_info.image->flags |= e_image_flag_has_palette_trans;
+				frame.flags |= e_image_frame_f_local_palette_trans;
+			}
+		}
+	}
+
 	return loaded_image;
 }
 
@@ -383,6 +410,16 @@ bool image_copy_frame_data( image_t& src, image_t& dst, size_t frame_i )
 }
 
 
+#define IMG_VERIFY_MSG( cond, msg ) \
+	if ( cond )                     \
+	{                               \
+		field_missing |= true;      \
+		printf( " *** Image Missing Field: %s\n", msg );        \
+	}                                             \
+	else                                          \
+		(void)0  // force semicolon
+
+
 // verify an image is valid and can be uploaded
 bool image_verify( image_t* image, bool check_pixel_data )
 {
@@ -391,22 +428,22 @@ bool image_verify( image_t* image, bool check_pixel_data )
 
 	bool field_missing = false;
 
-	field_missing |= image->width == 0;
-	field_missing |= image->height == 0;
-	field_missing |= image->format == 0;
-	field_missing |= image->channels == 0;
-	field_missing |= image->frame.empty();
+	IMG_VERIFY_MSG( image->width == 0, "width" );
+	IMG_VERIFY_MSG( image->height == 0, "height" );
+	IMG_VERIFY_MSG( image->format == 0, "format" );
+	IMG_VERIFY_MSG( image->channels == 0, "channels" );
+	IMG_VERIFY_MSG( image->frame.empty(), "frame" );
 
 	for ( auto& frame : image->frame )
 	{
-		field_missing |= frame.width == 0;
-		field_missing |= frame.height == 0;
-		field_missing |= frame.color_type == e_colortype_invalid;
+		IMG_VERIFY_MSG( frame.width == 0, "frame.width" );
+		IMG_VERIFY_MSG( frame.height == 0, "frame.height" );
+		IMG_VERIFY_MSG( frame.color_type == e_colortype_invalid, "frame.color_type" );
 
 		if ( check_pixel_data )
 		{
-			field_missing |= frame.data == nullptr;
-			field_missing |= frame.size == 0;
+			IMG_VERIFY_MSG( frame.data == nullptr, "frame.data" );
+			IMG_VERIFY_MSG( frame.size == 0, "frame.size" );
 		}
 
 		if ( field_missing )
@@ -416,6 +453,7 @@ bool image_verify( image_t* image, bool check_pixel_data )
 	return !field_missing;
 }
 
+#undef IMG_VERIFY_MSG
 
 // ===================================================================================================
 
@@ -490,9 +528,17 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 			pixel_layout = STBIR_RGB;
 			break;
 
+		case GL_BGR:
+			pixel_layout = STBIR_BGR;
+			break;
+
 		default:
 		case GL_RGBA:
 			pixel_layout = STBIR_RGBA;
+			break;
+
+		case GL_BGRA:
+			pixel_layout = STBIR_BGRA;
 			break;
 
 		case GL_RGBA16:
@@ -548,23 +594,7 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 	new_image->width    = new_width;
 	new_image->height   = new_height;
 	new_image->channels = old_image->channels;
-
-	switch ( old_image->channels )
-	{
-		default:
-		case 4:
-			new_image->format = GL_RGBA;
-			break;
-
-		case 3:
-			new_image->format = GL_RGB;
-			break;
-
-		case 1:
-			new_image->format = GL_R8;
-			break;
-	}
-
+	new_image->format   = old_image->format;
 	return true;
 }
 
