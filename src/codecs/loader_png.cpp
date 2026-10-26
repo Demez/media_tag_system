@@ -4,6 +4,22 @@
 
 #if 1
 
+static void png_write_palette( image_palette_t& palette, struct spng_plte& png_palette )
+{
+	if ( png_palette.n_entries == 0 )
+		return;
+
+	palette.count = png_palette.n_entries;
+	palette.elem  = ch_calloc< image_palette_elem_t >( palette.count, e_mem_category_image_data );
+
+	for ( u32 p = 0; p < palette.count; p++ )
+	{
+		palette.elem[ p ].r = png_palette.entries[ p ].red;
+		palette.elem[ p ].g = png_palette.entries[ p ].green;
+		palette.elem[ p ].b = png_palette.entries[ p ].blue;
+	}
+}
+
 struct LoaderPNG: public IImageLoader
 {
 	std::string match_ext  = ".png";
@@ -95,8 +111,9 @@ struct LoaderPNG: public IImageLoader
 
 		// https://libspng.org/docs/migrate-libpng/
 
-		if ( ihdr.color_type == SPNG_COLOR_TYPE_INDEXED )
-			pngFmt = SPNG_FMT_RGB8;
+		// palette image
+		//if ( ihdr.color_type == SPNG_COLOR_TYPE_INDEXED )
+		//	pngFmt = SPNG_FMT_PNG;
 
 		//else if ( ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE && ihdr.bit_depth < 8 )
 		//	pngFmt = SPNG_FMT_G8;
@@ -138,7 +155,7 @@ struct LoaderPNG: public IImageLoader
 			pngFmt = SPNG_FMT_RGBA8;
 		}
 
-        size_t size;
+		size_t size;
 		err = spng_decoded_image_size( ctx, pngFmt, &size );
 		if ( err != 0 )
 		{
@@ -161,7 +178,7 @@ struct LoaderPNG: public IImageLoader
 		load_info.image->frame[ 0 ].data = ch_realloc( load_info.image->frame[ 0 ].data, size, e_mem_category_image_data );
 		load_info.image->frame[ 0 ].size = size;
 
-		err                              = spng_decode_image( ctx, load_info.image->frame[ 0 ].data, size, pngFmt, decode_flags );
+		err = spng_decode_image( ctx, load_info.image->frame[ 0 ].data, size, pngFmt, decode_flags );
 		if ( err != 0 )
 		{
 			printf( "LOADER_PNG: Failed to decode image: %s\n", spng_strerror( err ) );
@@ -169,23 +186,62 @@ struct LoaderPNG: public IImageLoader
 			return false;
 		}
 
-		switch ( pngFmt )
+		switch ( ihdr.color_type )
 		{
-			case SPNG_FMT_RGB8:
-				load_info.image->format   = GL_RGB;
-				load_info.image->channels = 3;
-				break;
+			#if 0  // maybe one day i can get this working well for hopefully less memory used
+			case SPNG_COLOR_TYPE_INDEXED:
+			{
+				spng_plte plte;
+				err = spng_get_plte( ctx, &plte );
 
-			case SPNG_FMT_RGBA8:
-				load_info.image->format   = GL_RGBA;
-				load_info.image->channels = 4;
-				break;
+				if ( err == 0 )
+				{
+					load_info.image->flags |= e_image_flag_has_local_palettes;
+					load_info.image->frame[ 0 ].flags      |= e_image_frame_f_local_palette;
+					load_info.image->frame[ 0 ].color_type = e_colortype_palette;
+					png_write_palette( load_info.image->frame[ 0 ].palette, plte );
+				}
+				else
+				{
+					load_info.image->frame[ 0 ].color_type = e_colortype_min_is_white;
+				}
 
-			case SPNG_FMT_RGBA16:
-				load_info.image->format   = GL_RGBA16;
-				load_info.image->channels = 4;
+				if ( have_trns )
+				{
+					// load_info.image->frame[ 0 ].palette.trans_index = trns.gray;
+				}
+
+				load_info.image->format   = GL_R8;
+				load_info.image->channels = 1;
 				break;
+			}
+			#endif
+
+			case SPNG_COLOR_TYPE_TRUECOLOR:
+			default:
+			{
+				switch ( pngFmt )
+				{
+					case SPNG_FMT_RGB8:
+						load_info.image->format   = GL_RGB;
+						load_info.image->channels = 3;
+						break;
+
+					case SPNG_FMT_RGBA8:
+						load_info.image->format   = GL_RGBA;
+						load_info.image->channels = 4;
+						break;
+
+					case SPNG_FMT_RGBA16:
+						load_info.image->format   = GL_RGBA16;
+						load_info.image->channels = 4;
+						break;
+				}
+
+				break;
+			}
 		}
+
 
 		load_info.image->width             = ihdr.width;
 		load_info.image->height            = ihdr.height;
