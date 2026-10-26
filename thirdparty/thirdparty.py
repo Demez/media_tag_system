@@ -363,7 +363,34 @@ def post_libspng_extract():
 # =================================================================================================
 
 
+def post_libwebp_extract():
+    if ARGS.no_build:
+        return
+
+    set_project("libwebp")
+    os.chdir("libwebp")
+
+    build_options = "-DWEBP_BUILD_ANIM_UTILS=OFF "
+    build_options += "-DWEBP_BUILD_CWEBP=OFF "
+    build_options += "-DWEBP_BUILD_DWEBP=OFF "
+    build_options += "-DWEBP_BUILD_GIF2WEBP=OFF "
+    build_options += "-DWEBP_BUILD_IMG2WEBP=OFF "
+    build_options += "-DWEBP_BUILD_VWEBP=ON "
+    build_options += "-DWEBP_BUILD_EXTRAS=OFF "
+
+    if not syscmd(f"cmake -B build {build_options} .", "Failed to run cmake"):
+        return
+
+    cmake_built_targets(["RelWithDebInfo", "Release", "Debug"])
+
+
+# =================================================================================================
+
+
 def post_freetype_extract():
+    if ARGS.no_build:
+        return
+
     set_project("Freetype")
     os.chdir("freetype")
 
@@ -559,6 +586,12 @@ TASK_LIST = {
             "url":  "https://github.com/randy408/libspng/archive/v0.7.4.zip",
             "file": "libspng-0.7.4.zip",
             "func": post_libspng_extract,
+        },
+        {
+            "name": "libwebp",
+            "url":  "https://github.com/webmproject/libwebp/archive/refs/heads/main.zip",
+            "file": "libwebp-main.zip",
+            "func": post_libwebp_extract,
         },
         {
             "name": "nativefiledialog",

@@ -321,6 +321,7 @@ set(
     src/codecs/loader_gif.cpp
     src/codecs/loader_freeimage.cpp
     src/codecs/loader_jpegxl.cpp
+    src/codecs/loader_webp.cpp
 
     src/system/system.h
 
@@ -386,6 +387,8 @@ include_directories(
 	"thirdparty/libjpeg-turbo/build"
 	"thirdparty/libjpeg-turbo/src"
 	"thirdparty/libspng/spng"
+	"thirdparty/libwebp/src"
+	"thirdparty/libwebp/build"
 	"thirdparty/mpv/include"
 	"thirdparty/FreeImageRe/include"
 	"thirdparty/stb"
@@ -416,8 +419,11 @@ link_libraries(
 	jxl
 	jxl_cms
 	jxl_threads
+	# libwebp
+	libwebpdecoder
+	libwebpdemux
 
-	# must be below jxl, or my program will link the jxl functions to freeimage instead
+	# must be below other libraries, or the compiler will link the other libraries functions to freeimage instead
 	FreeImage
 )
 
@@ -448,6 +454,7 @@ link_directories(
 	"thirdparty/nativefiledialog/build/src"
 	"thirdparty/mozjpeg/build"
 	"thirdparty/libspng/build"
+	"thirdparty/libwebp/build"
 	"thirdparty/FreeImageRe/lib"
 	
 	# i don't want to use static, but for some reason, it can't find the lib when using the dll version?
