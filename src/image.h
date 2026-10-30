@@ -156,42 +156,34 @@ struct image_palette_t
 struct image_frame_t
 {
 	// image data
-	u8*                  data;
+	u8*              data           = nullptr;
 
 	// size
-	size_t               size;
+	size_t           size           = 0;
 
 	// time to spend on frame
-	double               time;
+	double           time           = 0.0;
 
 	// frame width and height
-	int                  width;
-	int                  height;
-	u32                  pitch = 0;
+	int              width          = 0;
+	int              height         = 0;
+	u32              pitch          = 0;
 
 	// frame draw position relative to image draw position
-	int                  pos_x;
-	int                  pos_y;
+	int              pos_x          = 0;
+	int              pos_y          = 0;
 
-	e_frame_disposal     frame_disposal;
+	e_frame_disposal frame_disposal = e_frame_disposal_keep;
 
-	e_image_frame_f      flags;
-	e_colortype          color_type = e_colortype_bitmap;
+	e_image_frame_f  flags          = 0;
+	e_colortype      color_type     = e_colortype_bitmap;
 
-	image_palette_t      palette{};
+	image_palette_t  palette{};
 
 	// animation_format_frame_data_base_t* frame_data;
 
 	image_frame_t()
 	{
-		data   = nullptr;
-		size   = 0;
-		time   = 0.0;
-		width  = 0;
-		height = 0;
-		pos_x  = 0;
-		pos_y  = 0;
-		// frame_data     = nullptr;
 	}
 
 	~image_frame_t()
@@ -203,14 +195,18 @@ struct image_frame_t
 	// copying
 	void assign( const image_frame_t& other ) noexcept
 	{
-		data       = other.data;
-		width      = other.width;
-		height     = other.height;
-		pos_x      = other.pos_x;
-		pos_y      = other.pos_y;
-		time       = other.time;
-		size       = other.size;
-		palette    = other.palette;
+		data           = other.data;
+		width          = other.width;
+		height         = other.height;
+		pos_x          = other.pos_x;
+		pos_y          = other.pos_y;
+		time           = other.time;
+		size           = other.size;
+		flags          = other.flags;
+		frame_disposal = other.frame_disposal;
+		color_type     = other.color_type;
+
+		palette        = other.palette;
 	}
 
 	// moving
@@ -225,6 +221,9 @@ struct image_frame_t
 		pos_y              = other.pos_y;
 		time               = other.time;
 		size               = other.size;
+		flags              = other.flags;
+		frame_disposal     = other.frame_disposal;
+		color_type         = other.color_type;
 
 		other.data         = nullptr;
 		other.palette.elem = nullptr;
@@ -232,7 +231,7 @@ struct image_frame_t
 
 	image_frame_t& operator=( image_frame_t&& other ) noexcept
 	{
-		assign( other );
+		assign( std::move( other ) );
 		return *this;
 	}
 
@@ -302,6 +301,7 @@ struct image_t
 		format          = other.format;
 		loop_count      = other.loop_count;
 		palette         = other.palette;
+		flags           = other.flags;
 
 		if ( other.image_format )
 			image_format = util_strdup( other.image_format );
@@ -318,6 +318,7 @@ struct image_t
 		channels           = other.channels;
 		format             = other.format;
 		loop_count         = other.loop_count;
+		flags              = other.flags;
 
 		image_format       = other.image_format;
 		other.image_format = nullptr;
@@ -325,7 +326,7 @@ struct image_t
 
 	image_t& operator=( image_t&& other ) noexcept
 	{
-		assign( other );
+		assign( std::move( other ) );
 		return *this;
 	}
 
