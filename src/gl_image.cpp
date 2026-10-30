@@ -123,7 +123,7 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 	if ( image->frame[ frame_i ].pitch > 0 )
 	{
 		glPixelStorei( GL_UNPACK_ROW_LENGTH, image->frame[ frame_i ].pitch / image->channels );
-		glPixelStorei( GL_UNPACK_ALIGNMENT, 4 );
+		glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 	}
 	else
 	{

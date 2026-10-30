@@ -113,6 +113,9 @@ struct LoaderJXL: public IImageLoader
 
 		std::vector< u8 > icc_profile{};
 
+		image_t*          image = load_info.image;
+		size_t            frame_i = 0;
+
 		// Sourced from JPEG XL decode_oneshot
 		for ( ;; )
 		{
@@ -136,16 +139,19 @@ struct LoaderJXL: public IImageLoader
 					return false;
 				}
 
-				load_info.image->width  = info.xsize;
-				load_info.image->height = info.ysize;
-				//format.num_channels     = info.num_color_channels;
+				image->width        = info.xsize;
+				image->height       = info.ysize;
+				format.num_channels = 3;  // info.num_color_channels;
 
 				// check for an alpha channel
-				//if ( info.alpha_bits > 0 )
-				//	format.num_channels++;
+				if ( info.alpha_bits > 0 )
+					format.num_channels++;
 
 				if ( info.have_animation )
+				{
 					printf( "ANIMATED JXL\n" );
+					image->loop_count = info.animation.num_loops;
+				}
 
 				JxlResizableParallelRunnerSetThreads( runner.get(), JxlResizableParallelRunnerSuggestThreads( info.xsize, info.ysize ) );
 			}
@@ -177,24 +183,78 @@ struct LoaderJXL: public IImageLoader
 					return false;
 				}
 
-				if ( load_info.image->frame.empty() )
-					load_info.image->frame.resize( 1 );
+				load_info.image->frame.resize( load_info.image->frame.size() + 1 );
+				image_frame_t& frame = load_info.image->frame[ frame_i ];
 
-				load_info.image->frame[ 0 ].data = ch_realloc< u8 >( load_info.image->frame[ 0 ].data, buffer_size, e_mem_category_image_data );
-				load_info.image->frame[ 0 ].size = buffer_size * sizeof( u8 );
+				JxlFrameHeader frame_header{};
+				if ( JXL_DEC_SUCCESS != JxlDecoderGetFrameHeader( dec.get(), &frame_header ) )
+				{
+					printf( "JxlDecoderGetFrameHeader failed\n" );
+					//return false;
+				}
 
-				memset( load_info.image->frame[ 0 ].data, 0, buffer_size * sizeof( u8 ) );
+				double duration = static_cast< double >( frame_header.duration );
+				double tps_den  = static_cast< double >( info.animation.tps_denominator );
+				double tps_num  = static_cast< double >( info.animation.tps_numerator );
 
-				void* pixels_buffer = static_cast< void* >( load_info.image->frame[ 0 ].data );
+				if ( tps_num > 0 )
+					frame.time = duration * tps_den / tps_num;
+				else
+					frame.time = 0.1;
 
+				frame.width  = frame_header.layer_info.xsize;
+				frame.height = frame_header.layer_info.ysize;
+
+				// TODO: this isn't really correct, doesn't take into account other parts of blend_info
+				switch ( frame_header.layer_info.blend_info.blendmode )
+				{
+					case JXL_BLEND_REPLACE:
+						frame.frame_disposal = e_frame_disposal_background;
+						break;
+					case JXL_BLEND_ADD:
+					case JXL_BLEND_BLEND:
+						frame.frame_disposal = e_frame_disposal_keep;
+						break;
+
+					// this frame disposal system doesn't really work with this, if i can encounter a jxl with this,
+					// then i can try to support it
+					case JXL_BLEND_MULADD:
+					case JXL_BLEND_MUL:
+						frame.frame_disposal = e_frame_disposal_keep;
+						break;
+				}
+
+				frame.data = ch_calloc< u8 >( buffer_size, e_mem_category_image_data );
+				frame.size = buffer_size * sizeof( u8 );
+
+				memset( frame.data, 0, buffer_size * sizeof( u8 ) );
+
+				void* pixels_buffer = static_cast< void* >( frame.data );
+
+				// the frame data will be processed in the next call to JxlDecoderProcessMoreInput()
 				if ( JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer( dec.get(), &format, pixels_buffer, buffer_size ) )
 				{
 					printf( "JxlDecoderSetImageOutBuffer failed\n" );
 					return false;
 				}
+
+				frame_i++;
+			}
+			else if ( status == JXL_DEC_FRAME )
+			{
+				JxlFrameHeader frame_header{};
+				if ( JXL_DEC_SUCCESS != JxlDecoderGetFrameHeader( dec.get(), &frame_header ) )
+				{
+					printf( "JxlDecoderGetFrameHeader failed\n" );
+					return false;
+				}
 			}
 			else if ( status == JXL_DEC_FULL_IMAGE )
 			{
+				// early exit, we only need the first frame
+				if ( load_info.thumbnail_load )
+					break;
+
 				// Nothing to do. Do not yet return. If the image is an animation, more
 				// full frames may be decoded. This example only keeps the last one.
 			}
@@ -214,11 +274,11 @@ struct LoaderJXL: public IImageLoader
 
 		load_info.image->channels          = format.num_channels;
 
-		//if ( load_info.image->channels == 3 )
-		//	load_info.image->format = GL_RGB;
+		if ( load_info.image->channels == 3 )
+			load_info.image->format = GL_RGB;
 		//else if ( load_info.image->channels == 1 )
 		//	load_info.image->format = GL_R8;
-		//else
+		else
 			load_info.image->format = GL_RGBA;
 
 
