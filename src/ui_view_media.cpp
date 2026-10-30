@@ -1437,18 +1437,16 @@ void media_load_on_finish()
 
 void media_load_job_finish( job_status_t* status, bool in_main_thread )
 {
-	g_media_load_status     = nullptr;
+	g_media_load_status = nullptr;
 
 	set_frame_draw();
 
-	auto load_data     = static_cast< media_load_data_t* >( status->userdata );
+	auto load_data = static_cast< media_load_data_t* >( status->userdata );
 
 	// g_image_data.index = load_data->file_index;
 	// gallery_view_set_selection( g_image_data.index );
 
 	path_printf( "%f Load - %s\n", load_data->load_time, load_data->full_path.c_str() );
-
-	// auto startTime       = std::chrono::high_resolution_clock::now();
 
 	if ( load_data->entry.type == e_media_type_image )
 	{
@@ -1474,20 +1472,8 @@ void media_load_job_finish( job_status_t* status, bool in_main_thread )
 
 		g_scale_lock.unlock();
 
-		image_copy_data( *load_data->load_info.image, g_image_data.image );
-
-		g_image_data.image.frame.resize( load_data->load_info.image->frame.size() );
-
-		for ( size_t i = 0; i < g_image_data.image.frame.size(); i++ )
-		{
-			image_copy_frame_data( load_data->load_info.image->frame[ i ], g_image_data.image.frame[ i ] );
-			g_image_data.image.frame[ i ].data = load_data->load_info.image->frame[ i ].data;
-			g_image_data.image.frame[ i ].size = load_data->load_info.image->frame[ i ].size;
-
-			// clear the pointer
-			load_data->load_info.image->frame[ i ].data         = nullptr;
-			load_data->load_info.image->frame[ i ].palette.elem = nullptr;
-		}
+		// move over data to main image pointer
+		g_image_data.image = std::move( *load_data->load_info.image );
 
 		// free the original image data
 		image_free( load_data->load_info.image );
@@ -1514,10 +1500,6 @@ void media_load_job_finish( job_status_t* status, bool in_main_thread )
 	//	image_free_data( g_image_data.image );
 	//	image_free_data( g_image_scaled_data.image );
 	}
-
-	// auto  currentTime    = std::chrono::high_resolution_clock::now();
-	// float up_time        = std::chrono::duration< float, std::chrono::seconds::period >( currentTime - startTime ).count();
-	//printf( "%f Load - %f Up - %s\n", load_time, up_time, directory::media_list[ g_folder_index ].string().c_str() );
 
 	update_window_title();
 
