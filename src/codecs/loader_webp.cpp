@@ -122,11 +122,13 @@ struct LoaderWebP : public IImageLoader
 				// TODO: handle blend mode
 
 				frame.size           = config.output.u.RGBA.size;
-				frame.pitch          = config.output.u.RGBA.stride;
+				// frame.pitch          = config.output.u.RGBA.stride;
 				frame.data           = ch_calloc< u8 >( config.output.u.RGBA.size, e_mem_category_image_data );
 
 				// VP8StatusCode status = WebPDecodeBGRA( iter.fragment.bytes, iter.fragment.size, &config );
 				memcpy( frame.data, config.output.u.RGBA.rgba, frame.size );
+
+				WebPFreeDecBuffer( &config.output );
 
 			} while ( WebPDemuxNextFrame( &iter ) );
 			WebPDemuxReleaseIterator( &iter );
