@@ -67,6 +67,18 @@ enum e_zoom_mode
 };
 
 
+enum e_scale_state
+{
+	e_scale_state_idle,
+	e_scale_state_start,     // main thread sets state to this when it wants to scale the current image
+	e_scale_state_working,   // main thread looks at this state when running, uses full image while waiting
+	e_scale_state_upload,    // main thread needs to upload to gpu, after this, it's set back to idle
+	e_scale_state_finished,  // main thread can use scaled image
+
+	e_scale_state_count
+};
+
+
 enum e_gallery_sort_mode
 {
 	e_gallery_sort_mode_name_a_z,
@@ -325,6 +337,11 @@ namespace image_draw
 	extern bool        scaling;
 	extern float       volume;  // for mpv
 
+	extern bool        show_raw_frames;
+	extern bool        hide_alpha;
+	extern bool        invert_color;
+	extern bool        show_channels[ 4 ];
+
 	// index into gallery::sorted_media
 	//extern size_t media_index;
 }
@@ -410,7 +427,8 @@ extern u32                           g_media_load_index;  // index of file curre
 extern bool                          g_media_load_from_gallery;  // are we loading a file selected from the gallery?
 
 // TODO: put these in the config
-constexpr u64                        SCALE_WAIT_TIME      = 100;  // in ms
+constexpr u64                        SCALE_WAIT_TIME      = 100;         // in ms
+constexpr u64                        SCALE_INVALID_TIME   = UINT64_MAX;  // in ms
 constexpr u64                        IMAGE_LOAD_WAIT_TIME = 150;
 
 #define GL_DBG_NAME( str ) sizeof( str ), str
@@ -445,10 +463,26 @@ void                                 media_view_draw_imgui();
 void                                 media_view_draw();
 void                                 media_view_scroll_zoom( int amount );
 void                                 media_view_advance( bool prev = false );
+void                                 media_view_frame_update_timer();
 void                                 media_view_window_resize();
 void                                 media_view_fit_in_view( bool adjust_zoom = true, bool center_image = true, bool adjust_zoom_step = true );
 void                                 media_view_zoom_reset();
+void                                 media_view_create_animated_image_fbo( GLenum format );
+bool                                 media_view_render_init();
+void                                 media_view_clamp_to_bounds();
+
+// media scaling
+e_scale_state                        media_get_scale_state();
+const char*                          media_get_scale_state_str();
+void                                 media_scale_init();
+void                                 media_scale_shutdown();
+void                                 media_scale_lock();
+void                                 media_scale_unlock();
+void                                 media_scale_check_upload();
 void                                 media_view_scale_reset_timer();
+void                                 media_view_scale_clear();
+void                                 media_view_scale_set_image();
+void                                 media_view_scale_check_timer();
 
 // media_entry_t                        gallery_item_get_media_entry( size_t index );
 const media_entry_t&                 gallery_item_get_media_entry( size_t index );

@@ -283,6 +283,10 @@ set(
     src/mpv_interface.cpp
     src/mpv_interface.h
     src/image_loader.cpp
+	src/media_load.cpp
+	src/media_render.cpp
+	src/media_scale.cpp
+	src/media_zoom.cpp
     src/image.h
     src/memory.cpp
     src/config.cpp
