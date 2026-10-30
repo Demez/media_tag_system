@@ -1,11 +1,6 @@
 #include "main.h"
 #include "imgui_internal.h"
 
-#include "stb_image_resize2.h"
-
-#include <thread>
-#include <mutex>
-
 
 // Image Draw Data
 namespace image_draw
@@ -642,11 +637,11 @@ void media_view_input()
 	static bool drag_cooldown     = false;
 
 	// if ( mouse_middle_down && !mouse_hover_imgui_window && mouse_in_client_area )
-	if ( mouse_middle_down && !mouse_hover_imgui_window )
+	if ( util_can_do_drag_drop() && mouse_middle_down && !mouse_hover_imgui_window )
 	{
-		if ( !drag_cooldown )
+		//if ( !drag_cooldown )
 		{
-			if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
+			// if ( app::mouse_delta[ 0 ] != 0.0 || app::mouse_delta[ 1 ] != 0.0 )
 			{
 				u32 button = 0;
 				if ( mouse_btns & SDL_BUTTON_LMASK )
@@ -665,13 +660,13 @@ void media_view_input()
 				}
 
 				// this way we don't try to start another drag drop instantly after somehow
-				drag_cooldown = true;
+				//drag_cooldown = true;
 			}
 		}
 	}
 	else
 	{
-		drag_cooldown = false;
+		//drag_cooldown = false;
 	}
 
 	// mouse down and not hovering an imgui window not in an image pan

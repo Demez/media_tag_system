@@ -24,6 +24,9 @@ namespace app
 	// ImVec4       clear_color    = ImVec4( 0.f, 0.f, 0.f, 0.f );
 	// ImVec4       clear_color    = ImVec4( 1.f, 1.f, 0.f, 0.f );
 
+	ImVec2       prev_mouse_delta;
+	ImVec2       prev_mouse_pos;
+
 	ImVec2       mouse_delta;
 	ImVec2       mouse_pos;
 	int          mouse_scroll       = 0;
@@ -478,6 +481,56 @@ bool drag_drop_recieve_func( const std::vector< fs::path >& files )
 }
 
 
+static bool     g_can_drag_drop  = false;
+
+constexpr float DRAG_DROP_THRESHOLD = 2.f;
+
+
+static bool     util_check_threshold( ImVec2& delta, float threshold )
+{
+	if ( fabs( delta.x ) > threshold )
+		return true;
+
+	if ( fabs( delta.y ) > threshold )
+		return true;
+
+	return false;
+}
+
+
+void util_update_can_do_drag_drop()
+{
+	g_can_drag_drop = false;
+
+	if ( app::in_drag_drop )
+		return;
+
+	//if ( util_check_threshold( app::prev_mouse_delta, DRAG_DROP_THRESHOLD ) )
+	//	return;
+
+	if ( app::mouse_delta.x == 0.f && app::mouse_delta.y == 0.f )
+		return;
+
+	if ( util_check_threshold( app::mouse_delta, DRAG_DROP_THRESHOLD ) )
+		return;
+
+	g_can_drag_drop = true;
+
+	//SDL_MouseButtonFlags mouse_btns = SDL_GetMouseState( nullptr, nullptr );
+
+	// mouse down and not hovering an imgui window not in an image pan
+	//g_can_drag_drop = ( mouse_btns & SDL_BUTTON_LMASK ) || ( mouse_btns & SDL_BUTTON_RMASK );
+}
+
+
+bool util_can_do_drag_drop()
+{
+	util_update_can_do_drag_drop();
+
+	return g_can_drag_drop;
+}
+
+
 void style_imgui()
 {
 	ImGuiStyle& style        = ImGui::GetStyle();
@@ -884,7 +937,10 @@ bool handle_event( SDL_Event& event )
 bool handle_events()
 {
 	app::mouse_scroll     = 0;
-	app::window_resized   = false;
+	app::window_resized = false;
+
+	app::prev_mouse_delta = app::mouse_delta;
+	app::prev_mouse_pos   = app::mouse_pos;
 
 	app::mouse_delta[ 0 ] = 0.f;
 	app::mouse_delta[ 1 ] = 0.f;
@@ -943,6 +999,8 @@ bool handle_events()
 	}
 
 	app::in_drag_drop = false;
+
+	util_update_can_do_drag_drop();
 
 	return false;
 }

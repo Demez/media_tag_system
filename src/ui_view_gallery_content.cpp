@@ -115,6 +115,9 @@ void gallery_view_do_selected_item_behavior( size_t i, gallery_item_draw_t& item
 	if ( !( item_draw.selected_item && item_draw.item_hovered ) )
 		return;
 
+	if ( !util_can_do_drag_drop() )
+		return;
+
 	SDL_MouseButtonFlags mouse_btns       = SDL_GetMouseState( nullptr, nullptr );
 
 	// mouse down and not hovering an imgui window not in an image pan
@@ -143,7 +146,7 @@ void gallery_view_do_selected_item_behavior( size_t i, gallery_item_draw_t& item
 			sys_do_drag_drop_files( files, button );
 
 			// this way we don't try to start another drag drop instantly after somehow
-			drag_cooldown = true;
+			// drag_cooldown = true;
 		}
 	}
 	else

@@ -438,6 +438,8 @@ void                                 set_frame_draw( u32 count = 1 );
 void                                 send_frame_draw_event();
 void                                 update_dpi( float dpi_override = 0.f );
 
+bool                                 util_can_do_drag_drop();
+
 void                                 imgui_draw( bool render );
 
 // Handle new file or path from external source
