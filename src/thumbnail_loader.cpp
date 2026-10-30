@@ -481,13 +481,19 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 			{
 				if ( event->error != 0 )
 				{
-					printf( "failed to load video for thumbnail - %d\n", event->error );
+					printf( "Failed to load video for thumbnail - %d\n", event->error );
 					failed = true;
 					break;
 				}
 			}
 			else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
 			{
+				break;
+			}
+			else if ( event->event_id == MPV_EVENT_END_FILE )
+			{
+				printf( "Failed to load video for thumbnail, video may not have a video track?\n" );
+				failed = true;
 				break;
 			}
 
@@ -526,7 +532,7 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 			{
 				if ( event->error != 0 )
 				{
-					printf( "failed to write screenshot for thumbnail - %d\n", event->error );
+					printf( "Failed to write screenshot for thumbnail - %d\n", event->error );
 					failed = true;
 					break;
 				}
