@@ -10,7 +10,7 @@ set( CMAKE_SHARED_LIBRARY_PREFIX "" )
 
 option( MIMALLOC "Use mimalloc" OFF )
 
-project( media_tag_system )
+project( foto_falcon )
 
 set( PROJ_OBJ "obj" )
 set( PROJ_OUT "${CMAKE_CURRENT_LIST_DIR}/out" )
@@ -236,37 +236,37 @@ if (WIN32)
 		link_directories( "thirdparty/SDL3/lib/x64"	)
 	endif()
 
-	add_executable( media_tag_system_launcher src/launcher.cpp )
+	add_executable( foto_falcon_launcher src/launcher.cpp )
 
 	set_target_properties(
-		media_tag_system_launcher PROPERTIES
-		RUNTIME_OUTPUT_NAME "media_tag_system"
-		PDB_NAME "media_tag_system"
+		foto_falcon_launcher PROPERTIES
+		RUNTIME_OUTPUT_NAME "foto_falcon"
+		PDB_NAME "foto_falcon"
 	)
 
-	add_executable( media_tag_system_con src/launcher.cpp )
+	add_executable( foto_falcon_con src/launcher.cpp )
 
 	target_link_options(
-		media_tag_system_con PRIVATE
+		foto_falcon_con PRIVATE
 		"/SUBSYSTEM:CONSOLE"
 		"/ENTRY:wmainCRTStartup"
 	)
 
 	target_link_options(
-		media_tag_system_launcher PRIVATE
+		foto_falcon_launcher PRIVATE
 		"/ENTRY:wmainCRTStartup"
 	)
 
 	target_compile_definitions(
-		media_tag_system_con PRIVATE
+		foto_falcon_con PRIVATE
 		"CONSOLE_APP"
 	)
 
 	set_target_properties(
-		media_tag_system_con PROPERTIES
+		foto_falcon_con PROPERTIES
 		SUFFIX ".com"
-		RUNTIME_OUTPUT_NAME "media_tag_system"
-		PDB_NAME "media_tag_system_con"
+		RUNTIME_OUTPUT_NAME "foto_falcon"
+		PDB_NAME "foto_falcon_con"
 	)
 endif()
 
@@ -349,7 +349,7 @@ set(
 if ( MSVC )
 	set(
 		SYSTEM_FILES
-		# src/system/win32/media_tag_system.manifest
+		# src/system/win32/foto_falcon.manifest
 		src/system/win32/sys_win32.h
 		src/system/win32/sys_win32.cpp
 		src/system/win32/sys_win32_filesystem.cpp
@@ -437,25 +437,24 @@ if ( MIMALLOC )
 endif()
 
 set( LINK_DIR_DEBUG
-	"${THIRDPARTY_DIR}/nativefiledialog/build/src/Debug"
+	# "${THIRDPARTY_DIR}/nativefiledialog/build/src/Debug"
 	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Debug"
 	"${THIRDPARTY_DIR}/ckdl/build/Debug"
 )
 
 set( LINK_DIR_RELEASE
-	"${THIRDPARTY_DIR}/nativefiledialog/build/src/Release"
+	# "${THIRDPARTY_DIR}/nativefiledialog/build/src/Release"
 	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Release"
 	"${THIRDPARTY_DIR}/ckdl/build/Release"
 )
 
 set( LINK_DIR_RELEASE_DEBUG_INFO
-	"${THIRDPARTY_DIR}/nativefiledialog/build/src/RelWithDebInfo"
+	# "${THIRDPARTY_DIR}/nativefiledialog/build/src/RelWithDebInfo"
 	"${THIRDPARTY_DIR}/libjpeg-turbo/build/Release"
 	"${THIRDPARTY_DIR}/ckdl/build/Release"
 )
 
 link_directories(
-	"thirdparty/nativefiledialog/build/src"
 	"thirdparty/mozjpeg/build"
 	"thirdparty/libspng/build"
 	"thirdparty/libwebp/build"
@@ -504,13 +503,13 @@ endforeach( OUTPUT_CONFIG ${CMAKE_CONFIGURATION_TYPES} )
 set( ALL_FILES ${SRC_FILES} ${SYSTEM_FILES} ${FREETYPE_IMGUI_SRC} ${THIRDPARTY_FILES} )
 
 if (WIN32)
-	add_library( media_tag_system SHARED ${ALL_FILES} )
+	add_library( foto_falcon SHARED ${ALL_FILES} )
 else()
-	add_executable( media_tag_system ${ALL_FILES} )
+	add_executable( foto_falcon ${ALL_FILES} )
 endif()
 
 set_target_properties(
-	media_tag_system PROPERTIES
+	foto_falcon PROPERTIES
 	PREFIX ""
 )
 

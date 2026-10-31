@@ -12,13 +12,13 @@ typedef int ( *fn_entry_t )( int argc, char* argv[] );
 #error unsupported platform
 #endif
 
-#define MODULE_NAME "media_tag_system" MODULE_EXT
+#define MODULE_NAME "foto_falcon" MODULE_EXT
 
 
 void handle_module_error( const char* msg )
 {
 #if CONSOLE_APP
-	SDL_ShowSimpleMessageBox( SDL_MESSAGEBOX_ERROR, "Media Tag System Error!", msg, nullptr );
+	SDL_ShowSimpleMessageBox( SDL_MESSAGEBOX_ERROR, "FotoFalcon Error!", msg, nullptr );
 #else
 	fputs( msg, stdout );
 #endif

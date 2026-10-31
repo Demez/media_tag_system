@@ -185,14 +185,14 @@ void update_window_title()
 
 	if ( g_gallery_view )
 	{
-		snprintf( buf, 512, "Media Tag System [%zu] - %s", gallery::sorted_media.size(), directory::path.string().c_str() );
+		snprintf( buf, 512, "FotoFalcon [%zu] - %s", gallery::sorted_media.size(), directory::path.string().c_str() );
 	}
 	else
 	{
 		if ( gallery::sorted_media.size() >= g_image_data.index )
-			snprintf( buf, 512, "Media Tag System [%zu / %zu] - %s", g_image_data.index + 1, gallery::sorted_media.size(), gallery_item_get_path_string( g_image_data.index ).c_str() );
+			snprintf( buf, 512, "FotoFalcon [%zu / %zu] - %s", g_image_data.index + 1, gallery::sorted_media.size(), gallery_item_get_path_string( g_image_data.index ).c_str() );
 		else
-			snprintf( buf, 512, "Media Tag System [%zu]", gallery::sorted_media.size() );
+			snprintf( buf, 512, "FotoFalcon [%zu]", gallery::sorted_media.size() );
 	}
 
 	SDL_SetWindowTitle( app::window, buf );
