@@ -149,6 +149,11 @@ bool media_view_can_pan_image()
 }
 
 
+void media_view_draw_palette_view()
+{
+}
+
+
 void media_view_draw_media_info()
 {
 	if ( gallery::sorted_media.empty() )
@@ -180,7 +185,8 @@ void media_view_draw_media_info()
 	ImGui::SetNextWindowPos( info_pos );
 	ImGui::SetNextWindowSizeConstraints( { 32, area_height }, { window_width / 2.f, area_height } );
 
-	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
+	// | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
+	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar ) )
 	{
 		ImGui::End();
 		return;
@@ -250,6 +256,36 @@ void media_view_draw_media_info()
 			}
 		}
 
+		if ( ImGui::CollapsingHeader( "Tools" ) )
+		{
+			ImGui::Checkbox( "Invert Colors", &image_draw::invert_color );
+			ImGui::Checkbox( "Draw Scaled Image", &image_draw::scaling );
+			ImGui::Checkbox( "Draw Raw Frames", &image_draw::show_raw_frames );
+			ImGui::Checkbox( "Disable Transparency", &image_draw::hide_alpha );
+
+			ImGui::Separator();
+			ImGui::AlignTextToFramePadding();
+			ImGui::Text( "Channels" );
+			ImGui::SameLine( 0, style.ItemInnerSpacing.x );
+
+			constexpr const char* channel_str[ 4 ] = { "Red", "Green", "Blue", "Alpha" };
+
+			for ( u8 i = 0; i < 4; i++ )
+			{
+				ImVec2 text_size = ImGui::CalcTextSize( channel_str[ i ] );
+				text_size.x += style.FramePadding.x;
+
+				// ImGui::Selectable( channel_str[ i ], &image_draw::show_channels[ i ], 0, text_size );
+				ImGui::Checkbox( channel_str[ i ], &image_draw::show_channels[ i ] );
+
+				if ( i < 3 )
+				{
+					// ImGui::SameLine( 0, style.ItemInnerSpacing.x );
+					ImGui::SameLine();
+				}
+			}
+		}
+
 		if ( ImGui::CollapsingHeader( "Image Info" ) )
 		{
 			std::string_view format_name = image_get_format_name( g_image_data.image.image_format );
@@ -259,8 +295,73 @@ void media_view_draw_media_info()
 			ImGui::Text( "Channels: %d", g_image_data.image.channels );
 		}
 
+		if ( ImGui::CollapsingHeader( "Current Frame" ) )
+		{
+			const image_frame_t& frame = g_image_data.image.frame[ image_draw::frame ];
+
+			ImGui::BeginTable( "##current_frame_info", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit );
+
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted( "Frame" );
+
+			ImGui::TableNextColumn();
+			ImGui::Text( "%zd", image_draw::frame );
+
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted( "Duration" );
+
+			ImGui::TableNextColumn();
+			ImGui::Text( "%.3f", frame.time );
+
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted( "Size" );
+
+			ImGui::TableNextColumn();
+			ImGui::Text( "%dx%d", frame.width, frame.height );
+
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted( "Pos" );
+
+			ImGui::TableNextColumn();
+			ImGui::Text( "%dx%d", frame.pos_x, frame.pos_y );
+
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted( "Palette" );
+
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted( frame.flags & e_image_frame_f_local_palette ? "Yes" : "No" );
+
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted( "Frame Disposal" );
+
+			ImGui::TableNextColumn();
+
+			switch ( frame.frame_disposal )
+			{
+				default:
+				case e_frame_disposal_keep:
+					ImGui::TextUnformatted( "Keep" );
+					break;
+				case e_frame_disposal_background:
+					ImGui::TextUnformatted( "Restore Background" );
+					break;
+				case e_frame_disposal_previous:
+					ImGui::TextUnformatted( "Keep Previous" );
+					break;
+			}
+
+			ImGui::EndTable();
+		}
+
 		if ( ImGui::CollapsingHeader( "Frame Data" ) )
 		{
+			ImGui::SetNextWindowSizeConstraints( { FLT_MIN, area_height }, { FLT_MAX, FLT_MAX } );
+
 			if ( ImGui::BeginChild( "##frame_data", {}, ImGuiChildFlags_Borders ) )
 			{
 				ImGui::BeginTable( "##frame_info", 5, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit );
@@ -396,50 +497,41 @@ void media_view_context_menu()
 
 	ImGui::Separator();
 
-	// ?????
-	float saved_pos_y = ImGui::GetCursorPosY();
-	ImGui::SetCursorPosY( saved_pos_y + style.FramePadding.y );
-
+	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted( "Rotate" );
 	ImGui::SameLine();
-	ImGui::SetCursorPosY( saved_pos_y );
 
 	if ( ImGui::Button( "L" ) )
 		rotate_image( -90 );
 
 	ImGui::SameLine();
-	ImGui::SetCursorPosY( saved_pos_y );
 
 	if ( ImGui::Button( "R" ) )
 		rotate_image( 90 );
 
 	ImGui::SameLine();
-	ImGui::SetCursorPosY( saved_pos_y );
 
 	if ( ImGui::Button( "Reset" ) )
 		image_draw::rot = 0;
 
 	ImGui::SameLine();
-	ImGui::SetCursorPosY( saved_pos_y );
 	ImGui::SeparatorEx( ImGuiSeparatorFlags_Vertical );
 	ImGui::SameLine();
-	ImGui::SetCursorPosY( saved_pos_y );
 
 	ImGui::TextUnformatted( "Flip" );
 	ImGui::SameLine();
-	ImGui::SetCursorPosY( saved_pos_y );
 
 	if ( ImGui::Button( "H" ) )
 		image_draw::flip_h = !image_draw::flip_h;
 
 	ImGui::SameLine();
-	ImGui::SetCursorPosY( saved_pos_y );
 
 	if ( ImGui::Button( "V" ) )
 		image_draw::flip_v = !image_draw::flip_v;
 
 	ImGui::Separator();
 
+	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted( "Rotate" );
 
 	ImGui::SameLine();
