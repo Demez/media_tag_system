@@ -66,6 +66,23 @@ static void media_view_draw_icon( e_icon icon_value, int window_width, int windo
 }
 
 
+static void media_view_set_palette_bg( image_palette_t& palette )
+{
+	if ( !image_draw::hide_alpha )
+		return;
+
+	if ( !palette.elem || palette.bg_index == IMAGE_PALETTE_INVALID )
+	{
+		// render_clear( { 0.f, 0.f, 0.f, 0.f } );
+		return;
+	}
+
+	image_palette_elem_t& elem = palette.elem[ palette.bg_index ];
+
+	render_clear( { elem.r / 255.f, elem.g / 255.f, elem.b / 255.f, 1.f } );
+}
+
+
 static void media_view_draw_animated_fbo()
 {
 	render_draw_texture_t draw_info{};
@@ -93,8 +110,8 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 	image_frame_t&        frame    = g_image_data.image.frame[ frame_i ];
 
 	render_draw_texture_t draw_info{};
-	draw_info.target_width  = g_image_data.image.width;
-	draw_info.target_height = g_image_data.image.height;
+	//draw_info.target_width  = g_image_data.image.width;
+	//draw_info.target_height = g_image_data.image.height;
 
 	if ( g_image_data.image.flags & e_image_flag_has_palette || g_image_data.image.flags & e_image_flag_has_local_palettes )
 	{
@@ -105,6 +122,8 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 			draw_info.palette       = g_image_data.textures.palette[ frame_i ];
 			draw_info.palette_trans = g_image_data.textures.palette_trans[ frame_i ];
 			draw_info.palette_count = g_image_data.image.frame[ frame_i ].palette.count;
+
+			// media_view_set_palette_bg( frame.palette );
 		}
 	}
 
@@ -121,7 +140,7 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 		draw_info.x       = frame.pos_x;
 		draw_info.y       = frame.pos_y;
 		draw_info.texture = g_image_data.textures.frame[ frame_i ];
-		draw_info.target  = g_main_image_anim_fbo;
+		//draw_info.target  = g_main_image_anim_fbo;
 	}
 	else
 	{
@@ -214,11 +233,14 @@ static void media_view_draw_image( int width, int height )
 	{
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 
-		glBindFramebuffer( GL_FRAMEBUFFER, g_main_image_anim_fbo );
-		glClear( GL_COLOR_BUFFER_BIT );
+		render_set_fbo( g_main_image_anim_fbo, g_image_data.image.width, g_image_data.image.height );
+
+		render_clear( { 0.f, 0.f, 0.f, 0.f } );
+		media_view_set_palette_bg( g_image_data.image.palette );
 	}
 	else
 	{
+		render_set_fbo( 0, width, height );
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 	}
 
@@ -259,6 +281,8 @@ static void media_view_draw_image( int width, int height )
 			last_frame_to_keep = 0;
 		}
 
+		media_view_set_palette_bg( g_image_data.image.frame[ last_frame_to_keep ].palette );
+
 		/// mmmm overdraw hell?
 		for ( u32 i = last_frame_to_keep; i < image_draw::frame + 1; i++ )
 		{
@@ -267,21 +291,56 @@ static void media_view_draw_image( int width, int height )
 	}
 	else if ( prev_disposal == e_frame_disposal_previous )
 	{
-		if ( image_draw::frame > 0 )
-			media_view_draw_frame( width, height, image_draw::frame - 1 );
+		// Restore to the last frame without the previous disposal type
+		size_t last_frame_to_keep = image_draw::frame;
+
+		if ( !image_draw::show_raw_frames && image_draw::frame > 0 )
+		{
+			for ( last_frame_to_keep--;; last_frame_to_keep-- )
+			{
+				image_frame_t& frame = g_image_data.image.frame[ last_frame_to_keep ];
+
+				if ( frame.frame_disposal != e_frame_disposal_previous )
+					break;
+
+				if ( last_frame_to_keep == 0 )
+				{
+					last_frame_to_keep = image_draw::frame;
+					break;
+				}
+			}
+		}
+		else if ( image_draw::show_raw_frames )
+		{
+			last_frame_to_keep = image_draw::frame;
+		}
+		else
+		{
+			last_frame_to_keep = 0;
+		}
+
+		if ( last_frame_to_keep < image_draw::frame )
+		{
+			media_view_set_palette_bg( g_image_data.image.frame[ last_frame_to_keep ].palette );
+			media_view_draw_frame( width, height, last_frame_to_keep );
+		}
 
 		media_view_draw_frame( width, height, image_draw::frame );
 	}
 	else  // e_frame_disposal_background ?
 	{
+		media_view_set_palette_bg( g_image_data.image.frame[ image_draw::frame ].palette );
 		media_view_draw_frame( width, height, image_draw::frame );
 	}
 
 	if ( g_image_data.image.frame.size() > 1 )
 	{
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+		render_set_fbo( 0, width, height );
 		media_view_draw_animated_fbo();
 	}
+
+	render_finish();
 }
 
 

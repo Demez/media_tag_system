@@ -400,9 +400,9 @@ struct render_draw_texture_t
 	GLuint              palette_count = 0;
 
 	// draw target
-	GLuint              target;
-	int                 target_width;
-	int                 target_height;
+//	GLuint              target;
+//	int                 target_width;
+//	int                 target_height;
 
 	e_shader            shader = e_shader_main;
 
@@ -414,6 +414,9 @@ struct render_draw_texture_t
 	bool                hide_channel[ 4 ];
 	bool                hide_alpha    = false;
 	bool                invert_colors = false;
+
+//	bool                clear_bg      = false;
+//	ImVec4              clear_bg_color{};
 };
 
 
@@ -557,6 +560,10 @@ void                                 render_window_set_fallbacks();
 bool                                 render_init();
 void                                 render_shutdown();
 void                                 render_window_resize();
+
+void                                 render_set_fbo( GLuint fbo, int fbo_width, int fbo_height );
+void                                 render_finish();
+void                                 render_clear( ImVec4 color );
 void                                 render_draw_texture( render_draw_texture_t draw_info );
 
 bool                                 config_init();

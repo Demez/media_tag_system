@@ -114,6 +114,7 @@ void media_load_job_run( job_status_t* status )
 
 	if ( load_data->entry.type == e_media_type_image )
 	{
+		load_data->load_info.threaded_load = true;
 		load_data->image_load_ret = image_load( load_data->full_path, load_data->load_info );
 	}
 	else

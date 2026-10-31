@@ -450,6 +450,33 @@ void render_shutdown()
 // ================================================================================================
 
 
+static int g_fbo_width  = 0;
+static int g_fbo_height = 0;
+
+
+void render_set_fbo( GLuint fbo, int fbo_width, int fbo_height )
+{
+	g_fbo_width  = fbo_width;
+	g_fbo_height = fbo_height;
+
+	glBindFramebuffer( GL_FRAMEBUFFER, fbo );
+	//glScissor( 0, 0, g_fbo_width, g_fbo_height );
+	//glEnable( GL_SCISSOR_TEST );
+}
+
+void render_finish()
+{
+	//glDisable( GL_SCISSOR_TEST );
+}
+
+
+void render_clear( ImVec4 color )
+{
+	glClearColor( color.x, color.y, color.z, color.w );
+	glClear( GL_COLOR_BUFFER_BIT );
+}
+
+
 void render_draw_texture( render_draw_texture_t draw_info )
 {
 	if ( draw_info.flip_h )
@@ -476,28 +503,28 @@ void render_draw_texture( render_draw_texture_t draw_info )
 		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 	}
 
-	int window_width, window_height;
+//	int window_width, window_height;
+//
+//	if ( draw_info.target )
+//	{
+//		window_width  = draw_info.target_width;
+//		window_height = draw_info.target_height;
+//
+//		glBindFramebuffer( GL_FRAMEBUFFER, draw_info.target );
+//	}
+//	else
+//	{
+//		SDL_GetWindowSizeInPixels( app::window, &window_width, &window_height );
+//		glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+//	}
 
-	if ( draw_info.target )
-	{
-		window_width  = draw_info.target_width;
-		window_height = draw_info.target_height;
-
-		glBindFramebuffer( GL_FRAMEBUFFER, draw_info.target );
-	}
-	else
-	{
-		SDL_GetWindowSizeInPixels( app::window, &window_width, &window_height );
-		glBindFramebuffer( GL_FRAMEBUFFER, 0 );
-	}
-
-	glViewport( 0, 0, window_width, window_height );
+	glViewport( 0, 0, g_fbo_width, g_fbo_height );
 
 	// from imgui code
 	float       L                              = 0.f;
-	float       R                              = static_cast< float >( window_width );
+	float       R                              = static_cast< float >( g_fbo_width );
 	float       T                              = 0.f;
-	float       B                              = static_cast< float >( window_height );
+	float       B                              = static_cast< float >( g_fbo_height );
 
 	const float ortho_projection[ 4 ][ 4 ]     = {
 		{ 2.0f / ( R - L ), 0.0f, 0.0f, 0.0f },
