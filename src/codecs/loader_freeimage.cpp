@@ -51,7 +51,7 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	//	}
 
 	// hdr image - TODO: this looks kinda shit
-	if ( bpp == 96 || bpp == 128 )
+	if ( bpp > 32 )
 	{
 		FIBITMAP* old_bitmap = bitmap;
 		bitmap               = FreeImage_ToneMapping( old_bitmap, FITMO_DRAGO03 );
