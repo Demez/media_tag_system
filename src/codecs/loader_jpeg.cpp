@@ -3,8 +3,6 @@
 
 #include <turbojpeg.h>
 
-#include <chrono>
-
 
 struct CodecJPEG: public IImageLoader
 {
@@ -28,11 +26,11 @@ struct CodecJPEG: public IImageLoader
 		tjDestroy( tjpg );
 	}
 
-	void get_supported_extensions( std::vector< std::string >& extensions ) override
+	void get_supported_formats( std::vector< image_format_info_t >& formats ) override
 	{
-		extensions.reserve( extensions.size() + 2 );
-		extensions.push_back( ".jpg" );
-		extensions.push_back( ".jpeg" );
+		formats.reserve( formats.size() + 2 );
+		formats.emplace_back( "JPEG", ".jpg" );
+		formats.emplace_back( "JPEG", ".jpeg" );
 	}
 
 	bool check_header( const fs::path& path ) override
@@ -179,10 +177,11 @@ struct CodecJPEG: public IImageLoader
 		}
 
 		//image->bytes_per_pixel = tjPixelSize[ pixelFmt ];
-		image->width    = best_width;
-		image->height   = best_height;
-		image->format   = GL_BGR;
-		image->channels = 3;
+		image->width        = best_width;
+		image->height       = best_height;
+		image->format       = GL_BGR;
+		image->channels     = 3;
+		image->image_format = image_get_format_index_from_ext( ".jpg" );
 
 		return true;
 	}

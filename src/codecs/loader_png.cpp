@@ -33,9 +33,9 @@ struct LoaderPNG: public IImageLoader
 	{
 	}
 
-	void get_supported_extensions( std::vector< std::string >& extensions ) override
+	void get_supported_formats( std::vector< image_format_info_t >& formats ) override
 	{
-		extensions.push_back( match_ext );
+		formats.emplace_back( "PNG", match_ext );
 	}
 
 	bool check_header( const fs::path& path ) override
@@ -253,8 +253,7 @@ struct LoaderPNG: public IImageLoader
 		//load_info.image->bit_depth         = ihdr.bit_depth;
 		// load_info.image->pitch             = load_info.image->width * load_info.image->bytes_per_pixel;
 
-		// the strdup is stupid lol
-		load_info.image->image_format      = util_strndup_r( load_info.image->image_format, "PNG", 3 );
+		load_info.image->image_format      = image_get_format_index_from_ext( match_ext );
 
         spng_ctx_free( ctx );
 

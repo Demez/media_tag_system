@@ -14,9 +14,9 @@ struct LoaderWebP : public IImageLoader
 	{
 	}
 
-	virtual void get_supported_extensions( std::vector< std::string >& extensions ) override
+	virtual void get_supported_formats( std::vector< image_format_info_t >& formats ) override
 	{
-		extensions.push_back( ".webp" );
+		formats.emplace_back( "WebP", ".webp" );
 	}
 
 	bool check_header( const fs::path& path ) override
@@ -149,6 +149,9 @@ struct LoaderWebP : public IImageLoader
 		#endif
 
 		WebPDemuxDelete( demux );
+
+		image->image_format = image_get_format_index_from_ext( ".webp" );
+
 		return true;
 	}
 };

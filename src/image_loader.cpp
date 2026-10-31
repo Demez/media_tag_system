@@ -38,6 +38,18 @@ static std::unordered_set< std::string >& get_ext_loader_set()
 	return ext_loader_set;
 }
 
+static std::unordered_map< std::string, int >& get_ext_index_map()
+{
+	static std::unordered_map< std::string, int > ext_index_map;
+	return ext_index_map;
+}
+
+static std::vector< std::string >& get_ext_name_list()
+{
+	static std::vector< std::string > ext_names;
+	return ext_names;
+}
+
 //static std::unordered_map< std::string, IImageLoader* > g_ext_loader_map{};
 //static std::unordered_set< std::string >                g_ext_loader_set{};
 
@@ -57,12 +69,12 @@ void image_register_codec( IImageLoader* codec, bool fallback )
 		g_codecs.push_back( codec );
 	}
 
-	std::vector< std::string > exts;
-	codec->get_supported_extensions( exts );
+	std::vector< image_format_info_t > formats;
+	codec->get_supported_formats( formats );
 
-	for ( const std::string& ext : exts )
+	for ( const image_format_info_t& format : formats )
 	{
-		auto it = get_ext_loader_map().find( ext );
+		auto it = get_ext_loader_map().find( format.ext );
 
 		// Already here
 		if ( it != get_ext_loader_map().end() )
@@ -72,9 +84,47 @@ void image_register_codec( IImageLoader* codec, bool fallback )
 		}
 		
 		// Add it
-		get_ext_loader_map()[ ext ] = codec;
-		get_ext_loader_set().insert( ext );
+		get_ext_loader_map()[ format.ext ] = codec;
+		get_ext_loader_set().insert( format.ext );
+
+		// Add to the format name list
+		auto it_index = get_ext_index_map().find( format.ext );
+
+		// Already here
+		if ( it_index != get_ext_index_map().end() )
+		{
+			if ( fallback )  // allow main formats to override fallback names
+				continue;
+		}
+
+		// Add it
+		int index = static_cast< int >( get_ext_name_list().size() );
+		get_ext_name_list().push_back( format.name );
+		get_ext_index_map()[ format.ext ] = index;
 	}
+}
+
+
+int image_get_format_index_from_ext( const std::string& extension )
+{
+	auto it = get_ext_index_map().find( extension );
+
+	if ( it == get_ext_index_map().end() )
+		return IMAGE_FORMAT_INVALID;
+
+	return it->second;
+}
+
+
+static std::string __invalid_format_name = "INVALID";
+
+
+std::string_view image_get_format_name( int index )
+{
+	if ( index == IMAGE_FORMAT_INVALID || index > get_ext_name_list().size() )
+		return __invalid_format_name;
+
+	return get_ext_name_list()[ index ];
 }
 
 
@@ -120,9 +170,6 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 			return false;
 		}
 
-		// construct in place
-		load_info.image = new ( load_info.image ) image_t();
-
 		allocated_image = true;
 	}
 
@@ -161,7 +208,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 
 	if ( !loaded_image )
 	{
-		printf( "*** Falling to backup codec\n" );
+		printf( "*** Falling to backup loader\n" );
 
 		for ( IImageLoader* _loader : g_codecs_backup )
 		{
@@ -197,7 +244,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 	{
 		load_info.image->flags |= e_image_flag_has_palette;
 
-		if ( load_info.image->palette.trans_index < INT32_MAX )
+		if ( load_info.image->palette.trans_index < IMAGE_PALETTE_INVALID )
 			load_info.image->flags |= e_image_flag_has_palette_trans;
 
 		//if ( load_info.image->frame.size() == 1 )
@@ -211,7 +258,7 @@ bool image_load( const fs::path& path, image_load_info_t& load_info, char* file_
 			load_info.image->flags |= e_image_flag_has_local_palettes;
 			frame.flags |= e_image_frame_f_local_palette;
 
-			if ( frame.palette.trans_index < INT32_MAX )
+			if ( frame.palette.trans_index < IMAGE_PALETTE_INVALID )
 			{
 				load_info.image->flags |= e_image_flag_has_palette_trans;
 				frame.flags |= e_image_frame_f_local_palette_trans;
@@ -314,11 +361,6 @@ void image_free_frames( image_t& image )
 void image_free_alloc( image_t& image )
 {
 	image_free_frames( image );
-
-	if ( image.image_format )
-		ch_free_str( image.image_format );
-
-	image.image_format = nullptr;
 }
 
 

@@ -252,8 +252,9 @@ void media_view_draw_media_info()
 
 		if ( ImGui::CollapsingHeader( "Image Info" ) )
 		{
+			std::string_view format_name = image_get_format_name( g_image_data.image.image_format );
 			ImGui::Text( "Size: %dx%d", g_image_data.image.width, g_image_data.image.height );
-			ImGui::Text( "Type: %s", g_image_data.image.image_format );
+			ImGui::Text( "Format: %s", format_name.data() );
 			ImGui::Text( "Frame Count: %zu", g_image_data.image.frame.size() );
 			ImGui::Text( "Channels: %d", g_image_data.image.channels );
 		}

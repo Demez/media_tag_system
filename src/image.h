@@ -37,7 +37,7 @@ enum e_colortype : u8
 // https://www.theimage.com/animation/pages/disposal.html
 // https://www.theimage.com/animation/pages/disposal2.html
 // GIF
-enum e_frame_disposal
+enum e_frame_disposal : u8
 {
 	e_frame_disposal_keep,        // leave rendered image on canvas and draw over it
 	e_frame_disposal_background,  // restore to background color or transparency before drawing
@@ -48,7 +48,7 @@ enum e_frame_disposal
 
 
 // JPEG XL, can i join the above into this somehow? or is this wrong, i haven't touched this yet still
-enum e_frame_blend_mode
+enum e_frame_blend_mode : u8
 {
 	e_frame_blend_mode_none,
 
@@ -75,7 +75,7 @@ struct animation_format_frame_data_gif_t : public animation_format_frame_data_ba
 };
 
 
-enum e_animation_format
+enum e_animation_format : u8
 {
 	e_animation_format_none,
 
@@ -147,14 +147,17 @@ struct image_palette_t;
 void image_free_palette( image_palette_t& palette );
 
 
+constexpr u16 IMAGE_PALETTE_INVALID = UINT16_MAX;
+constexpr u32 IMAGE_FORMAT_INVALID  = UINT32_MAX;
+
+
 struct image_palette_t
 {
 	image_palette_elem_t* elem        = nullptr;
-	u32                   count       = 0;
-	int                   bg_index    = INT32_MAX;
-	int                   trans_index = INT32_MAX;
+	u16                   count       = 0;
+	u16                   bg_index    = IMAGE_PALETTE_INVALID;
+	u16                   trans_index = IMAGE_PALETTE_INVALID;
 
-	
 	image_palette_t() {
 	};
 
@@ -189,8 +192,8 @@ struct image_palette_t
 		elem              = std::move( other.elem );
 
 		other.count       = 0;
-		other.bg_index    = 0;
-		other.trans_index = 0;
+		other.bg_index    = IMAGE_PALETTE_INVALID;
+		other.trans_index = IMAGE_PALETTE_INVALID;
 		other.elem        = nullptr;
 	}
 
@@ -337,33 +340,31 @@ struct image_frame_t
 // then image_frame_data_t contains a list of frames with JUST the raw pixel data and size
 struct image_t
 {
-	int                          width;
-	int                          height;
+	int                          width        = 0;
+	int                          height       = 0;
 
-	GLint                        format;
-	
-	e_image_flag                 flags;
-	u8                           channels;
+	GLint                        format       = 0;
+
+	e_image_flag                 flags        = 0;
+	u8                           channels     = 0;
 
 	// add channels_source - for the source channel count, would be used for jxl thumbnails
 
-	u16                          loop_count;
+	u16                          loop_count   = 0;
 
-	// REPLACE WITH INDEX INTO IMAGE FORMAT STRING LIST
-	char*                        image_format;
+	int                          image_format = IMAGE_FORMAT_INVALID;
 
 	//e_animation_format           animation_format;
 
-	std::vector< image_frame_t > frame;
+	std::vector< image_frame_t > frame{};
 	// image_frame_list_t frame;
 
-	image_palette_t              palette;
+	image_palette_t              palette{};
 
-	image_t() {
+	image_t(){
 	};
 
-	~image_t()
-	{
+	~image_t() {
 	}
 
 	// copying
@@ -378,9 +379,7 @@ struct image_t
 		loop_count      = other.loop_count;
 		palette         = other.palette;
 		flags           = other.flags;
-
-		if ( other.image_format )
-			image_format = util_strdup( other.image_format );
+		image_format    = other.image_format;
 	}
 
 	// moving
@@ -395,9 +394,7 @@ struct image_t
 		format             = other.format;
 		loop_count         = other.loop_count;
 		flags              = other.flags;
-
 		image_format       = other.image_format;
-		other.image_format = nullptr;
 	}
 
 	image_t& operator=( image_t&& other ) noexcept
@@ -412,8 +409,6 @@ struct image_t
 		assign( std::move( other ) );
 	}
 
-	//private:
-	// copying
 	image_t& operator=( const image_t& other ) noexcept
 	{
 		assign( other );
@@ -500,9 +495,16 @@ struct image_handle_t
 };
 
 
+struct image_format_info_t
+{
+	std::string name;
+	std::string ext;
+};
+
+
 struct IImageLoader
 {
-	virtual void get_supported_extensions( std::vector< std::string >& extensions )                            = 0;
+	virtual void get_supported_formats( std::vector< image_format_info_t >& formats )                          = 0;
 
 	virtual bool check_header( const fs::path& path )                                                          = 0;
 
@@ -590,6 +592,9 @@ bool               image_scale( image_t* old_image, image_t* new_image, int new_
 
 bool               image_convert_bgrx_to_rgbx( image_t* image );
 bool               image_convert_frames_bgrx_to_rgbx( u32 channels, std::vector< image_frame_t >& image_frames );
+
+int                image_get_format_index_from_ext( const std::string& extension );
+std::string_view   image_get_format_name( int index );
 
 
 // TODO: add image load functions here

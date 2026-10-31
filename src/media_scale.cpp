@@ -224,7 +224,7 @@ void media_view_scale_set_image()
 	image_copy_frame_data( g_image_data.image.frame[ 0 ], g_scale_src.frame[ 0 ] );
 
 	// don't hold onto this
-	g_scale_src.image_format    = nullptr;
+	g_scale_src.image_format    = IMAGE_FORMAT_INVALID;
 
 	size_t image_size           = (size_t)g_image_data.image.width * (size_t)g_image_data.image.height * (size_t)g_image_data.image.channels;
 	g_scale_src.frame[ 0 ].data = ch_calloc< u8 >( image_size, e_mem_category_image_data );

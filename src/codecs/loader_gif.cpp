@@ -28,7 +28,7 @@ static void gif_write_palette( image_palette_t& palette, struct GIF_WHDR* gif_wh
 	//if ( gif_whdr->tran != -1 )
 	//	frame.palette.trans_index = gif_whdr->tran;
 	//else
-	//	frame.palette.trans_index = frame.palette.count;
+	//	frame.palette.trans_index = IMAGE_PALETTE_INVALID;
 
 	for ( u32 p = 0; p < palette.count; p++ )
 	{
@@ -36,6 +36,37 @@ static void gif_write_palette( image_palette_t& palette, struct GIF_WHDR* gif_wh
 		palette.elem[ p ].g = gif_whdr->cpal[ p ].G;
 		palette.elem[ p ].b = gif_whdr->cpal[ p ].B;
 		// palette.elem[ p ].a = 255;
+	}
+}
+
+
+static void gif_deinterlace_frame( int width, int height, size_t line_size, u8* dst, u8* src )
+{
+	int src_line  = 0;
+
+	// https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art011
+	// first, take every 8th line of a gif
+	for ( u16 line = 0; line < height; line += 8 )
+	{
+		memcpy( dst + ( line * line_size ), src + ( src_line++ * line_size ), line_size );
+	}
+
+	// take every 8th line of a gif, starting from 4th line
+	for ( u16 line = 4; line < height; line += 8 )
+	{
+		memcpy( dst + ( line * line_size ), src + ( src_line++ * line_size ), line_size );
+	}
+
+	// take every 4th line of a gif, starting from 2nd line
+	for ( u16 line = 2; line < height; line += 4 )
+	{
+		memcpy( dst + ( line * line_size ), src + ( src_line++ * line_size ), line_size );
+	}
+
+	// take every other line of a gif
+	for ( u16 line = 1; line < height; line += 2 )
+	{
+		memcpy( dst + ( line * line_size ), src + ( src_line++ * line_size ), line_size );
 	}
 }
 
@@ -52,6 +83,8 @@ static void gif_setup_image( ff_gif_data_t* ff_gif_data, struct GIF_WHDR* gif_wh
 
 	image->width                 = gif_whdr->xdim;
 	image->height                = gif_whdr->ydim;
+
+	image->image_format          = image_get_format_index_from_ext( ".gif" );
 
 	image->palette.count         = gif_whdr->clrs;
 	image->palette.bg_index      = gif_whdr->bkgd;
@@ -134,19 +167,33 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 		frame.data     = ch_calloc< u8 >( size, e_mem_category_image_data );
 		frame.size     = size;
 
+		u8* src_data = nullptr;
+
+		if ( gif_whdr->intr )
+		{
+			src_data = ch_calloc< u8 >( og_size, e_mem_category_image_data );
+			gif_deinterlace_frame( frame.width, frame.height, frame.width, src_data, gif_whdr->bptr );
+		}
+		else
+		{
+			src_data = gif_whdr->bptr;
+		}
+
 		memset( frame.data, 0, size * sizeof( u8 ) );
 
 		u8* start = &frame.data[ 0 ];
 		for ( int s = 0; s < og_size; s++ )
 		{
-			auto palette_index = gif_whdr->bptr[ s ];
+			auto palette_index = src_data[ s ];
+
+		//	memcpy( start, &gif_whdr->cpal[ palette_index ], 3 );
 
 			*start = gif_whdr->cpal[ palette_index ].B;
 			start++;
-
+		
 			*start = gif_whdr->cpal[ palette_index ].G;
 			start++;
-
+		
 			*start = gif_whdr->cpal[ palette_index ].R;
 			start++;
 
@@ -156,6 +203,12 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 				*start = 255;
 
 			start++;
+			// start += 4;
+		}
+
+		if ( gif_whdr->intr )
+		{
+			ch_free( e_mem_category_image_data, src_data );
 		}
 	}
 	else
@@ -165,7 +218,43 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 		frame.size  = size;
 
 		memset( frame.data, 0, size * sizeof( u8 ) );
-		memcpy( frame.data, gif_whdr->bptr, size );
+
+		// interlaced frame!
+		if ( gif_whdr->intr )
+		{
+			gif_deinterlace_frame( frame.width, frame.height, frame.width, frame.data, gif_whdr->bptr );
+		//	size_t line_size = frame.width;
+		//	int    src_line  = 0;
+		//
+		//	// https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art011
+		//	// first, take every 8th line of a gif
+		//	for ( u16 line = 0; line < frame.height; line += 8 )
+		//	{
+		//		memcpy( frame.data + ( line * line_size ), gif_whdr->bptr + ( src_line++ * line_size ), line_size );
+		//	}
+		//
+		//	// take every 8th line of a gif, starting from 4th line
+		//	for ( u16 line = 4; line < frame.height; line += 8 )
+		//	{
+		//		memcpy( frame.data + ( line * line_size ), gif_whdr->bptr + ( src_line++ * line_size ), line_size );
+		//	}
+		//
+		//	// take every 4th line of a gif, starting from 2nd line
+		//	for ( u16 line = 2; line < frame.height; line += 4 )
+		//	{
+		//		memcpy( frame.data + ( line * line_size ), gif_whdr->bptr + ( src_line++ * line_size ), line_size );
+		//	}
+		//
+		//	// take every other line of a gif
+		//	for ( u16 line = 1; line < frame.height; line += 2 )
+		//	{
+		//		memcpy( frame.data + ( line * line_size ), gif_whdr->bptr + ( src_line++ * line_size ), line_size );
+		//	}
+		}
+		else
+		{
+			memcpy( frame.data, gif_whdr->bptr, size );
+		}
 
 		image->format             = GL_R8;
 		image->channels           = 1;
@@ -206,9 +295,9 @@ struct LoaderGIF : public IImageLoader
 	{
 	}
 
-	virtual void get_supported_extensions( std::vector< std::string >& extensions ) override
+	virtual void get_supported_formats( std::vector< image_format_info_t >& formats ) override
 	{
-		extensions.push_back( ".gif" );
+		formats.emplace_back( "GIF", ".gif" );
 	}
 
 	bool check_header( const fs::path& path ) override

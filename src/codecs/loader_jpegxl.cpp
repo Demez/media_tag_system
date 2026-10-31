@@ -36,9 +36,9 @@ struct LoaderJXL: public IImageLoader
 	{
 	}
 
-	void get_supported_extensions( std::vector< std::string >& extensions ) override
+	void get_supported_formats( std::vector< image_format_info_t >& formats ) override
 	{
-		extensions.push_back( match_ext );
+		formats.emplace_back( "JPEG XL", match_ext );
 	}
 
 	bool check_header( const fs::path& path ) override
@@ -272,21 +272,15 @@ struct LoaderJXL: public IImageLoader
 			}
 		}
 
-		load_info.image->channels          = format.num_channels;
+		image->image_format = image_get_format_index_from_ext( match_ext );
+		image->channels     = format.num_channels;
 
-		if ( load_info.image->channels == 3 )
-			load_info.image->format = GL_RGB;
+		if ( image->channels == 3 )
+			image->format = GL_RGB;
 		//else if ( load_info.image->channels == 1 )
 		//	load_info.image->format = GL_R8;
 		else
-			load_info.image->format = GL_RGBA;
-
-
-		load_info.image->frame[ 0 ].width  = load_info.image->width;
-		load_info.image->frame[ 0 ].height = load_info.image->height;
-
-		// the strdup is stupid lol
-		load_info.image->image_format = util_strndup_r( load_info.image->image_format, "JPEG XL", 8 );
+			image->format = GL_RGBA;
 
 		return true;
 	}

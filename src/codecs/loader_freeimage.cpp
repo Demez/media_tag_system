@@ -163,7 +163,7 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 				if ( trans )
 					frame.palette.trans_index = trans_index;
 				else
-					frame.palette.trans_index = frame.palette.count;
+					frame.palette.trans_index = IMAGE_PALETTE_INVALID;
 
 				for ( u32 p = 0; p < frame.palette.count; p++ )
 				{
@@ -400,12 +400,13 @@ struct LoaderFreeImage : public IImageLoader
 	{
 	}
 
-	void get_supported_extensions( std::vector< std::string >& extensions ) override
+	void get_supported_formats( std::vector< image_format_info_t >& formats ) override
 	{
 		for ( int idx = 0; idx < FreeImage_GetFIFCount2(); ++idx )
 		{
-			FREE_IMAGE_FORMAT fif  = FreeImage_GetFIFFromIndex( idx );
-			const char*       exts = FreeImage_GetFIFExtensionList( fif );
+			FREE_IMAGE_FORMAT fif      = FreeImage_GetFIFFromIndex( idx );
+			const char*       exts     = FreeImage_GetFIFExtensionList( fif );
+			const char*       format   = FreeImage_GetFormatFromFIF( fif );
 			// const char*       desc = FreeImage_GetFIFDescription( fif );
 
 			char*             ext_cur  = const_cast< char* >( exts );
@@ -420,7 +421,7 @@ struct LoaderFreeImage : public IImageLoader
 				else
 					ext.append( ext_cur, ext_next - ext_cur );
 
-				extensions.push_back( ext );
+				formats.emplace_back( format, ext );
 
 				if ( !ext_next )
 					break;
@@ -567,7 +568,38 @@ struct LoaderFreeImage : public IImageLoader
 			}
 		}
 
-		load_info.image->image_format = util_strdup_r( load_info.image->image_format, FreeImage_GetFormatFromFIF( format ) );
+		// ----------------------------------------------------------------------------------------
+
+		const char*       exts     = FreeImage_GetFIFExtensionList( format );
+		// const char*       desc = FreeImage_GetFIFDescription( fif );
+
+		char*             ext_cur  = const_cast< char* >( exts );
+		char*             ext_next = strchr( ext_cur, ',' );
+
+		while ( ext_cur != nullptr )
+		{
+			std::string ext = ".";
+
+			if ( !ext_next )
+				ext.append( ext_cur );
+			else
+				ext.append( ext_cur, ext_next - ext_cur );
+
+			int index = image_get_format_index_from_ext( ext );
+
+			if ( index == IMAGE_FORMAT_INVALID )
+			{
+				printf( "INVALID FORMAT ??\n" );
+				if ( !ext_next )
+					break;
+
+				ext_cur  = ext_next + 1;
+				ext_next = strchr( ext_cur, ',' );
+			}
+
+			load_info.image->image_format = index; 
+			break;
+		}
 
 		// TODO: HANDLE ANIM - LINE FROM GIF PLUGIN
 		//setup frame time
