@@ -154,7 +154,33 @@ void media_view_draw_media_info()
 	if ( gallery::sorted_media.empty() )
 		return;
 
-	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar ) )
+	int window_width, window_height;
+	SDL_GetWindowSize( app::window, &window_width, &window_height );
+
+	ImGuiStyle&  style = ImGui::GetStyle();
+
+	const ImVec2 info_pos( style.WindowPadding.x * 3.f, style.WindowPadding.y * 3.f );
+	float        area_height = window_height - ( info_pos.y * 2.f );
+
+	bool         drawing_controls = get_media_type() == e_media_type_video;
+	drawing_controls |= ( get_media_type() == e_media_type_image && g_image_data.image.frame.size() > 1 );
+	
+	if ( drawing_controls )
+	{
+		ImGui::PushFont( font::normal, app::config.font_size * 1.25f );
+
+		ImVec2      content_height( ImGui::GetFontSize() + style.FramePadding.x * 2.0f, ImGui::GetFrameHeight() );
+		ImVec2      playback_window_height( ImGui::GetFontSize() + style.FramePadding.x * 2.0f + style.ItemSpacing.x, ImGui::GetFrameHeightWithSpacing() );
+
+		ImGui::PopFont();
+
+		area_height -= ( playback_window_height.y + style.ItemSpacing.y + info_pos.y );
+	}
+
+	ImGui::SetNextWindowPos( info_pos );
+	ImGui::SetNextWindowSizeConstraints( { 32, area_height }, { window_width / 2.f, area_height } );
+
+	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse ) )
 	{
 		ImGui::End();
 		return;
@@ -166,16 +192,19 @@ void media_view_draw_media_info()
 
 	ImGui::Separator();
 
-	ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
+	if ( ImGui::CollapsingHeader( "File Information" ) )
+	{
+		ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
 
-	char date_created[ DATE_TIME_BUFFER ]{};
-	char date_mod[ DATE_TIME_BUFFER ]{};
+		char date_created[ DATE_TIME_BUFFER ]{};
+		char date_mod[ DATE_TIME_BUFFER ]{};
 
-	util_format_date_time( date_created, DATE_TIME_BUFFER, entry.file.date_created );
-	util_format_date_time( date_mod, DATE_TIME_BUFFER, entry.file.date_mod );
+		util_format_date_time( date_created, DATE_TIME_BUFFER, entry.file.date_created );
+		util_format_date_time( date_mod, DATE_TIME_BUFFER, entry.file.date_mod );
 
-	ImGui::Text( "Date Created: %s", date_created );
-	ImGui::Text( "Date Modified: %s", date_mod );
+		ImGui::Text( "Date Created: %s", date_created );
+		ImGui::Text( "Date Modified: %s", date_mod );
+	}
 
 	if ( get_media_type() == e_media_type_video )
 	{
@@ -184,60 +213,125 @@ void media_view_draw_media_info()
 	else
 	{
 		// Scaling Info
-		ImGui::SeparatorText( "Scaling" );
-
-		ImGui::Text( "Scale Thread State: %s", media_get_scale_state_str() );
-		ImGui::Text( "Scaled: %dx%d", g_image_scaled_data.image.width, g_image_scaled_data.image.height );
-		ImGui::Text( "Render Size: %.0fx%.0f", image_draw::size.x, image_draw::size.y );
-		ImGui::Text( "Render Pos: %.0fx%.0f", image_draw::pos.x, image_draw::pos.y );
-
-		ImGui::SeparatorText( "Image Info" );
-
-		// Image Type
-		ImGui::Text( "Size: %dx%d", g_image_data.image.width, g_image_data.image.height );
-
-		ImGui::Text( "Type: %s", g_image_data.image.image_format );
-		ImGui::Text( "Frame Count: %zu", g_image_data.image.frame.size() );
-		ImGui::Text( "Channels: %d", g_image_data.image.channels );
-
-		switch ( g_image_data.image.format )
+		if ( ImGui::CollapsingHeader( "Rendering" ) )
 		{
-			default:
-				ImGui::Text( "Format: Unhandled GL Format %d", g_image_data.image.format );
-				break;
-			case GL_RGB:
-				ImGui::TextUnformatted( "GL Format: RGB" );
-				break;
-			case GL_RGBA:
-				ImGui::TextUnformatted( "GL Format: RGBA" );
-				break;
-			case GL_BGR:
-				ImGui::TextUnformatted( "GL Format: BGR" );
-				break;
-			case GL_BGRA:
-				ImGui::TextUnformatted( "GL Format: BGRA" );
-				break;
-			case GL_RGBA16:
-				ImGui::TextUnformatted( "GL Format: RGBA16" );
-				break;
-			case GL_R8:
-				ImGui::TextUnformatted( "GL Format: R8" );
-				break;
-			case GL_ALPHA:
-				ImGui::TextUnformatted( "GL Format: ALPHA" );
-				break;
+			ImGui::Text( "Zoom: %.1f%%", (float)( image_draw::zoom * 100 ) );
+			ImGui::Text( "Scale Thread State: %s", media_get_scale_state_str() );
+			// ImGui::Text( "Scaled: %dx%d", g_image_scaled_data.image.width, g_image_scaled_data.image.height );
+			ImGui::Text( "Render Size: %.0fx%.0f", image_draw::size.x, image_draw::size.y );
+			// ImGui::Text( "Render Pos: %.0fx%.0f", image_draw::pos.x, image_draw::pos.y );
+
+			switch ( g_image_data.image.format )
+			{
+				default:
+					ImGui::Text( "Format: Unhandled GL Format %d", g_image_data.image.format );
+					break;
+				case GL_RGB:
+					ImGui::TextUnformatted( "GL Format: RGB" );
+					break;
+				case GL_RGBA:
+					ImGui::TextUnformatted( "GL Format: RGBA" );
+					break;
+				case GL_BGR:
+					ImGui::TextUnformatted( "GL Format: BGR" );
+					break;
+				case GL_BGRA:
+					ImGui::TextUnformatted( "GL Format: BGRA" );
+					break;
+				case GL_RGBA16:
+					ImGui::TextUnformatted( "GL Format: RGBA16" );
+					break;
+				case GL_R8:
+					ImGui::TextUnformatted( "GL Format: R8" );
+					break;
+				case GL_ALPHA:
+					ImGui::TextUnformatted( "GL Format: ALPHA" );
+					break;
+			}
+		}
+
+		if ( ImGui::CollapsingHeader( "Image Info" ) )
+		{
+			ImGui::Text( "Size: %dx%d", g_image_data.image.width, g_image_data.image.height );
+			ImGui::Text( "Type: %s", g_image_data.image.image_format );
+			ImGui::Text( "Frame Count: %zu", g_image_data.image.frame.size() );
+			ImGui::Text( "Channels: %d", g_image_data.image.channels );
 		}
 
 		if ( ImGui::CollapsingHeader( "Frame Data" ) )
 		{
-			for ( size_t frame_i = 0; frame_i < g_image_data.image.frame.size(); frame_i++ )
+			if ( ImGui::BeginChild( "##frame_data", {}, ImGuiChildFlags_Borders ) )
 			{
-				ImGui::Separator();
+				ImGui::BeginTable( "##frame_info", 5, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit );
 
-				ImGui::Text( "Frame %zu", frame_i );
-				ImGui::Text( "Duration: %.3f", g_image_data.image.frame[ frame_i ].time );
-				ImGui::Text( "Size: %dx%d", g_image_data.image.frame[ frame_i ].width, g_image_data.image.frame[ frame_i ].height );
+				ImGui::PushFont( font::normal_bold );
+
+				//ImGui::TableNextColumn();
+				//ImGui::TextUnformatted( "Frame" );
+
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted( "Duration" );
+
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted( "Size" );
+
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted( "Pos" );
+
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted( "Palette" );
+
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted( "Frame Disposal" );
+
+				// ImGui::TableNextColumn();
+				// ImGui::TextUnformatted( "Flags" );
+
+				ImGui::PopFont();
+
+				for ( size_t frame_i = 0; frame_i < g_image_data.image.frame.size(); frame_i++ )
+				{
+					if ( frame_i + 1 < g_image_data.image.frame.size() )
+						ImGui::TableNextRow();
+
+					//ImGui::TableNextColumn();
+					//ImGui::Text( "%zu", frame_i );
+
+					const image_frame_t& frame = g_image_data.image.frame[ frame_i ];
+
+					ImGui::TableNextColumn();
+					ImGui::Text( "%.3f", frame.time );
+
+					ImGui::TableNextColumn();
+					ImGui::Text( "%dx%d", frame.width, frame.height );
+
+					ImGui::TableNextColumn();
+					ImGui::Text( "%dx%d", frame.pos_x, frame.pos_y );
+
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted( frame.flags & e_image_frame_f_local_palette ? "Yes" : "No" );
+
+					ImGui::TableNextColumn();
+
+					switch ( frame.frame_disposal )
+					{
+						default:
+						case e_frame_disposal_keep:
+							ImGui::TextUnformatted( "Keep" );
+							break;
+						case e_frame_disposal_background:
+							ImGui::TextUnformatted( "Restore Background" );
+							break;
+						case e_frame_disposal_previous:
+							ImGui::TextUnformatted( "Keep Previous" );
+							break;
+					}
+				}
+
+				ImGui::EndTable();
 			}
+
+			ImGui::EndChild();
 		}
 	}
 
@@ -1247,7 +1341,7 @@ void media_view_draw_imgui()
 
 	if ( get_media_type() == e_media_type_image )
 	{
-		if ( g_draw_zoom_level )
+		if ( g_draw_zoom_level && !g_draw_media_info )
 		{
 			ImGui::Begin( "##zoom_level", 0, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration );
 			ImGui::Text( "%.1f%%", (float)( image_draw::zoom * 100 ) );
