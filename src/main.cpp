@@ -502,18 +502,21 @@ void util_update_can_do_drag_drop()
 {
 	g_can_drag_drop = false;
 
+	//printf( "MOUSE DELTA X: %.f - Y: %.f\n", app::mouse_delta.x, app::mouse_delta.y );
+
 	if ( app::in_drag_drop )
 		return;
 
-	//if ( util_check_threshold( app::prev_mouse_delta, DRAG_DROP_THRESHOLD ) )
-	//	return;
+	if ( util_check_threshold( app::prev_mouse_delta, DRAG_DROP_THRESHOLD ) )
+		return;
 
 	if ( app::mouse_delta.x == 0.f && app::mouse_delta.y == 0.f )
 		return;
 
-	if ( util_check_threshold( app::mouse_delta, DRAG_DROP_THRESHOLD ) )
+	if ( !util_check_threshold( app::mouse_delta, DRAG_DROP_THRESHOLD ) )
 		return;
 
+	//printf( "CAN DRAG DROP\n" );
 	g_can_drag_drop = true;
 
 	//SDL_MouseButtonFlags mouse_btns = SDL_GetMouseState( nullptr, nullptr );
@@ -525,7 +528,7 @@ void util_update_can_do_drag_drop()
 
 bool util_can_do_drag_drop()
 {
-	util_update_can_do_drag_drop();
+	//util_update_can_do_drag_drop();
 
 	return g_can_drag_drop;
 }
