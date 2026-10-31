@@ -259,19 +259,25 @@ struct image_frame_t
 	~image_frame_t()
 	{
 		ch_free( e_mem_category_image_data, data );
-		ch_free( e_mem_category_image_data, palette.elem );
+		//ch_free( e_mem_category_image_data, palette.elem );
 	}
 
 	// copying
 	void assign( const image_frame_t& other ) noexcept
 	{
-		data           = other.data;
+		// data           = other.data;
+		if ( other.data && other.size )
+		{
+			data = ch_calloc< u8 >( other.size, e_mem_category_image_data );
+			memcpy( data, other.data, other.size );
+		}
+
+		size           = other.size;
 		width          = other.width;
 		height         = other.height;
 		pos_x          = other.pos_x;
 		pos_y          = other.pos_y;
 		time           = other.time;
-		size           = other.size;
 		flags          = other.flags;
 		frame_disposal = other.frame_disposal;
 		color_type     = other.color_type;
@@ -581,6 +587,9 @@ bool               media_check_extension_fast( std::string& ext, e_media_type& t
 
 IImageLoader*      image_check_extension( const std::string& ext );
 bool               image_scale( image_t* old_image, image_t* new_image, int new_width, int new_height );
+
+bool               image_convert_bgrx_to_rgbx( image_t* image );
+bool               image_convert_frames_bgrx_to_rgbx( u32 channels, std::vector< image_frame_t >& image_frames );
 
 
 // TODO: add image load functions here

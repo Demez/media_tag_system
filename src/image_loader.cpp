@@ -605,6 +605,58 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 
 
 // =================================================================
+
+
+bool image_convert_frames_bgrx_to_rgbx( u32 channels, std::vector< image_frame_t >& image_frames )
+{
+	u8 pixel_stride = channels;
+
+	for ( auto& frame : image_frames )
+	{
+		size_t i = 0;
+		for ( size_t line = 0; line < frame.height; line++ )
+		{
+			for ( size_t w = 0; w < frame.width; w++, i += pixel_stride )
+			{
+				u8 b                = frame.data[ i + 0 ];
+				u8 g                = frame.data[ i + 1 ];
+				u8 r                = frame.data[ i + 2 ];
+
+				frame.data[ i + 0 ] = r;
+				frame.data[ i + 1 ] = g;
+				frame.data[ i + 2 ] = b;
+			}
+		}
+	}
+
+	return true;
+}
+
+
+bool image_convert_bgrx_to_rgbx( image_t* image )
+{
+	if ( image->channels < 3 || image->channels > 4 )
+		return false;
+
+	switch ( image->format )
+	{
+		case GL_BGRA:
+			image->format = GL_RGBA;
+			break;
+
+		case GL_BGR:
+			image->format = GL_RGB;
+			break;
+
+		default:
+			return false;
+	}
+
+	return image_convert_frames_bgrx_to_rgbx( image->channels, image->frame );
+}
+
+
+// =================================================================
 // Icon Loading
 
 

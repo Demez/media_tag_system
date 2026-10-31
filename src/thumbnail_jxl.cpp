@@ -111,12 +111,33 @@ bool thumbnail_save( image_t& image, const fs::path_str& output )
 	// might be useful for if i decide to stream in thumbnails from a tag system server
 	//status = JxlEncoderFrameSettingsSetOption( frame_settings, JXL_ENC_FRAME_SETTING_RESPONSIVE, 1 );  // force progressive decode enabled
 
-	status = JxlEncoderAddImageFrame( frame_settings, &pixel_format, image.frame[ 0 ].data, image.frame[ 0 ].size );
+	bool     has_temp_image = false;
+	image_t* temp_image     = nullptr;
+
+	if ( image.format == GL_BGR || image.format == GL_BGRA )
+	{
+		// we have to make a copy cause this data could be accessed mid way through scaling the image down to the current thumbnail resolution
+		temp_image = image_create();
+		temp_image->assign( image );
+
+		image_convert_bgrx_to_rgbx( temp_image );
+		has_temp_image = true;
+	}
+	else
+	{
+		temp_image = &image;
+	}
+
+	status = JxlEncoderAddImageFrame( frame_settings, &pixel_format, temp_image->frame[ 0 ].data, temp_image->frame[ 0 ].size );
 
 	if ( status != JXL_ENC_SUCCESS )
 	{
 		JxlEncoderError error = JxlEncoderGetError( enc.get() );
 		fprintf( stderr, "JxlEncoderAddImageFrame failed\n" );
+
+		if ( has_temp_image )
+			image_free( temp_image );
+
 		return false;
 	}
 
@@ -141,7 +162,12 @@ bool thumbnail_save( image_t& image, const fs::path_str& output )
 			avail_out = jxl_file.size() - offset;
 		}
 	}
+
 	jxl_file.resize( next_out - jxl_file.data() );
+
+	if ( has_temp_image )
+		image_free( temp_image );
+
 	if ( JXL_ENC_SUCCESS != process_result )
 	{
 		fprintf( stderr, "JxlEncoderProcessOutput failed\n" );
