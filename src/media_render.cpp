@@ -62,6 +62,7 @@ static void media_view_draw_icon( e_icon icon_value, int window_width, int windo
 	draw_info.rotation = 0.f;
 	draw_info.texture  = icon_get_texture( icon_value );
 
+	render_set_fbo( 0, window_width, window_height );
 	render_draw_texture( draw_info );
 }
 
