@@ -204,6 +204,10 @@ void media_view_scale_set_image()
 	if ( g_image_data.image.frame.size() > 1 )
 		return;
 
+	// don't scale paletted images
+	if ( g_image_data.image.flags & e_image_flag_has_palette || g_image_data.image.flags & e_image_flag_has_local_palettes )
+		return;
+
 	g_scale_lock.lock();
 
 	// copy a new image

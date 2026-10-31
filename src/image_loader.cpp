@@ -227,6 +227,7 @@ void image_free_palette( image_palette_t& palette )
 {
 	palette.count       = 0;
 	palette.trans_index = 0;
+	palette.bg_index    = 0;
 
 	ch_free( e_mem_category_image_data, palette.elem );
 }
@@ -348,6 +349,9 @@ void image_copy_all( image_t& src, image_t& dst, size_t frame_count = 0 )
 // all of this should be ref counted probably, ugh
 void image_copy_palette( image_palette_t& src, image_palette_t& dst )
 {
+	dst = src;
+
+#if 0
 	dst.count       = src.count;
 	dst.trans_index = src.trans_index;
 	dst.bg_index    = src.bg_index;
@@ -367,6 +371,7 @@ void image_copy_palette( image_palette_t& src, image_palette_t& dst )
 		dst.elem[ i ].b = src.elem[ i ].b;
 		//dst.elem[ i ].a = src.elem[ i ].a;
 	}
+#endif
 }
 
 

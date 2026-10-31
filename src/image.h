@@ -143,12 +143,82 @@ struct image_palette_elem_t
 };
 
 
+struct image_palette_t;
+void image_free_palette( image_palette_t& palette );
+
+
 struct image_palette_t
 {
 	image_palette_elem_t* elem        = nullptr;
 	u32                   count       = 0;
 	int                   bg_index    = INT32_MAX;
 	int                   trans_index = INT32_MAX;
+
+	
+	image_palette_t() {
+	};
+
+	~image_palette_t()
+	{
+		image_free_palette( *this );
+	}
+
+	// copying
+	void assign( const image_palette_t& other ) noexcept
+	{
+		if ( elem )
+			ch_free( e_mem_category_image_data, elem );
+
+		count       = other.count;
+		bg_index    = other.bg_index;
+		trans_index = other.trans_index;
+
+		if ( count > 0 )
+		{
+			elem = ch_calloc< image_palette_elem_t >( count, e_mem_category_image_data );
+			memcpy( elem, other.elem, sizeof( image_palette_elem_t ) * count );
+		}
+	}
+
+	// moving
+	void assign( image_palette_t&& other ) noexcept
+	{
+		count             = std::move( other.count );
+		bg_index          = std::move( other.bg_index );
+		trans_index       = std::move( other.trans_index );
+		elem              = std::move( other.elem );
+
+		other.count       = 0;
+		other.bg_index    = 0;
+		other.trans_index = 0;
+		other.elem        = nullptr;
+	}
+
+	image_palette_t& operator=( image_palette_t&& other ) noexcept
+	{
+		assign( std::move( other ) );
+		return *this;
+	}
+
+	// moving
+	image_palette_t( image_palette_t&& other ) noexcept
+	{
+		assign( std::move( other ) );
+	}
+
+	//private:
+	// copying
+	image_palette_t& operator=( const image_palette_t& other ) noexcept
+	{
+		assign( other );
+		return *this;
+	}
+
+	// copying
+	image_palette_t( const image_palette_t& other ) noexcept
+	{
+		assign( other );
+	}
 };
 
 
