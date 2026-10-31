@@ -523,6 +523,9 @@ bool                                 gallery_view_input_do_multi_select();
 void                                 gallery_view_input_check_clear_multi_select();
 void                                 gallery_view_input_update_multi_select( u32 index, bool readd = true );
 
+void                                 ui_draw_file_name( media_entry_t& entry, ImGuiStyle& style );
+void                                 ui_draw_file_information( media_entry_t& entry, ImGuiStyle& style );
+
 void                                 media_history_add( const std::string& entry );
 void                                 folder_history_add( const fs::path& entry );
 fs::path                             folder_history_get_prev();

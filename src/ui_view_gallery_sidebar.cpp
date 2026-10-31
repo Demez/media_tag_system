@@ -850,64 +850,8 @@ void sidebar_draw_bookmarks( ImGuiStyle& style )
 float g_file_info_height = 0;
 
 
-void sidebar_draw_file_information( ImGuiStyle& style )
+void  ui_draw_file_name( media_entry_t& entry, ImGuiStyle& style )
 {
-	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
-	g_file_info_height = ImGui::GetFrameHeightWithSpacing();
-
-	if ( !ImGui::CollapsingHeader( "File Information", ImGuiTreeNodeFlags_DefaultOpen ) )
-	{
-		ImGui::PopFont();
-		return;
-	}
-
-	ImGui::PopFont();
-
-	// if ( gallery::sorted_media.size() && gallery::last_selection.entry.type != e_media_type_none )
-	if ( gallery::sorted_media.empty() )
-		return;
-
-	//ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
-	//ImGui::TextUnformatted( "File Information\n" );
-	//ImGui::Separator();
-	//ImGui::PopFont();
-
-	// const media_entry_t& entry = gallery_item_get_media_entry( gallery_view_get_last_selected() );
-	media_entry_t entry{};
-
-	if ( gallery::selection.size() )
-	{
-		entry = gallery::selection.back().entry;
-	}
-	else
-	{
-		// find a hovered item
-		for ( size_t i = 0; i < gallery::visible_item_count; i++ )
-		{
-			gallery_item_draw_t* item_draw = gallery::visible_item[ i ];
-
-			if ( item_draw->item_hovered )
-			{
-				entry = directory::media_list[ item_draw->gallery_index ];
-				break;
-			}
-		}
-	}
-
-	// none found, try last item that was selected?
-	if ( entry.type == e_media_type_none )
-		entry = gallery::last_selection.entry;
-
-	// none found
-	if ( entry.type == e_media_type_none )
-		return;
-	
-	if ( !ImGui::BeginChild( "##file_info", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY, 0 ) )
-	{
-		ImGui::EndChild();
-		return;
-	}
-
 	ImGui::PushTextWrapPos();
 
 	if ( entry.file.type & e_file_type_file )
@@ -925,9 +869,11 @@ void sidebar_draw_file_information( ImGuiStyle& style )
 	ImGui::TextUnformatted( entry.file.name.c_str() );
 
 	ImGui::PopTextWrapPos();
+}
 
-	ImGui::Separator();
 
+void ui_draw_file_information( media_entry_t& entry, ImGuiStyle& style )
+{
 	// CONFIG_TODO
 	if ( entry.file.type & e_file_type_file )
 	{
@@ -1029,6 +975,72 @@ void sidebar_draw_file_information( ImGuiStyle& style )
 			}
 		}
 	}
+}
+
+
+void sidebar_draw_file_information( ImGuiStyle& style )
+{
+	ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
+	g_file_info_height = ImGui::GetFrameHeightWithSpacing();
+
+	if ( !ImGui::CollapsingHeader( "File Information", ImGuiTreeNodeFlags_DefaultOpen ) )
+	{
+		ImGui::PopFont();
+		return;
+	}
+
+	ImGui::PopFont();
+
+	// if ( gallery::sorted_media.size() && gallery::last_selection.entry.type != e_media_type_none )
+	if ( gallery::sorted_media.empty() )
+		return;
+
+	//ImGui::PushFont( font::normal_bold, style.FontSizeBase + 2.f );
+	//ImGui::TextUnformatted( "File Information\n" );
+	//ImGui::Separator();
+	//ImGui::PopFont();
+
+	// const media_entry_t& entry = gallery_item_get_media_entry( gallery_view_get_last_selected() );
+	media_entry_t entry{};
+
+	if ( gallery::selection.size() )
+	{
+		entry = gallery::selection.back().entry;
+	}
+	else
+	{
+		// find a hovered item
+		for ( size_t i = 0; i < gallery::visible_item_count; i++ )
+		{
+			gallery_item_draw_t* item_draw = gallery::visible_item[ i ];
+
+			if ( item_draw->item_hovered )
+			{
+				entry = directory::media_list[ item_draw->gallery_index ];
+				break;
+			}
+		}
+	}
+
+	// none found, try last item that was selected?
+	if ( entry.type == e_media_type_none )
+		entry = gallery::last_selection.entry;
+
+	// none found
+	if ( entry.type == e_media_type_none )
+		return;
+	
+	if ( !ImGui::BeginChild( "##file_info", {}, ImGuiChildFlags_FrameStyle | ImGuiChildFlags_AutoResizeY, 0 ) )
+	{
+		ImGui::EndChild();
+		return;
+	}
+
+	ui_draw_file_name( entry, style );
+	
+	ImGui::Separator();
+
+	ui_draw_file_information( entry, style );
 
 	g_file_info_height += ImGui::GetWindowHeight() + style.ItemSpacing.y;
 

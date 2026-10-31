@@ -185,6 +185,8 @@ void media_view_draw_media_info()
 	ImGui::SetNextWindowPos( info_pos );
 	ImGui::SetNextWindowSizeConstraints( { 32, area_height }, { window_width / 2.f, area_height } );
 
+	ImGui::SetNextWindowBgAlpha( 0.75 );
+
 	// | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
 	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar ) )
 	{
@@ -194,34 +196,69 @@ void media_view_draw_media_info()
 
 	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
 
-	ImGui::TextUnformatted( entry.file.name.c_str() );
+	// this is already shown in the titlebar, but if we get an actual fullscreen mode, then maybe bring it back?
+	//ui_draw_file_name( entry, style );
+	// ImGui::TextUnformatted( entry.file.name.c_str() );
 
-	ImGui::Separator();
+	//ImGui::Separator();
 
-	if ( ImGui::CollapsingHeader( "File Information" ) )
+	// i usually have zoom in the top left, so it might make sense to keep it here for familiarity?
+	ImGui::Text( "Zoom: %.1f%%", (float)( image_draw::zoom * 100 ) );
+
+	if ( ImGui::CollapsingHeader( "File Information", ImGuiTreeNodeFlags_DefaultOpen ) )
 	{
-		ImGui::Text( "Size: %.3f MB", (float)entry.file.size / ( STORAGE_SCALE * STORAGE_SCALE ) );
-
-		char date_created[ DATE_TIME_BUFFER ]{};
-		char date_mod[ DATE_TIME_BUFFER ]{};
-
-		util_format_date_time( date_created, DATE_TIME_BUFFER, entry.file.date_created );
-		util_format_date_time( date_mod, DATE_TIME_BUFFER, entry.file.date_mod );
-
-		ImGui::Text( "Date Created: %s", date_created );
-		ImGui::Text( "Date Modified: %s", date_mod );
+		ui_draw_file_information( entry, style );
 	}
 
-	if ( get_media_type() == e_media_type_video )
+	if ( ImGui::CollapsingHeader( "Tools", ImGuiTreeNodeFlags_DefaultOpen ) )
 	{
+		ImGui::Checkbox( "Invert Colors", &image_draw::invert_color );
+
+		ImGui::BeginDisabled( entry.type == e_media_type_video );
+
+		ImGui::Checkbox( "Draw Scaled Image", &image_draw::scaling );
+		ImGui::Checkbox( "Draw Raw Frames", &image_draw::show_raw_frames );
+
+		ImGui::EndDisabled();
+
+		ImGui::Checkbox( "Disable Transparency", &image_draw::hide_alpha );
+
 		ImGui::Separator();
+		ImGui::AlignTextToFramePadding();
+		ImGui::Text( "Channels" );
+		ImGui::SameLine( 0, style.ItemInnerSpacing.x );
+
+		constexpr const char* channel_str[ 4 ] = { "Red", "Green", "Blue", "Alpha" };
+
+		for ( u8 i = 0; i < 4; i++ )
+		{
+			ImVec2 text_size = ImGui::CalcTextSize( channel_str[ i ] );
+			text_size.x += style.FramePadding.x;
+
+			// ImGui::Selectable( channel_str[ i ], &image_draw::show_channels[ i ], 0, text_size );
+			ImGui::Checkbox( channel_str[ i ], &image_draw::show_channels[ i ] );
+
+			if ( i < 3 )
+			{
+				// ImGui::SameLine( 0, style.ItemInnerSpacing.x );
+				ImGui::SameLine();
+			}
+		}
+	}
+
+	if ( entry.type == e_media_type_video )
+	{
+		if ( ImGui::CollapsingHeader( "Video Info", ImGuiTreeNodeFlags_DefaultOpen ) )
+		{
+			std::string_view format_name = image_get_format_name( g_image_data.image.image_format );
+			ImGui::Text( "Size: %dx%d", g_mpv_data.dwidth, g_mpv_data.dheight );
+		}
 	}
 	else
 	{
-		// Scaling Info
 		if ( ImGui::CollapsingHeader( "Rendering" ) )
 		{
-			ImGui::Text( "Zoom: %.1f%%", (float)( image_draw::zoom * 100 ) );
+			// ImGui::Text( "Zoom: %.1f%%", (float)( image_draw::zoom * 100 ) );
 			ImGui::Text( "Scale Thread State: %s", media_get_scale_state_str() );
 			// ImGui::Text( "Scaled: %dx%d", g_image_scaled_data.image.width, g_image_scaled_data.image.height );
 			ImGui::Text( "Render Size: %.0fx%.0f", image_draw::size.x, image_draw::size.y );
@@ -256,37 +293,7 @@ void media_view_draw_media_info()
 			}
 		}
 
-		if ( ImGui::CollapsingHeader( "Tools" ) )
-		{
-			ImGui::Checkbox( "Invert Colors", &image_draw::invert_color );
-			ImGui::Checkbox( "Draw Scaled Image", &image_draw::scaling );
-			ImGui::Checkbox( "Draw Raw Frames", &image_draw::show_raw_frames );
-			ImGui::Checkbox( "Disable Transparency", &image_draw::hide_alpha );
-
-			ImGui::Separator();
-			ImGui::AlignTextToFramePadding();
-			ImGui::Text( "Channels" );
-			ImGui::SameLine( 0, style.ItemInnerSpacing.x );
-
-			constexpr const char* channel_str[ 4 ] = { "Red", "Green", "Blue", "Alpha" };
-
-			for ( u8 i = 0; i < 4; i++ )
-			{
-				ImVec2 text_size = ImGui::CalcTextSize( channel_str[ i ] );
-				text_size.x += style.FramePadding.x;
-
-				// ImGui::Selectable( channel_str[ i ], &image_draw::show_channels[ i ], 0, text_size );
-				ImGui::Checkbox( channel_str[ i ], &image_draw::show_channels[ i ] );
-
-				if ( i < 3 )
-				{
-					// ImGui::SameLine( 0, style.ItemInnerSpacing.x );
-					ImGui::SameLine();
-				}
-			}
-		}
-
-		if ( ImGui::CollapsingHeader( "Image Info" ) )
+		if ( ImGui::CollapsingHeader( "Image Info", ImGuiTreeNodeFlags_DefaultOpen ) )
 		{
 			std::string_view format_name = image_get_format_name( g_image_data.image.image_format );
 			ImGui::Text( "Size: %dx%d", g_image_data.image.width, g_image_data.image.height );
@@ -295,7 +302,7 @@ void media_view_draw_media_info()
 			ImGui::Text( "Channels: %d", g_image_data.image.channels );
 		}
 
-		if ( ImGui::CollapsingHeader( "Current Frame" ) )
+		if ( ImGui::CollapsingHeader( "Current Frame", ImGuiTreeNodeFlags_DefaultOpen ) )
 		{
 			const image_frame_t& frame = g_image_data.image.frame[ image_draw::frame ];
 
