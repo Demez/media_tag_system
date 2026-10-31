@@ -93,6 +93,8 @@ enum e_gallery_sort_mode
 	e_gallery_sort_mode_size_large_to_small,
 	e_gallery_sort_mode_size_small_to_large,
 
+	e_gallery_sort_mode_random,
+
 	// TODO: add resolution size, large to small
 
 	e_gallery_sort_mode_count,

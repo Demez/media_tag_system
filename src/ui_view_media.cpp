@@ -514,6 +514,7 @@ void media_view_context_menu()
 		SORT_MENU_ITEM( e_gallery_sort_mode_date_created_old_to_new )
 		SORT_MENU_ITEM( e_gallery_sort_mode_size_large_to_small )
 		SORT_MENU_ITEM( e_gallery_sort_mode_size_small_to_large )
+		SORT_MENU_ITEM( e_gallery_sort_mode_random )
 
 #undef SORT_MENU_ITEM
 

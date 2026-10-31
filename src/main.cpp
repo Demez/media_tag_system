@@ -1361,6 +1361,8 @@ void test_hdr_state()
 
 int startup()
 {
+	srand( 4 );
+
 	if ( !sys_setup_exe_path_vars() )
 	{
 		printf( "Failed to setup exe path variables!\n" );

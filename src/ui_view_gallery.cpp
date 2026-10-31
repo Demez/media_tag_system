@@ -2,6 +2,8 @@
 
 #include "imgui_internal.h"
 
+#include <random>
+
 
 namespace gallery
 {
@@ -67,7 +69,8 @@ const char* g_gallery_sort_mode_str[] = {
 	"Date Created - New to Old",
 	"Date Created - Old to New",
 	"File Size - Large to Small",
-	"File Size - Small to Large"
+	"File Size - Small to Large",
+	"Random"
 };
 
 static_assert( ARR_SIZE( g_gallery_sort_mode_str ) == e_gallery_sort_mode_count );
@@ -488,6 +491,15 @@ void gallery_view_sort_list( std::vector< size_t >& gallery_list, e_gallery_sort
 		case e_gallery_sort_mode_size_small_to_large:
 		{
 			std::qsort( gallery_list.data(), gallery_list.size(), sizeof( size_t ), qsort_size_small_to_large );
+			break;
+		}
+
+		case e_gallery_sort_mode_random:
+		{
+			std::random_device random_device;
+			std::mt19937       what( random_device() );
+
+			std::shuffle( gallery_list.begin(), gallery_list.end(), what );
 			break;
 		}
 	}
