@@ -20,6 +20,7 @@ namespace image_draw
 	u64         next_frame_time    = 0;  // time until next frame, add to last_frame_time
 	size_t      frame              = 0;
 	double      playback_speed     = 1.0;
+	bool        reverse            = false;
 	bool        pause              = false;
 	bool        scaling            = true;
 	float       volume             = 100.0;
@@ -98,11 +99,11 @@ void media_view_update()
 		if ( !image_draw::pause )
 		{
 			u64 current_time = sys_get_time_ms();
-			u64 next_time    = image_draw::last_frame_time + ( image_draw::next_frame_time * image_draw::playback_speed );
+			u64 next_time = image_draw::last_frame_time + ( image_draw::next_frame_time / abs( image_draw::playback_speed ) );
 
 			if ( next_time < current_time )
 			{
-				media_view_frame_advance();
+				media_view_frame_advance( image_draw::reverse );
 			}
 		}
 	}
@@ -155,6 +156,7 @@ void media_view_draw_palette_view()
 }
 
 
+// maybe add a toggle button in the top left?
 void media_view_draw_media_info()
 {
 	if ( gallery::sorted_media.empty() )
@@ -189,7 +191,7 @@ void media_view_draw_media_info()
 	ImGui::SetNextWindowBgAlpha( 0.75 );
 
 	// | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
-	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoTitleBar ) )
+	if ( !ImGui::Begin( "##media_info", 0, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar ) )
 	{
 		ImGui::End();
 		return;
@@ -1145,6 +1147,51 @@ void media_view_draw_animated_image_controls( float right_side_area )
 		image_draw::pause = true;
 		media_view_frame_advance();
 	}
+
+	ImGui::SameLine();
+
+	if ( ImGui::Button( image_draw::reverse ? ">>" : "<<" ) )
+	{
+		image_draw::reverse = !image_draw::reverse;
+	}
+
+	ImGui::SameLine();
+
+	float max_speed_width = ImGui::CalcTextSize( "1000%" ).x;
+
+	ImGui::SameLine();
+	float base_pos = ImGui::GetCursorPosX();
+
+
+	char  speed_text[ 10 ]{};
+	snprintf( speed_text, 10, "%d%%", static_cast< int >( image_draw::playback_speed * 100 ) );
+
+	// ImGui::Text( "%d%%", static_cast< int >( image_draw::playback_speed * 100 ) );
+
+	// click to reset speed
+	if ( ImGui::Button( speed_text, { max_speed_width + ( style.FramePadding.x * 2.f ), 0.f } ) )
+	{
+		image_draw::playback_speed = 1.0;
+	}
+
+	//ImGui::SameLine( base_pos + max_speed_width + style.ItemSpacing.x );
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth( 128 );
+
+	int desired_speed = image_draw::playback_speed * 10.f;
+	if ( ImGui::SliderInt( "##speed", &desired_speed, 1, 100, "" ) )
+	{
+		image_draw::playback_speed = desired_speed / 10.f;
+	}
+
+//	if ( ImGui::InputDouble( "##speed", &image_draw::playback_speed, 0.1, 1.0, "%.1f" ) )
+//	{
+//		image_draw::playback_speed = std::clamp(image_draw::playback_speed, 0.1, 30.0 );
+//	}
+
+	ImGui::SameLine();
+
+	ImGui::SeparatorEx( ImGuiSeparatorFlags_Vertical );
 
 	ImGui::SameLine();
 
