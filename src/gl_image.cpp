@@ -153,7 +153,8 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 			break;
 
 		case GL_RGBA16:
-			internal_format = format = GL_RGBA16;
+			internal_format = GL_RGBA16;
+			format          = GL_RGBA;
 			break;
 
 		case GL_R16UI:
@@ -199,11 +200,11 @@ void gl_update_texture( GLuint texture, image_t* image, size_t frame_i )
 			type = GL_UNSIGNED_BYTE;
 			break;
 
-		case GL_RGBA16:
 		case GL_R16UI:
 			type = GL_UNSIGNED_SHORT;
 			break;
 
+		case GL_RGBA16:
 		case GL_R16I:
 			type = GL_SHORT;
 			break;
