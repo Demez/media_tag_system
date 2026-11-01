@@ -756,6 +756,18 @@ void media_view_input()
 		//}
 	}
 
+	if ( ImGui::IsKeyPressed( ImGuiKey_Comma ) )
+	{
+		image_draw::pause = true;
+		media_view_frame_advance( true );
+	}
+
+	if ( ImGui::IsKeyPressed( ImGuiKey_Period ) )
+	{
+		image_draw::pause = true;
+		media_view_frame_advance();
+	}
+
 	// TODO: Test ImGui::Shortcut()
 	if ( app::window_focused && ImGui::IsKeyDown( ImGuiKey_LeftCtrl ) && ImGui::IsKeyPressed( ImGuiKey_C, false ) )
 	{
