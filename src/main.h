@@ -36,6 +36,7 @@ enum e_user_event : u8
 enum e_shader : u8
 {
 	e_shader_main,
+	e_shader_color,
 	e_shader_palette,
 	e_shader_min_is_black,
 	e_shader_min_is_white,
@@ -341,6 +342,7 @@ namespace image_draw
 
 	extern bool        show_raw_frames;
 	extern bool        hide_alpha;
+	extern bool        disable_palette;
 	extern bool        invert_color;
 	extern bool        show_channels[ 4 ];
 
@@ -394,10 +396,11 @@ struct render_draw_texture_t
 	int                 y;
 	float               rotation;
 
-	GLuint              texture       = 0;
-	GLuint              palette       = 0;
-	GLuint              palette_trans = 0;
-	GLuint              palette_count = 0;
+	GLuint              texture         = 0;
+	GLuint              palette         = 0;
+	GLuint              palette_trans   = 0;
+	GLuint              palette_count   = 0;
+	bool                palette_enabled = true;
 
 	// draw target
 //	GLuint              target;
@@ -415,8 +418,8 @@ struct render_draw_texture_t
 	bool                hide_alpha    = false;
 	bool                invert_colors = false;
 
-//	bool                clear_bg      = false;
-//	ImVec4              clear_bg_color{};
+	bool                clear_bg      = false;
+	ImVec4              clear_bg_color{};
 };
 
 

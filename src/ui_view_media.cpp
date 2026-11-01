@@ -26,6 +26,7 @@ namespace image_draw
 
 	bool        show_raw_frames    = false;
 	bool        hide_alpha         = false;
+	bool        disable_palette    = false;
 	bool        invert_color       = false;
 	bool        show_channels[ 4 ] = { true, true, true, true };
 
@@ -218,15 +219,18 @@ void media_view_draw_media_info()
 
 		ImGui::Checkbox( "Draw Scaled Image", &image_draw::scaling );
 		ImGui::Checkbox( "Draw Raw Frames", &image_draw::show_raw_frames );
+		ImGui::Checkbox( "Disable Palette", &image_draw::disable_palette );
 
 		ImGui::EndDisabled();
 
 		ImGui::Checkbox( "Disable Transparency", &image_draw::hide_alpha );
 
-		ImGui::Separator();
-		ImGui::AlignTextToFramePadding();
-		ImGui::Text( "Channels" );
-		ImGui::SameLine( 0, style.ItemInnerSpacing.x );
+		// ImGui::Separator();
+		ImGui::SeparatorText( "Channels" );
+		//ImGui::AlignTextToFramePadding();
+		//ImGui::SetCursorPosX( ImGui::GetCursorPosX() + style.FramePadding.x );
+		//ImGui::Text( "Channels" );
+		//ImGui::SameLine( 0, style.ItemInnerSpacing.x );
 
 		constexpr const char* channel_str[ 4 ] = { "Red", "Green", "Blue", "Alpha" };
 
@@ -240,7 +244,7 @@ void media_view_draw_media_info()
 
 			if ( i < 3 )
 			{
-				// ImGui::SameLine( 0, style.ItemInnerSpacing.x );
+				//ImGui::SameLine( 0, style.ItemInnerSpacing.x * 2.f );
 				ImGui::SameLine();
 			}
 		}
@@ -559,7 +563,8 @@ void media_view_context_menu()
 		ImGui::MenuItem( "Invert Colors", nullptr, &image_draw::invert_color, true );
 		ImGui::MenuItem( "Draw Scaled Image", nullptr, &image_draw::scaling, true );
 		ImGui::MenuItem( "Draw Raw Frames", nullptr, &image_draw::show_raw_frames, true );
-		ImGui::MenuItem( "Hide Alpha Channel", nullptr, &image_draw::hide_alpha, true );
+		ImGui::MenuItem( "Disable Palette", nullptr, &image_draw::disable_palette );
+		ImGui::MenuItem( "Disable Transparency", nullptr, &image_draw::hide_alpha, true );
 
 		ImGui::Separator();
 		ImGui::Text( "Channels" );
@@ -578,8 +583,6 @@ void media_view_context_menu()
 				ImGui::SameLine( 0, style.ItemInnerSpacing.x );
 			}
 		}
-
-		ImGui::MenuItem( "Disable Transparency", nullptr, &image_draw::hide_alpha, true );
 
 		if ( app::config.dev_mode )
 		{

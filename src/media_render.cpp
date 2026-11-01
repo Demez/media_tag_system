@@ -67,7 +67,8 @@ static void media_view_draw_icon( e_icon icon_value, int window_width, int windo
 }
 
 
-static void media_view_set_palette_bg( image_palette_t& palette )
+// this is fucking stupid
+static void media_view_set_palette_bg( image_palette_t& palette, size_t frame_i )
 {
 	if ( !image_draw::hide_alpha )
 		return;
@@ -80,7 +81,58 @@ static void media_view_set_palette_bg( image_palette_t& palette )
 
 	image_palette_elem_t& elem = palette.elem[ palette.bg_index ];
 
-	render_clear( { elem.r / 255.f, elem.g / 255.f, elem.b / 255.f, 1.f } );
+	// render_clear( { elem.r / 255.f, elem.g / 255.f, elem.b / 255.f, 1.f } );
+
+	bool                  animated = g_image_data.textures.count > 1;
+	image_frame_t&        frame    = g_image_data.image.frame[ frame_i ];
+
+	render_draw_texture_t draw_info{};
+	//draw_info.target_width  = g_image_data.image.width;
+	//draw_info.target_height = g_image_data.image.height;
+
+	draw_info.shader         = e_shader_color;
+	draw_info.clear_bg       = true;
+
+	if ( image_draw::disable_palette )
+	{
+		draw_info.clear_bg_color = { palette.bg_index / 255.f, palette.bg_index / 255.f, palette.bg_index / 255.f, 1.f };
+	}
+	else
+	{
+		draw_info.clear_bg_color = { elem.r / 255.f, elem.g / 255.f, elem.b / 255.f, 1.f };
+	}
+
+	// draw_info.width   = frame.width;
+	// draw_info.height  = frame.height;
+	// draw_info.x       = frame.pos_x;
+	// draw_info.y       = frame.pos_y;
+	draw_info.texture        = 0;
+
+	if ( animated )
+	{
+		draw_info.width  = g_image_data.image.width;
+		draw_info.height = g_image_data.image.height;
+		draw_info.x      = 0;
+		draw_info.y      = 0;
+
+		// draw_info.width  = frame.width;
+		// draw_info.height = frame.height;
+		// draw_info.x      = frame.pos_x;
+		// draw_info.y      = frame.pos_y;
+	}
+	else
+	{
+		draw_info.width      = static_cast< int >( round( std::max( 0.01, frame.width * image_draw::zoom ) ) );
+		draw_info.height     = static_cast< int >( round( std::max( 0.01, frame.height * image_draw::zoom ) ) );
+		draw_info.x          = static_cast< int >( round( image_draw::pos.x + ( frame.pos_x * image_draw::zoom ) ) );
+		draw_info.y          = static_cast< int >( round( image_draw::pos.y + ( frame.pos_y * image_draw::zoom ) ) );
+		draw_info.rotation   = image_draw::rot;
+		draw_info.hide_alpha = image_draw::hide_alpha;
+		draw_info.flip_h     = image_draw::flip_h;
+		draw_info.flip_v     = image_draw::flip_v;
+	}
+
+	render_draw_texture( draw_info );
 }
 
 
@@ -116,15 +168,17 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 
 	if ( g_image_data.image.flags & e_image_flag_has_palette || g_image_data.image.flags & e_image_flag_has_local_palettes )
 	{
-		draw_info.shader = e_shader_palette;
+		draw_info.shader          = e_shader_palette;
+		draw_info.palette_enabled = !image_draw::disable_palette;
 
-		if ( g_image_data.image.flags & e_image_flag_has_local_palettes )
+		// if ( image_draw::disable_palette )
 		{
-			draw_info.palette       = g_image_data.textures.palette[ frame_i ];
-			draw_info.palette_trans = g_image_data.textures.palette_trans[ frame_i ];
-			draw_info.palette_count = g_image_data.image.frame[ frame_i ].palette.count;
-
-			// media_view_set_palette_bg( frame.palette );
+			if ( g_image_data.image.flags & e_image_flag_has_local_palettes )
+			{
+				draw_info.palette       = g_image_data.textures.palette[ frame_i ];
+				draw_info.palette_trans = g_image_data.textures.palette_trans[ frame_i ];
+				draw_info.palette_count = g_image_data.image.frame[ frame_i ].palette.count;
+			}
 		}
 	}
 
@@ -230,20 +284,31 @@ static void media_view_draw_image( int width, int height )
 		return;
 	}
 
+	bool using_fbo = false;
+
 	if ( g_image_data.image.frame.size() > 1 )
 	{
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 
 		render_set_fbo( g_main_image_anim_fbo, g_image_data.image.width, g_image_data.image.height );
+		using_fbo = true;
 
 		render_clear( { 0.f, 0.f, 0.f, 0.f } );
-		media_view_set_palette_bg( g_image_data.image.palette );
+		media_view_set_palette_bg( g_image_data.image.palette, 0 );
 	}
 	else
 	{
 		render_set_fbo( 0, width, height );
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+
+		//glEnable( GL_SCISSOR_TEST );
+		//glScissor( image_draw::pos.x, image_draw::pos.y, image_draw::size.x, image_draw::size.y );
 	}
+
+	ImVec4 clear_color( 0.f, 0.f, 0.f, image_draw::hide_alpha ? 1.f : 0.f );
+
+	if ( !using_fbo )
+		clear_color = app::config.media_bg_color;
 
 	e_frame_disposal prev_disposal = g_image_data.image.frame[ image_draw::frame ].frame_disposal;
 
@@ -282,7 +347,7 @@ static void media_view_draw_image( int width, int height )
 			last_frame_to_keep = 0;
 		}
 
-		media_view_set_palette_bg( g_image_data.image.frame[ last_frame_to_keep ].palette );
+		media_view_set_palette_bg( g_image_data.image.frame[ last_frame_to_keep ].palette, last_frame_to_keep );
 
 		/// mmmm overdraw hell?
 		for ( u32 i = last_frame_to_keep; i < image_draw::frame + 1; i++ )
@@ -322,7 +387,7 @@ static void media_view_draw_image( int width, int height )
 
 		if ( last_frame_to_keep < image_draw::frame )
 		{
-			media_view_set_palette_bg( g_image_data.image.frame[ last_frame_to_keep ].palette );
+			media_view_set_palette_bg( g_image_data.image.frame[ last_frame_to_keep ].palette, last_frame_to_keep );
 			media_view_draw_frame( width, height, last_frame_to_keep );
 		}
 
@@ -330,7 +395,7 @@ static void media_view_draw_image( int width, int height )
 	}
 	else  // e_frame_disposal_background ?
 	{
-		media_view_set_palette_bg( g_image_data.image.frame[ image_draw::frame ].palette );
+		media_view_set_palette_bg( g_image_data.image.frame[ image_draw::frame ].palette, image_draw::frame );
 		media_view_draw_frame( width, height, image_draw::frame );
 	}
 

@@ -52,6 +52,7 @@ static u32 indices[] = {
 
 const char* shader_str[] = {
 	"Main",
+	"Color",
 	"Palette",
 	"MinIsWhite",
 	"MinIsBlack",
@@ -123,15 +124,17 @@ struct shader_main_t : public shader_base_t
 // Shader Info - Palette
 struct shader_palette_t : public shader_base_t
 {
-	GLint        in_palette       = 0;
-	GLint        in_palette_trans = 0;
-	GLint        in_palette_count = 0;
+	GLint        in_palette         = 0;
+	GLint        in_palette_trans   = 0;
+	GLint        in_palette_count   = 0;
+	GLint        in_palette_enabled = 0;
 
 	virtual bool init()
 	{
-		in_palette       = glGetUniformLocation( program, "in_palette" );
-		in_palette_trans = glGetUniformLocation( program, "in_palette_trans" );
-		in_palette_count = glGetUniformLocation( program, "in_palette_count" );
+		in_palette         = glGetUniformLocation( program, "in_palette" );
+		in_palette_trans   = glGetUniformLocation( program, "in_palette_trans" );
+		in_palette_count   = glGetUniformLocation( program, "in_palette_count" );
+		in_palette_enabled = glGetUniformLocation( program, "in_palette_enabled" );
 		return true;
 	}
 
@@ -142,6 +145,7 @@ struct shader_palette_t : public shader_base_t
 		glUniform1i( in_palette, 1 );
 		glUniform1i( in_palette_trans, draw_info.palette_trans );
 		glUniform1i( in_palette_count, draw_info.palette_count );
+		glUniform1i( in_palette_enabled, draw_info.palette_enabled ? 1 : 0 );
 	}
 };
 
@@ -182,6 +186,24 @@ struct shader_min_black_t : public shader_min_white_t
 };
 
 
+// Shader Info - Color
+struct shader_color_t : public shader_base_t
+{
+	GLint        in_bg_color = 0;
+
+	virtual bool init()
+	{
+		in_bg_color = glGetUniformLocation( program, "in_bg_color" );
+		return true;
+	}
+	virtual void draw( const render_draw_texture_t& draw_info )
+	{
+		glUniform4f( in_bg_color, draw_info.clear_bg_color.x, draw_info.clear_bg_color.y, draw_info.clear_bg_color.z, draw_info.clear_bg_color.w );
+		shader_base_t::draw( draw_info );
+	}
+};
+
+
 struct register_shader_t
 {
 	register_shader_t( e_shader shader_enum, shader_base_t* shader_base, const fs::path_char* vert_path, const fs::path_char* frag_path )
@@ -199,6 +221,7 @@ struct register_shader_t
 
 
 REGISTER_SHADER( e_shader_main, shader_main_t, "shaders/image.vert", "shaders/image.frag" );
+REGISTER_SHADER( e_shader_color, shader_color_t, "shaders/image.vert", "shaders/color.frag" );
 REGISTER_SHADER( e_shader_palette, shader_palette_t, "shaders/image.vert", "shaders/image_palette.frag" );
 REGISTER_SHADER( e_shader_min_is_black, shader_min_black_t, "shaders/image.vert", "shaders/image_min_grey.frag" );
 REGISTER_SHADER( e_shader_min_is_white, shader_min_white_t, "shaders/image.vert", "shaders/image_min_grey.frag" );
@@ -469,11 +492,11 @@ void render_finish()
 	//glDisable( GL_SCISSOR_TEST );
 }
 
-
 void render_clear( ImVec4 color )
 {
 	glClearColor( color.x, color.y, color.z, color.w );
 	glClear( GL_COLOR_BUFFER_BIT );
+
 }
 
 

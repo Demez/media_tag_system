@@ -84,7 +84,7 @@ void media_load_job_finish( job_status_t* status, bool in_main_thread )
 
 			if ( g_image_data.image.frame.size() > 1 )
 			{
-				if ( g_image_data.image.flags & e_image_flag_has_palette_trans )
+				if ( g_image_data.image.flags & e_image_flag_has_palette_trans || g_image_data.image.channels > 3 )
 					media_view_create_animated_image_fbo( GL_RGBA );
 				else
 					media_view_create_animated_image_fbo( GL_RGB );
