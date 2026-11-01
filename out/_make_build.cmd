@@ -19,9 +19,9 @@ copy "SDL3.dll"         "_new_build/SDL3.dll"
 copy "spng.dll"         "_new_build/spng.dll"
 copy "turbojpeg.dll"    "_new_build/turbojpeg.dll"
 
-copy "media_tag_system.dll" "_new_build/media_tag_system.dll"
-copy "media_tag_system.com" "_new_build/media_tag_system.com"
-copy "media_tag_system.exe" "_new_build/media_tag_system.exe"
+copy "foto_falcon.dll" "_new_build/foto_falcon.dll"
+copy "foto_falcon.com" "_new_build/foto_falcon.com"
+copy "foto_falcon.exe" "_new_build/foto_falcon.exe"
 
 copy "config_default.kdl" "_new_build/config_default.kdl"
 copy "seguiemj.ttf"       "_new_build/seguiemj.ttf"
