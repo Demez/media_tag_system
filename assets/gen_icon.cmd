@@ -1,0 +1,1 @@
+magick convert -background transparent -define icon:auto-resize=512,256,128,64,32,24,16 foto_falcon_icon.svg foto_falcon_icon.ico

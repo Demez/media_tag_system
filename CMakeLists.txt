@@ -35,6 +35,8 @@ set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 set( CMAKE_CXX_STANDARD 23 )
 set( CMAKE_EXPORT_COMPILE_COMMANDS ON )
 
+set( APP_ICO )
+
 # Compiler/Platform specifc options
 if ( MSVC )
 	add_compile_definitions(
@@ -149,6 +151,9 @@ if ( MSVC )
 	)
 
 	link_libraries( Dwmapi ntdll )
+
+	# App Icon
+	set( APP_ICO assets/foto_falcon_icon.rc )
 	
 	# TODO: move all these copying of files to the thirdparty.py script, and have a check to make sure it was run before cmake was run
 	# do a version compare, store a version number here and in thirdparty, if out of sync, fail until they build it
@@ -236,7 +241,7 @@ if (WIN32)
 		link_directories( "thirdparty/SDL3/lib/x64"	)
 	endif()
 
-	add_executable( foto_falcon_launcher src/launcher.cpp )
+	add_executable( foto_falcon_launcher src/launcher.cpp ${APP_ICO} )
 
 	set_target_properties(
 		foto_falcon_launcher PROPERTIES
@@ -244,7 +249,7 @@ if (WIN32)
 		PDB_NAME "foto_falcon"
 	)
 
-	add_executable( foto_falcon_con src/launcher.cpp )
+	add_executable( foto_falcon_con src/launcher.cpp ${APP_ICO} )
 
 	target_link_options(
 		foto_falcon_con PRIVATE
