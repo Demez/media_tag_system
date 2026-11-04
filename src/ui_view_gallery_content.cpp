@@ -611,7 +611,7 @@ void gallery_view_draw_item_content( ImGuiStyle& style, size_t i, gallery_item_d
 		if ( scaled_image_size.x )
 		{
 			image_offset_from_side_x = ( item_draw.image_bounds.x - scaled_image_size.x ) / 2.f;
-			image_offset_from_side_y = ( item_draw.image_bounds.y - scaled_image_size.y ) / 2.f;
+			//image_offset_from_side_y = ( item_draw.image_bounds.y - scaled_image_size.y ) / 2.f;
 		}
 
 		// TODO: this doesn't work as well at different zoom levels
