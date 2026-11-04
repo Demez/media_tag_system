@@ -61,21 +61,98 @@ void media_view_frame_update_timer()
 }
 
 
+bool media_view_has_video()
+{
+	if ( get_media_type() != e_media_type_video )
+		return false;
+
+	return g_mpv_data.loaded_file;
+}
+
+
+void media_view_set_playback_pause( bool pause )
+{
+	image_draw::pause = pause;
+
+	if ( media_view_has_video() )
+	{
+		const char* cmd[]   = { "set", "pause", pause ? "yes" : "no", NULL };
+		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+	}
+}
+
+
+void media_view_seek_image( double seconds, bool backwards = false )
+{
+	size_t target_frame = image_draw::frame;
+
+	while ( seconds > 0 )
+	{
+		if ( backwards )
+		{
+			if ( target_frame == 0 )
+				break;
+				// target_frame = g_image_data.image.frame.size();
+
+			target_frame--;
+		}
+		else
+		{
+			if ( target_frame + 1 == g_image_data.image.frame.size() )
+				break;
+
+			target_frame++;
+			// target_frame = ( target_frame + 1 ) % g_image_data.image.frame.size();
+		}
+
+		image_frame_t& frame = g_image_data.image.frame[ target_frame ];
+		seconds -= frame.time;
+	}
+
+	image_draw::frame = target_frame;
+}
+
+
 void media_view_frame_advance( bool backwards = false )
 {
-	if ( backwards )
+	switch ( get_media_type() )
 	{
-		if ( image_draw::frame == 0 )
-			image_draw::frame = g_image_data.image.frame.size();
+		default:
+			break;
 
-		image_draw::frame--;
-	}
-	else
-	{
-		image_draw::frame = ( image_draw::frame + 1 ) % g_image_data.image.frame.size();
-	}
+		case e_media_type_video:
+		{
+			if ( backwards )
+			{
+				const char* cmd[]   = { "frame-back-step", NULL };
+				int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+			}
+			else
+			{
+				const char* cmd[]   = { "frame-step", NULL };
+				int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+			}
 
-	media_view_frame_update_timer();
+			break;
+		}
+		case e_media_type_image:
+		{
+			if ( backwards )
+			{
+				if ( image_draw::frame == 0 )
+					image_draw::frame = g_image_data.image.frame.size();
+
+				image_draw::frame--;
+			}
+			else
+			{
+				image_draw::frame = ( image_draw::frame + 1 ) % g_image_data.image.frame.size();
+			}
+
+			media_view_frame_update_timer();
+			break;
+		}
+	}
 }
 
 
@@ -734,9 +811,58 @@ void media_view_context_menu()
 }
 
 
+void media_view_handle_content_inputs()
+{
+	bool video                    = media_view_has_video();
+	bool mouse_hover_imgui_window = util_mouse_hovering_imgui_window();
+
+	if ( ImGui::IsKeyReleased( ImGuiKey_Space, false ) || ( !mouse_hover_imgui_window && ImGui::IsKeyReleased( ImGuiKey_MouseLeft, false ) ) )
+	{
+		if ( video )
+		{
+			const char* cmd[]   = { "cycle", "pause", NULL };
+			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+
+			set_frame_draw();
+		}
+	}
+
+	// Seeking
+	if ( !mouse_hover_imgui_window )
+	{
+		if ( ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) ) || ImGui::IsKeyPressed( ImGuiKey_K, true ) )
+		{
+			if ( video )
+			{
+				const char* cmd[]   = { "seek", "-5", NULL };
+				int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+			}
+			else
+			{
+				media_view_seek_image( 1, true );
+			}
+		}
+		if ( ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) ) || ImGui::IsKeyPressed( ImGuiKey_L, true ) )
+		{
+			if ( video )
+			{
+				const char* cmd[]   = { "seek", "5", NULL };
+				int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+			}
+			else
+			{
+				media_view_seek_image( 1, false );
+			}
+		}
+	}
+}
+
+
 void media_view_input()
 {
 	media_scale_check_upload();
+
+	media_view_handle_content_inputs();
 
 	// for video view
 	if ( !ImGui::IsKeyDown( ImGuiKey_RightCtrl ) )
@@ -758,13 +884,13 @@ void media_view_input()
 
 	if ( ImGui::IsKeyPressed( ImGuiKey_Comma ) )
 	{
-		image_draw::pause = true;
+		media_view_set_playback_pause( true );
 		media_view_frame_advance( true );
 	}
 
 	if ( ImGui::IsKeyPressed( ImGuiKey_Period ) )
 	{
-		image_draw::pause = true;
+		media_view_set_playback_pause( true );
 		media_view_frame_advance();
 	}
 
@@ -952,72 +1078,6 @@ advance:
 //constexpr float MEDIA_CONTROLS_PADDING = 20.f;
 
 
-// this should be elsewhere
-void media_view_handle_inputs( bool mouse_hover_imgui_window, bool video )
-{
-	if ( ImGui::IsKeyReleased( ImGuiKey_Space, false ) || ( !mouse_hover_imgui_window && ImGui::IsKeyReleased( ImGuiKey_MouseLeft, false ) ) )
-	{
-		if ( video )
-		{
-			const char* cmd[]   = { "cycle", "pause", NULL };
-			int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-
-			set_frame_draw();
-		}
-	}
-
-	// Seeking
-	if ( !mouse_hover_imgui_window )
-	{
-		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_LeftArrow, true ) )
-		{
-			if ( video )
-			{
-				const char* cmd[]   = { "seek", "-5", NULL };
-				int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-			}
-			else
-			{
-				media_view_frame_advance();
-			}
-		}
-		if ( ImGui::IsKeyDown( ImGuiKey_RightCtrl ) && ImGui::IsKeyPressed( ImGuiKey_RightArrow, true ) )
-		{
-			if ( video )
-			{
-				const char* cmd[]   = { "seek", "5", NULL };
-				int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-			}
-			else
-			{
-				media_view_frame_advance( true );
-			}
-		}
-	}
-}
-
-
-bool media_view_has_video()
-{
-	if ( get_media_type() != e_media_type_video )
-		return false;
-
-	return g_mpv_data.loaded_file;
-}
-
-
-void media_view_set_playback_pause( bool pause )
-{
-	image_draw::pause = pause;
-
-	if ( media_view_has_video() )
-	{
-		const char* cmd[]   = { "set", "pause", pause ? "yes" : "no", NULL };
-		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-	}
-}
-
-
 void media_view_draw_video_controls( bool mouse_hover_imgui_window, float right_side_area, ImVec2& play_btn_size, int window_width, int window_height )
 {
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -1025,20 +1085,20 @@ void media_view_draw_video_controls( bool mouse_hover_imgui_window, float right_
 	//ImGui::Spacing();
 	//ImGui::SameLine();
 
-	if ( ImGui::Button( "<" ) )
-	{
-		const char* cmd[]   = { "frame-back-step", NULL };
-		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-	}
-
-	ImGui::SameLine();
-	if ( ImGui::Button( ">" ) )
-	{
-		const char* cmd[]   = { "frame-step", NULL };
-		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
-	}
-
-	ImGui::SameLine();
+//	if ( ImGui::Button( "<" ) )
+//	{
+//		const char* cmd[]   = { "frame-back-step", NULL };
+//		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+//	}
+//
+//	ImGui::SameLine();
+//	if ( ImGui::Button( ">" ) )
+//	{
+//		const char* cmd[]   = { "frame-step", NULL };
+//		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+//	}
+//
+//	ImGui::SameLine();
 
 	// https://stackoverflow.com/questions/3673226/how-to-print-time-in-format-2009-08-10-181754-811
 
@@ -1132,10 +1192,12 @@ void media_view_draw_animated_image_controls( float right_side_area )
 	//ImGui::Spacing();
 	//ImGui::SameLine();
 
-	if ( ImGui::Button( "<|" ) )
-	{
-		media_view_frame_set( 0 );
-	}
+//	if ( ImGui::Button( "<|" ) )
+//	{
+//		media_view_frame_set( 0 );
+//	}
+//
+//	ImGui::SameLine();
 
 	//ImGui::SameLine();
 	//if ( ImGui::Button( "|>" ) )
@@ -1143,24 +1205,8 @@ void media_view_draw_animated_image_controls( float right_side_area )
 	//	media_view_frame_set( g_image_data.image.frame.size() - 1 );
 	//}
 
-	ImGui::SameLine();
+	//ImGui::SameLine();
 	//ImGui::Spacing();
-
-	ImGui::SameLine();
-	if ( ImGui::Button( "<" ) )
-	{
-		image_draw::pause = true;
-		media_view_frame_advance( true );
-	}
-
-	ImGui::SameLine();
-	if ( ImGui::Button( ">" ) )
-	{
-		image_draw::pause = true;
-		media_view_frame_advance();
-	}
-
-	ImGui::SameLine();
 
 	if ( ImGui::Button( image_draw::reverse ? ">>" : "<<" ) )
 	{
@@ -1242,8 +1288,6 @@ void media_view_draw_media_controls( bool mouse_hover_imgui_window )
 
 	bool video      = get_media_type() == e_media_type_video;
 	bool anim_image = ( get_media_type() == e_media_type_image && g_image_data.image.frame.size() > 1 );
-
-	media_view_handle_inputs( mouse_hover_imgui_window, video );
 
 	ImGui::PushFont( font::normal, app::config.font_size * 1.25f );
 
@@ -1348,10 +1392,37 @@ void media_view_draw_media_controls( bool mouse_hover_imgui_window )
 					media_view_set_playback_pause( true );
 				}
 			}
-		}
 
-		if ( draw_playback_controls )
-		{
+			ImGui::SameLine();
+			if ( ImGui::Button( "<|" ) )
+			{
+				media_view_set_playback_pause( true );
+
+				if ( video )
+				{
+					const char* cmd[]   = { "seek", "0", "absolute", NULL };
+					int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
+				}
+				else
+				{
+					media_view_frame_set( 0 );
+				}
+			}
+
+			ImGui::SameLine();
+			if ( ImGui::Button( "<" ) )
+			{
+				media_view_set_playback_pause( true );
+				media_view_frame_advance( true );
+			}
+
+			ImGui::SameLine();
+			if ( ImGui::Button( ">" ) )
+			{
+				media_view_set_playback_pause( true );
+				media_view_frame_advance();
+			}
+
 			ImGui::SameLine();
 
 			if ( video )
