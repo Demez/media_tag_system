@@ -32,6 +32,16 @@ void media_load_on_finish()
 		image_free_data( g_image_data.image );
 		image_free_data( g_image_scaled_data.image );
 	}
+
+	update_window_title();
+	set_frame_draw( 3 );
+}
+
+
+// TODO: when loading the rest of the frames of an animated image, call this on main thread, custom user event?
+void media_load_on_finish_frames()
+{
+	// create animated fbo here
 }
 
 
@@ -96,8 +106,6 @@ void media_load_job_finish( job_status_t* status, bool in_main_thread )
 		//	image_free_data( g_image_data.image );
 		//	image_free_data( g_image_scaled_data.image );
 	}
-
-	update_window_title();
 
 	media_view_scale_reset_timer();
 	media_view_scale_set_image();

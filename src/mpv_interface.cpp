@@ -273,7 +273,7 @@ bool mpv_init_render_context()
 	// request a new frame to be rendered.
 	// (Separate from the normal event handling mechanism for the sake of
 	//  users which run OpenGL on a different thread.)
-	//p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, nullptr );
+	p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, nullptr );
 
 	//int64_t wid = (s64)g_mpv_window;
 	//bool    yes = true;
@@ -516,14 +516,23 @@ void mpv_sdl_event( SDL_Event& sdl_event )
 #if 1
 	if ( sdl_event.user.code == e_user_event_mpv_render )
 	{
-		u64 flags = p_mpv_render_context_update( g_mpv_gl );
-		if ( flags & MPV_RENDER_UPDATE_FRAME )
-			g_mpv_redraw = true;
+		//u64 flags = p_mpv_render_context_update( g_mpv_gl );
+		//if ( flags & MPV_RENDER_UPDATE_FRAME )
+		//	g_mpv_redraw = true;
 
 		// mpv_update();
+		
+		// :/
+		// idk, i need to figure out mpv updates more, and get it to show a frame when paused
+		// if i don't use this event and have this, and mpv is paused when i advance to a different video
+		// it can get stuck and not show the first video frame until i send an input,
+		// like mouse moving or key press in the program
+		// and THIS is for fixing the video resolution,
+		// something i need to handle better with a video reconfig event
+		set_frame_draw( 4 );
 	}
 #endif
-#if 1
+#if 0
 	if ( sdl_event.user.code == e_user_event_mpv_event )
 	{
 		if ( g_mpv_event_sending )
@@ -597,7 +606,7 @@ bool start_mpv()
 	p_mpv_observe_property( g_mpv, e_mpv_cmd_observe, "track-list/count", MPV_FORMAT_INT64 );
 
 	// When normal mpv events are available.
-	p_mpv_set_wakeup_callback( g_mpv, on_mpv_events, nullptr );
+	// p_mpv_set_wakeup_callback( g_mpv, on_mpv_events, nullptr );
 
 	// let mpv finish startup
 	// mpv_handle_wait_event( g_mpv, 0.1 );
@@ -738,8 +747,15 @@ void mpv_update( mpv_data_t& data )
 
 	mpv_event* mpv_event = p_mpv_wait_event( data.mpv, 0 );
 
+	if ( mpv_event->event_id == MPV_EVENT_NONE )
+		return;
+
+	printf( " ------ MPV UPDATE ------ \n" );
+
 	while ( mpv_event && mpv_event->event_id != MPV_EVENT_NONE )
 	{
+		printf( "MPV EVENT %d\n", mpv_event->event_id );
+
 		if ( mpv_event->event_id == MPV_EVENT_NONE )
 			return;
 
@@ -844,7 +860,20 @@ void mpv_update( mpv_data_t& data )
 				//}
 			}
 		}
-		else if ( mpv_event->event_id == MPV_EVENT_PLAYBACK_RESTART )
+		else if ( mpv_event->event_id == MPV_EVENT_PLAYBACK_RESTART || mpv_event->event_id == MPV_EVENT_VIDEO_RECONFIG )
+		{
+			data.loaded_file = true;
+			// get_media_info( data );
+
+			// this may be called on new video creation to set to specific time
+			// p_mpv_set_option_string( data.mpv, "start", "0" );
+
+			//if ( g_media_load_index < UINT32_MAX )
+			//	media_load_on_finish();
+
+			send_frame_draw_event();
+		}
+		else if ( mpv_event->event_id == MPV_EVENT_FILE_LOADED )
 		{
 			data.loaded_file = true;
 			// get_media_info( data );

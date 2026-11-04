@@ -88,6 +88,7 @@ void                       mpv_sdl_event( SDL_Event& event );
 extern mpv_handle*         g_mpv;
 extern mpv_render_context* g_mpv_gl;
 extern bool                g_mpv_event_sending;
+extern bool                g_mpv_waiting_for_draw;
 
 // --------------------------------------------------------------------------------------------------------
 // mpv function pointer typedefs, cause im not compiling the mpv source just to link to it

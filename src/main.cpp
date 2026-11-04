@@ -956,7 +956,12 @@ bool handle_events()
 
 	int max_events = SDL_PeepEvents( nullptr, 0, SDL_PEEKEVENT, 0, 0 );
 
-	bool need_draw  = app::config.always_draw || app::draw_frame_count > 0;
+	// stupid hack
+	bool loading_video = false;
+	if ( g_media_load_index < UINT32_MAX )
+		loading_video = gallery_item_get_media_entry( g_media_load_index ).type;
+
+	bool need_draw = app::config.always_draw || app::draw_frame_count > 0 || loading_video;
 
 	// slam it to false when minimized
 	if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
@@ -1249,7 +1254,7 @@ void main_loop()
 
 		// -----------------------------------------------------------------------------------
 		
-		//mpv_update();
+		mpv_update();
 
 		u32 draw_frame_count = app::draw_frame_count;
 
