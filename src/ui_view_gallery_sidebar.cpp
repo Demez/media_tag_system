@@ -625,7 +625,7 @@ float gallery_view_draw_header()
 
 	ImGui::SetNextItemWidth( sort_width );
 
-	if ( ImGui::BeginCombo( "##sort_by", combo_preview_value, 0 ) )
+	if ( ImGui::BeginCombo( "##sort_by", combo_preview_value, ImGuiComboFlags_HeightLargest ) )
 	{
 		for ( int n = 0; n < e_gallery_sort_mode_count; n++ )
 		{
