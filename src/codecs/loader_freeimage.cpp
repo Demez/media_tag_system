@@ -28,8 +28,8 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	FIBITMAP* bitmap     = base_bitmap;
 
 	// HACK, some 24 bit images appear diagonal and i don't know why yet
-	// if ( bpp == 24 )
-	if ( false )
+	if ( bpp == 24 )
+	// if ( false )
 	{
 		//u32       channel_num = FreeImage_GetChannelsNumber( bitmap );
 
