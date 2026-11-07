@@ -28,9 +28,12 @@ struct CodecJPEG: public IImageLoader
 
 	void get_supported_formats( std::vector< image_format_info_t >& formats ) override
 	{
-		formats.reserve( formats.size() + 2 );
+		formats.reserve( formats.size() + 5 );
 		formats.emplace_back( "JPEG", ".jpg" );
 		formats.emplace_back( "JPEG", ".jpeg" );
+		formats.emplace_back( "JPEG", ".jpe" );
+		formats.emplace_back( "JPEG", ".jif" );
+		formats.emplace_back( "JPEG", ".jfif" );
 	}
 
 	bool check_header( const fs::path& path ) override
