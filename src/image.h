@@ -657,7 +657,7 @@ struct thumbnail_t
 {
 	std::atomic< e_thumbnail_status >      status;
 	std::atomic< e_thumbnail_save_status > save_status;
-	fs::path_char*                         path;  // mainly for debugging
+	fs::path_char*                         path;
 	image_t*                               image;
 	image_t*                               image_scaled;
 	uploaded_textures_t                    textures{};
