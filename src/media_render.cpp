@@ -61,8 +61,9 @@ static void media_view_draw_icon( e_icon icon_value, int window_width, int windo
 	draw_info.height   = icon->height;
 	draw_info.rotation = 0.f;
 	draw_info.texture  = icon_get_texture( icon_value );
+	draw_info.blend    = e_frame_blend_alpha;
 
-	render_set_fbo( 0, window_width, window_height );
+	render_set_fbo( 0, 0, window_width, window_height );
 	render_draw_texture( draw_info );
 }
 
@@ -114,6 +115,7 @@ static void media_view_set_palette_bg( image_palette_t& palette, size_t frame_i 
 		draw_info.height = g_image_data.image.height;
 		draw_info.x      = 0;
 		draw_info.y      = 0;
+		draw_info.blend  = image_draw::hide_alpha ? e_frame_blend_none : frame.blend;
 
 		// draw_info.width  = frame.width;
 		// draw_info.height = frame.height;
@@ -127,7 +129,7 @@ static void media_view_set_palette_bg( image_palette_t& palette, size_t frame_i 
 		draw_info.x          = static_cast< int >( round( image_draw::pos.x + ( frame.pos_x * image_draw::zoom ) ) );
 		draw_info.y          = static_cast< int >( round( image_draw::pos.y + ( frame.pos_y * image_draw::zoom ) ) );
 		draw_info.rotation   = image_draw::rot;
-		draw_info.hide_alpha = image_draw::hide_alpha;
+		draw_info.blend      = image_draw::hide_alpha ? e_frame_blend_none : frame.blend;
 		draw_info.flip_h     = image_draw::flip_h;
 		draw_info.flip_v     = image_draw::flip_v;
 	}
@@ -144,7 +146,7 @@ static void media_view_draw_animated_fbo()
 	draw_info.x             = roundf( image_draw::pos.x );
 	draw_info.y             = roundf( image_draw::pos.y );
 	draw_info.rotation      = image_draw::rot;
-	draw_info.hide_alpha    = image_draw::hide_alpha;
+	draw_info.blend         = image_draw::hide_alpha ? e_frame_blend_none : e_frame_blend_alpha;
 	draw_info.flip_h        = image_draw::flip_h;
 	draw_info.flip_v        = !image_draw::flip_v;
 	draw_info.texture       = g_main_image_anim_tex;
@@ -195,6 +197,7 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 		draw_info.x       = frame.pos_x;
 		draw_info.y       = frame.pos_y;
 		draw_info.texture = g_image_data.textures.frame[ frame_i ];
+		draw_info.blend   = frame.blend;
 		//draw_info.target  = g_main_image_anim_fbo;
 	}
 	else
@@ -204,7 +207,7 @@ static void media_view_draw_frame( int width, int height, size_t frame_i )
 		draw_info.x             = static_cast< int >( round( image_draw::pos.x + ( frame.pos_x * image_draw::zoom ) ) );
 		draw_info.y             = static_cast< int >( round( image_draw::pos.y + ( frame.pos_y * image_draw::zoom ) ) );
 		draw_info.rotation      = image_draw::rot;
-		draw_info.hide_alpha    = image_draw::hide_alpha;
+		draw_info.blend         = image_draw::hide_alpha ? e_frame_blend_none : frame.blend;
 		draw_info.flip_h        = image_draw::flip_h;
 		draw_info.flip_v        = image_draw::flip_v;
 		draw_info.invert_colors = image_draw::invert_color;
@@ -259,6 +262,39 @@ bool media_view_draw_load_status( int width, int height )
 }
 
 
+static size_t media_view_get_starting_frame()
+{
+	size_t starting_frame = image_draw::frame;
+
+	if ( image_draw::show_raw_frames || starting_frame == 0 )
+		return starting_frame;
+
+	// no previous frames to draw at all
+	if ( g_image_data.image.frame[ starting_frame ].blend == e_frame_blend_none )
+		return starting_frame;
+		
+	starting_frame--;
+
+	for ( ;; starting_frame-- )
+	{
+		image_frame_t& frame = g_image_data.image.frame[ starting_frame ];
+
+		if ( frame.frame_disposal == e_frame_disposal_background )
+		{
+			// we don't render the background disposed frame, the rendered image is cleared after that was drawn
+			// so just start with the frame after that
+			starting_frame++;
+			break;
+		}
+
+		if ( starting_frame == 0 )
+			break;
+	}
+
+	return starting_frame;
+}
+
+
 static void media_view_draw_image( int width, int height )
 {
 	if ( g_image_data.textures.frame == nullptr )
@@ -290,7 +326,7 @@ static void media_view_draw_image( int width, int height )
 	{
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
 
-		render_set_fbo( g_main_image_anim_fbo, g_image_data.image.width, g_image_data.image.height );
+		render_set_fbo( g_main_image_anim_fbo, g_main_image_anim_tex, g_image_data.image.width, g_image_data.image.height );
 		using_fbo = true;
 
 		render_clear( { 0.f, 0.f, 0.f, 0.f } );
@@ -298,111 +334,32 @@ static void media_view_draw_image( int width, int height )
 	}
 	else
 	{
-		render_set_fbo( 0, width, height );
+		render_set_fbo( 0, 0, width, height );
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-
-		//glEnable( GL_SCISSOR_TEST );
-		//glScissor( image_draw::pos.x, image_draw::pos.y, image_draw::size.x, image_draw::size.y );
 	}
 
-	ImVec4 clear_color( 0.f, 0.f, 0.f, image_draw::hide_alpha ? 1.f : 0.f );
+	size_t starting_frame = media_view_get_starting_frame();
 
-	if ( !using_fbo )
-		clear_color = app::config.media_bg_color;
+	media_view_set_palette_bg( g_image_data.image.frame[ starting_frame ].palette, starting_frame );
 
-	e_frame_disposal prev_disposal = g_image_data.image.frame[ image_draw::frame ].frame_disposal;
-
-	// frame disposal seems to be how to handle THIS frame for the next frame drawn
-	// so here, the current frame will use the last frame's disposal method for how to draw it
-	// if it's keep, look for all previous frames to draw, until we hit 0 or one that's not keep
-
-	if ( image_draw::frame > 0 )
+	for ( size_t frame_i = starting_frame; frame_i < image_draw::frame; frame_i++ )
 	{
-		prev_disposal = g_image_data.image.frame[ image_draw::frame - 1 ].frame_disposal;
+		image_frame_t& frame = g_image_data.image.frame[ frame_i ];
+
+		// these frames don't stay on the canvas, so skip previous cases of these
+		if ( frame.frame_disposal == e_frame_disposal_previous )
+			continue;
+
+		media_view_draw_frame( width, height, frame_i );
 	}
 
-	if ( prev_disposal == e_frame_disposal_keep )
-	{
-		size_t last_frame_to_keep = image_draw::frame;
-
-		if ( !image_draw::show_raw_frames && image_draw::frame > 0 )
-		{
-			for ( last_frame_to_keep--;; last_frame_to_keep-- )
-			{
-				image_frame_t& frame = g_image_data.image.frame[ last_frame_to_keep ];
-
-				if ( frame.frame_disposal != e_frame_disposal_keep )
-					break;
-
-				if ( last_frame_to_keep == 0 )
-					break;
-			}
-		}
-		else if ( image_draw::show_raw_frames )
-		{
-			last_frame_to_keep = image_draw::frame;
-		}
-		else
-		{
-			last_frame_to_keep = 0;
-		}
-
-		media_view_set_palette_bg( g_image_data.image.frame[ last_frame_to_keep ].palette, last_frame_to_keep );
-
-		/// mmmm overdraw hell?
-		for ( u32 i = last_frame_to_keep; i < image_draw::frame + 1; i++ )
-		{
-			media_view_draw_frame( width, height, i );
-		}
-	}
-	else if ( prev_disposal == e_frame_disposal_previous )
-	{
-		// Restore to the last frame without the previous disposal type
-		size_t last_frame_to_keep = image_draw::frame;
-
-		if ( !image_draw::show_raw_frames && image_draw::frame > 0 )
-		{
-			for ( last_frame_to_keep--;; last_frame_to_keep-- )
-			{
-				image_frame_t& frame = g_image_data.image.frame[ last_frame_to_keep ];
-
-				if ( frame.frame_disposal != e_frame_disposal_previous )
-					break;
-
-				if ( last_frame_to_keep == 0 )
-				{
-					last_frame_to_keep = image_draw::frame;
-					break;
-				}
-			}
-		}
-		else if ( image_draw::show_raw_frames )
-		{
-			last_frame_to_keep = image_draw::frame;
-		}
-		else
-		{
-			last_frame_to_keep = 0;
-		}
-
-		if ( last_frame_to_keep < image_draw::frame )
-		{
-			media_view_set_palette_bg( g_image_data.image.frame[ last_frame_to_keep ].palette, last_frame_to_keep );
-			media_view_draw_frame( width, height, last_frame_to_keep );
-		}
-
-		media_view_draw_frame( width, height, image_draw::frame );
-	}
-	else  // e_frame_disposal_background ?
-	{
-		media_view_set_palette_bg( g_image_data.image.frame[ image_draw::frame ].palette, image_draw::frame );
-		media_view_draw_frame( width, height, image_draw::frame );
-	}
+	// finally, draw the current frame
+	media_view_draw_frame( width, height, image_draw::frame );
 
 	if ( g_image_data.image.frame.size() > 1 )
 	{
 		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-		render_set_fbo( 0, width, height );
+		render_set_fbo( 0, 0, width, height );
 		media_view_draw_animated_fbo();
 	}
 

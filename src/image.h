@@ -47,18 +47,25 @@ enum e_frame_disposal : u8
 };
 
 
-// JPEG XL, can i join the above into this somehow? or is this wrong, i haven't touched this yet still
-enum e_frame_blend_mode : u8
+enum e_frame_blend : u8
 {
-	e_frame_blend_mode_none,
+	// No frame blending, does not draw any previous frames
+	e_frame_blend_none,
 
-	e_frame_blend_mode_replace,
-	e_frame_blend_mode_add,
-	e_frame_blend_mode_blend,
-	e_frame_blend_mode_multiply_add,
-	e_frame_blend_mode_multiply,
+	// Draw over the previous drawn content, no blending done
+	e_frame_blend_all,
 
-	e_frame_blend_mode_count,
+	// same as using GL_ONE_MINUS_SRC_ALPHA
+	e_frame_blend_alpha,
+
+	// JPEG XL - not implemented yet
+	e_frame_blend_replace,
+	e_frame_blend_add,  // would this be the same as all?
+	e_frame_blend_blend,
+	e_frame_blend_multiply_add,
+	e_frame_blend_multiply,
+
+	e_frame_blend_count,
 };
 
 
@@ -229,29 +236,30 @@ struct image_palette_t
 struct image_frame_t
 {
 	// image data
-	u8*              data           = nullptr;
+	u8*                data           = nullptr;
 
 	// size
-	size_t           size           = 0;
+	size_t             size           = 0;
 
 	// time to spend on frame
-	double           time           = 0.0;
+	double             time           = 0.0;
 
 	// frame width and height
-	int              width          = 0;
-	int              height         = 0;
-	u32              pitch          = 0;
+	int                width          = 0;
+	int                height         = 0;
+	u32                pitch          = 0;
 
 	// frame draw position relative to image draw position
-	int              pos_x          = 0;
-	int              pos_y          = 0;
+	int                pos_x          = 0;
+	int                pos_y          = 0;
 
-	e_frame_disposal frame_disposal = e_frame_disposal_keep;
+	e_frame_disposal   frame_disposal = e_frame_disposal_keep;
+	e_frame_blend blend          = e_frame_blend_none;
 
-	e_image_frame_f  flags          = 0;
-	e_colortype      color_type     = e_colortype_bitmap;
+	e_image_frame_f    flags          = 0;
+	e_colortype        color_type     = e_colortype_bitmap;
 
-	image_palette_t  palette{};
+	image_palette_t    palette{};
 
 	// animation_format_frame_data_base_t* frame_data;
 
@@ -283,6 +291,7 @@ struct image_frame_t
 		time           = other.time;
 		flags          = other.flags;
 		frame_disposal = other.frame_disposal;
+		blend          = other.blend;
 		color_type     = other.color_type;
 
 		palette        = other.palette;
@@ -302,6 +311,7 @@ struct image_frame_t
 		size               = other.size;
 		flags              = other.flags;
 		frame_disposal     = other.frame_disposal;
+		blend              = other.blend;
 		color_type         = other.color_type;
 
 		other.data         = nullptr;

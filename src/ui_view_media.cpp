@@ -427,7 +427,7 @@ void media_view_draw_media_info()
 
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
-			ImGui::TextUnformatted( "Frame Disposal" );
+			ImGui::TextUnformatted( "Disposal" );
 
 			ImGui::TableNextColumn();
 
@@ -442,6 +442,26 @@ void media_view_draw_media_info()
 					break;
 				case e_frame_disposal_previous:
 					ImGui::TextUnformatted( "Keep Previous" );
+					break;
+			}
+
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextUnformatted( "Blend" );
+
+			ImGui::TableNextColumn();
+
+			switch ( frame.blend )
+			{
+				default:
+				case e_frame_blend_none:
+					ImGui::TextUnformatted( "None" );
+					break;
+				case e_frame_blend_all:
+					ImGui::TextUnformatted( "All" );
+					break;
+				case e_frame_blend_alpha:
+					ImGui::TextUnformatted( "Alpha" );
 					break;
 			}
 
@@ -474,7 +494,7 @@ void media_view_draw_media_info()
 				ImGui::TextUnformatted( "Palette" );
 
 				ImGui::TableNextColumn();
-				ImGui::TextUnformatted( "Frame Disposal" );
+				ImGui::TextUnformatted( "Disposal" );
 
 				// ImGui::TableNextColumn();
 				// ImGui::TextUnformatted( "Flags" );

@@ -400,7 +400,7 @@ void mpv_draw_frame()
 	draw_info.rotation = 0;
 	draw_info.texture  = g_mpv_fbo_tex;
 
-	render_set_fbo( 0, width, height );
+	render_set_fbo( 0, 0, width, height );
 
 	glEnable( GL_SCISSOR_TEST );
 	glScissor( pos_x - viewport_offset_x, pos_y - viewport_offset_y, new_width, new_height );

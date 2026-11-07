@@ -408,6 +408,7 @@ struct render_draw_texture_t
 //	int                 target_height;
 
 	e_shader            shader = e_shader_main;
+	e_frame_blend       blend  = e_frame_blend_none;
 
 	// draw settings
 	bool                flip_v = false;
@@ -415,7 +416,6 @@ struct render_draw_texture_t
 
 	// draw a specific channel of the image
 	bool                hide_channel[ 4 ];
-	bool                hide_alpha    = false;
 	bool                invert_colors = false;
 
 	bool                clear_bg      = false;
@@ -567,7 +567,7 @@ bool                                 render_init();
 void                                 render_shutdown();
 void                                 render_window_resize();
 
-void                                 render_set_fbo( GLuint fbo, int fbo_width, int fbo_height );
+void                                 render_set_fbo( GLuint fbo, GLint fbo_tex, int fbo_width, int fbo_height );
 void                                 render_finish();
 void                                 render_clear( ImVec4 color );
 void                                 render_draw_texture( render_draw_texture_t draw_info );

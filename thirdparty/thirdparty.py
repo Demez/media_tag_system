@@ -351,13 +351,7 @@ def post_libspng_extract():
     if not syscmd(f"cmake -B build {build_options} .", "Failed to run cmake"):
         return
 
-    print("Building libspng - Release\n")
-    if not syscmd(f"cmake --build ./build --config Release --parallel", "Failed to build in Release"):
-        return
-
-    #print("Building libspng - Debug\n")
-    #if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
-    #    return
+    cmake_built_targets(["Release"])
     
 
 # =================================================================================================
@@ -583,8 +577,10 @@ TASK_LIST = {
         },
         {
             "name": "libspng",
-            "url":  "https://github.com/randy408/libspng/archive/v0.7.4.zip",
-            "file": "libspng-0.7.4.zip",
+            # "url":  "https://github.com/randy408/libspng/archive/v0.7.4.zip",
+            # "file": "libspng-0.7.4.zip",
+            "url":  "https://github.com/felixbuenemann/libspng/archive/refs/heads/apng-support.zip",
+            "file": "libspng-apng-support.zip",
             "func": post_libspng_extract,
         },
         {

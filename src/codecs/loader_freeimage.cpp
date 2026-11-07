@@ -84,6 +84,8 @@ bool image_load_frame( FIBITMAP* base_bitmap, image_load_info_t& load_info, size
 	load_info.image->frame[ page ].width  = FreeImage_GetWidth( bitmap );
 	load_info.image->frame[ page ].height = FreeImage_GetHeight( bitmap );
 
+	load_info.image->frame[ page ].blend  = e_frame_blend_alpha;
+
 	// ----------------------------------------------------------------------------------------
 
 	image_frame_t& frame                  = load_info.image->frame[ page ];

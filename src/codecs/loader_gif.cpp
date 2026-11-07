@@ -136,6 +136,7 @@ static void gif_frame_writer( void* data, struct GIF_WHDR* gif_whdr )
 	frame.pos_y  = gif_whdr->fryo;
 	frame.width  = gif_whdr->frxd;
 	frame.height = gif_whdr->fryd;
+	frame.blend  = e_frame_blend_alpha;
 
 	switch ( gif_whdr->mode )
 	{

@@ -50,6 +50,12 @@ static u32 indices[] = {
 };
 
 
+static int    g_fbo_width  = 0;
+static int    g_fbo_height = 0;
+static GLuint g_fbo_idx    = 0;
+static GLint  g_fbo_tex    = 0;
+
+
 const char* shader_str[] = {
 	"Main",
 	"Color",
@@ -473,14 +479,12 @@ void render_shutdown()
 // ================================================================================================
 
 
-static int g_fbo_width  = 0;
-static int g_fbo_height = 0;
-
-
-void render_set_fbo( GLuint fbo, int fbo_width, int fbo_height )
+void render_set_fbo( GLuint fbo, GLint fbo_tex, int fbo_width, int fbo_height )
 {
 	g_fbo_width  = fbo_width;
 	g_fbo_height = fbo_height;
+	g_fbo_idx    = fbo;
+	g_fbo_tex    = fbo_tex;
 
 	glBindFramebuffer( GL_FRAMEBUFFER, fbo );
 	//glScissor( 0, 0, g_fbo_width, g_fbo_height );
@@ -520,8 +524,11 @@ void render_draw_texture( render_draw_texture_t draw_info )
 	
 	glUseProgram( shader->program );
 
-	if ( !draw_info.hide_alpha )
+	bool should_blend = false;
+
+	if ( draw_info.blend == e_frame_blend_alpha /*|| draw_info.blend == e_frame_blend_all*/ )
 	{
+		should_blend = true;
 		glEnable( GL_BLEND );
 		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 	}
@@ -572,7 +579,7 @@ void render_draw_texture( render_draw_texture_t draw_info )
 
 	glDrawElements( GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 );
 
-	if ( !draw_info.hide_alpha )
+	if ( should_blend )
 	{
 		glDisable( GL_BLEND );
 	}

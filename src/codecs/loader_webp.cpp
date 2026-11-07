@@ -46,7 +46,7 @@ struct LoaderWebP : public IImageLoader
 		// ... (Get information about the features present in the WebP file).
 		u32 flags     = WebPDemuxGetI( demux, WEBP_FF_FORMAT_FLAGS );
 
-		if ( flags & ANIMATION_FLAG )
+		if ( !load_info.single_frame && flags & ANIMATION_FLAG )
 		{
 			u32 loop_count  = WebPDemuxGetI( demux, WEBP_FF_LOOP_COUNT );
 			u32 frame_count = WebPDemuxGetI( demux, WEBP_FF_FRAME_COUNT );
@@ -110,16 +110,28 @@ struct LoaderWebP : public IImageLoader
 
 				switch (iter.dispose_method)
 				{
+					default:
 					case WEBP_MUX_DISPOSE_NONE:
 						frame.frame_disposal = e_frame_disposal_keep;
 						break;
 
 					case WEBP_MUX_DISPOSE_BACKGROUND:
-						frame.frame_disposal = e_frame_disposal_background;
+						// frame.frame_disposal = e_frame_disposal_background;
+						frame.frame_disposal = e_frame_disposal_previous;  // ???
 						break;
 				}
 
-				// TODO: handle blend mode
+				switch (iter.blend_method)
+				{
+					default:
+					case WEBP_MUX_NO_BLEND:
+						frame.blend = e_frame_blend_none;
+						break;
+
+					case WEBP_MUX_BLEND:
+						frame.blend = e_frame_blend_alpha;
+						break;
+				}
 
 				frame.size           = config.output.u.RGBA.size;
 				// frame.pitch          = config.output.u.RGBA.stride;
@@ -129,6 +141,9 @@ struct LoaderWebP : public IImageLoader
 				memcpy( frame.data, config.output.u.RGBA.rgba, frame.size );
 
 				WebPFreeDecBuffer( &config.output );
+
+				if ( load_info.single_frame )
+					break;
 
 			} while ( WebPDemuxNextFrame( &iter ) );
 			WebPDemuxReleaseIterator( &iter );
