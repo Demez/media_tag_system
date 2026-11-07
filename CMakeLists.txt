@@ -429,8 +429,8 @@ link_libraries(
 	jxl_cms
 	jxl_threads
 	# libwebp
-	libwebpdecoder
-	libwebpdemux
+	webpdecoder
+	webpdemux
 
 	# must be below other libraries, or the compiler will link the other libraries functions to freeimage instead
 	FreeImage

@@ -107,6 +107,8 @@ constexpr float STORAGE_SCALE = 1024.f;
   #define Win32()             false
   #define Linux()             true
 
+  #include <math.h>
+
 namespace fs
 {
 	using path_view = std::string_view;

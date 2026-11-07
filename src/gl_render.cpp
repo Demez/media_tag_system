@@ -3,8 +3,9 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
 
-
+#ifdef _WIN32
 constexpr float      M_PI   = 3.14159265358979323846f;
+#endif // _WIN32
 constexpr float      TO_RAD = M_PI / 180.f;
 
 extern SDL_GLContext g_gl_context;
