@@ -86,14 +86,17 @@ static void gif_setup_image( ff_gif_data_t* ff_gif_data, struct GIF_WHDR* gif_wh
 
 	image->image_format          = image_get_format_index_from_ext( ".gif" );
 
-	image->palette.count         = gif_whdr->clrs;
-	image->palette.bg_index      = gif_whdr->bkgd;
-	image->palette.trans_index   = gif_whdr->tran;
-
-	if ( gif_whdr->clrs > 0 )
+	if ( gif_whdr->ifrm == -1 )
 	{
-		image->flags |= e_image_flag_has_palette;
-		gif_write_palette( image->palette, gif_whdr );
+		image->palette.count         = gif_whdr->clrs;
+		image->palette.bg_index      = gif_whdr->bkgd;
+		image->palette.trans_index   = gif_whdr->tran;
+
+		if ( gif_whdr->clrs > 0 )
+		{
+			image->flags |= e_image_flag_has_palette;
+			gif_write_palette( image->palette, gif_whdr );
+		}
 	}
 
 	if ( gif_whdr->nfrm > 0 )
