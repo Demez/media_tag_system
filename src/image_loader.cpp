@@ -558,7 +558,7 @@ bool media_check_extension( std::string ext, e_media_type& type )
 bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new_height )
 {
 	stbir_pixel_layout pixel_layout = STBIR_RGBA;
-	stbir_datatype     datatype     = STBIR_TYPE_UINT8;
+	stbir_datatype     datatype     = STBIR_TYPE_UINT8_SRGB;
 
 	switch ( old_image->format )
 	{
