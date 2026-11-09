@@ -428,9 +428,6 @@ link_libraries(
 	jxl
 	jxl_cms
 	jxl_threads
-	# libwebp
-	webpdecoder
-	webpdemux
 
 	# must be below other libraries, or the compiler will link the other libraries functions to freeimage instead
 	FreeImage
@@ -483,6 +480,8 @@ if ( WIN32 )
 	)
 	link_libraries(
 		turbojpeg
+		libwebpdecoder
+		libwebpdemux
 	)
 elseif( LINUX )
 	link_directories(
@@ -493,6 +492,8 @@ elseif( LINUX )
 	link_libraries(
 		turbojpeg
 		stdc++exp
+		webpdecoder
+		webpdemux
 	)
 endif()
 
