@@ -1067,6 +1067,10 @@ void media_view_window_resize()
 
 void media_view_advance( bool prev )
 {
+	// don't try to advance while a gallery scan is happening
+	if ( gallery::scan_state != e_gallery_scan_idle )
+		return;
+
 	if ( gallery::sorted_media.size() <= 1 )
 		return;
 

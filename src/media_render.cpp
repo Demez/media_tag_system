@@ -385,7 +385,7 @@ void media_view_draw()
 	}
 
 	// show loading icon in corner
-	if ( g_media_load_start_time > 0 )
+	if ( g_media_load_start_time > 0 || gallery::scan_state != e_gallery_scan_idle )
 		media_view_draw_icon( e_icon_loading, width, height, false );
 }
 

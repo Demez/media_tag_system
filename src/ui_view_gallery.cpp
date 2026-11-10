@@ -538,7 +538,7 @@ void gallery_find_selected_file()
 			gallery_view_scroll_to_cursor();
 
 			if ( !g_gallery_view )
-				g_image_data.index = selection.index;
+				media_view_set_media_index( selection.index );
 
 			break;
 		}
@@ -696,11 +696,15 @@ void gallery_view_sort_dir_finish( job_status_t* status, bool in_main_thread )
 	auto sort_data        = static_cast< gallery_sort_dir_data_t* >( status->userdata );
 	gallery::sorted_media = sort_data->sorted_media;
 
-	if ( !directory::queued.empty() )
-		select_image_in_folder( false );
+	// check if image is also loading currently on another job, like on startup or image is dragged in from a different folder
+	// if ( g_media_load_index != MEDIA_INDEX_INVALID )
+	{
+		if ( !directory::queued.empty() )
+			select_image_in_folder( false );
 
-	if ( !gallery::selection.empty() )
-		gallery_find_selected_file();
+		else if ( !gallery::selection.empty() )
+			gallery_find_selected_file();
+	}
 
 	// gallery_view_scroll_to_cursor();
 	gallery_draw_extra_refresh( 2 );
@@ -775,14 +779,13 @@ void gallery_view_dir_change( bool keep_selection )
 	//	gallery_view_set_selection( gallery::cursor );
 
 	// TODO: make it work with recursive, so if the selected item is still within the results, use that to snap scroll view to
-	if ( !directory::folder_reload || directory::recursive )
-		gallery_view_reset();
+	//if ( !directory::folder_reload || directory::recursive )
+	//	gallery_view_reset();
 
 	gallery_view_sort_dir();
 
-	// Invalidate These
-	g_image_data.index        = SIZE_MAX;
-	g_image_scaled_data.index = SIZE_MAX;
+	// Invalidate the media index
+	// media_view_clear_media_index();
 }
 
 

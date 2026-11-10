@@ -432,12 +432,13 @@ extern bool                          g_mpv_video_ready;
 extern main_image_data_t             g_image_data;
 extern main_image_data_t             g_image_scaled_data;
 extern u64                           g_media_load_start_time;
-extern u32                           g_media_load_index;  // index of file currently loading
+extern size_t                        g_media_load_index;  // index of file currently loading
 extern bool                          g_media_load_from_gallery;  // are we loading a file selected from the gallery?
 
 // TODO: put these in the config
 constexpr u64                        SCALE_WAIT_TIME      = 100;         // in ms
 constexpr u64                        SCALE_INVALID_TIME   = UINT64_MAX;  // in ms
+constexpr size_t                     MEDIA_INDEX_INVALID  = SIZE_MAX;  // in ms
 constexpr u64                        IMAGE_LOAD_WAIT_TIME = 150;
 
 #define GL_DBG_NAME( str ) sizeof( str ), str
@@ -466,8 +467,11 @@ void                                 media_view_shutdown();
 void                                 media_view_update();
 e_media_type                         get_media_type();
 
+void                                 media_view_clear_media_index();
+void                                 media_view_set_media_index( size_t index );
+
 // Load currently selected file, does not change view type though
-void                                 media_view_load( u32 index );
+void                                 media_view_load( size_t index );
 void                                 media_load_on_finish();
 void                                 media_view_input();
 void                                 media_view_draw_imgui();

@@ -85,7 +85,7 @@ std::vector< fs::path >      g_drag_drop_files;
 main_image_data_t            g_image_data;
 main_image_data_t            g_image_scaled_data;
 u64                          g_media_load_start_time   = 0;
-u32                          g_media_load_index        = UINT32_MAX;
+size_t                       g_media_load_index        = MEDIA_INDEX_INVALID;
 bool                         g_media_load_from_gallery = false;
 
 SDL_GLContext                g_gl_context;
@@ -213,10 +213,22 @@ void select_image_in_folder( bool force_load_media )
 		if ( abs_path != directory::queued )
 			continue;
 
-		gallery_view_set_selection( i );
-		g_image_data.index = i;
-		break;
+		if ( g_media_load_index != MEDIA_INDEX_INVALID )
+		{
+			// change the currently loading media index
+			g_media_load_index = i;
+		}
+
+		// else
+		{
+			gallery_view_set_selection( i );
+			media_view_set_media_index( i );
+		}
+
+		return;
 	}
+
+	path_printf( "FAILED TO FIND FILE IN FOLDER: %s\n", directory::queued.c_str() );
 }
 
 
@@ -324,7 +336,16 @@ void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_t
 
 	directory::thumbnail_list.resize( directory::media_list.size() );
 
-	// select_image_in_folder( false );
+	// make a temporary unsorted copy of the images
+	gallery::sorted_media.reserve( directory::media_list.size() );
+	for ( size_t i = 0; i < directory::media_list.size(); i++ )
+	{
+		gallery::sorted_media.push_back( i );
+	}
+
+	// now select that temp file?
+	select_image_in_folder( false );
+
 	directory::folder_loading = false;
 
 	gallery_view_dir_change( false );
@@ -356,11 +377,6 @@ void folder_load_media_list()
 	{
 		gallery_view_clear_selection();
 	}
-
-	folder_media_list_reset();
-
-	directory::media_list.reserve( 5000 );
-	directory::thumbnail_list.reserve( 5000 );
 
 	// split into chunks
 	directory::path_chunks.clear();
@@ -1119,8 +1135,8 @@ static void handle_queued_file()
 		directory::media_list.push_back( entry );
 		gallery::sorted_media.push_back( 0 );
 
-		g_image_data.index        = 0;
-		g_image_scaled_data.index = 0;
+		// set to first file of fake media list
+		media_view_set_media_index( 0 );
 
 		set_view_type_media( true );
 
@@ -1132,7 +1148,7 @@ static void handle_queued_file()
 		// now we can load the files in the directory
 		folder_load_media_list();
 	}
-	// if still running a folder change, wait for the thread to
+	// if still running a folder change, wait for the thread to finish
 	else if ( !directory::folder_changed && gallery::scan_state == e_gallery_scan_idle )
 	{
 		select_image_in_folder( true );
@@ -1183,7 +1199,7 @@ static void check_queued_path()
 	else
 		handle_queued_folder();
 
-	update_window_title();
+	//update_window_title();
 }
 
 

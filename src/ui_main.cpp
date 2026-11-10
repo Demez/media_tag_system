@@ -231,7 +231,7 @@ void set_view_type_media( bool force_load_media )
 	u32 selected = gallery_view_get_last_selected_index();
 
 	if ( directory::folder_loading )
-		g_image_data.index = selected;
+		media_view_set_media_index( selected );
 
 	bool reload_image = force_load_media;
 	reload_image |= g_image_data.index != selected;
@@ -254,7 +254,7 @@ void set_view_type_media( bool force_load_media )
 
 	g_gallery_view = false;
 
-	update_window_title();
-	set_frame_draw( 3 );
+	//update_window_title();
+	//set_frame_draw( 3 );
 }
 

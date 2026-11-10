@@ -1,10 +1,22 @@
 #include "main.h"
 
 
-constexpr float            UPSCALE_LIMIT = 2.f;
+void media_view_clear_media_index()
+{
+	g_image_data.index        = MEDIA_INDEX_INVALID;
+	g_image_scaled_data.index = MEDIA_INDEX_INVALID;
+}
 
 
-job_status_t* g_media_load_status = nullptr;
+void media_view_set_media_index( size_t index )
+{
+	g_image_data.index        = index;
+	g_image_scaled_data.index = MEDIA_INDEX_INVALID;
+}
+
+
+constexpr float UPSCALE_LIMIT       = 2.f;
+job_status_t*   g_media_load_status = nullptr;
 
 
 struct media_load_data_t
@@ -20,14 +32,16 @@ struct media_load_data_t
 
 void media_load_on_finish()
 {
-	g_image_data.index        = g_media_load_index;
+	// if ( gallery::scan_state == e_gallery_scan_idle )
+	media_view_set_media_index( g_media_load_index );
+
 	g_media_load_start_time   = 0;
-	g_media_load_index        = UINT32_MAX;
+	g_media_load_index        = MEDIA_INDEX_INVALID;
 	g_media_load_from_gallery = false;
 
 	gallery_view_set_selection( g_image_data.index );
 
-	if ( get_media_type() == e_media_type_video )
+	if ( get_media_type() != e_media_type_image )
 	{
 		image_free_data( g_image_data.image );
 		image_free_data( g_image_scaled_data.image );
@@ -101,11 +115,6 @@ void media_load_job_finish( job_status_t* status, bool in_main_thread )
 			}
 		}
 	}
-	else if ( load_data->entry.type == e_media_type_video )
-	{
-		//	image_free_data( g_image_data.image );
-		//	image_free_data( g_image_scaled_data.image );
-	}
 
 	media_view_scale_reset_timer();
 	media_view_scale_set_image();
@@ -146,9 +155,9 @@ void media_load_job_free( job_status_t* status )
 }
 
 
-void media_view_load( u32 index )
+void media_view_load( size_t index )
 {
-	if ( g_media_load_status || g_media_load_index != UINT32_MAX )
+	if ( g_media_load_status || g_media_load_index != MEDIA_INDEX_INVALID )
 		return;
 
 	if ( gallery::sorted_media.empty() )
