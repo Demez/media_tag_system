@@ -974,7 +974,7 @@ bool handle_events()
 
 	// stupid hack
 	bool loading_video = false;
-	if ( g_media_load_index < UINT32_MAX )
+	if ( g_media_load_index < MEDIA_INDEX_INVALID )
 		loading_video = gallery_item_get_media_entry( g_media_load_index ).type;
 
 	bool need_draw = app::config.always_draw || app::draw_frame_count > 0 || loading_video;
@@ -1097,8 +1097,7 @@ static bool check_mpv_playback()
 
 	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
 
-	// if ( entry.type == e_media_type_video /*&& g_mpv_video_ready*/ )
-	if ( entry.type != e_media_type_video )
+	if ( !is_mpv_media_type( entry.type ) )
 		return false;
 
 	// check mpv state (SHOULD PROBABLY TRY USING OBSERVE PROPERTY)

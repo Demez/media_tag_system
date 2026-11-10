@@ -28,6 +28,7 @@ bool                              g_mpv_texture_updated_needed = false;
 
 
 static std::vector< std::string > g_mpv_exts;
+static std::vector< std::string > g_mpv_exts_audio;
 
 
 #define FUNC_PTR( func ) func##_t p_##func = nullptr
@@ -544,6 +545,23 @@ void mpv_sdl_event( SDL_Event& sdl_event )
 }
 
 
+void load_ext_list( std::vector< std::string >& ext_list, char* exts )
+{
+	char* ext_cur  = exts;
+	char* ext_next = strchr( ext_cur, ',' );
+
+	while ( ext_next != nullptr )
+	{
+		std::string ext = ".";
+		ext.append( ext_cur, ext_next - ext_cur );
+		ext_list.push_back( ext );
+
+		ext_cur  = ext_next + 1;
+		ext_next = strchr( ext_cur, ',' );
+	}
+}
+
+
 bool start_mpv()
 {
 	if ( !g_mpv_module )
@@ -612,26 +630,17 @@ bool start_mpv()
 	// mpv_handle_wait_event( g_mpv, 0.1 );
 
 	// Load supported extensions
-	char* exts = p_mpv_get_property_string( g_mpv, "video-exts" );
+	char* video_exts = p_mpv_get_property_string( g_mpv, "video-exts" );
+	char* audio_exts = p_mpv_get_property_string( g_mpv, "audio-exts" );
 
-	if ( !exts )
+	if ( !video_exts || !audio_exts )
 	{
 		printf( "no supported extensions from mpv??\n" );
 		return false;
 	}
 
-	char* ext_cur  = exts; 
-	char* ext_next = strchr( ext_cur, ',' );
-
-	while ( ext_next != nullptr )
-	{
-		std::string ext = ".";
-		ext.append( ext_cur, ext_next - ext_cur );
-		g_mpv_exts.push_back( ext );
-
-		ext_cur  = ext_next + 1;
-		ext_next = strchr( ext_cur, ',' );
-	}
+	load_ext_list( g_mpv_exts, video_exts );
+	load_ext_list( g_mpv_exts_audio, audio_exts );
 
 	g_mpv_data.mpv = g_mpv;
 	g_mpv_data.gl  = g_mpv_gl;
@@ -671,6 +680,29 @@ bool mpv_supports_ext( std::string_view ext )
 	return false;
 }
 
+
+bool mpv_supports_ext_audio( std::string_view ext )
+{
+	for ( const std::string& supported_ext : g_mpv_exts_audio )
+		if ( ext.ends_with( supported_ext ) )
+			return true;
+
+	return false;
+}
+
+
+bool is_mpv_media_type( e_media_type type )
+{
+	switch ( type )
+	{
+		default:
+			return false;
+
+		case e_media_type_audio:
+		case e_media_type_video:
+			return true;
+	}
+}
 
 
 // ----------------------------------------------------
@@ -881,7 +913,7 @@ void mpv_update( mpv_data_t& data )
 			// this may be called on new video creation to set to specific time
 			// p_mpv_set_option_string( data.mpv, "start", "0" );
 
-			if ( g_media_load_index < UINT32_MAX )
+			if ( g_media_load_index < MEDIA_INDEX_INVALID )
 				media_load_on_finish();
 
 			send_frame_draw_event();

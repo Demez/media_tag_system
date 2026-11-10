@@ -63,7 +63,7 @@ void media_view_frame_update_timer()
 
 bool media_view_has_video()
 {
-	if ( get_media_type() != e_media_type_video )
+	if ( !is_mpv_media_type( get_media_type() ) )
 		return false;
 
 	return g_mpv_data.loaded_file;
@@ -1310,7 +1310,7 @@ void media_view_draw_media_controls( bool mouse_hover_imgui_window )
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
-	bool video      = get_media_type() == e_media_type_video;
+	bool video      = is_mpv_media_type( get_media_type() );
 	bool anim_image = ( get_media_type() == e_media_type_image && g_image_data.image.frame.size() > 1 );
 
 	ImGui::PushFont( font::normal, app::config.font_size * 1.25f );
@@ -1574,6 +1574,38 @@ void media_view_draw_imgui_controls( bool mouse_hover_imgui_window )
 }
 
 
+void media_view_draw_audio_text()
+{
+	int width, height;
+	SDL_GetWindowSizeInPixels( app::window, &width, &height );
+
+	image_t*    icon  = icon_get_image( e_icon_audio );
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	ImVec2      text_pos{
+		static_cast< float >( width ) / 2.f,
+		static_cast< float >( height + icon->height ) / 2.f + style.ItemSpacing.y,
+	};
+
+	ImGui::SetNextWindowPos( text_pos, 0, { 0.5f, 0.5f } );
+
+	if ( !ImGui::Begin( "##audio_name", 0, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoBackground ) )
+	{
+		ImGui::End();
+		return;
+	}
+
+	ImGui::PushFont( font::normal, app::config.font_size * 1.5f );
+
+	const media_entry_t& entry = gallery_item_get_media_entry( g_image_data.index );
+	ImGui::TextUnformatted( entry.file.name.c_str() );
+
+	ImGui::PopFont();
+
+	ImGui::End();
+}
+
+
 void media_view_draw_imgui()
 {
 	media_view_input();
@@ -1604,6 +1636,11 @@ void media_view_draw_imgui()
 			ImGui::Text( "%.1f%%", (float)( image_draw::zoom * 100 ) );
 			ImGui::End();
 		}
+	}
+
+	if ( get_media_type() == e_media_type_audio )
+	{
+		media_view_draw_audio_text();
 	}
 }
 

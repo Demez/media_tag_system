@@ -636,6 +636,9 @@ void gallery_view_sort_dir_func( job_status_t* status )
 
 			if ( type == e_media_type_video && !( sort_data->filter & e_gallery_filter_videos ) )
 				continue;
+
+			if ( type == e_media_type_audio && !( sort_data->filter & e_gallery_filter_audio ) )
+				continue;
 		}
 
 		if ( sort_data->search_len )

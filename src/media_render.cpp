@@ -367,6 +367,12 @@ static void media_view_draw_image( int width, int height )
 }
 
 
+void media_view_draw_audio( int width, int height )
+{
+	media_view_draw_icon( e_icon_audio, width, height, true );
+}
+
+
 void media_view_draw()
 {
 	int width, height;
@@ -375,13 +381,23 @@ void media_view_draw()
 	if ( media_view_draw_load_status( width, height ) )
 		return;
 
-	if ( get_media_type() == e_media_type_video )
+	switch ( get_media_type() )
 	{
-		mpv_draw_frame();
-	}
-	else
-	{
-		media_view_draw_image( width, height );
+		default:
+			media_view_draw_icon( e_icon_invalid, width, height, true );
+			break;
+
+		case e_media_type_audio:
+			media_view_draw_audio( width, height );
+			break;
+
+		case e_media_type_video:
+			mpv_draw_frame();
+			break;
+
+		case e_media_type_image:
+			media_view_draw_image( width, height );
+			break;
 	}
 
 	// show loading icon in corner

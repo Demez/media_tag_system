@@ -542,6 +542,12 @@ bool media_check_extension_fast( std::string& ext, e_media_type& type )
 			type = e_media_type_video;
 			return true;
 		}
+
+		if ( mpv_supports_ext_audio( ext ) )
+		{
+			type = e_media_type_audio;
+			return true;
+		}
 	}
 
 	type = e_media_type_none;
@@ -709,6 +715,7 @@ static const char* g_icon_names[] = {
 	"loading",
 	"video",
 	"image",
+	"audio",
 };
 
 
@@ -719,6 +726,7 @@ static const char* g_icon_paths[] = {
 	"icons" SEP_S "loading.png",
 	"icons" SEP_S "video.png",
 	"icons" SEP_S "image.png",
+	"icons" SEP_S "audio.png",
 };
 
 

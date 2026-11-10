@@ -908,6 +908,10 @@ void ui_draw_file_information( media_entry_t& entry, ImGuiStyle& style )
 	{
 		ImGui::TextUnformatted( "Type: Video" );
 	}
+	else if ( entry.type == e_media_type_audio )
+	{
+		ImGui::TextUnformatted( "Type: Audio" );
+	}
 
 	// unsure what i want to do with this for the long term, but for now, im gonna have this be here
 	if ( entry.file.type & e_file_type_file && entry.file.name.starts_with( "[twitter]" ) )

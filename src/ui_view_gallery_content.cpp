@@ -366,24 +366,40 @@ void gallery_view_draw_image( ImVec2 image_bounds, image_t* image, ImTextureRef 
 
 void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw, ImVec2& scaled_image_size, bool& drew_base_icon )
 {
-	if ( item_draw.media->type == e_media_type_directory )
+	e_icon base_icon = e_icon_none;
+
+	switch ( item_draw.media->type )
 	{
-		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( e_icon_folder ), icon_get_imtexture( e_icon_folder ), true, true, scaled_image_size );
+		default:
+			break;
+
+		case e_media_type_directory:
+			base_icon = e_icon_folder;
+			break;
+
+		case e_media_type_image:
+			base_icon = e_icon_image;
+			break;
+
+		case e_media_type_video:
+			base_icon = e_icon_video;
+			break;
+
+		case e_media_type_audio:
+			base_icon = e_icon_audio;
+			break;
+	}
+
+	if ( item_draw.media->type == e_media_type_directory || item_draw.media->type == e_media_type_audio )
+	{
+		gallery_view_draw_image( item_draw.image_bounds, icon_get_image( base_icon ), icon_get_imtexture( base_icon ), true, true, scaled_image_size );
 		return;
 	}
 
 	thumbnail_t* thumbnail = nullptr;
-	e_icon       base_icon = e_icon_none;
 
 	if ( app::config.thumbnail_enable )
 		thumbnail = thumbnail_get_data( directory::thumbnail_list[ item_draw.gallery_index ] );
-
-	if ( item_draw.media->type == e_media_type_directory )
-		base_icon = e_icon_folder;
-	else if ( item_draw.media->type == e_media_type_image )
-		base_icon = e_icon_image;
-	else if ( item_draw.media->type == e_media_type_video )
-		base_icon = e_icon_video;
 
 	if ( !thumbnail )
 	{
@@ -875,7 +891,7 @@ void gallery_view_handle_context_menu()
 	{
 		const media_entry_t& entry = directory::media_list[ i ];
 
-		if ( entry.type == e_media_type_image || entry.type == e_media_type_video )
+		if ( entry.type == e_media_type_image || is_mpv_media_type( entry.type ) )
 		{
 			valid = true;
 			break;

@@ -54,6 +54,7 @@ enum e_icon : u8
 	e_icon_loading,
 	e_icon_video,
 	e_icon_image,
+	e_icon_audio,
 
 	e_icon_count,
 };
@@ -109,10 +110,11 @@ enum e_gallery_filter_ : u8
 	e_gallery_filter_folders = 1 << 0,
 	e_gallery_filter_images  = 1 << 1,
 	e_gallery_filter_videos  = 1 << 2,
+	e_gallery_filter_audio   = 1 << 3,
 
-	e_gallery_filter_media   = e_gallery_filter_images | e_gallery_filter_videos,
-	e_gallery_filter_all     = e_gallery_filter_folders | e_gallery_filter_images | e_gallery_filter_videos,
-	e_gallery_filter_count   = 4,
+	e_gallery_filter_media   = e_gallery_filter_images | e_gallery_filter_videos | e_gallery_filter_audio,
+	e_gallery_filter_all     = e_gallery_filter_folders | e_gallery_filter_images | e_gallery_filter_videos | e_gallery_filter_audio,
+	e_gallery_filter_count   = 5,
 };
 
 

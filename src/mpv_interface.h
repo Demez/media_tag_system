@@ -66,6 +66,9 @@ void                       stop_mpv();
 void                       mpv_update();
 
 bool                       mpv_supports_ext( std::string_view ext );
+bool                       mpv_supports_ext_audio( std::string_view ext );
+
+bool                       is_mpv_media_type( e_media_type type );
 
 void                       mpv_draw_frame();
 
