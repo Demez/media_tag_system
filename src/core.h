@@ -15,6 +15,7 @@ enum e_media_type : u8
 	e_media_type_directory,
 	e_media_type_image,
 	e_media_type_video,
+	e_media_type_audio,
 
 	e_media_type_count,
 };
