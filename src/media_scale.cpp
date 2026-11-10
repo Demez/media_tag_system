@@ -246,7 +246,7 @@ void media_view_scale_check_timer()
 
 	const media_entry_t& entry = gallery_item_get_media_entry( g_image_data.index );
 
-	if ( entry.type == e_media_type_video )
+	if ( entry.type != e_media_type_image )
 		return;
 
 	// Don't handle animated images for now
