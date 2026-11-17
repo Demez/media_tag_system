@@ -972,12 +972,7 @@ bool handle_events()
 
 	int max_events = SDL_PeepEvents( nullptr, 0, SDL_PEEKEVENT, 0, 0 );
 
-	// stupid hack
-	bool loading_video = false;
-	if ( g_media_load_index < MEDIA_INDEX_INVALID )
-		loading_video = gallery_item_get_media_entry( g_media_load_index ).type;
-
-	bool need_draw = app::config.always_draw || app::draw_frame_count > 0 || loading_video;
+	bool need_draw  = app::config.always_draw || app::draw_frame_count > 0;
 
 	// slam it to false when minimized
 	if ( SDL_GetWindowFlags( app::window ) & SDL_WINDOW_MINIMIZED )
@@ -1094,6 +1089,9 @@ static bool check_mpv_playback()
 {
 	if ( g_gallery_view || gallery::sorted_media.empty() )
 		return false;
+
+	if ( mpv_needs_update() )
+		return true;
 
 	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
 
@@ -1242,6 +1240,8 @@ void main_loop()
 
 		// -----------------------------------------------------------------------------------
 		// Window Events
+		
+		mpv_update();
 
 		check_need_draw( playing_back_video );
 
@@ -1268,8 +1268,6 @@ void main_loop()
 		// }
 
 		// -----------------------------------------------------------------------------------
-		
-		mpv_update();
 
 		u32 draw_frame_count = app::draw_frame_count;
 

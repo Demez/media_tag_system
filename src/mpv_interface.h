@@ -64,6 +64,7 @@ void                       unload_mpv_dll();
 bool                       start_mpv();
 void                       stop_mpv();
 void                       mpv_update();
+bool                       mpv_needs_update();
 
 bool                       mpv_supports_ext( std::string_view ext );
 bool                       mpv_supports_ext_audio( std::string_view ext );

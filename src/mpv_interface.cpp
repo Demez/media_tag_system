@@ -20,11 +20,11 @@ static char*                      g_current_video = nullptr;
 
 //s64                               g_mpv_data.dwidth = 0, g_mpv_data.dheight = 0;
 
-bool                              g_scale_up_video             = true;
-bool                              g_mpv_video_ready            = false;
-bool                              g_mpv_event_sending          = false;
+bool                              g_scale_up_video            = true;
+bool                              g_mpv_video_ready           = false;
+bool                              g_mpv_event_sending         = false;
 
-bool                              g_mpv_texture_updated_needed = false;
+bool                              g_mpv_texture_redraw_needed = false;
 
 
 static std::vector< std::string > g_mpv_exts;
@@ -199,6 +199,41 @@ bool load_mpv_dll()
 }
 
 
+#define MPV_EVENT_STR_CASE( event_id ) \
+	case event_id: return #event_id
+
+
+constexpr const char* mpv_event_to_str( mpv_event_id event_id )
+{
+	switch ( event_id )
+	{
+		default:
+		MPV_EVENT_STR_CASE( MPV_EVENT_NONE );
+		MPV_EVENT_STR_CASE( MPV_EVENT_SHUTDOWN );
+		MPV_EVENT_STR_CASE( MPV_EVENT_LOG_MESSAGE );
+		MPV_EVENT_STR_CASE( MPV_EVENT_GET_PROPERTY_REPLY );
+		MPV_EVENT_STR_CASE( MPV_EVENT_SET_PROPERTY_REPLY );
+		MPV_EVENT_STR_CASE( MPV_EVENT_COMMAND_REPLY );
+		MPV_EVENT_STR_CASE( MPV_EVENT_START_FILE );
+		MPV_EVENT_STR_CASE( MPV_EVENT_END_FILE );
+		MPV_EVENT_STR_CASE( MPV_EVENT_FILE_LOADED );
+#if MPV_ENABLE_DEPRECATED
+		MPV_EVENT_STR_CASE( MPV_EVENT_IDLE );
+		MPV_EVENT_STR_CASE( MPV_EVENT_TICK );
+#endif
+		MPV_EVENT_STR_CASE( MPV_EVENT_CLIENT_MESSAGE );
+		MPV_EVENT_STR_CASE( MPV_EVENT_VIDEO_RECONFIG );
+		MPV_EVENT_STR_CASE( MPV_EVENT_AUDIO_RECONFIG );
+		MPV_EVENT_STR_CASE( MPV_EVENT_SEEK );
+		MPV_EVENT_STR_CASE( MPV_EVENT_PLAYBACK_RESTART );
+		MPV_EVENT_STR_CASE( MPV_EVENT_PROPERTY_CHANGE );
+		MPV_EVENT_STR_CASE( MPV_EVENT_QUEUE_OVERFLOW );
+		MPV_EVENT_STR_CASE( MPV_EVENT_HOOK );
+	}
+}
+
+
+
 void mpv_create_texture();
 
 
@@ -274,7 +309,8 @@ bool mpv_init_render_context()
 	// request a new frame to be rendered.
 	// (Separate from the normal event handling mechanism for the sake of
 	//  users which run OpenGL on a different thread.)
-	p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, nullptr );
+	// NOTE: if you enable this, be careful with rendering the image when resizing the window, it likes to lock up
+	// p_mpv_render_context_set_update_callback( g_mpv_gl, on_mpv_render_update, nullptr );
 
 	//int64_t wid = (s64)g_mpv_window;
 	//bool    yes = true;
@@ -341,7 +377,8 @@ void mpv_update_frame()
 		printf("MPV Render Context Render Error: %d\n", ret );
 	}
 
-	g_mpv_redraw = false;
+	g_mpv_texture_redraw_needed = false;
+	g_mpv_redraw                = false;
 }
 
 
@@ -364,7 +401,11 @@ void mpv_draw_frame()
 //	p_mpv_get_property( g_mpv, "height", MPV_FORMAT_INT64, &g_mpv_data.dheight );
 
 	if ( g_mpv_data.dwidth == 0 || g_mpv_data.dheight == 0 )
+	{
+		printf( "DRAW FRAME WITH 0 WIDTH OR HEIGHT\n" );
+		g_mpv_texture_redraw_needed = true;
 		return;
+	}
 
 	// Fit image in window size
 	float factor[ 2 ] = { 1.f, 1.f };
@@ -423,6 +464,14 @@ void mpv_update_texture()
 		return;
 	}
 
+	set_frame_draw( 2 );
+	send_frame_draw_event();
+
+	g_mpv_texture_redraw_needed = true;
+
+	if ( g_mpv_data.dwidth == 0 || g_mpv_data.dheight == 0 )
+		return;
+
 	int width, height;
 	SDL_GetWindowSize( app::window, &width, &height );
 
@@ -467,8 +516,6 @@ void mpv_update_texture()
 
 	g_mpv_framebuffer_size[ 0 ] = new_width;
 	g_mpv_framebuffer_size[ 1 ] = new_height;
-
-	set_frame_draw( 2 );
 }
 
 
@@ -786,7 +833,7 @@ void mpv_update( mpv_data_t& data )
 
 	while ( mpv_event && mpv_event->event_id != MPV_EVENT_NONE )
 	{
-		printf( "MPV EVENT %d\n", mpv_event->event_id );
+		printf( "MPV EVENT %d - %s\n", mpv_event->event_id, mpv_event_to_str( mpv_event->event_id ) );
 
 		if ( mpv_event->event_id == MPV_EVENT_NONE )
 			return;
@@ -892,10 +939,25 @@ void mpv_update( mpv_data_t& data )
 				//}
 			}
 		}
-		else if ( mpv_event->event_id == MPV_EVENT_PLAYBACK_RESTART || mpv_event->event_id == MPV_EVENT_VIDEO_RECONFIG )
+		else if ( mpv_event->event_id == MPV_EVENT_PLAYBACK_RESTART  )
 		{
 			data.loaded_file = true;
 			// get_media_info( data );
+
+			// this may be called on new video creation to set to specific time
+			// p_mpv_set_option_string( data.mpv, "start", "0" );
+
+			//if ( g_media_load_index < UINT32_MAX )
+			//	media_load_on_finish();
+
+			send_frame_draw_event();
+		}
+		else if ( mpv_event->event_id == MPV_EVENT_VIDEO_RECONFIG )
+		{
+			// data.loaded_file = true;
+			// get_media_info( data );
+
+			mpv_update_texture();
 
 			// this may be called on new video creation to set to specific time
 			// p_mpv_set_option_string( data.mpv, "start", "0" );
@@ -955,6 +1017,47 @@ void mpv_update( mpv_data_t& data )
 void mpv_update()
 {
 	mpv_update( g_mpv_data );
+}
+
+
+bool mpv_needs_update()
+{
+	if ( !g_mpv )
+		return false;
+
+	//if ( g_gallery_view )
+	//	return false;
+
+	if ( !g_current_video )
+	{
+		//printf( "no video is set\n" );
+		return false;
+	}
+
+//	if ( g_media_load_index != MEDIA_INDEX_INVALID )
+//	{
+//		printf( "g_media_load_index is set\n" );
+//		return true;
+//	}
+
+	//if ( g_mpv_video_ready )
+	//	return true;
+
+//	if ( !g_mpv_data.loaded_file )
+//	{
+//		printf( "loaded_file false\n" );
+//		return true;
+//	}
+
+	// i know this spams the main thread with a bunch of updates every frame, but i need to check for mpv to finish loading
+	// if i can get sdl events to behave better maybe, then i shouldn't need to spam the main thread anymore
+	if ( g_mpv_texture_redraw_needed )
+	{
+		//printf( "g_mpv_texture_redraw_needed\n" );
+		return true;
+	}
+
+	return false;
 }
 
 
@@ -1050,7 +1153,7 @@ void mpv_cmd_loadfile( const char* file )
 
 	printf( "MPV: Loading File: %s\n", file );
 
-	g_mpv_texture_updated_needed = true;
+	//g_mpv_texture_redraw_needed = true;
 	g_mpv_data.loaded_file       = false;
 
 	const char* cmd[]            = { "loadfile", file, NULL };
