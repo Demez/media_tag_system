@@ -829,11 +829,11 @@ void mpv_update( mpv_data_t& data )
 	if ( mpv_event->event_id == MPV_EVENT_NONE )
 		return;
 
-	printf( " ------ MPV UPDATE ------ \n" );
+	// printf( " ------ MPV UPDATE ------ \n" );
 
 	while ( mpv_event && mpv_event->event_id != MPV_EVENT_NONE )
 	{
-		printf( "MPV EVENT %d - %s\n", mpv_event->event_id, mpv_event_to_str( mpv_event->event_id ) );
+		// printf( "MPV EVENT %d - %s\n", mpv_event->event_id, mpv_event_to_str( mpv_event->event_id ) );
 
 		if ( mpv_event->event_id == MPV_EVENT_NONE )
 			return;
