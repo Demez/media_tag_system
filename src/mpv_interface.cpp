@@ -402,7 +402,7 @@ void mpv_draw_frame()
 
 	if ( g_mpv_data.dwidth == 0 || g_mpv_data.dheight == 0 )
 	{
-		printf( "DRAW FRAME WITH 0 WIDTH OR HEIGHT\n" );
+		// printf( "DRAW FRAME WITH 0 WIDTH OR HEIGHT\n" );
 		g_mpv_texture_redraw_needed = true;
 		return;
 	}
@@ -791,30 +791,14 @@ void get_media_info( mpv_data_t& mpv )
 	if ( !g_current_video )
 		return;
 
-	//mpv.track_count       = 0;
 	mpv.track_count_audio = 0;
 	mpv.track_count_video = 0;
 
-	//p_mpv_get_property_async( mpv.mpv, "track-list/count", MPV_FORMAT_INT64, &mpv.track_count );
-
-	// mpv_error ret          = (mpv_error)p_mpv_get_property( mpv.mpv, "track-list/count", MPV_FORMAT_INT64, &mpv.track_count );
-	//
 	for ( s32 i = 0; i < mpv.track_count; i++ )
 	{
 		char cmd[ 64 ] = { 0 };
 		snprintf( cmd, 64, "track-list/%d/type", i );
-
-		//char* type = nullptr;
 		p_mpv_get_property_async( mpv.mpv, e_mpv_cmd_track_type, cmd, MPV_FORMAT_STRING );
-
-		//if ( !type )
-		//	continue;
-		//
-		//if ( strcmp( type, "video" ) == 0 )
-		//	mpv.track_count_video++;
-		//
-		//else if ( strcmp( type, "audio" ) == 0 )
-		//	mpv.track_count_audio++;
 	}
 }
 
@@ -851,11 +835,6 @@ void mpv_update( mpv_data_t& data )
 			{
 				if ( strcmp( "time-pos/full", property->name ) == 0 )
 				{
-					// what the fuck is this?
-					// if ( property->data == nullptr )
-					// 	data.time_pos = 0.0;
-					// else
-					// 	data.time_pos = *(double*)property->data;
 					data.time_pos = get_mpv_value( property->data, 0.0 );
 				}
 				else if ( strcmp( "duration/full", property->name ) == 0 )
@@ -918,62 +897,20 @@ void mpv_update( mpv_data_t& data )
 
 				free( track_type );
 			}
-
-			if ( property->name )
-			{
-				//if ( strcmp( "audio", property->name ) == 0 )
-				//{
-				//	data.audio_track = get_mpv_value< char* >( property->data, nullptr );
-				//}
-				//if ( strcmp( "current-tracks/audio/title", property->name ) == 0 )
-				//{
-				//	//if ( data.audio_track_title )
-				//	//	p_mpv_free( data.audio_track_title );
-				//
-				//	//data.audio_track_title = get_mpv_value< char* >( property->data, nullptr );
-				//}
-
-				//if ( strncmp( "track-list/", property->name, 11 ) == 0 )
-				//{
-				//	char* track_type = get_mpv_string( data.audio_track_title, property, nullptr );
-				//}
-			}
 		}
 		else if ( mpv_event->event_id == MPV_EVENT_PLAYBACK_RESTART  )
 		{
 			data.loaded_file = true;
-			// get_media_info( data );
-
-			// this may be called on new video creation to set to specific time
-			// p_mpv_set_option_string( data.mpv, "start", "0" );
-
-			//if ( g_media_load_index < UINT32_MAX )
-			//	media_load_on_finish();
-
 			send_frame_draw_event();
 		}
 		else if ( mpv_event->event_id == MPV_EVENT_VIDEO_RECONFIG )
 		{
-			// data.loaded_file = true;
-			// get_media_info( data );
-
 			mpv_update_texture();
-
-			// this may be called on new video creation to set to specific time
-			// p_mpv_set_option_string( data.mpv, "start", "0" );
-
-			//if ( g_media_load_index < UINT32_MAX )
-			//	media_load_on_finish();
-
-			send_frame_draw_event();
 		}
 		else if ( mpv_event->event_id == MPV_EVENT_FILE_LOADED )
 		{
 			data.loaded_file = true;
 			// get_media_info( data );
-
-			// this may be called on new video creation to set to specific time
-			// p_mpv_set_option_string( data.mpv, "start", "0" );
 
 			if ( g_media_load_index < MEDIA_INDEX_INVALID )
 				media_load_on_finish();
@@ -1003,8 +940,6 @@ void mpv_update( mpv_data_t& data )
 			}
 			else if ( mpv_event->reply_userdata == e_mpv_cmd_seek )
 			{
-				//printf( "FINISH SEEK - %u\n", sys_get_time_ms(), data.seek_queued_time );
-				// if ( data.seek_queued )
 				data.seek_queued = false;
 			}
 		}
