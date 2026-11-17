@@ -254,7 +254,7 @@ struct image_frame_t
 	int                pos_y          = 0;
 
 	e_frame_disposal   frame_disposal = e_frame_disposal_keep;
-	e_frame_blend blend          = e_frame_blend_none;
+	e_frame_blend      blend          = e_frame_blend_none;
 
 	e_image_frame_f    flags          = 0;
 	e_colortype        color_type     = e_colortype_bitmap;

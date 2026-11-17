@@ -453,6 +453,9 @@ T get_mpv_value( void* data, T fallback )
 }
 
 
+bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int thread_id, char* mpv_thread_name );
+
+
 bool thumbnail_loader_load_video_from_disk( thumbnail_t* thumbnail, mpv_handle*& local_mpv, int thread_id, char* mpv_thread_name, fs::path_char* video_thumbnail_path )
 {
 	if ( !local_mpv )
@@ -634,7 +637,8 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 			return false;
 
 		case e_media_type_video:
-			return thumbnail_loader_load_video_from_disk( thumbnail, local_mpv, thread_id, mpv_thread_name, video_thumbnail_path );
+			// return thumbnail_loader_load_video_from_disk( thumbnail, local_mpv, thread_id, mpv_thread_name, video_thumbnail_path );
+			return thumbnail_loader_get_video_thumbnail_from_disk( thumbnail, thread_id, mpv_thread_name );
 			
 		case e_media_type_image:
 		{
@@ -876,9 +880,16 @@ void thumbnail_loader_worker( u32 thread_id )
 }
 
 
+bool thumbnail_libav_init();
+void thumbnail_libav_shutdown();
+
+
 bool thumbnail_loader_init()
 {
 	g_thumbnails_running.store( true );
+
+	if ( !thumbnail_libav_init() )
+		return false;
 
 	g_thumbnail_worker      = ch_calloc< std::thread* >( app::config.thumbnail_threads, e_mem_category_general );
 	g_thumbnail_save_worker = ch_calloc< std::thread* >( app::config.thumbnail_save_threads, e_mem_category_general );
@@ -902,6 +913,8 @@ void thumbnail_loader_shutdown( bool free_thumbnails )
 {
 	if ( !g_thumbnails_running )
 		return;
+
+	thumbnail_libav_shutdown();
 
 	g_thumbnails_running.store( false );
 

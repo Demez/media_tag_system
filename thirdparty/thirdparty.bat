@@ -1,5 +1,5 @@
 @echo off
 
-py thirdparty.py
+py thirdparty.py %*
 
 pause

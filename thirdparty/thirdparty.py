@@ -589,12 +589,12 @@ TASK_LIST = {
             "file": "libwebp-main.zip",
             "func": post_libwebp_extract,
         },
-        {
-            "name": "nativefiledialog",
-            "url":  "https://github.com/btzy/nativefiledialog-extended/archive/refs/tags/v1.2.1.zip",
-            "file": "nativefiledialog-extended-1.2.1.zip",
-            "func": compile_nativefiledialog,
-        },
+    #   {
+    #       "name": "nativefiledialog",
+    #       "url":  "https://github.com/btzy/nativefiledialog-extended/archive/refs/tags/v1.2.1.zip",
+    #       "file": "nativefiledialog-extended-1.2.1.zip",
+    #       "func": compile_nativefiledialog,
+    #   },
         {
             "name": "ckdl",
             "url":  "https://github.com/tjol/ckdl/archive/refs/heads/main.zip",
@@ -640,6 +640,11 @@ TASK_LIST = {
             "file": mpv_file,
             "extracted_folder": "mpv",
             "user_extract": True,
+        },
+        {
+            "name": "ffmpeg",
+            "url":  "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl-shared.zip",
+            "file": "ffmpeg-master-latest-win64-lgpl-shared.zip",
         },
     ],
 

@@ -186,6 +186,15 @@ if ( MSVC )
 	configure_file( "thirdparty/libjxl/build/third_party/brotli/Release/brotlidec.dll" "${PROJ_OUT}/brotlidec.dll" COPYONLY )
 	configure_file( "thirdparty/libjxl/build/third_party/brotli/Release/brotlienc.dll" "${PROJ_OUT}/brotlienc.dll" COPYONLY )
 
+	message( "Copying ffmpeg libraries" )
+	configure_file( "thirdparty/ffmpeg/bin/avcodec-63.dll" "${PROJ_OUT}/avcodec-63.dll" COPYONLY )
+	configure_file( "thirdparty/ffmpeg/bin/avdevice-63.dll" "${PROJ_OUT}/avdevice-63.dll" COPYONLY )
+	configure_file( "thirdparty/ffmpeg/bin/avfilter-12.dll" "${PROJ_OUT}/avfilter-12.dll" COPYONLY )
+	configure_file( "thirdparty/ffmpeg/bin/avformat-63.dll" "${PROJ_OUT}/avformat-63.dll" COPYONLY )
+	configure_file( "thirdparty/ffmpeg/bin/avutil-61.dll" "${PROJ_OUT}/avutil-61.dll" COPYONLY )
+	configure_file( "thirdparty/ffmpeg/bin/swresample-7.dll" "${PROJ_OUT}/swresample-7.dll" COPYONLY )
+	configure_file( "thirdparty/ffmpeg/bin/swscale-10.dll" "${PROJ_OUT}/swscale-10.dll" COPYONLY )
+
 	#message( "Copying mimalloc" )
 	#configure_file( "thirdparty/mimalloc/out/msvc-x64/Release/mimalloc-redirect.dll" "${PROJ_OUT}/mimalloc-redirect.dll" COPYONLY )
 	#configure_file( "thirdparty/mimalloc/out/msvc-x64/Release/mimalloc.dll" "${PROJ_OUT}/mimalloc.dll" COPYONLY )
@@ -285,6 +294,7 @@ set(
 	src/core.h
     src/thumbnail_loader.cpp
     src/thumbnail_jxl.cpp
+    src/thumbnail_libav.cpp
     src/mpv_interface.cpp
     src/mpv_interface.h
     src/image_loader.cpp
@@ -404,6 +414,7 @@ include_directories(
 	"thirdparty/ckdl/include"
 	"thirdparty/libjxl/lib/include"
 	"thirdparty/libjxl/build/lib/include"
+	"thirdparty/ffmpeg/include"
 )
 
 if( LINUX )
@@ -428,6 +439,15 @@ link_libraries(
 	jxl
 	jxl_cms
 	jxl_threads
+
+	# ffmpeg libs
+	avcodec
+	avdevice
+	avfilter
+	avformat
+	avutil
+	swresample
+	swscale
 
 	# must be below other libraries, or the compiler will link the other libraries functions to freeimage instead
 	FreeImage
@@ -477,6 +497,7 @@ if ( WIN32 )
 		"thirdparty/libspng/build/Release"
 		"thirdparty/libjxl/build/lib/Release"
 		"thirdparty/SDL3/lib/x64"
+		"thirdparty/ffmpeg/lib"
 	)
 	link_libraries(
 		turbojpeg
