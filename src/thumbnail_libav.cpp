@@ -299,7 +299,7 @@ static int decode_packet( libav_data_t& avdata, AVFrame* av_frame, const AVPacke
 
 #endif
 
-bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int thread_id, char* mpv_thread_name )
+bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int thread_id )
 {
 	libav_data_t avdata{};
 

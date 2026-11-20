@@ -230,112 +230,6 @@ search:
 }
 
 
-mpv_handle* thumbnail_mpv_ctx_create( u32 thread_id )
-{
-	// MPV Init
-	mpv_handle* local_mpv = nullptr;
-
-	if ( g_mpv_module )
-	{
-		local_mpv = p_mpv_create();
-
-		if ( local_mpv == nullptr )
-		{
-			printf( "mpv_create failed on thread %d!\n", thread_id );
-		}
-		else
-		{
-			int ret = 0;
-
-			// Disable Video - So no window pops up when playing back a video
-			p_mpv_set_option_string( local_mpv, "vo", "null" );
-
-			// Disable Audio
-			ret = p_mpv_set_option_string( local_mpv, "ao", "null" );
-
-			// Low Latency Mode
-			ret = p_mpv_set_option_string( local_mpv, "profile", "low-latency" );
-
-			ret = p_mpv_set_option_string( local_mpv, "demuxer-max-bytes", "6M" );
-			// ret     = p_mpv_set_option_string( local_mpv, "demuxer-max-bytes", "0" );
-			ret = p_mpv_set_option_string( local_mpv, "demuxer-max-back-bytes", "0" );
-			ret = p_mpv_set_option_string( local_mpv, "demuxer-donate-buffer", "no" );
-
-			// hopefully helps? since it's just for a single screenshot
-			ret = p_mpv_set_option_string( local_mpv, "demuxer-thread", "no" );
-
-			ret = p_mpv_set_option_string( local_mpv, "video-reversal-buffer", "0" );
-			ret = p_mpv_set_option_string( local_mpv, "audio-reversal-buffer", "0" );
-			ret = p_mpv_set_option_string( local_mpv, "cache", "no" );
-			ret = p_mpv_set_option_string( local_mpv, "cache-secs", "0" );
-
-			ret = p_mpv_set_option_string( local_mpv, "aid", "no" );
-			ret = p_mpv_set_option_string( local_mpv, "sid", "no" );
-
-			// Only allow 1 frame used
-			ret = p_mpv_set_option_string( local_mpv, "frames", "1" );
-
-			// Start Paused
-			ret = p_mpv_set_option_string( local_mpv, "pause", "" );
-
-			// Always start at 30% of the way in the video
-			ret = p_mpv_set_option_string( local_mpv, "start", "30%" );
-
-			// Fast PNG files
-			ret = p_mpv_set_option_string( local_mpv, "screenshot-high-bit-depth", "no" );
-			ret = p_mpv_set_option_string( local_mpv, "screenshot-png-compression", "1" );
-			ret = p_mpv_set_option_string( local_mpv, "screenshot-png-filter", "0" );
-
-			if ( p_mpv_initialize( local_mpv ) < 0 )
-			{
-				printf( "mpv_initialize failed!\n" );
-				p_mpv_destroy( local_mpv );
-				local_mpv = nullptr;
-			}
-			else
-			{
-				// p_mpv_request_log_messages( local_mpv, "debug" );
-				// p_mpv_request_log_messages( local_mpv, "warn" );
-			}
-
-			p_mpv_observe_property( local_mpv, e_mpv_cmd_observe, "track-list/count", MPV_FORMAT_INT64 );
-		}
-	}
-
-	// let mpv startup
-	// mpv_handle_wait_event( local_mpv, 0.1, mpv_thread_name );
-
-	char mpv_thread_name[ 64 ];
-	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );
-
-	mpv_event* event = p_mpv_wait_event( local_mpv, -1 );
-
-	while ( event->event_id != MPV_EVENT_NONE )
-	{
-		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
-		{
-			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
-			printf( "%s: [%s] %s: %s", mpv_thread_name, msg->prefix, msg->level, msg->text );
-		}
-		else if ( event->event_id == MPV_EVENT_IDLE )
-		{
-			break;
-		}
-
-		event = p_mpv_wait_event( local_mpv, -1 );
-	}
-
-	return local_mpv;
-}
-
-
-void thumbnail_mpv_ctx_free( mpv_handle*& ctx )
-{
-	p_mpv_destroy( ctx );
-	ctx = nullptr;
-}
-
-
 size_t thumbnail_generate_hash( file_t& file )
 {
 	// take full file path + date modified + file size
@@ -443,209 +337,10 @@ void thumbnail_save_push( h_thumbnail thumbnail_handle, thumbnail_t* thumbnail, 
 }
 
 
-template< typename T >
-T get_mpv_value( void* data, T fallback )
-{
-	if ( data == nullptr )
-		return fallback;
-	else
-		return *(T*)data;
-}
+bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int thread_id );
 
 
-bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int thread_id, char* mpv_thread_name );
-
-
-bool thumbnail_loader_load_video_from_disk( thumbnail_t* thumbnail, mpv_handle*& local_mpv, int thread_id, char* mpv_thread_name, fs::path_char* video_thumbnail_path )
-{
-	if ( !local_mpv )
-		local_mpv = thumbnail_mpv_ctx_create( thread_id );
-
-	// Use the local mpv instance to capture a frame from the video
-	if ( !local_mpv )
-	{
-		thumbnail->status = e_thumbnail_status_failed;
-		return false;
-	}
-
-	u64         start_time = sys_get_time_ms();
-
-	// Clear Video from MPV
-	const char* cmd_clear[] = { "stop", NULL };
-	p_mpv_command_async( local_mpv, NULL, cmd_clear );
-
-	// burn through old events
-	mpv_event* event        = p_mpv_wait_event( local_mpv, 0 );
-
-	while ( event->event_id != MPV_EVENT_NONE )
-	{
-		event = p_mpv_wait_event( local_mpv, 0 );
-	}
-
-	std::string path_str;
-	sys_path_to_string( thumbnail->path, path_str );
-
-	const char* cmd[]   = { "loadfile", path_str.data(), NULL };
-	int         cmd_ret = p_mpv_command_async( local_mpv, NULL, cmd );
-
-	bool        failed       = false;
-	event                    = p_mpv_wait_event( local_mpv, -1 );
-
-	s64         tracks_video = 0;
-	s64         tracks_audio = 0;
-	s64         tracks_total = 0;
-
-	//while ( event->event_id != MPV_EVENT_NONE )
-	while ( true )
-	{
-		//if ( event->event_id != MPV_EVENT_NONE )
-		//	printf( "[%d] MPV EVENT %d - %s\n", thread_id, event->event_id, mpv_event_to_str( event->event_id ) );
-
-		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
-		{
-			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
-			printf( "%s: [%s] %s: %s", mpv_thread_name, msg->prefix, msg->level, msg->text );
-		}
-		else if ( event->event_id == MPV_EVENT_COMMAND_REPLY )
-		{
-			if ( event->error != 0 )
-			{
-				printf( "Failed to load video for thumbnail - %d\n", event->error );
-				failed = true;
-				break;
-			}
-		}
-		else if ( event->event_id == MPV_EVENT_PROPERTY_CHANGE )
-		{
-			struct mpv_event_property* property = (struct mpv_event_property*)event->data;
-
-			if ( property->name )
-			{
-				if ( strcmp( "track-list/video", property->name ) == 0 )
-				{
-					tracks_video = get_mpv_value( property->data, 0 );
-				}
-				else if ( strcmp( "track-list/audio", property->name ) == 0 )
-				{
-					tracks_audio = get_mpv_value( property->data, 0 );
-				}
-				else if ( strcmp( "track-list/count", property->name ) == 0 )
-				{
-					tracks_total = get_mpv_value( property->data, 0 );
-				}
-			}
-		}
-		else if ( event->event_id == MPV_EVENT_PLAYBACK_RESTART )
-		{
-			break;
-		}
-		else if ( event->event_id == MPV_EVENT_IDLE )
-		{
-			//printf( "Failed to load video for thumbnail, video may not have a video track?\n" );
-			//failed = true;
-			//break;
-		}
-		else if ( event->event_id == MPV_EVENT_END_FILE )
-		{
-			// if ( tracks_video )
-			//break;
-		}
-		else if ( event->event_id == MPV_EVENT_NONE )
-		{
-			// if ( tracks_video )
-			//break;
-		}
-
-		//event = p_mpv_wait_event( local_mpv, -1 );
-		event = p_mpv_wait_event( local_mpv, 0 );
-	}
-
-	if ( failed || tracks_total == 0 )
-	{
-		thumbnail->status = e_thumbnail_status_failed;
-		return false;
-	}
-
-	u64         current_time = sys_get_time_ms();
-	double      time         = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
-
-	printf( " ---- MPV THUMBNAIL VIDEO OPEN TIME - %.3f\n", time );
-
-	// TODO: Use another frame buffer object instead, created at the thumbnail size
-	std::string utf8_path = sys_path_to_string( video_thumbnail_path );
-	const char* cmd3[]    = { "screenshot-to-file", utf8_path.c_str(), NULL };
-	cmd_ret               = p_mpv_command_async( local_mpv, NULL, cmd3 );
-
-	event                 = p_mpv_wait_event( local_mpv, -1 );
-
-	while ( event->event_id != MPV_EVENT_NONE )
-	{
-		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
-		{
-			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
-
-			if ( msg->log_level == MPV_LOG_LEVEL_ERROR )
-			{
-				printf( "ERROR: %s: [%s] %s: %s - %d", mpv_thread_name, msg->prefix, msg->level, msg->text, event->error );
-			}
-			else
-			{
-				printf( "%s: [%s] %s: %s", mpv_thread_name, msg->prefix, msg->level, msg->text );
-			}
-		}
-		else if ( event->event_id == MPV_EVENT_COMMAND_REPLY )
-		{
-			if ( event->error != 0 )
-			{
-				printf( "Failed to write screenshot for thumbnail - %d\n", event->error );
-				failed = true;
-				break;
-			}
-
-			break;
-		}
-
-		event = p_mpv_wait_event( local_mpv, -1 );
-	}
-
-	// Clear Video from MPV
-	//const char* cmd_clear[] = { "stop", NULL };
-	cmd_ret                 = p_mpv_command_async( local_mpv, NULL, cmd_clear );
-
-	if ( failed )
-	{
-		thumbnail->status       = e_thumbnail_status_failed;
-		return false;
-	}
-
-	// Load Image Normally
-	thumbnail->image        = image_create();
-
-	image_load_info_t load_info{};
-	load_info.image          = thumbnail->image;
-	load_info.load_quick     = true;
-	load_info.threaded_load  = true;
-	load_info.thumbnail_load = true;
-	load_info.target_size.x  = static_cast< float >( app::config.thumbnail_size );
-	load_info.target_size.y  = static_cast< float >( app::config.thumbnail_size );
-
-	if ( image_load( video_thumbnail_path, load_info ) )
-	{
-		current_time = sys_get_time_ms();
-		time         = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
-
-		printf( " ---- MPV IMAGE OPEN TIME - %.3f\n", time );
-
-		return true;
-	}
-
-	path_printf( "FAILED TO LOAD IMAGE: %s\n", video_thumbnail_path );
-	thumbnail->status = e_thumbnail_status_failed;
-	return false;
-}
-
-
-bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*& local_mpv, int thread_id, char* mpv_thread_name, fs::path_char* video_thumbnail_path )
+bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, int thread_id )
 {
 	// No thumbnail was found on disk, load the source file and generate one
 	switch ( thumbnail->type )
@@ -654,8 +349,7 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 			return false;
 
 		case e_media_type_video:
-			// return thumbnail_loader_load_video_from_disk( thumbnail, local_mpv, thread_id, mpv_thread_name, video_thumbnail_path );
-			return thumbnail_loader_get_video_thumbnail_from_disk( thumbnail, thread_id, mpv_thread_name );
+			return thumbnail_loader_get_video_thumbnail_from_disk( thumbnail, thread_id );
 			
 		case e_media_type_image:
 		{
@@ -686,19 +380,6 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, mpv_handle*
 
 void thumbnail_loader_worker( u32 thread_id )
 {
-	fs::path_char video_thumbnail_path[ 512 ];
-
-#if WIN32
-	_snwprintf( video_thumbnail_path, 512, L"%s\\video_thumbnail_thread_%d.png", app::config.thumbnail_video_cache_path.c_str(), thread_id );
-#else
-	snprintf( video_thumbnail_path, 512, "%s" SEP_S "video_thumbnail_thread_%d.png", app::config.thumbnail_video_cache_path.c_str(), thread_id );
-#endif
-
-	char mpv_thread_name[ 64 ];
-	snprintf( mpv_thread_name, 64, "MPV THREAD %d", thread_id );
-
-	mpv_handle* local_mpv = nullptr;
-
 	thumbnail_thread_data_t& thread_data = g_thumbnail_thread_data[ thread_id ];
 
 	// Enter Loop
@@ -785,7 +466,7 @@ void thumbnail_loader_worker( u32 thread_id )
 		if ( !thumbnail_found_on_disk )
 		{
 			// No thumbnail was found on disk, load the source file and generate one
-			if ( !thumbnail_loader_load_source_from_disk( thumbnail, local_mpv, thread_id, mpv_thread_name, video_thumbnail_path ) )
+			if ( !thumbnail_loader_load_source_from_disk( thumbnail, thread_id ) )
 			{
 				thumbnail->status = e_thumbnail_status_failed;
 				send_frame_draw_event();
