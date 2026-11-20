@@ -243,3 +243,29 @@ void util_open_in_new_window( const fs::path_char* path )
 	int ret = sys_execute( command.c_str() );
 }
 
+
+void util_downscale_resolution( int src_width, int src_height, int max_size, int& dst_width, int& dst_height )
+{
+	dst_width         = src_width;
+	dst_height        = src_height;
+
+	//if ( scale - DBL_EPSILON == 1.0 || scale + DBL_EPSILON == 1.0 )
+	//{
+	//	dst_width  = src_width;
+	//	dst_height = src_height;
+	//	return;
+	//}
+
+	float factor[ 2 ] = {
+		(float)max_size / (float)src_width,
+		(float)max_size / (float)src_height
+	};
+
+	float scale_amount = std::min( factor[ 0 ], factor[ 1 ] );
+
+	if ( scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f )
+	{
+		dst_width  = static_cast< int >( round( src_width * scale_amount ) );
+		dst_height = static_cast< int >( round( src_height * scale_amount ) );
+	}
+}

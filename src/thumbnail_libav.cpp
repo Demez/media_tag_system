@@ -29,7 +29,71 @@ struct libav_data_t
 	AVFilterGraph*   filter_graph;
 	int              video_stream_index = -1;
 	int64_t          last_pts           = AV_NOPTS_VALUE;
+
+	AVPixelFormat    dst_format;
 };
+
+
+constexpr AVPixelFormat get_dst_av_format( AVPixelFormat src_format )
+{
+	switch ( src_format )
+	{
+		default:
+			// return AV_PIX_FMT_RGB24;
+			return AV_PIX_FMT_BGR24;
+			// return AV_PIX_FMT_BGRA;
+
+		case AV_PIX_FMT_YA16BE:
+		case AV_PIX_FMT_YA16LE:
+		case AV_PIX_FMT_YUVA422P12BE:
+		case AV_PIX_FMT_YUVA422P12LE:
+		case AV_PIX_FMT_YUVA444P12BE:
+		case AV_PIX_FMT_YUVA444P12LE:
+		case AV_PIX_FMT_YAF32BE:
+		case AV_PIX_FMT_YAF32LE:
+		case AV_PIX_FMT_YAF16BE:
+		case AV_PIX_FMT_YAF16LE:
+			return AV_PIX_FMT_BGRA;
+	}
+}
+
+
+constexpr GLenum get_dst_gl_format( AVPixelFormat src_format )
+{
+	switch ( src_format )
+	{
+		default:
+			printf( "UNHANDLED AVPixelFormat TO GL FORMAT CONVERSION!\n" );
+			return GL_RGB;
+
+		case AV_PIX_FMT_BGR24:
+			return GL_BGR;
+
+		case AV_PIX_FMT_RGB24:
+			return GL_RGB;
+
+		case AV_PIX_FMT_BGRA:
+			return GL_BGRA;
+
+		case AV_PIX_FMT_RGBA:
+			return GL_RGBA;
+	}
+}
+
+constexpr int get_dst_channels( GLenum src_format )
+{
+	switch ( src_format )
+	{
+		default:
+		case GL_BGR:
+		case GL_RGB:
+			return 3;
+
+		case GL_BGRA:
+		case GL_RGBA:
+			return 4;
+	}
+}
 
 
 bool thumbnail_libav_init()
@@ -43,76 +107,6 @@ void thumbnail_libav_shutdown()
 }
 
 #if 1
-
-static void pgm_save( unsigned char* buf, int wrap, int xsize, int ysize,
-                      char* filename )
-{
-	FILE* f;
-	int   i;
-
-	f = fopen( filename, "wb" );
-	if ( !f )
-	{
-		fprintf( stderr, "Could not open %s\n", filename );
-		return;
-	}
-	fprintf( f, "P5\n%d %d\n%d\n", xsize, ysize, 255 );
-	for ( i = 0; i < ysize; i++ )
-		fwrite( buf + i * wrap, 1, xsize, f );
-	fclose( f );
-}
-
-
-static void decode( AVCodecContext* dec_ctx, AVFrame* frame, AVPacket* pkt, thumbnail_t* thumbnail )
-{
-#if 0
-	char buf[ 1024 ];
-	int  ret;
-
-	ret = avcodec_send_packet( dec_ctx, pkt );
-	if ( ret < 0 )
-	{
-		fprintf( stderr, "Error sending a packet for decoding\n" );
-		exit( 1 );
-	}
-
-	while ( ret >= 0 )
-	{
-		ret = avcodec_receive_frame( dec_ctx, frame );
-		if ( ret == AVERROR( EAGAIN ) || ret == AVERROR_EOF )
-			return;
-		else if ( ret < 0 )
-		{
-			fprintf( stderr, "Error during decoding\n" );
-			exit( 1 );
-		}
-
-		printf( "saving frame %3" PRId64 "\n", dec_ctx->frame_num );
-		fflush( stdout );
-
-		image_t* image           = image_create();
-		thumbnail->image         = image;
-
-		image->width             = frame->width;
-		image->height            = frame->height;
-		image->format            = GL_RGBA;
-
-		// AVPixelFormat;
-
-		image->frame.resize( 1 );
-
-
-		/* the picture is allocated by the decoder. no need to
-           free it */
-		//snprintf( buf, sizeof( buf ), "%s-%" PRId64, filename, dec_ctx->frame_num );
-
-		//pgm_save( frame->data[ 0 ], frame->linesize[ 0 ],
-		//          frame->width, frame->height, buf );
-
-		return;
-	}
-#endif
-}
 
 
 static int open_input_file( libav_data_t& avdata, const fs::path_char* filename )
@@ -140,7 +134,7 @@ static int open_input_file( libav_data_t& avdata, const fs::path_char* filename 
 	//	printf( "%s=%s\n", tag->key, tag->value );
 
 	/* dump input information to stderr */
-	av_dump_format( avdata.fmt_ctx, 0, filename_utf8.c_str(), 0 );
+	//av_dump_format( avdata.fmt_ctx, 0, filename_utf8.c_str(), 0 );
 
 	/* select the video stream */
 	ret = av_find_best_stream( avdata.fmt_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, &dec, 0 );
@@ -155,13 +149,17 @@ static int open_input_file( libav_data_t& avdata, const fs::path_char* filename 
 	/* create decoding context */
 	avdata.dec_ctx            = avcodec_alloc_context3( dec );
 	if ( !avdata.dec_ctx )
+	{
+		printf( "FFMPEG: Failed to allocate decoding context\n" );
 		return AVERROR( ENOMEM );
+	}
 
 	avcodec_parameters_to_context( avdata.dec_ctx, avdata.fmt_ctx->streams[ avdata.video_stream_index ]->codecpar );
 
 	/* init the video decoder */
 	if ( ( ret = avcodec_open2( avdata.dec_ctx, dec, NULL ) ) < 0 )
 	{
+		printf( "FFMPEG: Failed to open decoder\n" );
 		av_log( NULL, AV_LOG_ERROR, "Cannot open video decoder\n" );
 		return ret;
 	}
@@ -178,7 +176,8 @@ static int decode_packet( libav_data_t& avdata, AVFrame* av_frame, const AVPacke
 	ret     = avcodec_send_packet( avdata.dec_ctx, av_packet );
 	if ( ret < 0 )
 	{
-		// fprintf( stderr, "Error submitting a packet for decoding (%s)\n", av_err2str( ret ) );
+		char averr_str[ AV_ERROR_MAX_STRING_SIZE ];
+		fprintf( stderr, "Error submitting a packet for decoding (%s)\n", av_make_error_string( averr_str, AV_ERROR_MAX_STRING_SIZE, ret ) );
 		return -1;
 	}
 
@@ -193,76 +192,97 @@ static int decode_packet( libav_data_t& avdata, AVFrame* av_frame, const AVPacke
 			if ( ret == AVERROR_EOF || ret == AVERROR( EAGAIN ) )
 				return 0;
 
-			// fprintf( stderr, "Error during decoding (%s)\n", av_err2str( ret ) );
+			char averr_str[ AV_ERROR_MAX_STRING_SIZE ];
+			fprintf( stderr, "Error during decoding (%s)\n",  av_make_error_string( averr_str, AV_ERROR_MAX_STRING_SIZE, ret ) );
 			return 1;
 		}
 
-		AVPixelFormat      dst_fmt = AV_PIX_FMT_BGRA;
+		AVPixelFormat dst_fmt    = get_dst_av_format( avdata.dec_ctx->pix_fmt );
+
+		int           new_width  = avdata.dec_ctx->width;
+		int           new_height = avdata.dec_ctx->height;
+
+		util_downscale_resolution( avdata.dec_ctx->width, avdata.dec_ctx->height, app::config.thumbnail_size, new_width, new_height );
 
 		// https://stackoverflow.com/questions/71422496/how-to-save-avframe-as-image-in-c-using-ffmpeg
 		// create SWS context for converting from decode pixel format (like YUV420) to BGRA
-		struct SwsContext* sws_ctx = NULL;
-		sws_ctx                    = sws_getContext( avdata.dec_ctx->width,
-		                                             avdata.dec_ctx->height,
-		                                             avdata.dec_ctx->pix_fmt,
-		                                             avdata.dec_ctx->width,
-		                                             avdata.dec_ctx->height,
-		                                             dst_fmt,
-		                                             SWS_BICUBIC,
-		                                             NULL,
-		                                             NULL,
-		                                             NULL );
+		struct SwsContext* sws_ctx       = NULL;
+		sws_ctx                          = sws_getContext( avdata.dec_ctx->width,
+		                                                   avdata.dec_ctx->height,
+		                                                   avdata.dec_ctx->pix_fmt,
+		                                                   new_width,
+		                                                   new_height,
+		                                                   dst_fmt,
+		                                                   SWS_BICUBIC,
+		                                                   NULL,
+		                                                   NULL,
+		                                                   NULL );
 
 		AVFrame*  dst_frame         = av_frame_alloc();
 
 		if ( !dst_frame )
 		{
+			sws_freeContext( sws_ctx );
+			av_frame_unref( av_frame );
+
 			printf( "FFMPEG: Failed to allocate converted frame!\n" );
 			return false;
 		}
 
-		dst_frame->format = AV_PIX_FMT_BGRA;
-		dst_frame->width  = avdata.dec_ctx->width;
-		dst_frame->height = avdata.dec_ctx->height;
+		dst_frame->format = dst_fmt;
+		dst_frame->width  = new_width;
+		dst_frame->height = new_height;
+
+		image->width      = dst_frame->width;
+		image->height     = dst_frame->height;
 
 		int sts           = av_frame_get_buffer( dst_frame, 0 );
 
 		if ( sts < 0 )
 		{
+			sws_freeContext( sws_ctx );
+			av_frame_free( &dst_frame );
+			av_frame_unref( av_frame );
+
 			printf( "FFMPEG: Failed to get frame status!\n" );
 			return false;
 		}
 
-		//Convert from input format (e.g YUV420) to RGB and save to PPM:
-		////////////////////////////////////////////////////////////////////////////
-		sts = sws_scale( sws_ctx,                //struct SwsContext* c,
-		                        av_frame->data,           //const uint8_t* const srcSlice[],
-		                        av_frame->linesize,    //const int srcStride[],
-		                        0,                     //int srcSliceY,
-		                        av_frame->height,      //int srcSliceH,
-		                        dst_frame->data,       //uint8_t* const dst[],
-		                        dst_frame->linesize );  //const int dstStride[]);
+		// convert from input format (e.g YUV420) to BGRX
+		sts = sws_scale( sws_ctx,
+		                 av_frame->data,
+		                 av_frame->linesize,
+		                 0,
+		                 av_frame->height,
+		                 dst_frame->data,
+		                 dst_frame->linesize ); 
 
 		if ( sts < 0 )
 		{
+			sws_freeContext( sws_ctx );
+			av_frame_free( &dst_frame );
+			av_frame_unref( av_frame );
+
 			printf( "FFMPEG: Failed to convert frame format!\n" );
 			return false;
 		}
 
+		image->format   = get_dst_gl_format( dst_fmt );
+		image->channels = get_dst_channels( image->format );
+
 		image->frame.resize( 1 );
 		image_frame_t& frame = image->frame[ 0 ];
 
-		frame.width          = avdata.dec_ctx->width;
-		frame.height         = avdata.dec_ctx->height;
+		frame.width          = dst_frame->width;
+		frame.height         = dst_frame->height;
 
 		// frame.size           = image->width * image->height * image->channels;
-		frame.size           = dst_frame->linesize[ 0 ] * image->height;
+		frame.size           = dst_frame->linesize[ 0 ] * frame.height;
 		frame.data           = ch_calloc< u8 >( frame.size, e_mem_category_image_data );
 		frame.pitch          = dst_frame->linesize[ 0 ];
 
 		for ( size_t i = 0; i < dst_frame->height; i++ )
 		{
-			// memcpy( frame.data + i * dst_frame->linesize[ 0 ], dst_frame->data[ 0 ] + i * dst_frame->linesize[ 0 ], dst_frame->width * image->channels );
 			memcpy( frame.data + i * dst_frame->linesize[ 0 ], dst_frame->data[ 0 ] + i * dst_frame->linesize[ 0 ], dst_frame->linesize[ 0 ] );
 		}
 
@@ -293,6 +313,9 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 
 	if ( !av_frame || !av_packet )
 	{
+		avcodec_free_context( &avdata.dec_ctx );
+		avformat_close_input( &avdata.fmt_ctx );
+
 		printf( "FFMPEG: Failed to allocate frame or packet!\n" );
 		return false;
 	}
@@ -315,23 +338,31 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 
 	image->width       = avdata.dec_ctx->width;
 	image->height      = avdata.dec_ctx->height;
-	image->channels    = 4;
-	image->format      = GL_BGRA;
+	// image->channels    = 4;
+	// image->format      = GL_BGRA;
 
 	image->frame.resize( 1 );
+
+	int decode_ret = 0;
 	
 	while ( av_read_frame( avdata.fmt_ctx, av_packet ) <= 0 )
 	{
-		int what = decode_packet( avdata, av_frame, av_packet, image );
+		if ( av_packet->stream_index != avdata.video_stream_index )
+			continue;
 
-		if ( what == -1 )
+		decode_ret = decode_packet( avdata, av_frame, av_packet, image );
+
+		if ( decode_ret == -1 || decode_ret == 1 )
 			break;
-
-		if ( what == 1 )
-			return true;
 	}
 
-	return true;
+	av_frame_free( &av_frame );
+	av_packet_free( &av_packet );
+	//av_parser_close( avdata.parser );
+	avcodec_free_context( &avdata.dec_ctx );
+	avformat_close_input( &avdata.fmt_ctx );
+
+	return decode_ret == 1;
 
 #if 0
 	const AVCodec*        codec;

@@ -468,6 +468,8 @@ bool thumbnail_loader_load_video_from_disk( thumbnail_t* thumbnail, mpv_handle*&
 		return false;
 	}
 
+	u64         start_time = sys_get_time_ms();
+
 	// Clear Video from MPV
 	const char* cmd_clear[] = { "stop", NULL };
 	p_mpv_command_async( local_mpv, NULL, cmd_clear );
@@ -496,6 +498,9 @@ bool thumbnail_loader_load_video_from_disk( thumbnail_t* thumbnail, mpv_handle*&
 	//while ( event->event_id != MPV_EVENT_NONE )
 	while ( true )
 	{
+		//if ( event->event_id != MPV_EVENT_NONE )
+		//	printf( "[%d] MPV EVENT %d - %s\n", thread_id, event->event_id, mpv_event_to_str( event->event_id ) );
+
 		if ( event->event_id == MPV_EVENT_LOG_MESSAGE )
 		{
 			struct mpv_event_log_message* msg = (struct mpv_event_log_message*)event->data;
@@ -543,7 +548,7 @@ bool thumbnail_loader_load_video_from_disk( thumbnail_t* thumbnail, mpv_handle*&
 		else if ( event->event_id == MPV_EVENT_END_FILE )
 		{
 			// if ( tracks_video )
-			break;
+			//break;
 		}
 		else if ( event->event_id == MPV_EVENT_NONE )
 		{
@@ -560,6 +565,11 @@ bool thumbnail_loader_load_video_from_disk( thumbnail_t* thumbnail, mpv_handle*&
 		thumbnail->status = e_thumbnail_status_failed;
 		return false;
 	}
+
+	u64         current_time = sys_get_time_ms();
+	double      time         = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
+
+	printf( " ---- MPV THUMBNAIL VIDEO OPEN TIME - %.3f\n", time );
 
 	// TODO: Use another frame buffer object instead, created at the thumbnail size
 	std::string utf8_path = sys_path_to_string( video_thumbnail_path );
@@ -620,7 +630,14 @@ bool thumbnail_loader_load_video_from_disk( thumbnail_t* thumbnail, mpv_handle*&
 	load_info.target_size.y  = static_cast< float >( app::config.thumbnail_size );
 
 	if ( image_load( video_thumbnail_path, load_info ) )
+	{
+		current_time = sys_get_time_ms();
+		time         = ( current_time / 1000.0 ) - ( start_time / 1000.0 );
+
+		printf( " ---- MPV IMAGE OPEN TIME - %.3f\n", time );
+
 		return true;
+	}
 
 	path_printf( "FAILED TO LOAD IMAGE: %s\n", video_thumbnail_path );
 	thumbnail->status = e_thumbnail_status_failed;
@@ -803,7 +820,15 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		bool  saving_thumbnail = false;
 
-		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
+		// FIXME FIXME FIXME FIXME FIXME
+		// FIXME FIXME FIXME FIXME FIXME
+		// FIXME FIXME FIXME FIXME FIXME
+		// FIXME FIXME FIXME FIXME FIXME
+		// FIXME FIXME FIXME FIXME FIXME
+		// FIXME FIXME FIXME FIXME FIXME
+		bool temp_hack_skip_cache = thumbnail->type == e_media_type_video;
+
+		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk && !temp_hack_skip_cache )
 		{
 			// Make sure it's not in the cache folder
 			fs::path     cleaned_path     = fs_path_clean( thumbnail->path );
@@ -860,8 +885,8 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		if ( scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f )
 		{
-			int new_width           = static_cast< int >( thumbnail->image->width * scale_amount );
-			int new_height          = static_cast< int >( thumbnail->image->height * scale_amount );
+			int new_width           = static_cast< int >( round( thumbnail->image->width * scale_amount ) );
+			int new_height          = static_cast< int >( round( thumbnail->image->height * scale_amount ) );
 
 			u8* old_frame           = thumbnail->image->frame[ 0 ].data;
 

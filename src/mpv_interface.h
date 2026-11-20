@@ -95,6 +95,46 @@ extern bool                g_mpv_event_sending;
 extern bool                g_mpv_waiting_for_draw;
 
 // --------------------------------------------------------------------------------------------------------
+
+
+#define MPV_EVENT_STR_CASE( event_id ) \
+	case event_id: return #event_id
+
+
+constexpr const char* mpv_event_to_str( mpv_event_id event_id )
+{
+	switch ( event_id )
+	{
+		default:
+			MPV_EVENT_STR_CASE( MPV_EVENT_NONE );
+			MPV_EVENT_STR_CASE( MPV_EVENT_SHUTDOWN );
+			MPV_EVENT_STR_CASE( MPV_EVENT_LOG_MESSAGE );
+			MPV_EVENT_STR_CASE( MPV_EVENT_GET_PROPERTY_REPLY );
+			MPV_EVENT_STR_CASE( MPV_EVENT_SET_PROPERTY_REPLY );
+			MPV_EVENT_STR_CASE( MPV_EVENT_COMMAND_REPLY );
+			MPV_EVENT_STR_CASE( MPV_EVENT_START_FILE );
+			MPV_EVENT_STR_CASE( MPV_EVENT_END_FILE );
+			MPV_EVENT_STR_CASE( MPV_EVENT_FILE_LOADED );
+#if MPV_ENABLE_DEPRECATED
+			MPV_EVENT_STR_CASE( MPV_EVENT_IDLE );
+			MPV_EVENT_STR_CASE( MPV_EVENT_TICK );
+#endif
+			MPV_EVENT_STR_CASE( MPV_EVENT_CLIENT_MESSAGE );
+			MPV_EVENT_STR_CASE( MPV_EVENT_VIDEO_RECONFIG );
+			MPV_EVENT_STR_CASE( MPV_EVENT_AUDIO_RECONFIG );
+			MPV_EVENT_STR_CASE( MPV_EVENT_SEEK );
+			MPV_EVENT_STR_CASE( MPV_EVENT_PLAYBACK_RESTART );
+			MPV_EVENT_STR_CASE( MPV_EVENT_PROPERTY_CHANGE );
+			MPV_EVENT_STR_CASE( MPV_EVENT_QUEUE_OVERFLOW );
+			MPV_EVENT_STR_CASE( MPV_EVENT_HOOK );
+	}
+}
+
+
+#undef MPV_EVENT_STR_CASE
+
+
+// --------------------------------------------------------------------------------------------------------
 // mpv function pointer typedefs, cause im not compiling the mpv source just to link to it
 
 #define MPV_PTR( return_type, func, ... ) \

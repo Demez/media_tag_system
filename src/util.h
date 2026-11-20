@@ -541,6 +541,7 @@ bool  util_mouse_hovering_imgui_window();
 void  util_imgui_set_tooltip( const char* value );
 void  util_open_in_new_window( const fs::path_char* path );
 
+void  util_downscale_resolution( int src_width, int src_height, int max_size, int& dst_width, int& dst_height );
 
 template< typename CHAR >
 CHAR* util_strxndup_r( CHAR* data, const CHAR* string, size_t len )
