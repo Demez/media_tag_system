@@ -286,6 +286,7 @@ struct image_frame_t
 		size           = other.size;
 		width          = other.width;
 		height         = other.height;
+		pitch          = other.pitch;
 		pos_x          = other.pos_x;
 		pos_y          = other.pos_y;
 		time           = other.time;
@@ -305,6 +306,7 @@ struct image_frame_t
 		data               = other.data;
 		width              = other.width;
 		height             = other.height;
+		pitch              = other.pitch;
 		pos_x              = other.pos_x;
 		pos_y              = other.pos_y;
 		time               = other.time;
