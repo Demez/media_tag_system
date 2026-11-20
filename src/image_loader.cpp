@@ -657,21 +657,23 @@ bool image_scale( image_t* old_image, image_t* new_image, int new_width, int new
 
 bool image_convert_frames_bgrx_to_rgbx( u32 channels, std::vector< image_frame_t >& image_frames )
 {
-	u8 pixel_stride = channels;
+	u32 pixel_stride = channels;
 
 	for ( auto& frame : image_frames )
 	{
-		size_t frame_stride = frame.pitch > 0 ? frame.pitch : frame.width;
-		size_t i = 0;
+		size_t frame_stride = frame.pitch > 0 ? frame.pitch : frame.width * pixel_stride;
+
 		for ( size_t line = 0; line < frame.height; line++ )
 		{
-			for ( size_t w = 0; w < frame_stride; w += pixel_stride, i += pixel_stride )
-			{
-				u8 b                = frame.data[ i + 0 ];
-				u8 r                = frame.data[ i + 2 ];
+			size_t row_offset = line * frame_stride;
 
-				frame.data[ i + 0 ] = r;
-				frame.data[ i + 2 ] = b;
+			for ( size_t w = 0; w < frame_stride; w += pixel_stride )
+			{
+				u8 b                = frame.data[ row_offset + w + 0 ];
+				u8 r                = frame.data[ row_offset + w + 2 ];
+
+				frame.data[ row_offset + w + 0 ] = r;
+				frame.data[ row_offset + w + 2 ] = b;
 			}
 		}
 	}
