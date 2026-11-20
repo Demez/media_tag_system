@@ -1471,7 +1471,7 @@ int startup()
 
 		{
 			ImFontConfig font_cfg{};
-			load_default_font( font_data, font::normal, font_cfg, false );
+			load_default_font( font_data, font::normal, font_cfg, true );
 		}
 
 		{
