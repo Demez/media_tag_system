@@ -820,15 +820,7 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		bool  saving_thumbnail = false;
 
-		// FIXME FIXME FIXME FIXME FIXME
-		// FIXME FIXME FIXME FIXME FIXME
-		// FIXME FIXME FIXME FIXME FIXME
-		// FIXME FIXME FIXME FIXME FIXME
-		// FIXME FIXME FIXME FIXME FIXME
-		// FIXME FIXME FIXME FIXME FIXME
-		bool temp_hack_skip_cache = thumbnail->type == e_media_type_video;
-
-		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk && !temp_hack_skip_cache )
+		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
 		{
 			// Make sure it's not in the cache folder
 			fs::path     cleaned_path     = fs_path_clean( thumbnail->path );
