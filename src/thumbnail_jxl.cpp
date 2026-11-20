@@ -111,6 +111,8 @@ bool thumbnail_save( image_t& image, const fs::path_str& output )
 	// might be useful for if i decide to stream in thumbnails from a tag system server
 	//status = JxlEncoderFrameSettingsSetOption( frame_settings, JXL_ENC_FRAME_SETTING_RESPONSIVE, 1 );  // force progressive decode enabled
 
+	pixel_format.align      = image.frame[ 0 ].pitch;
+
 	bool     has_temp_image = false;
 	image_t* temp_image     = nullptr;
 
