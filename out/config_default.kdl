@@ -61,7 +61,7 @@ general {
 	media_zoom_scale 0.2
 
 	// Disable video support
-	no_video true
+	no_video false
 
 	// Only one instance open at a time
 	single_instance false
