@@ -4,6 +4,8 @@
 
 #define APNG_SUPPORTED 1
 
+constexpr double APNG_DEFAULT_TIME = 0.1;
+
 #if 1
 
 static void png_write_palette( image_palette_t& palette, struct spng_plte& png_palette )
@@ -21,6 +23,61 @@ static void png_write_palette( image_palette_t& palette, struct spng_plte& png_p
 		palette.elem[ p ].b = png_palette.entries[ p ].blue;
 	}
 }
+
+
+#if APNG_SUPPORTED
+static void apng_set_frametime( image_frame_t& frame, struct spng_fctl& fctl )
+{
+	double tps_den = static_cast< double >( fctl.delay_den );
+	double tps_num = static_cast< double >( fctl.delay_num );
+
+	if ( tps_num > 0 )
+		frame.time = tps_num / tps_den;
+	else
+		frame.time = APNG_DEFAULT_TIME;
+}
+
+
+static void apng_set_fctl_info( image_frame_t& frame, struct spng_fctl& fctl )
+{
+	frame.width    = fctl.width;
+	frame.height   = fctl.height;
+	frame.pos_x    = fctl.x_offset;
+	frame.pos_y    = fctl.y_offset;
+
+	apng_set_frametime( frame, fctl );
+
+	switch ( fctl.dispose_op )
+	{
+		default:
+		case SPNG_DISPOSE_OP_NONE:
+			frame.frame_disposal = e_frame_disposal_keep;
+			break;
+
+		case SPNG_DISPOSE_OP_BACKGROUND:
+			frame.frame_disposal = e_frame_disposal_background;
+			break;
+
+		case SPNG_DISPOSE_OP_PREVIOUS:
+			frame.frame_disposal = e_frame_disposal_previous;
+			break;
+	}
+
+	// TODO: look into blend modes, kinda varrying with all formats
+	switch ( fctl.blend_op )
+	{
+		default:
+		case SPNG_BLEND_OP_SOURCE:
+			frame.blend = e_frame_blend_all;
+			break;
+
+		case SPNG_BLEND_OP_OVER:
+			frame.blend = e_frame_blend_alpha;
+			break;
+	}
+}
+#endif
+
 
 struct LoaderPNG: public IImageLoader
 {
@@ -227,7 +284,17 @@ struct LoaderPNG: public IImageLoader
 			size_t           frame_i = 1;
 
 			struct spng_fctl fctl;
-			//int              has_apng_fctl = spng_get_frame_fctl( ctx, &fctl ); /* num_frames, num_plays */
+			int              has_apng_fctl = spng_get_frame_fctl( ctx, &fctl ); /* num_frames, num_plays */
+
+			// write first frame info
+			if ( has_apng_fctl == 0 )
+			{
+				apng_set_fctl_info( image->frame[ 0 ], fctl );
+			}
+			else
+			{
+				image->frame[ 0 ].time = APNG_DEFAULT_TIME;
+			}
 
 			err = spng_decoded_image_size( ctx, pngFmt, &size );
 			if ( err != 0 )
@@ -237,56 +304,21 @@ struct LoaderPNG: public IImageLoader
 				return false;
 			}
 
-			//size_t      image_size = static_cast< size_t >( fctl.width ) * static_cast< size_t >( fctl.height ) * static_cast< size_t >( image->channels );
+			image->frame[ frame_i ].data = ch_calloc< u8 >( size, e_mem_category_image_data );
+			image->frame[ frame_i ].size = size;
 
-			image->frame[ frame_i ].data   = ch_calloc< u8 >( size, e_mem_category_image_data );
-			image->frame[ frame_i ].size   = size;
-
-			err                            = spng_decode_frame( ctx, image->frame[ frame_i ].data, image->frame[ frame_i ].size, pngFmt, decode_flags, &fctl );
+			err                          = spng_decode_frame( ctx, image->frame[ frame_i ].data, image->frame[ frame_i ].size, pngFmt, decode_flags, &fctl );
 
 			while ( err == 0 )
 			{
 				image_frame_t& frame = image->frame[ frame_i ];
-				frame.width          = fctl.width;
-				frame.height         = fctl.height;
-				frame.pos_x          = fctl.x_offset;
-				frame.pos_y          = fctl.y_offset;
+				apng_set_fctl_info( frame, fctl );
 
-				double tps_den       = static_cast< double >( fctl.delay_den );
-				double tps_num       = static_cast< double >( fctl.delay_num );
-
-				if ( tps_num > 0 )
-					frame.time = tps_num / tps_den;
-				else
-					frame.time = 0.1;
-
-				switch ( fctl.dispose_op )
+				// HACK HACK: not sure if this is correct, but sometimes the first frame doesn't have this information
+				// so maybe the playback time needs to be copied from this frame to the first one?
+				if ( has_apng_fctl != 0 && frame_i == 1 )
 				{
-					default:
-					case SPNG_DISPOSE_OP_NONE:
-						frame.frame_disposal = e_frame_disposal_keep;
-						break;
-
-					case SPNG_DISPOSE_OP_BACKGROUND:
-						frame.frame_disposal = e_frame_disposal_background;
-						break;
-
-					case SPNG_DISPOSE_OP_PREVIOUS:
-						frame.frame_disposal = e_frame_disposal_previous;
-						break;
-				}
-
-				// TODO: look into blend modes, kinda varrying with all formats
-				switch ( fctl.blend_op )
-				{
-					default:
-					case SPNG_BLEND_OP_SOURCE:
-						frame.blend = e_frame_blend_all;
-						break;
-
-					case SPNG_BLEND_OP_OVER:
-						frame.blend = e_frame_blend_alpha;
-						break;
+					apng_set_frametime( image->frame[ 0 ], fctl );
 				}
 
 				frame_i++;
@@ -294,19 +326,10 @@ struct LoaderPNG: public IImageLoader
 				if ( frame_i == image->frame.size() )
 					break;
 
-				//has_apng_fctl            = spng_get_frame_fctl( ctx, &fctl ); /* num_frames, num_plays */
-
-				// image_size                   = fctl.width * fctl.height * image->channels;
-
 				image->frame[ frame_i ].data = ch_calloc< u8 >( size, e_mem_category_image_data );
 				image->frame[ frame_i ].size = size;
 
 				err                          = spng_decode_frame( ctx, image->frame[ frame_i ].data, image->frame[ frame_i ].size, pngFmt, decode_flags, &fctl );
-
-				/* fctl.delay_num / fctl.delay_den = frame delay in seconds */
-				// display_frame( buf, fctl.width, fctl.height,
-				//                fctl.x_offset, fctl.y_offset,
-				//                fctl.delay_num, fctl.delay_den );
 			}
 
 			if ( err != 0 )
