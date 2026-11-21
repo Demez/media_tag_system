@@ -344,7 +344,8 @@ void folder_load_media_list_finish( folder_scan_status_t* status, bool in_main_t
 	}
 
 	// now select that temp file?
-	select_image_in_folder( false );
+	if ( !directory::queued.empty() )
+		select_image_in_folder( false );
 
 	directory::folder_loading = false;
 
