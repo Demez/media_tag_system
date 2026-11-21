@@ -168,6 +168,104 @@ static int open_input_file( libav_data_t& avdata, const fs::path_char* filename 
 }
 
 
+static bool write_image_data( libav_data_t& avdata, AVFrame* av_frame, const AVPacket* av_packet, image_t* image )
+{
+	AVPixelFormat dst_fmt    = get_dst_av_format( avdata.dec_ctx->pix_fmt );
+
+	int           new_width  = avdata.dec_ctx->width;
+	int           new_height = avdata.dec_ctx->height;
+
+	util_downscale_resolution( avdata.dec_ctx->width, avdata.dec_ctx->height, app::config.thumbnail_size, new_width, new_height );
+
+	// https://stackoverflow.com/questions/71422496/how-to-save-avframe-as-image-in-c-using-ffmpeg
+	// create SWS context for converting from decode pixel format (like YUV420) to BGRA
+	struct SwsContext* sws_ctx = NULL;
+	sws_ctx                    = sws_getContext( avdata.dec_ctx->width,
+	                                             avdata.dec_ctx->height,
+	                                             avdata.dec_ctx->pix_fmt,
+	                                             new_width,
+	                                             new_height,
+	                                             dst_fmt,
+	                                             SWS_BICUBIC,
+	                                             NULL,
+	                                             NULL,
+	                                             NULL );
+
+	AVFrame* dst_frame         = av_frame_alloc();
+
+	if ( !dst_frame )
+	{
+		sws_freeContext( sws_ctx );
+		av_frame_unref( av_frame );
+
+		printf( "FFMPEG: Failed to allocate converted frame!\n" );
+		return false;
+	}
+
+	dst_frame->format = dst_fmt;
+	dst_frame->width  = new_width;
+	dst_frame->height = new_height;
+
+	image->width      = dst_frame->width;
+	image->height     = dst_frame->height;
+
+	int sts           = av_frame_get_buffer( dst_frame, 0 );
+
+	if ( sts < 0 )
+	{
+		sws_freeContext( sws_ctx );
+		av_frame_free( &dst_frame );
+		av_frame_unref( av_frame );
+
+		printf( "FFMPEG: Failed to get frame status!\n" );
+		return false;
+	}
+
+	// convert from input format (e.g YUV420) to BGRX
+	sts = sws_scale( sws_ctx,
+	                 av_frame->data,
+	                 av_frame->linesize,
+	                 0,
+	                 av_frame->height,
+	                 dst_frame->data,
+	                 dst_frame->linesize );
+
+	if ( sts < 0 )
+	{
+		sws_freeContext( sws_ctx );
+		av_frame_free( &dst_frame );
+		av_frame_unref( av_frame );
+
+		printf( "FFMPEG: Failed to convert frame format!\n" );
+		return false;
+	}
+
+	image->format   = get_dst_gl_format( dst_fmt );
+	image->channels = get_dst_channels( image->format );
+
+	image->frame.resize( 1 );
+	image_frame_t& frame = image->frame[ 0 ];
+
+	frame.width          = dst_frame->width;
+	frame.height         = dst_frame->height;
+
+	// frame.size           = image->width * image->height * image->channels;
+	frame.size           = dst_frame->linesize[ 0 ] * frame.height;
+	frame.data           = ch_calloc< u8 >( frame.size, e_mem_category_image_data );
+	frame.pitch          = dst_frame->linesize[ 0 ];
+
+	for ( size_t i = 0; i < dst_frame->height; i++ )
+	{
+		memcpy( frame.data + i * dst_frame->linesize[ 0 ], dst_frame->data[ 0 ] + i * dst_frame->linesize[ 0 ], dst_frame->linesize[ 0 ] );
+	}
+
+	sws_freeContext( sws_ctx );
+	av_frame_free( &dst_frame );
+
+	return true;
+}
+
+
 static int decode_packet( libav_data_t& avdata, AVFrame* av_frame, const AVPacket* av_packet, image_t* image )
 {
 	int ret = 0;
@@ -176,6 +274,9 @@ static int decode_packet( libav_data_t& avdata, AVFrame* av_frame, const AVPacke
 	ret     = avcodec_send_packet( avdata.dec_ctx, av_packet );
 	if ( ret < 0 )
 	{
+		if ( ret == AVERROR_EOF )
+			return AVERROR_EOF;
+
 		char averr_str[ AV_ERROR_MAX_STRING_SIZE ];
 		fprintf( stderr, "Error submitting a packet for decoding (%s)\n", av_make_error_string( averr_str, AV_ERROR_MAX_STRING_SIZE, ret ) );
 		return -1;
@@ -189,115 +290,73 @@ static int decode_packet( libav_data_t& avdata, AVFrame* av_frame, const AVPacke
 		{
 			// those two return values are special and mean there is no output
 			// frame available, but there were no errors during decoding
-			if ( ret == AVERROR_EOF || ret == AVERROR( EAGAIN ) )
+			if ( ret == AVERROR_EOF )
+				return AVERROR_EOF;
+
+			if ( ret == AVERROR( EAGAIN ) )
 				return 0;
 
 			char averr_str[ AV_ERROR_MAX_STRING_SIZE ];
 			fprintf( stderr, "Error during decoding (%s)\n",  av_make_error_string( averr_str, AV_ERROR_MAX_STRING_SIZE, ret ) );
-			return 1;
+			return -1;
 		}
 
-		AVPixelFormat dst_fmt    = get_dst_av_format( avdata.dec_ctx->pix_fmt );
-
-		int           new_width  = avdata.dec_ctx->width;
-		int           new_height = avdata.dec_ctx->height;
-
-		util_downscale_resolution( avdata.dec_ctx->width, avdata.dec_ctx->height, app::config.thumbnail_size, new_width, new_height );
-
-		// https://stackoverflow.com/questions/71422496/how-to-save-avframe-as-image-in-c-using-ffmpeg
-		// create SWS context for converting from decode pixel format (like YUV420) to BGRA
-		struct SwsContext* sws_ctx       = NULL;
-		sws_ctx                          = sws_getContext( avdata.dec_ctx->width,
-		                                                   avdata.dec_ctx->height,
-		                                                   avdata.dec_ctx->pix_fmt,
-		                                                   new_width,
-		                                                   new_height,
-		                                                   dst_fmt,
-		                                                   SWS_BICUBIC,
-		                                                   NULL,
-		                                                   NULL,
-		                                                   NULL );
-
-		AVFrame*  dst_frame         = av_frame_alloc();
-
-		if ( !dst_frame )
-		{
-			sws_freeContext( sws_ctx );
-			av_frame_unref( av_frame );
-
-			printf( "FFMPEG: Failed to allocate converted frame!\n" );
-			return false;
-		}
-
-		dst_frame->format = dst_fmt;
-		dst_frame->width  = new_width;
-		dst_frame->height = new_height;
-
-		image->width      = dst_frame->width;
-		image->height     = dst_frame->height;
-
-		int sts           = av_frame_get_buffer( dst_frame, 0 );
-
-		if ( sts < 0 )
-		{
-			sws_freeContext( sws_ctx );
-			av_frame_free( &dst_frame );
-			av_frame_unref( av_frame );
-
-			printf( "FFMPEG: Failed to get frame status!\n" );
-			return false;
-		}
-
-		// convert from input format (e.g YUV420) to BGRX
-		sts = sws_scale( sws_ctx,
-		                 av_frame->data,
-		                 av_frame->linesize,
-		                 0,
-		                 av_frame->height,
-		                 dst_frame->data,
-		                 dst_frame->linesize ); 
-
-		if ( sts < 0 )
-		{
-			sws_freeContext( sws_ctx );
-			av_frame_free( &dst_frame );
-			av_frame_unref( av_frame );
-
-			printf( "FFMPEG: Failed to convert frame format!\n" );
-			return false;
-		}
-
-		image->format   = get_dst_gl_format( dst_fmt );
-		image->channels = get_dst_channels( image->format );
-
-		image->frame.resize( 1 );
-		image_frame_t& frame = image->frame[ 0 ];
-
-		frame.width          = dst_frame->width;
-		frame.height         = dst_frame->height;
-
-		// frame.size           = image->width * image->height * image->channels;
-		frame.size           = dst_frame->linesize[ 0 ] * frame.height;
-		frame.data           = ch_calloc< u8 >( frame.size, e_mem_category_image_data );
-		frame.pitch          = dst_frame->linesize[ 0 ];
-
-		for ( size_t i = 0; i < dst_frame->height; i++ )
-		{
-			memcpy( frame.data + i * dst_frame->linesize[ 0 ], dst_frame->data[ 0 ] + i * dst_frame->linesize[ 0 ], dst_frame->linesize[ 0 ] );
-		}
-
-		sws_freeContext( sws_ctx );
-		av_frame_free( &dst_frame );
-		av_frame_unref( av_frame );
+		// av_frame_unref( av_frame );
 
 		return 1;
 	}
 
-	return 1;
+	return -1;
 }
 
 
 #endif
+
+
+// seek to closest keyframe to perecentage of file
+static bool seek_to_percentage( libav_data_t& avdata, double ratio, int64_t& out_ts )
+{
+	AVStream* video_stream = avdata.fmt_ctx->streams[ avdata.video_stream_index ];
+
+	int64_t   duration     = avdata.fmt_ctx->duration;
+	int64_t   start_time   = avdata.fmt_ctx->start_time;
+	int       stream_idx   = -1;
+
+	// if ( avdata.fmt_ctx->duration <= 0 )
+	{
+		// no duration found
+		if ( video_stream->duration <= 0 )
+			return false;
+
+		// fallback to video duration
+		duration   = video_stream->duration;
+		start_time = video_stream->start_time;
+		stream_idx = avdata.video_stream_index;
+	}
+
+	int64_t start = ( start_time != AV_NOPTS_VALUE ) ? start_time : 0;
+	out_ts        = start + static_cast< int64_t >( duration * ratio );
+
+	// backwards flag allows to seek the nearest keyframe behind the timestamp we want
+	// then we can properly decode forward to the frame we want
+	// if ( av_seek_frame( avdata.fmt_ctx, stream_idx, seek_ts, AVSEEK_FLAG_ANY ) < 0 )
+	if ( av_seek_frame( avdata.fmt_ctx, stream_idx, out_ts, AVSEEK_FLAG_BACKWARD ) < 0 )
+		return false;
+
+	// clears old frames out
+	avcodec_flush_buffers( avdata.dec_ctx );
+	return true;
+}
+
+
+int64_t frame_get_timestamp( const AVFrame* frame )
+{
+	if ( frame->best_effort_timestamp != AV_NOPTS_VALUE )
+		return frame->best_effort_timestamp;
+
+	return frame->pts;
+}
+
 
 bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int thread_id )
 {
@@ -307,6 +366,12 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 
 	if ( ret != 0 )
 		return false;
+
+	int64_t seek_ts = 0;
+	if ( !seek_to_percentage( avdata, 0.3, seek_ts ) )
+	{
+		printf( "Failed to seek file\n" );
+	}
 
 	AVFrame*     av_frame  = av_frame_alloc();
 	AVPacket*    av_packet = av_packet_alloc();
@@ -343,17 +408,59 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 
 	image->frame.resize( 1 );
 
-	int decode_ret = 0;
-	
+	int  decode_ret = 0;
+	bool hit_eof    = false;
+
 	while ( av_read_frame( avdata.fmt_ctx, av_packet ) <= 0 )
 	{
 		if ( av_packet->stream_index != avdata.video_stream_index )
+		{
+			av_packet_unref( av_packet );
 			continue;
+		}
+
+		// check the timestamp, make sure we are at the correct position
+		avdata.dec_ctx;
+		av_packet->dts;
 
 		decode_ret = decode_packet( avdata, av_frame, av_packet, image );
 
-		if ( decode_ret == -1 || decode_ret == 1 )
+		if ( decode_ret == -1 )
 			break;
+
+		if ( decode_ret == AVERROR_EOF )
+		{
+			hit_eof = true;
+			// printf( "END OF VIDEO STREAM - SEEKING TO START\n" );
+
+			// go to start of file instead
+			if ( !seek_to_percentage( avdata, 0.0, seek_ts ) )
+			// if ( av_seek_frame( avdata.fmt_ctx, -1, 0, AVSEEK_FLAG_BACKWARD ) < 0 )
+				break;
+			
+			// clear out old frames
+			// avcodec_flush_buffers( avdata.dec_ctx );
+		}
+
+		if ( decode_ret == 1 )
+		{
+			// check the timestamp, make sure we are at the correct position
+			int64_t frame_ts = frame_get_timestamp( av_frame );
+			if ( frame_ts < seek_ts && !hit_eof )
+			{
+				av_frame_unref( av_frame );
+				continue;
+			}
+
+			// TODO: do blank frame detection here
+
+			if ( !write_image_data( avdata, av_frame, av_packet, image ) )
+			{
+			}
+
+			av_frame_unref( av_frame );
+			break;
+		}
 	}
 
 	av_frame_free( &av_frame );
