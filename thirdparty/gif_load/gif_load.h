@@ -101,12 +101,21 @@ static long _GIF_LoadFrame(
     mask = (GIF_H)((1 << (ccsz = (ctsz = *(*buff - 1)) + 1)) - 1);
     if ((ctsz < 2) || (ctsz > 8))
         return -3; /** min LZW size is out of its nominal [2; 8] bounds **/
+
+#if 1  // HACK - ignore this clear code
+	ctbl = ( 1L << ctsz );
+#else
     if ((ctbl = (1L << ctsz)) != (mask & _GIF_SWAP(*(GIF_H*)(*buff + 1))))
         return -2; /** initial code is not equal to min LZW size **/
+#endif
     for (curr = ++ctbl; curr; code[--curr] = 0); /** actual color codes **/
 
     /** getting codes from stream (--size makes up for end-of-stream mark) **/
+  #if 1  // HACK
+    for (--(*size), bszc = -ccsz, prev = (1L << ctsz), curr = 0;
+#else
     for (--(*size), bszc = -ccsz, prev = curr = 0;
+#endif
         ((*size -= (bseq = *(*buff)++) + 1) >= 0) && bseq; *buff += bseq)
         for (; bseq > 0; bseq -= GIF_HLEN, *buff += GIF_HLEN)
             for (accu = (GIF_H)(_GIF_SWAP(*(GIF_H*)*buff)
