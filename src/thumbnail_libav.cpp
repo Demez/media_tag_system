@@ -24,11 +24,11 @@ struct libav_data_t
 {
 	AVFormatContext* fmt_ctx;
 	AVCodecContext*  dec_ctx;
-	AVFilterContext* buffersink_ctx;
-	AVFilterContext* buffersrc_ctx;
-	AVFilterGraph*   filter_graph;
+	// AVFilterContext* buffersink_ctx;
+	// AVFilterContext* buffersrc_ctx;
+	// AVFilterGraph*   filter_graph;
 	int              video_stream_index = -1;
-	int64_t          last_pts           = AV_NOPTS_VALUE;
+	// int64_t          last_pts           = AV_NOPTS_VALUE;
 
 	AVPixelFormat    dst_format;
 };
@@ -400,7 +400,15 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 		thumbnail->loaded_type = e_media_type_audio;
 
 	if ( ret != e_open_file_success )
+	{
+		if ( avdata.dec_ctx )
+			avcodec_free_context( &avdata.dec_ctx );
+
+		if ( avdata.fmt_ctx )
+			avformat_close_input( &avdata.fmt_ctx );
+
 		return false;
+	}
 
 	int64_t seek_ts = 0;
 	if ( !seek_to_percentage( avdata, 0.3, seek_ts ) )
