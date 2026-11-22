@@ -413,6 +413,10 @@ void gallery_view_draw_item_thumbnail( size_t i, gallery_item_draw_t& item_draw,
 		return;
 	}
 
+	// correct the media type
+	if ( thumbnail->loaded_type != e_media_type_none )
+		item_draw.media->type = thumbnail->loaded_type;
+
 	if ( thumbnail->status == e_thumbnail_status_finished )
 	{
 		if ( thumbnail->image_scaled )

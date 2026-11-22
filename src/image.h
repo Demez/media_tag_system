@@ -665,6 +665,7 @@ struct thumbnail_t
 	uploaded_textures_t                    textures{};
 	u32                                    distance;  // higher distances get freed first for other thumbnails
 	e_media_type                           type;
+	e_media_type                           loaded_type;  // type of file found from reading the file
 	// bool                                   scaled;
 };
 

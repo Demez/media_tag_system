@@ -349,6 +349,7 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, int thread_
 			return false;
 
 		case e_media_type_video:
+		case e_media_type_audio:  // look for an embedded image, like album art
 			return thumbnail_loader_get_video_thumbnail_from_disk( thumbnail, thread_id );
 			
 		case e_media_type_image:
@@ -375,6 +376,11 @@ bool thumbnail_loader_load_source_from_disk( thumbnail_t* thumbnail, int thread_
 			return true;
 		}
 	}
+
+	// TODO: check thumbnail->loaded_type in case we have a correction, like a video file is actually just audio
+	// but try to load it with the inverse method instead, in case of incorrect file extensions
+	// if it loads, we need to update the type in media_entry_t properly, we can do that on the main thread later
+	// note that it could change as well if the user tries to load it before or during thumbnail generation for the file
 }
 
 

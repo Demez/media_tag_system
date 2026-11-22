@@ -108,8 +108,15 @@ void thumbnail_libav_shutdown()
 
 #if 1
 
+enum e_open_file
+{
+	e_open_file_fail,
+	e_open_file_success,
+	e_open_file_audio_only,
+};
 
-static int open_input_file( libav_data_t& avdata, const fs::path_char* filename )
+
+static e_open_file open_input_file( libav_data_t& avdata, const fs::path_char* filename )
 {
 	const AVCodec* dec{};
 	int            ret = 0;
@@ -120,13 +127,13 @@ static int open_input_file( libav_data_t& avdata, const fs::path_char* filename 
 	if ( ( ret = avformat_open_input( &avdata.fmt_ctx, filename_utf8.c_str(), NULL, NULL ) ) < 0 )
 	{
 		av_log( NULL, AV_LOG_ERROR, "Cannot open input file\n" );
-		return ret;
+		return e_open_file_fail;
 	}
 
 	if ( ( ret = avformat_find_stream_info( avdata.fmt_ctx, NULL ) ) < 0 )
 	{
 		av_log( NULL, AV_LOG_ERROR, "Cannot find stream information\n" );
-		return ret;
+		return e_open_file_fail;
 	}
 
 	//const AVDictionaryEntry* tag = NULL;
@@ -141,7 +148,16 @@ static int open_input_file( libav_data_t& avdata, const fs::path_char* filename 
 	if ( ret < 0 )
 	{
 		av_log( NULL, AV_LOG_ERROR, "Cannot find a video stream in the input file\n" );
-		return ret;
+
+		// do we have an audio stream?
+		ret = av_find_best_stream( avdata.fmt_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0 );
+		if ( ret >= 0 )
+		{
+			// this video container has an audio track at least
+			return e_open_file_audio_only;
+		}
+
+		return e_open_file_fail;
 	}
 
 	avdata.video_stream_index = ret;
@@ -151,7 +167,7 @@ static int open_input_file( libav_data_t& avdata, const fs::path_char* filename 
 	if ( !avdata.dec_ctx )
 	{
 		printf( "FFMPEG: Failed to allocate decoding context\n" );
-		return AVERROR( ENOMEM );
+		return e_open_file_fail;
 	}
 
 	avcodec_parameters_to_context( avdata.dec_ctx, avdata.fmt_ctx->streams[ avdata.video_stream_index ]->codecpar );
@@ -161,14 +177,30 @@ static int open_input_file( libav_data_t& avdata, const fs::path_char* filename 
 	{
 		printf( "FFMPEG: Failed to open decoder\n" );
 		av_log( NULL, AV_LOG_ERROR, "Cannot open video decoder\n" );
-		return ret;
+		return e_open_file_fail;
 	}
 
-	return 0;
+	return e_open_file_success;
 }
 
 
-static bool write_image_data( libav_data_t& avdata, AVFrame* av_frame, const AVPacket* av_packet, image_t* image )
+static const AVCodec* find_media_type( libav_data_t& avdata, AVMediaType type )
+{
+	/* select the video stream */
+	const AVCodec* dec{};
+	int            ret = av_find_best_stream( avdata.fmt_ctx, type, -1, -1, &dec, 0 );
+
+	if ( ret < 0 )
+	{
+		// av_log( NULL, AV_LOG_ERROR, "Cannot find a valid stream in the input file\n" );
+		return nullptr;
+	}
+
+	return dec;
+}
+
+
+static bool write_image_data( libav_data_t& avdata, AVFrame* av_frame, image_t* image )
 {
 	AVPixelFormat dst_fmt    = get_dst_av_format( avdata.dec_ctx->pix_fmt );
 
@@ -266,7 +298,7 @@ static bool write_image_data( libav_data_t& avdata, AVFrame* av_frame, const AVP
 }
 
 
-static int decode_packet( libav_data_t& avdata, AVFrame* av_frame, const AVPacket* av_packet, image_t* image )
+static int decode_packet( libav_data_t& avdata, AVFrame* av_frame, const AVPacket* av_packet )
 {
 	int ret = 0;
 
@@ -362,9 +394,12 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 {
 	libav_data_t avdata{};
 
-	int          ret = open_input_file( avdata, thumbnail->path );
+	e_open_file  ret = open_input_file( avdata, thumbnail->path );
 
-	if ( ret != 0 )
+	if ( ret == e_open_file_audio_only )
+		thumbnail->loaded_type = e_media_type_audio;
+
+	if ( ret != e_open_file_success )
 		return false;
 
 	int64_t seek_ts = 0;
@@ -385,31 +420,12 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 		return false;
 	}
 
-//	av_frame->format   = AV_PIX_FMT_BGRA;
-//	av_frame->width    = avdata.dec_ctx->width;
-//	av_frame->height   = avdata.dec_ctx->height;
-//
-//	int sts            = av_frame_get_buffer( av_frame, 0 );
-//
-//	if ( sts < 0 )
-//	{
-//		printf( "FFMPEG: Failed to get frame status!\n" );
-//		return false;
-//	}
-
-	/* allocate image where the decoded image will be put */
 	image_t*     image = image_create();
 	thumbnail->image   = image;
 
-	image->width       = avdata.dec_ctx->width;
-	image->height      = avdata.dec_ctx->height;
-	// image->channels    = 4;
-	// image->format      = GL_BGRA;
-
-	image->frame.resize( 1 );
-
-	int  decode_ret = 0;
-	bool hit_eof    = false;
+	int  decode_ret    = 0;
+	bool hit_eof       = false;
+	bool wrote_image   = false;
 
 	while ( av_read_frame( avdata.fmt_ctx, av_packet ) <= 0 )
 	{
@@ -419,11 +435,7 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 			continue;
 		}
 
-		// check the timestamp, make sure we are at the correct position
-		avdata.dec_ctx;
-		av_packet->dts;
-
-		decode_ret = decode_packet( avdata, av_frame, av_packet, image );
+		decode_ret = decode_packet( avdata, av_frame, av_packet );
 
 		if ( decode_ret == -1 )
 			break;
@@ -435,11 +447,7 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 
 			// go to start of file instead
 			if ( !seek_to_percentage( avdata, 0.0, seek_ts ) )
-			// if ( av_seek_frame( avdata.fmt_ctx, -1, 0, AVSEEK_FLAG_BACKWARD ) < 0 )
 				break;
-			
-			// clear out old frames
-			// avcodec_flush_buffers( avdata.dec_ctx );
 		}
 
 		if ( decode_ret == 1 )
@@ -454,10 +462,7 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 
 			// TODO: do blank frame detection here
 
-			if ( !write_image_data( avdata, av_frame, av_packet, image ) )
-			{
-			}
-
+			wrote_image = write_image_data( avdata, av_frame, image );
 			av_frame_unref( av_frame );
 			break;
 		}
@@ -465,120 +470,9 @@ bool thumbnail_loader_get_video_thumbnail_from_disk( thumbnail_t* thumbnail, int
 
 	av_frame_free( &av_frame );
 	av_packet_free( &av_packet );
-	//av_parser_close( avdata.parser );
 	avcodec_free_context( &avdata.dec_ctx );
 	avformat_close_input( &avdata.fmt_ctx );
 
-	return decode_ret == 1;
-
-#if 0
-	const AVCodec*        codec;
-	AVCodecParserContext* parser;
-	AVCodecContext*       c = NULL;
-	AVFrame*              frame;
-	uint8_t               inbuf[ INBUF_SIZE + AV_INPUT_BUFFER_PADDING_SIZE ];
-	uint8_t*              data;
-	size_t                data_size;
-	int                   ret;
-	int                   eof;
-	AVPacket*             pkt;
-
-	pkt = av_packet_alloc();
-	if ( !pkt )
-		return false;
-
-	/* set end of buffer to 0 (this ensures that no overreading happens for damaged MPEG streams) */
-	memset( inbuf + INBUF_SIZE, 0, AV_INPUT_BUFFER_PADDING_SIZE );
-
-	/* find the MPEG-1 video decoder */
-	codec = avcodec_find_decoder( AV_CODEC_ID_MPEG1VIDEO );
-	if ( !codec )
-	{
-		fprintf( stderr, "Codec not found\n" );
-		return false;
-	}
-
-	parser = av_parser_init( codec->id );
-	if ( !parser )
-	{
-		fprintf( stderr, "parser not found\n" );
-		return false;
-	}
-
-	c = avcodec_alloc_context3( codec );
-	if ( !c )
-	{
-		fprintf( stderr, "Could not allocate video codec context\n" );
-		return false;
-	}
-
-	/* For some codecs, such as msmpeg4 and mpeg4, width and height
-       MUST be initialized there because this information is not
-       available in the bitstream. */
-
-	/* open it */
-	if ( avcodec_open2( c, codec, NULL ) < 0 )
-	{
-		fprintf( stderr, "Could not open codec\n" );
-		return false;
-	}
-
-	FILE* file_handle = path_open( thumbnail->path, "rb" );
-
-	if ( !file_handle )
-	{
-		path_printf( "Could not open %s\n", thumbnail->path );
-		return false;
-	}
-
-	frame = av_frame_alloc();
-	if ( !frame )
-	{
-		fprintf( stderr, "Could not allocate video frame\n" );
-		exit( 1 );
-	}
-
-	do
-	{
-		/* read raw data from the input file */
-		data_size = fread( inbuf, 1, INBUF_SIZE, file_handle );
-		if ( ferror( file_handle ) )
-			break;
-		eof  = !data_size;
-
-		/* use the parser to split the data into frames */
-		data = inbuf;
-		while ( data_size > 0 || eof )
-		{
-			ret = av_parser_parse2( parser, c, &pkt->data, &pkt->size,
-			                        data, data_size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0 );
-			if ( ret < 0 )
-			{
-				fprintf( stderr, "Error while parsing\n" );
-				exit( 1 );
-			}
-			data += ret;
-			data_size -= ret;
-
-			if ( pkt->size )
-				decode( c, frame, pkt, thumbnail );
-			else if ( eof )
-				break;
-		}
-	} while ( !eof );
-
-	/* flush the decoder */
-	decode( c, frame, NULL, thumbnail );
-
-	fclose( file_handle );
-
-	av_parser_close( parser );
-	avcodec_free_context( &c );
-	av_frame_free( &frame );
-	av_packet_free( &pkt );
-
-#endif
-
-	//return false;
+	return wrote_image;
 }
 
