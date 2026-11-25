@@ -930,14 +930,23 @@ void ui_draw_file_information( media_entry_t& entry, ImGuiStyle& style )
 
 		if ( find )
 		{
-			// new style, user id added, skip it
-			// check if this is a date
-			if ( ( find + 1 )[ 0 ] != '2' )
+			// find the end of the url string
+			const char* find_next = strchr( find + 1, '—' );
+
+			// scan if this is the artist user id, or the artist name, twitter names can't have underscores in the name
+			size_t      cur_len   = find_next - find;
+
+			bool date = false;
+			for ( size_t i = 0; i < cur_len; i++ )
+			{
+				if ( ( date |= find[ i ] == '.' ) )
+					break;
+			}
+
+			if ( !date )
 			{
 				start = find + 1;  // offset the — character
-
-				// find the end of the url string
-				find  = strchr( start, '—' );
+				find  = find_next;
 			}
 
 			if ( find )
