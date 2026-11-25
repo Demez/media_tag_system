@@ -233,6 +233,8 @@ void set_view_type_media( bool force_load_media )
 	if ( directory::folder_loading )
 		media_view_set_media_index( selected );
 
+	g_gallery_view    = false;
+
 	bool reload_image = force_load_media;
 	reload_image |= g_image_data.index != selected;
 	reload_image |= directory::folder_reload;
@@ -245,14 +247,16 @@ void set_view_type_media( bool force_load_media )
 
 		media_view_load( selected );
 	}
+	else
+	{
+		update_window_title();
+	}
 
 	if ( g_mpv_resume_on_focus )
 	{
 		const char* cmd[]   = { "set", "pause", "no", NULL };
 		int         cmd_ret = p_mpv_command_async( g_mpv, 0, cmd );
 	}
-
-	g_gallery_view = false;
 
 	//update_window_title();
 	//set_frame_draw( 3 );
