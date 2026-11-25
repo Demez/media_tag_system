@@ -342,8 +342,7 @@ struct LoaderPNG: public IImageLoader
 		else
 		{
   #endif
-
-
+			image->frame[ 0 ].blend = e_frame_blend_alpha;
   #if APNG_SUPPORTED
 		}
 	#endif
