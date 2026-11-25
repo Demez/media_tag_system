@@ -354,7 +354,7 @@ static bool seek_to_percentage( libav_data_t& avdata, double ratio, int64_t& out
 	int64_t   start_time   = avdata.fmt_ctx->start_time;
 	int       stream_idx   = -1;
 
-	// if ( avdata.fmt_ctx->duration <= 0 )
+	if ( avdata.fmt_ctx->duration <= 0 )
 	{
 		// no duration found
 		if ( video_stream->duration <= 0 )
