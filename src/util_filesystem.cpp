@@ -155,7 +155,7 @@ fs::path fs_path_clean( const fs::path& path )
 				path_segments.pop_back();
 			}
 		}
-		else if ( end_index - start_index > 1 )  // if it's not an empty segment
+		else if ( end_index - start_index > 0 )  // if it's not an empty segment
 		{
 			fs::path::string_type segment( &path_str[ start_index ], end_index - start_index );
 			path_segments.push_back( segment );
