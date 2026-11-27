@@ -774,7 +774,8 @@ def handle_item(item: dict):
         if extracted_folder:
             folder = extracted_folder
 
-        if not os.path.isdir(name) or ARGS.force or not is_zip:
+        # if force, a zip file and not directory, or not a zip file or regular file
+        if ARGS.force or (is_zip and not os.path.isdir(name)) or (not is_zip and not os.path.isfile(file)):
             print_color(Color.CYAN, f"Downloading \"{name}\"")
 
             file_data: bytes = download_file(url)
