@@ -43,20 +43,23 @@ struct LoaderVTF : public IImageLoader
 
 		image_t*           image      = load_info.image;
 
-		vtfpp::ImageFormat target_fmt = vtfpp::ImageFormat::BGR888;
+		vtfpp::ImageFormat target_fmt = vtfpp::ImageFormat::RGB888;
 		s8                 alpha_bits = vtfpp::ImageFormatDetails::decompressedAlpha( vtf_file.getFormat() );
 
-		if ( alpha_bits > 0 )
+		// this library converts the DXT formats to RGBA first, then the format we want after
+		// so if we use BGRX, it has to go from RGBA to BGRX, adding additional processing time
+		// it doesn't use much more memory i've noticed at all, so im just gonna disable this for now
+		//if ( alpha_bits > 0 )
 		{
-			target_fmt      = vtfpp::ImageFormat::BGRA8888;
-			image->format   = GL_BGRA;
+			target_fmt      = vtfpp::ImageFormat::RGBA8888;
+			image->format   = GL_RGBA;
 			image->channels = 4;
 		}
-		else
-		{
-			image->format   = GL_BGR;
-			image->channels = 3;
-		}
+		//else
+		//{
+		//	image->format   = GL_RGB;
+		//	image->channels = 3;
+		//}
 
 		if ( load_info.target_size.x != 0 )
 		{
