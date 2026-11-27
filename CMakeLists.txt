@@ -415,6 +415,11 @@ include_directories(
 	"thirdparty/libjxl/lib/include"
 	"thirdparty/libjxl/build/lib/include"
 	"thirdparty/ffmpeg/include"
+
+	# wtf
+	"thirdparty/sourcepp/include"
+	"thirdparty/sourcepp/build/_deps/bufferstream-src/include"
+	"thirdparty/sourcepp/ext/half/include"
 )
 
 if( LINUX )
@@ -449,6 +454,19 @@ link_libraries(
 	swresample
 	swscale
 
+	# why is this library so fat
+	sourcepp
+	sourcepp_vtfpp
+	sourcepp_compression
+	miniz
+	CMP_Compressonator
+	CMP_Core
+	CMP_Core_AVX
+	CMP_Core_AVX512
+	CMP_Core_SSE
+	lzma
+	zstd_static
+
 	# must be below other libraries, or the compiler will link the other libraries functions to freeimage instead
 	FreeImage
 )
@@ -481,6 +499,13 @@ link_directories(
 	"thirdparty/libspng/build"
 	"thirdparty/libwebp/build"
 	"thirdparty/FreeImageRe/lib"
+
+	"thirdparty/sourcepp/build"
+	"thirdparty/sourcepp/build/_deps/miniz-build"
+	"thirdparty/sourcepp/build/_deps/cmp_compressonator-build/cmp_compressonatorlib"
+	"thirdparty/sourcepp/build/_deps/cmp_compressonator-build/cmp_core"
+	"thirdparty/sourcepp/build/_deps/liblzma-build"
+	"thirdparty/sourcepp/build/_deps/zstd-build/lib"
 	
 	# i don't want to use static, but for some reason, it can't find the lib when using the dll version?
 	"${FREETYPE_DIR}/objs/x64/Release Static"
@@ -504,6 +529,8 @@ if ( WIN32 )
 		libwebpdecoder
 		libwebpdemux
 	)
+
+	set( SRC_FILES ${SRC_FILES} "src/codecs/loader_vtf.cpp" )
 elseif( LINUX )
 	link_directories(
 		"${THIRDPARTY_DIR}/ckdl/build"

@@ -404,6 +404,9 @@ def post_freetype_extract():
 
 
 def compile_nativefiledialog():
+    if ARGS.no_build:
+        return
+
     set_project("Native File Dialog")
     os.chdir("nativefiledialog")
 
@@ -417,6 +420,9 @@ def compile_nativefiledialog():
 
 
 def compile_ckdl():
+    if ARGS.no_build:
+        return
+
     set_project("ckdl")
     os.chdir("ckdl")
 
@@ -471,6 +477,9 @@ def libjxl_run():
         # add spacing
         print()
 
+    if ARGS.no_build:
+        return
+
     os.chdir("libjxl")
 
     defines = "-DBUILD_SHARED_LIBS=ON -DJPEGXL_ENABLE_FUZZERS=OFF -DCXX_FUZZERS_SUPPORTED=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_EXAMPLES=OFF -DJPEGXL_ENABLE_JNI=OFF -DJPEGXL_ENABLE_OPENEXR=OFF -DJPEGXL_ENABLE_SJPEG=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_TOOLS=OFF"
@@ -491,6 +500,30 @@ def libjxl_run():
     #print("Building jxl - Debug\n")
     #if not syscmd(f"cmake --build ./build --config Debug", "Failed to build in Debug"):
     #    return
+
+
+# =================================================================================================
+
+
+def compile_sourcepp():
+    if ARGS.no_build:
+        return
+
+    set_project("sourcepp")
+    os.chdir("sourcepp")
+
+    build_ops = ("-DSOURCEPP_LIBS_START_ENABLED=OFF "
+                 "-DSOURCEPP_USE_VTFPP=ON "
+                 "-DSOURCEPP_VTFPP_SUPPORT_EXR=OFF "
+                 "-DSOURCEPP_VTFPP_SUPPORT_JXL=OFF "
+                 "-DSOURCEPP_VTFPP_SUPPORT_QOI=OFF "
+                 "-DSOURCEPP_VTFPP_SUPPORT_WEBP=OFF "
+                 )
+
+    if not syscmd(f"cmake -B build {build_ops} .", "Failed to run cmake"):
+        return
+
+    cmake_built_targets(["RelWithDebInfo", "Release", "Debug"])
 
 
 # =================================================================================================
@@ -610,6 +643,12 @@ TASK_LIST = {
         {
             "name": "jxl",
             "func": libjxl_run,
+        },
+        {
+            "name": "sourcepp",
+            "url":  "https://github.com/craftablescience/sourcepp/archive/refs/tags/v2026.11.1.zip",
+            "file": "sourcepp-2026.11.1.zip",
+            "func": compile_sourcepp,
         },
     ],
 
