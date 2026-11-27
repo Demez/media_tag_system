@@ -709,6 +709,9 @@ void gallery_view_sort_dir_finish( job_status_t* status, bool in_main_thread )
 			gallery_find_selected_file();
 	}
 
+	// TODO: there's a bug where the thumbnail cache can become full in some cases on searching, so just clear it for now
+	thumbnail_clear_cache();
+
 	// gallery_view_scroll_to_cursor();
 	gallery_draw_extra_refresh( 2 );
 	gallery::sort_mode_update = true;
