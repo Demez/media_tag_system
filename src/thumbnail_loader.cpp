@@ -574,7 +574,9 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		float scale_amount = std::min( factor[ 0 ], factor[ 1 ] );
 
-		if ( scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f )
+		bool  should_scale = scale_amount != 0.f && scale_amount < 2.f && scale_amount != 1.f;
+
+		if ( should_scale && thumbnail->image->width > 1 && thumbnail->image->height > 1 )
 		{
 			int new_width           = static_cast< int >( round( thumbnail->image->width * scale_amount ) );
 			int new_height          = static_cast< int >( round( thumbnail->image->height * scale_amount ) );
@@ -583,11 +585,8 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			thumbnail->image_scaled = image_create();
 
-			if ( image_scale( thumbnail->image, thumbnail->image_scaled, new_width, new_height ) )
-			{
-				// thumbnail->scaled = true;
-				// ch_free( e_mem_category_image_data, old_frame );
-			}
+			if ( !image_scale( thumbnail->image, thumbnail->image_scaled, new_width, new_height ) )
+				image_free( thumbnail->image_scaled );
 		}
 
 		send_frame_draw_event();
