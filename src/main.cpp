@@ -1094,7 +1094,7 @@ static bool check_mpv_playback()
 	if ( mpv_needs_update() )
 		return true;
 
-	media_entry_t entry = gallery_item_get_media_entry( g_image_data.index );
+	const media_entry_t& entry = gallery_item_get_media_entry( g_image_data.index );
 
 	if ( !is_mpv_media_type( entry.type ) )
 		return false;
