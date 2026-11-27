@@ -273,6 +273,15 @@ struct image_frame_t
 		//ch_free( e_mem_category_image_data, palette.elem );
 	}
 
+	// helper functions
+	void allocate_data( size_t s_size )
+	{
+		ch_free( e_mem_category_image_data, data );
+
+		data = ch_calloc< u8 >( s_size, e_mem_category_image_data );
+		size = s_size * sizeof( u8 );
+	}
+	
 	// copying
 	void assign( const image_frame_t& other ) noexcept
 	{
