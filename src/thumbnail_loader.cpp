@@ -500,14 +500,24 @@ void thumbnail_loader_worker( u32 thread_id )
 
 		thumbnail_printf( "[THUMBNAIL %d] LOADED IMAGE: %s\n", thread_data.thumbnail.index, thumbnail->path );
 
-		int max_image_size = std::max( thumbnail->image->width, thumbnail->image->height );
+		// ---------------------------------------------------------------------------------------------------------
+		// Check if this loader wants us to save thumbnails for this image,
+		// VTF's for example seem to be faster than loading a JPEG XL file, 
+		// probably because of less effort decompressing, or no decompression at all
+		// only probably with this idea is if the image is on slow storage, like a slow NAS server or SD card
+		// but figuring out a way to handle that? i have no clue, i'll leave it enabled for certain loaders for now
 
+		bool should_save_thumbnail = app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk;
+
+		if ( thumbnail->image->flags & e_image_flag_no_thumbnail_cache )
+			should_save_thumbnail = false;
+		
 		// ---------------------------------------------------------------------------------------------------------
 		// If we didn't find the thumbnail on disk, write it!
 
 		bool  saving_thumbnail = false;
 
-		if ( app::config.thumbnail_jxl_enable && !thumbnail_found_on_disk )
+		if ( should_save_thumbnail )
 		{
 			// Make sure it's not in the cache folder
 			fs::path     cleaned_path     = fs_path_clean( thumbnail->path );
@@ -515,8 +525,10 @@ void thumbnail_loader_worker( u32 thread_id )
 
 			if ( !cleaned_path_str.starts_with( app::config.thumbnail_cache_path ) )
 			{
+				u64 max_image_size = static_cast< u64 >( std::max( thumbnail->image->width, thumbnail->image->height ) );
+
 				// prescale the image instead, that way the save thread doesn't need to hold onto images nearly as long
-				if ( static_cast< u64 >( max_image_size ) > static_cast< u64 >( app::config.thumbnail_size ) )
+				if ( max_image_size > static_cast< u64 >( app::config.thumbnail_size ) )
 				{
 					float factor[ 2 ]  = { 1.f, 1.f };
 

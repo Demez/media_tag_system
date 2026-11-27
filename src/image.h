@@ -129,6 +129,7 @@ enum : e_image_flag
 	e_image_flag_has_palette        = 1 << 0,
 	e_image_flag_has_palette_trans  = 1 << 1,  // palette has transparancy
 	e_image_flag_has_local_palettes = 1 << 2,
+	e_image_flag_no_thumbnail_cache = 1 << 3,  // don't save this image to the cache
 	//e_image_flag_scaling_use_fbo    = 1 << 3,  // draw image to fbo before scaling it back
 };
 

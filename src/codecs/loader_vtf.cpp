@@ -109,6 +109,7 @@ struct LoaderVTF : public IImageLoader
 		}
 
 		image->image_format = image_get_format_index_from_ext( match_ext );
+		image->flags |= e_image_flag_no_thumbnail_cache;
 		return true;
 	}
 };
