@@ -33,7 +33,6 @@ struct app_config_t
 	u32                       thumbnail_jxl_effort        = 6;
 
 	fs::path_str              thumbnail_cache_path{};
-	fs::path_str              thumbnail_video_cache_path{};
 
 	int                       vsync                          = 1;
 	bool                      high_bpc                       = false;
@@ -198,7 +197,6 @@ struct config_opt_t
 constexpr config_opt_t g_cfg_opt_thumbnail[] = {
 	// config_opt_t::create_option< decltype( app_config_t::thumbnail_cache_path ) >( "cache_path", sizeof( "cache_path" ) - 1, offsetof( app_config_t, thumbnail_cache_path ), sizeof( app_config_t::thumbnail_cache_path ) ),
 	CONFIG_OPT( e_cfg_path, "cache_path", thumbnail_cache_path, "Folder for the thumbnail cache" ),
-	CONFIG_OPT( e_cfg_path, "cache_path_video", thumbnail_video_cache_path, "Folder for temporary video thumbnails to generate to, before being added to the thumbnail cache" ),
 	CONFIG_OPT_RANGE( e_cfg_float, "jxl_distance", thumbnail_jxl_distance, -1.f, 25.f, "" ),
 	CONFIG_OPT_RANGE( e_cfg_u32, "jxl_effort", thumbnail_jxl_effort, 0U, 11U, "" ),
 	CONFIG_OPT( e_cfg_bool, "jxl_enable", thumbnail_jxl_enable, "Enable the Thumbnail Cache" ),

@@ -4,11 +4,8 @@
 
 #include <type_traits>
 
-constexpr const fs::path_char DEFAULT_THUMBNAIL_CACHE[]         = PATH_FMT( "thumbnail_cache" );
-constexpr const fs::path_char DEFAULT_VIDEO_THUMBNAIL_CACHE[]   = PATH_FMT( "thumbnail_video_cache" );
-
-constexpr size_t              DEFAULT_THUMBNAIL_CACHE_LEN       = ( sizeof( DEFAULT_THUMBNAIL_CACHE ) / sizeof( fs::path_char ) ) - 1;
-constexpr size_t              DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN = ( sizeof( DEFAULT_VIDEO_THUMBNAIL_CACHE ) / sizeof( fs::path_char ) ) - 1;
+constexpr const fs::path_char DEFAULT_THUMBNAIL_CACHE[]   = PATH_FMT( "thumbnail_cache" );
+constexpr size_t              DEFAULT_THUMBNAIL_CACHE_LEN = ( sizeof( DEFAULT_THUMBNAIL_CACHE ) / sizeof( fs::path_char ) ) - 1;
 
 
 #define CFG_STR_EQUALS( my_str, kdl_str ) util_strncmp( my_str, sizeof( my_str ) - 1, kdl_str.data, kdl_str.len )
@@ -390,10 +387,6 @@ void config_reset()
 	app::config.thumbnail_cache_path += SEP;
 	app::config.thumbnail_cache_path.append( DEFAULT_THUMBNAIL_CACHE, DEFAULT_THUMBNAIL_CACHE_LEN );
 
-	app::config.thumbnail_video_cache_path = sys_get_exe_folder_native_char();
-	app::config.thumbnail_video_cache_path += SEP;
-	app::config.thumbnail_video_cache_path.append( DEFAULT_VIDEO_THUMBNAIL_CACHE, DEFAULT_VIDEO_THUMBNAIL_CACHE_LEN );
-
 	app::config.gallery_header_padding.x   = 6;
 	app::config.gallery_header_padding.y   = 6;
 }
@@ -493,10 +486,7 @@ bool config_load()
 	app::config.thumbnail_jxl_effort   = std::clamp( app::config.thumbnail_jxl_effort, 0U, 11U );
 
 	// Make Directories
-	if ( !config_mkdir( app::config.thumbnail_cache_path, "config: Invalid path for thumbnail/cache-path!\n" ) )
-		return false;
-
-	if ( !config_mkdir( app::config.thumbnail_video_cache_path, "config: Invalid path for thumbnail/cache-path-video!\n" ) )
+	if ( !config_mkdir( app::config.thumbnail_cache_path, "config: Invalid path for thumbnail/cache_path!\n" ) )
 		return false;
 
 	app::config.gallery_zoom_default = std::clamp( app::config.gallery_zoom_default, gallery::item_size_min, gallery::item_size_max );
