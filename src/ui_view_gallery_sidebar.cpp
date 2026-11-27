@@ -610,6 +610,11 @@ float gallery_view_draw_header()
 		{
 			gallery_update_filter( e_gallery_filter_videos );
 		}
+
+		if ( ImGui::MenuItem( "Audio", 0, gallery::filter & e_gallery_filter_audio ) )
+		{
+			gallery_update_filter( e_gallery_filter_audio );
+		}
 		ImGui::EndDisabled();
 
 		ImGui::EndCombo();
